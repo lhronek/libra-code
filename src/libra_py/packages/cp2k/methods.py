@@ -4133,6 +4133,12 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     force-difference rescaling);
                     "none" - RUN_TYPE is rewritten to ENERGY and no forces are
                     computed (pairs with force_method=0)
+                    "gs" - CP2K always runs at the GROUND state (any
+                    &EXCITED_STATES section is dropped) while TDDFPT
+                    energies/overlaps are computed as usual; the GS forces go
+                    on EVERY d1ham_adi diagonal, so nuclei follow S0
+                    regardless of the hopping state (classical-path NBRA;
+                    pairs with force_method=1 + the S0 forces)
                 mo_source (str): "wfn" (default) = binary RESTART.wfn -
                     zero cost, binary precision, works in GS-SD mode too;
                     "namd_print" (TDDFPT print file); "molden" (ASCII molden
@@ -4187,8 +4193,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
     backend = params.get("overlap_backend", "sd")
     ci_threshold = params.get("ci_threshold", 0.001)
     force_source = params.get("force_source", "active_state")
-    if force_source not in ("active_state", "all_states", "none"):
-        raise ValueError(F"force_source must be 'active_state', 'all_states' or 'none', "
+    if force_source not in ("active_state", "all_states", "gs", "none"):
+        raise ValueError(F"force_source must be 'active_state', 'all_states', 'gs' or 'none', "
                          F"got {force_source!r}")
     wd = f"{params.get('working_directory_prefix', 'wd')}_itraj{itraj}"
 
@@ -4206,7 +4212,10 @@ def cp2k_compute_adi_impl(q, params, full_id):
                    "force_source", "cp2k_exe", "cp2k_data_dir",
                    "omp_num_threads", "mpi_executable", "nprocs", "project")
                   if k in params}
-    run_params.update({"act_state": act_state, "working_directory": wd,
+    # force_source="gs": always run at the GS (drops any &EXCITED_STATES
+    # section), so the parsed FORCES| block is guaranteed to be the S0 forces
+    run_params.update({"act_state": 0 if force_source == "gs" else act_state,
+                       "working_directory": wd,
                        "number_of_states": params.get("number_of_states", nexc)})
     res = compute_state_energy_and_force(coordinates, run_params)
     E_adi_curr = res["E_adi"][:nstates]
@@ -4383,10 +4392,10 @@ def cp2k_compute_adi_impl(q, params, full_id):
                 for ist in range(nstates):
                     obj.d1ham_adi[3 * iat + k].set(ist, ist,
                                                    -forces_all[ist, iat, k] * (1.0 + 0.0j))
-            elif time_dependent:                # mechanism A: active state only
+            elif time_dependent and force_source == "active_state":   # mechanism A: active state only
                 obj.d1ham_adi[3 * iat + k].set(act_state, act_state,
                                                -forces[iat, k] * (1.0 + 0.0j))
-            else:  # GS mode: GS forces are state-independent - fill all diagonals
+            else:  # GS mode / force_source "gs" or "none": GS forces on all diagonals
                 for ist in range(nstates):
                     obj.d1ham_adi[3 * iat + k].set(ist, ist,
                                                    -forces[iat, k] * (1.0 + 0.0j))
