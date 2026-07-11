@@ -2703,6 +2703,88 @@ def compute_mo_overlap(params):
 
 
 
+def read_cp2k_newtonx_output(filename):
+    """
+    Parse the Newton-X interface file written by &TDDFPT &PRINT &NAMD_PRINT
+    (with PRINT_VIRTUALS T): <project>-CP2K_NEWTONX-1_0.inp.
+
+    Contains, at ~1e-12 precision and WITHOUT amplitude thresholding:
+      - per state: the FULL MO-basis excitation matrix X (nvirt x nocc,
+        L2-normalized - the metrically correct CI expansion; the log's
+        excitation-analysis amplitudes are printed in a different metric)
+      - per state: PHASES ES EIGENVECTORS (nocc values)
+      - OCCUPIED/VIRTUAL MO COEFFICIENTS (nao x nmo, CP2K MOLog AO order)
+        and MO EIGENVALUES
+
+    Returns:
+        dict: X (list of np.ndarray (nvirt, nocc) per state),
+              C_occ, C_virt (np.ndarray or None), E_occ, E_virt (np.ndarray or None)
+    """
+    lines = open(filename).readlines()
+
+    def read_triplet_matrix(start):
+        rows, i = [], start
+        while i < len(lines):
+            t = lines[i].split()
+            if len(t) == 3 and re.match(r"-?\d+$", t[0]) and re.match(r"-?\d", t[2]):
+                rows.append((int(t[0]), int(t[1]), float(t[2])))
+            elif rows:
+                break
+            i += 1
+        n_r = max(r for r, _, _ in rows)
+        n_c = max(c for _, c, _ in rows)
+        M = np.zeros((n_r, n_c))
+        for r, c, v in rows:
+            M[r - 1, c - 1] = v
+        return M, i
+
+    X, C_occ, C_virt = [], None, None
+    extra = {}
+    i = 0
+    while i < len(lines):
+        s = lines[i].strip()
+        if s == "ES EIGENVECTORS":
+            M, i = read_triplet_matrix(i + 1)
+            X.append(M)
+            continue
+        if s == "OCCUPIED MO COEFFICIENTS":
+            C_occ, i = read_triplet_matrix(i + 1)
+            continue
+        if s == "VIRTUAL MO COEFFICIENTS":
+            C_virt, i = read_triplet_matrix(i + 1)
+            continue
+        if s in ("PHASES OCCUPIED ORBITALS", "PHASES VIRTUAL ORBITALS",
+                 "OCCUPIED MO EIGENVALUES", "VIRTUAL MO EIGENVALUES"):
+            vals, j = [], i + 1
+            while j < len(lines):
+                t = lines[j].split()
+                if len(t) == 1 and re.match(r"-?\d", t[0]):
+                    vals.append(float(t[0])); j += 1
+                elif vals:
+                    break
+                else:
+                    j += 1
+            key = {"PHASES OCCUPIED ORBITALS": "phases_occ",
+                   "PHASES VIRTUAL ORBITALS": "phases_virt",
+                   "OCCUPIED MO EIGENVALUES": "E_occ",
+                   "VIRTUAL MO EIGENVALUES": "E_virt"}[s]
+            extra[key] = np.array(vals)
+            i = j
+            continue
+        i += 1
+    if not X:
+        raise ValueError(f"no ES EIGENVECTORS blocks in {filename}")
+    # the writer UNCONDITIONALLY column-scales X by the occupied-MO phases
+    # (qs_tddfpt2_restart.F); undo it so the amplitudes refer to the raw MOs
+    # (the same convention as the molden coefficients). Requires PRINT_PHASES T.
+    if "phases_occ" in extra:
+        for M in X:
+            M *= extra["phases_occ"][np.newaxis, :]     # phases are +-1
+    return {"X": X, "C_occ": C_occ, "C_virt": C_virt,
+            "E_occ": extra.get("E_occ"), "E_virt": extra.get("E_virt"),
+            "phases_occ": extra.get("phases_occ"), "phases_virt": extra.get("phases_virt")}
+
+
 class tmp:
     pass
 
