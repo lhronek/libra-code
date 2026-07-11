@@ -3347,6 +3347,409 @@ def fd_force_check(coords_bohr, params, atom, dim, h=0.01):
     return -(E["p"] - E["m"]) / (2.0 * h)
 
 
+def _two_spinor(S):
+    """alpha (+) beta block-diagonal duplication (= data_conv.form_block_matrix(S, 0, 0, S))."""
+    z = np.zeros_like(S)
+    return data_conv.form_block_matrix(S, z, z, S)
+
+
+def load_molden_data(molden_file, is_spherical=True):
+    """
+    Read a CP2K molden file into libint shells + AO-resorted MO coefficients.
+
+    Returns:
+        dict: shell (libint shells), C (nmo x nao, resorted to libint AO order),
+              E (nmo, orbital energies in Hartree)
+    """
+    shell, l_vals = molden_methods.molden_file_to_libint_shell(molden_file, is_spherical)
+    C, E = molden_methods.eigenvectors_molden(molden_file, nbasis(shell), l_vals)
+    idx = resort_molog_eigenvectors(l_vals)
+    C = np.array([c[idx] for c in C])
+    return {"shell": shell, "C": C, "E": np.array(E), "resort_idx": np.array(idx)}
+
+
+def mo_overlap(data1, data2, lowest_orbital, highest_orbital, nprocs=1):
+    """
+    Windowed MO overlap  S_ij = <phi_i(R1)|phi_j(R2)>  (one spin channel).
+
+    data1/data2 come from load_molden_data (possibly the same object for
+    same-time overlaps). The AO overlap is computed with libint for the pair
+    of geometries; the MO matrix is sliced to the 1-based orbital window
+    [lowest_orbital, highest_orbital].
+
+    Returns:
+        np.ndarray (norb_w, norb_w)
+
+    Raises ValueError when the window does not fit the stored MOs (python
+    slicing would silently truncate or wrap).
+    """
+    for d in (data1, data2):
+        nmo = d["C"].shape[0]
+        if not 1 <= lowest_orbital <= highest_orbital <= nmo:
+            raise ValueError(F"orbital window [{lowest_orbital}, {highest_orbital}] does "
+                             F"not fit the {nmo} stored MOs (1-based) - increase ADDED_MOS "
+                             F"in the template or adjust lowest_orbital/highest_orbital")
+    S_ao = data_conv.MATRIX2nparray(compute_overlaps(data1["shell"], data2["shell"], nprocs))
+    lo, hi = lowest_orbital - 1, highest_orbital
+    S = data1["C"][lo:hi] @ S_ao @ data2["C"][lo:hi].T   # window first: O(win*nao^2)
+    return np.ascontiguousarray(S.real)
+
+
+def align_mo_phases(C_prev_aligned, data_curr, St_mo):
+    """
+    Fix the random MO phases of the current step against the previous one:
+    flip the sign of every current MO whose time-overlap diagonal is negative.
+
+    Args:
+        C_prev_aligned: unused except for interface symmetry (phases are
+            defined by St_mo, which must be <prev_aligned | curr_raw>)
+        data_curr (dict): current-step molden data; C is modified IN PLACE
+        St_mo (np.ndarray): time-overlap computed with the RAW current MOs,
+            windowed, one spin channel; also fixed in place (columns flipped)
+
+    Returns:
+        phases (np.ndarray, norb_w): the +-1 factors applied (window orbitals)
+    """
+    phases = np.sign(np.diag(St_mo))
+    phases[phases == 0] = 1.0
+    St_mo *= phases[np.newaxis, :]
+    return phases
+
+
+# ========================= TDDFPT CI data ==================================
+
+
+def read_ci_data(logfile, nstates, tolerance=0.01, lowest_orbital=1, highest_orbital=int(1e10)):
+    """
+    Parse TDDFPT excitation energies + CI expansions from a CP2K log.
+
+    Thin wrapper around read_cp2k_tddfpt_log_file (master format).
+
+    Returns:
+        dict: E (np.ndarray nexc, Hartree), configs (list per state of [occ, vir]
+              ABSOLUTE 1-based orbital pairs), amps (list per state of np.ndarray,
+              NORMALIZED after tolerance truncation), spins (list per state)
+    """
+    out = read_cp2k_tddfpt_log_file(
+        {"logfile_name": logfile, "number_of_states": nstates,
+         "tolerance": tolerance, "ci_threshold": tolerance,   # master / devel keyword
+         "isUKS": False, "lowest_orbital": lowest_orbital, "highest_orbital": highest_orbital})
+    if len(out) == 2:
+        # devel branch: (info, [E_Ha, configs, amplitudes])
+        info, data = out
+        E = np.asarray(data[0], dtype=float)[:nstates]
+        basis = [np.asarray(c, dtype=int).tolist() for c in data[1][:nstates]]
+        coeff = [np.asarray(a, dtype=float) for a in data[2][:nstates]]
+        spin = [["alp"] * len(b) for b in basis]
+    else:
+        # master branch: (E_eV, configs, amplitudes, spins)
+        E_ev, basis, coeff, spin = out
+        E = np.array(E_ev[:nstates]) * units.ev2Ha
+        basis = [list(b) for b in basis[:nstates]]
+        coeff = coeff[:nstates]
+        spin = spin[:nstates]
+    amps = []
+    for c in coeff:
+        a = np.array(c, dtype=float)
+        amps.append(a / np.linalg.norm(a))
+    return {"E": E, "configs": basis, "amps": amps, "spins": spin}
+
+
+# ===================== Backend A: Slater determinants ======================
+
+
+def make_sd_basis(homo_w, num_occ_states, num_unocc_states, norb_w):
+    """
+    Fixed single-particle SD basis for the orbital window (restricted case).
+
+    Excitations occ -> vir with occ in [homo_w-num_occ_states+1, homo_w] and
+    vir in [homo_w+1, homo_w+num_unocc_states], all indices 1-based WITHIN the window.
+
+    Returns:
+        sd_unique (list): [[occ, vir], 'alp'] pairs (no ground state)
+        sd_states (list): Libra signed-spin-orbital SDs, ground state FIRST
+                          (from step2_many_body.reindex_cp2k_sd_states)
+
+    Raises ValueError when the window does not bracket the HOMO or when the
+    SD window exceeds the orbitals available in it - invalid indices would
+    otherwise reindex into duplicate/garbage determinants (singular SD
+    overlaps, NaN through everything downstream).
+    """
+    if not 1 <= homo_w <= norb_w - 1:
+        raise ValueError(F"the orbital window does not bracket the HOMO "
+                         F"(window-relative HOMO={homo_w}, window size {norb_w}) - "
+                         F"choose lowest_orbital <= HOMO < highest_orbital")
+    if not 1 <= num_occ_states <= homo_w:
+        raise ValueError(F"num_occ_states={num_occ_states} but the orbital window holds only "
+                         F"{homo_w} occupied orbitals - reduce num_occ_states or lower "
+                         F"lowest_orbital")
+    if not 1 <= num_unocc_states <= norb_w - homo_w:
+        raise ValueError(F"num_unocc_states={num_unocc_states} but the orbital window holds only "
+                         F"{norb_w - homo_w} virtuals above the HOMO - reduce "
+                         F"num_unocc_states or raise highest_orbital")
+    sd_unique = []
+    for o in range(homo_w - num_occ_states + 1, homo_w + 1):
+        for v in range(homo_w + 1, homo_w + num_unocc_states + 1):
+            sd_unique.append([[o, v], 'alp'])
+    sd_states = step2_many_body.reindex_cp2k_sd_states(
+        homo_w, list(range(1, norb_w + 1)), sd_unique, sd_format=2)
+    return sd_unique, sd_states
+
+
+def sd_overlaps(sd_states, St_mo, S_mo_prev, S_mo_curr, orthonormalize=True,
+                sd_states_prev=None):
+    """
+    SD overlap matrices from windowed one-spin MO overlaps.
+
+    Args:
+        sd_states: signed-spin-orbital SD list (GS first), window-relative;
+            this is the CURRENT (ket) basis
+        St_mo, S_mo_prev, S_mo_curr: (norb_w x norb_w) MO matrices
+        orthonormalize: apply Lowdin S^-1/2 sandwiches (step3 style)
+        sd_states_prev: previous-step (bra) SD list if it differs from the
+            current one (e.g. per-step energy-sorted bases) [default: sd_states]
+
+    Returns:
+        st_sd (nSD x nSD), s_sd_curr (nSD x nSD)
+    """
+    from libra_py.workflows.nbra import mapping
+    from libra_py.workflows.nbra.step3 import apply_orthonormalization_scipy
+    if sd_states_prev is None:
+        sd_states_prev = sd_states
+    n_half = St_mo.shape[0]
+    # mapping's fast kernels use the canonical (sorted) determinant convention;
+    # convert back to the list-order convention with the per-SD sort parities
+    # so that the SD2CI amplitudes (built without parities) stay consistent
+    sp = mapping._sort_parities(mapping._sd_indices(sd_states_prev, n_half))
+    sc = mapping._sort_parities(mapping._sd_indices(sd_states, n_half))
+    st = sp[:, None] * mapping.ovlp_mat_arb_auto(sd_states_prev, sd_states,
+                                                 _two_spinor(St_mo)) * sc[None, :]
+    s1 = sp[:, None] * mapping.ovlp_mat_arb_auto(sd_states_prev, sd_states_prev,
+                                                 _two_spinor(S_mo_prev)) * sp[None, :]
+    s2 = sc[:, None] * mapping.ovlp_mat_arb_auto(sd_states, sd_states,
+                                                 _two_spinor(S_mo_curr)) * sc[None, :]
+    if orthonormalize:
+        st, _ = apply_orthonormalization_scipy(s1, s2, st)
+        s2, _ = apply_orthonormalization_scipy(s2, s2, s2)
+    return st, s2
+
+
+def sd2ci_matrix(ci_data, sd_unique, lowest_orbital):
+    """
+    SD -> CI transformation matrix T (nSD+1 x nstates+1) on the FIXED SD basis.
+
+    Column 0 = ground state (pure reference determinant). Column i>0 holds the
+    normalized amplitudes of excited state i distributed over the SD basis.
+    Configs in ci_data are absolute orbital indices; sd_unique is window-relative.
+
+    Components outside the SD basis cannot be represented there: they are
+    dropped and the column is renormalized over the kept part (the same
+    truncate-then-renormalize convention the log reader and
+    normalize_ci_coefficients apply upstream; bit-identical when nothing is
+    dropped). The lost weight is printed per state when it exceeds 1e-6 -
+    widen num_occ_states/num_unocc_states and/or the MO window to capture more.
+    A state lying entirely outside the basis raises.
+    """
+    nsd = len(sd_unique) + 1
+    nstates = len(ci_data["configs"]) + 1
+    T = np.zeros((nsd, nstates))
+    T[0, 0] = 1.0
+    for i, (confs, amps) in enumerate(zip(ci_data["configs"], ci_data["amps"])):
+        dropped = 0.0
+        for c, a in zip(confs, amps):
+            cw = [c[0] - lowest_orbital + 1, c[1] - lowest_orbital + 1]
+            try:
+                j = sd_unique.index([cw, 'alp'])
+            except ValueError:
+                dropped += a * a
+                continue
+            T[j + 1, i + 1] = a
+        if dropped > 0.0:
+            nrm = np.linalg.norm(T[:, i + 1])
+            if nrm == 0.0:
+                raise ValueError(f"CI state {i+1} lies entirely outside the SD basis - "
+                                 f"increase num_occ_states/num_unocc_states (and the MO window)")
+            T[:, i + 1] /= nrm
+            if dropped > 1e-6:
+                print(F"sd2ci_matrix: state {i+1}: dropped CI weight {dropped:.2e} "
+                      F"outside the SD basis (column renormalized) - widen "
+                      F"num_occ_states/num_unocc_states or the MO window to capture it")
+    return T
+
+
+# ======================= Backend B: citools CSFs ===========================
+
+
+def ci_overlap_citools(St_mo, ci_prev, ci_curr, homo, lowest_orbital, highest_orbital, nstates):
+    """
+    CI time-overlap via the citools CSF machinery (spin-adapted singlets).
+
+    Args:
+        St_mo: windowed one-spin MO time-overlap (norb_w x norb_w)
+        ci_prev, ci_curr: read_ci_data dicts (ABSOLUTE orbital indices)
+        homo: absolute 1-based HOMO index
+        nstates: total number of states INCLUDING the ground state
+
+    Returns:
+        np.ndarray (nstates x nstates)
+    """
+    data_prev = [ci_prev["E"], [np.array(c) for c in ci_prev["configs"]], ci_prev["amps"]]
+    data_curr = [ci_curr["E"], [np.array(c) for c in ci_curr["configs"]], ci_curr["amps"]]
+    orbital_space = list(range(lowest_orbital, highest_orbital + 1))
+    ovlp_params = {"homo_indx": homo,
+                   "nocc": homo - lowest_orbital,
+                   "nvirt": highest_orbital - homo,
+                   "nelec": (homo - lowest_orbital + 1) * 2,
+                   "nstates": nstates,
+                   "active_space": orbital_space,
+                   "orbital_space": orbital_space}
+    st_ci = ci.overlap(_two_spinor(St_mo), data_prev, data_curr, ovlp_params)
+    return np.array(st_ci).real
+
+
+def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
+                         lowest_orbital, highest_orbital, params):
+    """
+    All three windowed MO overlap matrices from ONE CP2K-native OVERLAP_DELTAT
+    run on the doubled geometry (prev atoms + curr atoms) - no libint needed.
+
+    The doubled AO matrix supplies S(prev,prev), S(prev,curr) and S(curr,curr)
+    as blocks; they are mapped from CP2K (MOLog) to libint AO order with the
+    molden-derived resort index and contracted with the cached (phase-aligned)
+    previous MOs and the raw current MOs. ~1 s per call even for DFT.
+
+    Args:
+        mo_prev, mo_curr: load_molden_data dicts (mo_prev["C"] may be aligned)
+        coords_*_bohr (array-like, 3N): the two geometries
+        lowest_orbital, highest_orbital: 1-based MO window
+        params (dict): atom_labels, overlap_template (an es_overlap_deltat_* input
+            with CONNECTIVITY OFF and no VDW section), working_directory,
+            cp2k_exe / cp2k_data_dir / omp_num_threads / mpi_executable / nprocs
+
+    Returns:
+        St_mo, S_mo_prev, S_mo_curr  (each (norb_w, norb_w))
+
+    Raises ValueError when the window does not fit the stored MOs (python
+    slicing would silently truncate or wrap).
+    """
+    for d in (mo_prev, mo_curr):
+        nmo = d["C"].shape[0]
+        if not 1 <= lowest_orbital <= highest_orbital <= nmo:
+            raise ValueError(F"orbital window [{lowest_orbital}, {highest_orbital}] does "
+                             F"not fit the {nmo} stored MOs (1-based) - increase ADDED_MOS "
+                             F"in the template or adjust lowest_orbital/highest_orbital")
+    atom_labels = params["atom_labels"]
+    run_params = dict(params)
+    run_params.update({"atom_labels": list(atom_labels) + list(atom_labels),
+                       "input_template": params["overlap_template"],
+                       "act_state": 0})
+    for k in ("ot_template", "force_source", "number_of_states"):
+        run_params.pop(k, None)
+    q2 = np.concatenate([np.asarray(coords_prev_bohr, dtype=float),
+                         np.asarray(coords_curr_bohr, dtype=float)])
+    logfile = run_cp2k(q2, run_params)
+    project = run_params.get("project", "libra")
+    csr = os.path.join(run_params.get("working_directory", "wd"),
+                       f"{project}-S_SPIN_1-1_0.csr")
+    if os.path.exists(csr):        # patched CP2K + &S_CSR_WRITE template: O(nnz)
+        S = read_cp2k_s_csr(csr)
+    else:                          # fallback: dense &AO_MATRICES log print
+        S = read_cp2k_ao_overlap_print(logfile)
+    idx = mo_curr["resort_idx"]
+    if idx is None:                       # MOs already in MOLog AO order
+        idx = np.arange(S.shape[0] // 2)
+    n = len(idx)
+    if S.shape[0] != 2 * n:
+        raise ValueError(f"doubled overlap is {S.shape[0]}x, expected {2*n}")
+    ix = np.ix_(idx, idx)
+    S11, S12, S22 = S[:n, :n][ix], S[:n, n:][ix], S[n:, n:][ix]
+    lo, hi = lowest_orbital - 1, highest_orbital
+    # window BEFORE contracting: O(win * nao^2) instead of O(nao^3) -
+    # 20-100x cheaper already at a few thousand AOs
+    Cp, Cc = mo_prev["C"][lo:hi], mo_curr["C"][lo:hi]
+    St     = np.ascontiguousarray((Cp @ S12 @ Cc.T).real)
+    S_prev = np.ascontiguousarray((Cp @ S11 @ Cp.T).real)
+    S_curr = np.ascontiguousarray((Cc @ S22 @ Cc.T).real)
+    return St, S_prev, S_curr
+
+
+def load_newtonx_mo_data(filename):
+    """
+    MO data from the &NAMD_PRINT file - the molden-free source (requires
+    PRINT_VIRTUALS T and PRINT_PHASES T in the template).
+
+    Returns the same dict layout as load_molden_data minus libint shells:
+    C (nmo x nao, CP2K MOLog AO order - pairs directly with the OVERLAP_DELTAT
+    matrix, no reordering), E (Hartree), resort_idx = None (signals MOLog
+    order to mo_overlaps_via_cp2k), and the parsed "newtonx" dict so the CI
+    amplitudes need not be re-parsed.
+    """
+    nx = read_cp2k_newtonx_output(filename)
+    if nx["C_occ"] is None or nx["C_virt"] is None:
+        raise ValueError(f"{filename} has no MO blocks - set PRINT_VIRTUALS T")
+    C = np.vstack([nx["C_occ"].T, nx["C_virt"].T])      # (nmo, nao), MOLog order
+    E = np.concatenate([nx["E_occ"], nx["E_virt"]])
+    return {"C": C, "E": E, "resort_idx": None, "newtonx": nx}
+
+
+def load_wfn_mo_data(filename):
+    """
+    MO data from CP2K's binary RESTART.wfn - the zero-cost native source
+    (the file is already written every step for restart chaining), valid for
+    BOTH ground-state-only and TDDFPT runs, at binary precision.
+
+    Coefficients are in CP2K-native AO order (resort_idx = None -> pairs with
+    the OVERLAP_DELTAT matrix; requires ao_overlap_method="cp2k"). Verified:
+    C S C^T = I to 3.5e-12 against the native overlap. Per-MO global signs may
+    differ from molden/NAMD_PRINT MOs - irrelevant, the driver's cumulative
+    phase alignment handles them.
+
+    Returns:
+        dict: C (nmo, nao), E (Hartree, exact), occ (occupation numbers),
+              homo (1-based index from the file itself), resort_idx = None
+    """
+    basis, spin, evocc, moc = read_wfn_file(filename)
+    nmo, homo = int(spin[0][0]), int(spin[0][1])
+    vals = np.asarray(evocc[0], dtype=np.float64)
+    E, occ = vals[:nmo].copy(), vals[nmo:2 * nmo].copy()
+    C = np.array(moc[0], dtype=float)                  # (nmo, nao), CP2K order
+    return {"C": C, "E": E, "occ": occ, "homo": homo, "resort_idx": None}
+
+
+def ci_data_from_newtonx(newtonx, omegas_Ha, ci_threshold=0.001,
+                         occ_min=None, vir_max=None):
+    """
+    Convert NAMD_PRINT excitation matrices into the read_ci_data dict layout
+    (configs with ABSOLUTE 1-based orbital indices, thresholded + renormalized
+    amplitudes) so it can feed the SD/citools machinery unchanged.
+
+    Args:
+        newtonx: read_cp2k_newtonx_output result
+        omegas_Ha (array): excitation energies, Hartree (from the log table)
+        ci_threshold: |amplitude| cutoff (applied to the exact vectors)
+        occ_min, vir_max: clip configs to the MO window [occ_min, vir_max]
+            (absolute 1-based; out-of-window amplitudes are dropped before
+            renormalization - they cannot be represented in the windowed
+            overlap machinery anyway)
+    """
+    configs, amps, spins = [], [], []
+    for M in newtonx["X"]:
+        nvirt, nocc = M.shape
+        sel = np.argwhere(np.abs(M) > ci_threshold)
+        if occ_min is not None:
+            sel = sel[sel[:, 1] + 1 >= occ_min]
+        if vir_max is not None:
+            sel = sel[nocc + sel[:, 0] + 1 <= vir_max]
+        conf = [[int(c) + 1, int(nocc + r) + 1] for r, c in sel]     # [occ, vir] absolute
+        a = np.array([M[r, c] for r, c in sel], dtype=float)
+        a /= np.linalg.norm(a)
+        configs.append(conf)
+        amps.append(a)
+        spins.append(["alp"] * len(conf))
+    return {"E": np.asarray(omegas_Ha)[:len(configs)],
+            "configs": configs, "amps": amps, "spins": spins}
+
+
 class tmp:
     pass
 
