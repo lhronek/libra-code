@@ -3754,7 +3754,7 @@ class tmp:
     pass
 
 
-def cp2k_compute_adi(q, params, full_id):
+def cp2k_compute_adi_nbra(q, params, full_id):
     """
     Compute adiabatic electronic properties and derivative couplings
     for a single trajectory using CP2K TDDFPT outputs and CI overlap analysis.
@@ -4092,3 +4092,323 @@ def cp2k_compute_adi(q, params, full_id):
     params["is_first_time"][itraj] = False
 
     return obj
+
+
+def cp2k_compute_adi_impl(q, params, full_id):
+    """
+    Compute adiabatic properties for one trajectory at one time step, on the fly.
+
+    Args:
+        q (MATRIX 3N x ntraj): coordinates of all trajectories, Bohr
+        params (dict): model parameters + per-trajectory caches (mutated in place):
+
+            Required:
+                atom_labels (list of str), input_template (str), cp2k_exe (str),
+                nstates (int): TOTAL number of states incl. ground state
+                lowest_orbital, highest_orbital (int): MO window (1-based, absolute)
+                num_occ_states, num_unocc_states (int): SD basis window around HOMO
+                                                (backend A; must cover the CI configs)
+            Optional:
+                time_dependent (bool): True (default) = TDDFPT CI states with
+                    per-state forces. False = ground-state-only mode: states are
+                    the fixed KS-SD basis, energies E_gs + orbital gaps, GS
+                    forces on every diagonal (needs a template WITHOUT TDDFPT /
+                    EXCITED_STATES; nstates must be 1 + num_occ_states*num_unocc_states;
+                    sd_state_ordering: "energy" (default) or "identity")
+                ao_overlap_method (str): "cp2k" (default) = OVERLAP_DELTAT
+                    doubled-geometry run per step (requires overlap_template;
+                    exact AO overlaps, periodic-capable; the CSR fast path
+                    needs the cp2k patch, stock CP2K falls back to the dense
+                    log print); "libint" = molden+libint in-process (no extra
+                    CP2K run, nonperiodic)
+                force_source (str): what forces CP2K supplies (the engine-side
+                    dyn_params["force_method"] decides how they are used):
+                    "active_state" [default] - one Z-vector run at the hopping
+                    state (pairs with force_method=1, TSH);
+                    "all_states" - mechanism B: template without
+                    &EXCITED_STATES but with &TDDFPT &PRINT &FORCES (LIST is
+                    rewritten from number_of_states); forces for ALL states parsed
+                    from the .tdfrc file and placed on every d1ham_adi diagonal
+                    (pairs with force_method=2 - Ehrenfest - or
+                    force-difference rescaling);
+                    "none" - RUN_TYPE is rewritten to ENERGY and no forces are
+                    computed (pairs with force_method=0)
+                mo_source (str): "wfn" (default) = binary RESTART.wfn -
+                    zero cost, binary precision, works in GS-SD mode too;
+                    "namd_print" (TDDFPT print file); "molden" (ASCII molden
+                    print - needs &MO_MOLDEN in the template, MO precision
+                    capped by the print digits). wfn/namd_print need
+                    ao_overlap_method="cp2k"
+                ci_source (str): "namd_print" (default) = full-precision
+                    X vectors from the &TDDFPT &PRINT &NAMD_PRINT file (the
+                    template must carry that print with PRINT_VIRTUALS T);
+                    "log" = excitation-analysis block (~5 digits, works with
+                    any TDDFPT template)
+                overlap_backend (str): "sd" (default) or "citools"
+                ci_threshold (float): amplitude truncation       [default 0.001]
+                act_state (dict itraj->int): synced by run_dynamics each step
+                working_directory_prefix (str)                   [default "wd"]
+                cp2k_data_dir, omp_num_threads, mpi_executable, nprocs,
+                number_of_states: passed to the execution layer
+                    (number_of_states defaults to nstates-1)
+
+            Caches (auto-created): mo_prev, ci_prev, E_adi_prev, S_prev,
+                homo, sd_basis, coordinates_prev, is_first_time
+
+        full_id: Libra trajectory id; last element = itraj
+
+    Returns:
+        obj with CMATRIX fields: ham_adi, hvib_adi (diagonals = mid-point total
+        energies), time_overlap_adi (CI-level), overlap_adi (identity),
+        basis_transform (identity), nac_adi (zeros), d1ham_adi (list over DOFs,
+        -force at the active-state diagonal), dc1_adi (zeros - CP2K TDDFPT has
+        no NACVs; use energy-based hop acceptance/rescaling).
+    """
+    # ---------------- trajectory index and coordinates ----------------
+    Id = Cpp2Py(full_id)
+    itraj = Id[-1]
+
+    coords = q.col(itraj)
+    coordinates = data_conv.MATRIX2nparray(coords, float).flatten()
+    ndof = coords.num_of_rows
+    nat = ndof // 3
+
+    # ---------------- per-trajectory caches ----------------
+    for key in ("mo_prev", "ci_prev", "E_adi_prev", "S_prev", "sd_prev",
+                "coordinates_prev", "is_first_time", "act_state", "homo"):
+        params.setdefault(key, {})
+    is_first_time = params["is_first_time"].get(itraj, True)
+    act_state = int(params["act_state"].get(itraj, 0))
+
+    nstates = int(params["nstates"])
+    nexc = nstates - 1
+    LO = int(params["lowest_orbital"])
+    HI = int(params["highest_orbital"])
+    backend = params.get("overlap_backend", "sd")
+    ci_threshold = params.get("ci_threshold", 0.001)
+    force_source = params.get("force_source", "active_state")
+    if force_source not in ("active_state", "all_states", "none"):
+        raise ValueError(F"force_source must be 'active_state', 'all_states' or 'none', "
+                         F"got {force_source!r}")
+    wd = f"{params.get('working_directory_prefix', 'wd')}_itraj{itraj}"
+
+    # ---------------- run CP2K (execution layer) ----------------
+    # a fresh trajectory must not inherit restart files from an older run in
+    # the same directory (a stale .tdwfn from a different system hard-aborts
+    # CP2K: "Incompatible number of atomic orbitals")
+    if is_first_time:
+        for f in glob.glob(os.path.join(wd, "*-RESTART.wfn*")) + \
+                 glob.glob(os.path.join(wd, "*-RESTART.tdwfn*")):
+            os.remove(f)
+
+    run_params = {k: params[k] for k in
+                  ("atom_labels", "input_template", "ot_template", "time_dependent",
+                   "force_source", "cp2k_exe", "cp2k_data_dir",
+                   "omp_num_threads", "mpi_executable", "nprocs", "project")
+                  if k in params}
+    run_params.update({"act_state": act_state, "working_directory": wd,
+                       "number_of_states": params.get("number_of_states", nexc)})
+    res = compute_state_energy_and_force(coordinates, run_params)
+    E_adi_curr = res["E_adi"][:nstates]
+    forces = res["forces"]
+
+    # ---------------- MO overlaps ----------------
+    project = run_params.get("project", "libra")
+    mo_source = params.get("mo_source", "wfn")
+    if mo_source == "wfn":
+        # zero-cost binary-precision MOs from the restart file (GS and TD modes)
+        if params.get("ao_overlap_method", "cp2k") != "cp2k":
+            raise ValueError('mo_source="wfn" requires ao_overlap_method="cp2k"')
+        mo_curr = load_wfn_mo_data(f"{wd}/{project}-RESTART.wfn")
+        params["homo"].setdefault(itraj, mo_curr["homo"])
+    elif mo_source == "namd_print":
+        # fully CP2K-native pipeline: MOs from the &NAMD_PRINT file (MOLog AO
+        # order) - requires the cp2k AO backend (no libint shells available)
+        if params.get("ao_overlap_method", "cp2k") != "cp2k":
+            raise ValueError('mo_source="namd_print" requires '
+                             'ao_overlap_method="cp2k" (no libint shells)')
+        if not params.get("time_dependent", True):
+            raise ValueError('mo_source="namd_print" needs a TDDFPT run '
+                             '(&NAMD_PRINT is a TDDFPT print)')
+        mo_curr = load_newtonx_mo_data(f"{wd}/{project}-CP2K_NEWTONX-1_0.inp")
+    else:
+        molden_file = f"{wd}/{project}-1_0.molden"
+        mo_curr = load_molden_data(molden_file)
+
+    if itraj not in params["homo"]:
+        params["homo"][itraj] = read_homo_index(res["logfile"])
+    homo = params["homo"][itraj]
+
+    mo_prev = params["mo_prev"].get(itraj, mo_curr) if not is_first_time else mo_curr
+    if params.get("ao_overlap_method", "cp2k") == "cp2k":
+        # CP2K-native AO overlaps (OVERLAP_DELTAT doubled-geometry run)
+        if "overlap_template" not in params:
+            raise ValueError('ao_overlap_method="cp2k" (the default) needs '
+                             'params["overlap_template"] (an es_overlap_deltat_* '
+                             'input); set ao_overlap_method="libint" for in-process '
+                             'libint overlaps instead')
+        coords_prev = (params["coordinates_prev"].get(itraj, coordinates)
+                       if not is_first_time else coordinates)
+        odt = {k: params[k] for k in ("atom_labels", "cp2k_exe", "cp2k_data_dir",
+                                      "omp_num_threads", "mpi_executable", "nprocs",
+                                      "overlap_template") if k in params}
+        odt["working_directory"] = f"{wd}/odt"
+        St_mo, S_prev, S_curr = mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev,
+                                                     coordinates, LO, HI, odt)
+    else:
+        S_curr = mo_overlap(mo_curr, mo_curr, LO, HI)
+        S_prev = params["S_prev"].get(itraj, S_curr) if not is_first_time else S_curr
+        St_mo = mo_overlap(mo_prev, mo_curr, LO, HI)
+
+    # cumulative MO phase alignment: flip current MOs (in place, so the cache
+    # carries aligned orbitals forward) and remember the phases for the CI data
+    phases = align_mo_phases(mo_prev["C"], mo_curr, St_mo)
+    mo_curr["C"][LO - 1:HI, :] *= phases[:, np.newaxis]
+    S_curr = phases[:, np.newaxis] * S_curr * phases[np.newaxis, :]
+
+    time_dependent = params.get("time_dependent", True)
+    if "sd_basis" not in params:
+        params["sd_basis"] = make_sd_basis(homo - LO + 1,
+                                           int(params["num_occ_states"]),
+                                           int(params["num_unocc_states"]),
+                                           HI - LO + 1)
+    sd_unique, sd_states = params["sd_basis"]
+
+    if time_dependent:
+        # ---------------- CI data, phase-consistent ----------------
+        if params.get("ci_source", "namd_print") == "namd_print":
+            # full-precision unthresholded X vectors from &NAMD_PRINT
+            # (reuse the parse if the MOs came from the same file)
+            nx_file = f"{wd}/{params.get('project', 'libra')}-CP2K_NEWTONX-1_0.inp"
+            if mo_curr.get("newtonx") is None and not os.path.isfile(nx_file):
+                raise ValueError('ci_source="namd_print" (the default) needs the '
+                                 '&TDDFPT &PRINT &NAMD_PRINT section (PRINT_VIRTUALS '
+                                 'T) in the input template; set ci_source="log" to '
+                                 'parse the excitation-analysis block instead')
+            nx = mo_curr.get("newtonx") or read_cp2k_newtonx_output(nx_file)
+            amps_prealigned = False
+            if params.get("mo_source", "wfn") == "wfn":
+                # X follows the NAMD-print MO sign convention; the wfn MOs
+                # carry arbitrary per-MO signs. Re-signing against the ALIGNED
+                # current C converts X to the aligned-MO convention in one shot
+                # (relative raw signs AND the cumulative alignment phases), so
+                # the phase loop below must be skipped for these amplitudes.
+                # the wfn may hold fewer MOs than the NAMD print (nmo =
+                # nocc + ADDED_MOS under diagonalization) - re-sign over the
+                # shared MOs and truncate X to the wfn virtual range (the
+                # dropped rows reference MOs the wfn route cannot overlap)
+                nocc = nx["C_occ"].shape[1]
+                nmo = mo_curr["C"].shape[0]
+                C_namd = np.vstack([nx["C_occ"].T, nx["C_virt"].T])[:nmo]
+                s = np.sign(np.sum(mo_curr["C"] * C_namd, axis=1))
+                nx = dict(nx)
+                nx["X"] = [M[:nmo - nocc] * s[np.newaxis, :nocc] * s[nocc:, np.newaxis]
+                           for M in nx["X"]]
+                amps_prealigned = True
+            ci_curr = ci_data_from_newtonx(nx, res["omegas"][:nexc], ci_threshold,
+                                           occ_min=LO, vir_max=HI)
+        else:
+            amps_prealigned = False
+            ci_curr = read_ci_data(res["logfile"], nexc, ci_threshold, LO, HI)
+        if not amps_prealigned:
+            for confs, amps in zip(ci_curr["configs"], ci_curr["amps"]):
+                for k, c in enumerate(confs):
+                    amps[k] *= phases[c[0] - LO] * phases[c[1] - LO]
+        ci_prev = params["ci_prev"].get(itraj, ci_curr) if not is_first_time else ci_curr
+
+        # ---------------- CI time-overlap: backend A or B ----------------
+        if backend == "sd":
+            st_sd, _ = sd_overlaps(sd_states, St_mo, S_prev, S_curr, orthonormalize=True)
+            T_prev = sd2ci_matrix(ci_prev, sd_unique, LO)
+            T_curr = sd2ci_matrix(ci_curr, sd_unique, LO)
+            st_ci = T_prev.T @ st_sd @ T_curr
+        elif backend == "citools":
+            st_ci = ci_overlap_citools(St_mo, ci_prev, ci_curr, homo, LO, HI, nstates)
+        else:
+            raise ValueError(f"unknown overlap_backend '{backend}'")
+    else:
+        # ------- ground-state-only mode: KS-SD (electron-only) states -------
+        # States = the fixed single-particle SD basis (GS first); energies =
+        # E_gs + orbital-energy gaps; forces = GS forces for every state
+        # (classical-path picture, like the libra-template KS/SD workflows).
+        if nstates != 1 + len(sd_unique):
+            raise ValueError(f"time_dependent=False requires nstates = "
+                             f"1 + num_occ_states*num_unocc_states = {1 + len(sd_unique)}, "
+                             f"got {nstates}")
+        eps = mo_curr["E"]
+        E_gs = res["E_gs"]
+        E_states = np.array([E_gs] + [E_gs + eps[v + LO - 2] - eps[o + LO - 2]
+                                      for (o, v), _spin in sd_unique])
+        if params.get("sd_state_ordering", "energy") == "energy":
+            order = np.argsort(E_states)
+        else:
+            order = np.arange(nstates)
+        E_adi_curr = E_states[order]
+        sd_sorted = [sd_states[k] for k in order]
+        sd_prev_sorted = params["sd_prev"].get(itraj, sd_sorted) if not is_first_time else sd_sorted
+        st_ci, _ = sd_overlaps(sd_sorted, St_mo, S_prev, S_curr, orthonormalize=True,
+                               sd_states_prev=sd_prev_sorted)
+        params["sd_prev"][itraj] = sd_sorted
+
+    # ---------------- mid-point energies ----------------
+    E_adi_prev = params["E_adi_prev"].get(itraj, E_adi_curr) if not is_first_time else E_adi_curr
+    E_mid = 0.5 * (E_adi_prev + E_adi_curr)
+
+    # ---------------- build the returned object ----------------
+    obj = tmp()
+    obj.ham_adi = CMATRIX(nstates, nstates)
+    obj.hvib_adi = CMATRIX(nstates, nstates)
+    obj.nac_adi = CMATRIX(nstates, nstates)
+    obj.basis_transform = CMATRIX(nstates, nstates)
+    obj.time_overlap_adi = CMATRIX(nstates, nstates)
+    obj.overlap_adi = CMATRIX(nstates, nstates)
+
+    for i in range(nstates):
+        obj.ham_adi.set(i, i, float(E_mid[i]) * (1.0 + 0.0j))
+        obj.hvib_adi.set(i, i, float(E_mid[i]) * (1.0 + 0.0j))
+        obj.basis_transform.set(i, i, 1.0 + 0.0j)
+        obj.overlap_adi.set(i, i, 1.0 + 0.0j)
+        for j in range(nstates):
+            obj.time_overlap_adi.set(i, j, float(st_ci[i, j]) * (1.0 + 0.0j))
+
+    obj.d1ham_adi = CMATRIXList()
+    obj.dc1_adi = CMATRIXList()
+    for _ in range(ndof):
+        obj.d1ham_adi.append(CMATRIX(nstates, nstates))
+        obj.dc1_adi.append(CMATRIX(nstates, nstates))
+    forces_all = res.get("forces_all", None)   # mechanism B: per-state forces
+    for iat in range(nat):
+        for k in range(3):
+            if forces_all is not None:          # all diagonals, state-specific
+                for ist in range(nstates):
+                    obj.d1ham_adi[3 * iat + k].set(ist, ist,
+                                                   -forces_all[ist, iat, k] * (1.0 + 0.0j))
+            elif time_dependent:                # mechanism A: active state only
+                obj.d1ham_adi[3 * iat + k].set(act_state, act_state,
+                                               -forces[iat, k] * (1.0 + 0.0j))
+            else:  # GS mode: GS forces are state-independent - fill all diagonals
+                for ist in range(nstates):
+                    obj.d1ham_adi[3 * iat + k].set(ist, ist,
+                                                   -forces[iat, k] * (1.0 + 0.0j))
+
+    # ---------------- store per-trajectory state ----------------
+    params["mo_prev"][itraj] = mo_curr
+    if time_dependent:
+        params["ci_prev"][itraj] = ci_curr
+    params["E_adi_prev"][itraj] = E_adi_curr.copy()
+    params["S_prev"][itraj] = S_curr
+    params["coordinates_prev"][itraj] = coordinates.copy()
+    params["is_first_time"][itraj] = False
+
+    return obj
+
+
+def cp2k_compute_adi(q, params, full_id):
+    """Traceback-printing wrapper: C++ callers swallow Python exceptions."""
+    try:
+        return cp2k_compute_adi_impl(q, params, full_id)
+    except Exception:
+        import traceback, sys
+        traceback.print_exc()
+        sys.stdout.flush(); sys.stderr.flush()
+        raise
