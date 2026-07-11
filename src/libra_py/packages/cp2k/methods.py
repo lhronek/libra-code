@@ -2785,6 +2785,59 @@ def read_cp2k_newtonx_output(filename):
             "phases_occ": extra.get("phases_occ"), "phases_virt": extra.get("phases_virt")}
 
 
+def read_cp2k_tdfrc(filename):
+    """
+    Parse a CP2K TDDFPT multi-state force file (*.tdfrc) produced by
+    &PROPERTIES &TDDFPT &PRINT &FORCES (mechanism B).
+
+    File layout per state (verified on CP2K 2026.1-dev):
+        # STATE NR.   n            E eV       Oscillator strength:  f
+              natom
+        <blank>
+        natom rows of three floats (TOTAL forces = GS + response, Ha/Bohr)
+
+    States screened out by the oscillator-strength THRESHOLD appear with the
+    header only (no force block) - they are returned in `energies`/`fosc`
+    but absent from `forces`.
+
+    Returns:
+        forces (dict): state index (1-based) -> np.ndarray (natom, 3)
+        energies (dict): state index -> excitation energy, Hartree
+        fosc (dict): state index -> oscillator strength
+    """
+    ev2Ha = units.ev2Ha
+    forces, energies, fosc = {}, {}, {}
+    with open(filename) as f:
+        lines = f.readlines()
+    i = 0
+    while i < len(lines):
+        m = re.match(r"\s*#\s*STATE NR\.\s+(\d+)\s+(-?[\d.]+)\s*eV\s+Oscillator strength:\s*(-?[\d.]+)",
+                     lines[i])
+        if not m:
+            i += 1
+            continue
+        state = int(m.group(1))
+        energies[state] = float(m.group(2)) * ev2Ha
+        fosc[state] = float(m.group(3))
+        i += 1
+        if i < len(lines) and re.match(r"\s*(\d+)\s*$", lines[i]):
+            nat = int(lines[i].split()[0])
+            i += 1
+            rows = []
+            while i < len(lines) and len(rows) < nat:
+                parts = lines[i].split()
+                if len(parts) == 3:
+                    rows.append([float(x) for x in parts])
+                i += 1
+            arr = np.array(rows)
+            if arr.shape != (nat, 3) or not np.all(np.isfinite(arr)):
+                raise ValueError(f"Malformed force block for state {state} in {filename}")
+            forces[state] = arr
+    if not energies:
+        raise ValueError(f"No STATE blocks found in {filename}")
+    return forces, energies, fosc
+
+
 class tmp:
     pass
 
