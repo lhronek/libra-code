@@ -2838,6 +2838,82 @@ def read_cp2k_tdfrc(filename):
     return forces, energies, fosc
 
 
+def read_cp2k_ao_overlap_print(logfile):
+    """
+    Parse the AO overlap matrix printed by &DFT &PRINT &AO_MATRICES (OVERLAP T,
+    NDIGITS 12) - the OVERLAP_DELTAT / Newton-X route.
+
+    Intended use (CP2K-native alternative to the molden+libint route, exactly
+    the ODIN doubled-geometry trick): run a DOUBLED geometry (atoms at t-dt
+    then atoms at t) with `&DFT &EXCITED_STATES OVERLAP_DELTAT T` - CP2K skips
+    the SCF and all properties, builds and prints S in ~1 s. The doubled
+    template additionally needs CONNECTIVITY OFF (&TOPOLOGY) and no
+    &VDW_POTENTIAL (both die on near-coincident atoms). The matrix is printed
+    in CP2K-internal (MOLog) AO order - apply resort_molog_eigenvectors(l_vals)
+    to both indices to convert to libint order:
+
+        S = read_cp2k_ao_overlap_print("out.log")
+        idx = CP2K_methods.resort_molog_eigenvectors(l_vals)      # one monomer
+        St_ao = S[:nao, nao:][np.ix_(idx, idx)]                   # <chi(t-dt)|chi(t)>
+
+    Validated against libint cross-geometry overlaps to 3.5e-7 (molden print
+    precision - the CP2K matrix is the exact one in the code's own basis).
+
+    Returns:
+        np.ndarray (n, n): the full printed overlap matrix
+    """
+    import re as _re
+    FLOAT = _re.compile(r"-?\d+\.\d+(E[+-]?\d+)?$", _re.I)
+    with open(logfile) as f:
+        lines = f.readlines()
+    start = next(i for i, l in enumerate(lines)
+                 if l.strip().endswith("OVERLAP MATRIX"))   # GPW: "OVERLAP MATRIX"; xTB: "XTB OVERLAP MATRIX"
+    entries, cols = {}, []
+    for l in lines[start + 1:]:
+        t = l.split()
+        if not t:
+            continue
+        if all(_re.fullmatch(r"\d+", x) for x in t):      # column-header line
+            cols = [int(x) for x in t]
+            continue
+        if _re.fullmatch(r"\d+", t[0]) and len(t) >= 5 and all(FLOAT.match(x) for x in t[4:]):
+            for c, v in zip(cols, t[4:]):
+                entries[(int(t[0]), c)] = float(v)
+            continue
+        if entries:                                        # left the matrix region
+            break
+    n = max(k[0] for k in entries)
+    S = np.zeros((n, n))
+    for (i, j), v in entries.items():
+        S[i - 1, j - 1] = v
+    if np.abs(S - S.T).max() > 1e-10:
+        raise ValueError(f"parsed overlap not symmetric ({logfile})")
+    return S
+
+
+def read_cp2k_s_csr(filename):
+    """
+    Parse the sparse AO overlap written by &DFT &PRINT &S_CSR_WRITE
+    (requires the qs_energy.F patch in tools/cp2k-overlap-deltat-csr.patch for
+    OVERLAP_DELTAT runs - upstream only fires this print post-SCF).
+
+    Format: 1-based "row col value" triplets, both triangles, 15-digit
+    scientific - more precise AND O(nnz) instead of the O(n^2) dense log print.
+
+    Returns:
+        np.ndarray (n, n)
+    """
+    rows = np.loadtxt(filename)
+    if rows.ndim == 1:
+        rows = rows.reshape(1, -1)
+    n = int(max(rows[:, 0].max(), rows[:, 1].max()))
+    S = np.zeros((n, n))
+    S[rows[:, 0].astype(int) - 1, rows[:, 1].astype(int) - 1] = rows[:, 2]
+    if np.abs(S - S.T).max() > 1e-10:
+        raise ValueError(f"CSR overlap not symmetric ({filename})")
+    return S
+
+
 class tmp:
     pass
 
