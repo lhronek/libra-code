@@ -20,7 +20,6 @@
 
 #include "../../math_linalg/liblinalg.h"
 #include "../../nhamiltonian/libnhamiltonian.h"
-#include "../dyn_control_params.h"
 
 
 /// liblibra namespace

@@ -701,10 +701,13 @@ void qtag_hamiltonian_and_overlap(MATRIX& q, MATRIX& p, MATRIX& alp, MATRIX& s, 
 
 */
 
-  dyn_control_params prms;
-  prms.set_parameters(dyn_params);
-
-  int method = prms.qtag_pot_approx_method; 
+  // the only dyn_control_params key qtag needs - read it directly so that
+  // qtag does not depend on the parent dyn library
+  int method = 0;  // the dyn_control_params default
+  for(int i0=0;i0<len(dyn_params.values());i0++){
+    std::string key0 = bp::extract<std::string>(dyn_params.keys()[i0]);
+    if(key0=="qtag_pot_approx_method"){ method = bp::extract<int>(dyn_params.values()[i0]); }
+  }
 
   double AA = 0.0;
   double BB = 0.0;

@@ -2,7 +2,7 @@
 #  Source files and headers in this directory
 #
 file(GLOB QTAG_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/*.h)
-file(GLOB QTAG_SRC ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp ${QTAG_HEADERS}) 
+file(GLOB QTAG_SRC ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp ${QTAG_HEADERS})
 
 
 #
@@ -23,7 +23,7 @@ endif()
 #
 #  Link to external libraries
 #
-TARGET_LINK_LIBRARIES(qtag      linalg_stat ${ext_libs})
-TARGET_LINK_LIBRARIES(qtag_stat linalg_stat ${ext_libs})
+TARGET_LINK_LIBRARIES(qtag      gwp nhamiltonian linalg_stat ${ext_libs})
+TARGET_LINK_LIBRARIES(qtag_stat gwp_stat nhamiltonian_stat linalg_stat ${ext_libs})
 
 

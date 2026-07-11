@@ -64,6 +64,8 @@ TARGET_LINK_LIBRARIES(dyn
                       electronic 
                       nuclear
                       nhamiltonian
+                      opt
+                      calculators
                       converters_stat
                       linalg meigen util specialfunctions ${ext_libs} )
 
@@ -75,6 +77,8 @@ TARGET_LINK_LIBRARIES(dyn_stat
                       electronic_stat 
                       nuclear_stat 
                       nhamiltonian_stat
+                      opt_stat
+                      calculators_stat
                       converters_stat
                       linalg_stat meigen_stat util_stat specialfunctions_stat ${ext_libs} )
 
