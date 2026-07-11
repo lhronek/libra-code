@@ -2385,7 +2385,7 @@ def read_wfn_file(filename):
         spin_tmp.append(lfomo)
         spin_tmp.append(nelectron)
         spin_data.append(spin_tmp)
-        eigen_val_and_occ_num = wfn_file.read_reals(dtype=np.float32)
+        eigen_val_and_occ_num = wfn_file.read_reals(dtype=np.float64)
         eigen_vals_and_occ_nums.append(eigen_val_and_occ_num)
         mo_coeff = []
         for mo in range(nmo):
