@@ -17,7 +17,7 @@
 """
 
 
-import os, sys, math, re, copy, time, glob
+import os, sys, math, re, copy, time, glob, subprocess
 import numpy as np
 import scipy.sparse as sp
 import scipy.linalg
@@ -2912,6 +2912,439 @@ def read_cp2k_s_csr(filename):
     if np.abs(S - S.T).max() > 1e-10:
         raise ValueError(f"CSR overlap not symmetric ({filename})")
     return S
+
+
+def write_xyz(filename, atom_labels, coords_bohr, comment=""):
+    """
+    Write an xyz file (Angstrom) from a flat coordinate array in Bohr.
+
+    Args:
+        filename (str): output path
+        atom_labels (list of str): N atomic symbols
+        coords_bohr (array-like, 3N): flattened [x1,y1,z1, x2,...] in Bohr
+        comment (str): second line of the xyz file
+    """
+    c = np.asarray(coords_bohr, dtype=float).reshape(-1, 3) / units.Angst
+    nat = len(atom_labels)
+    if c.shape[0] != nat:
+        raise ValueError(f"coords length {3*c.shape[0]} does not match 3*natoms={3*nat}")
+    with open(filename, "w") as f:
+        f.write(f"{nat}\n{comment}\n")
+        for lab, (x, y, z) in zip(atom_labels, c):
+            f.write(f"{lab} {x:18.10f} {y:18.10f} {z:18.10f}\n")
+
+
+def make_cp2k_input(params, working_directory="."):
+    """
+    Generate a CP2K input file from a template, in a thread-safe manner.
+
+    The template must be a complete, working CP2K input for an
+    excited-state force calculation (RUN_TYPE ENERGY_FORCE, &PROPERTIES &TDDFPT,
+    &DFT &EXCITED_STATES with a STATE line, &FORCE_EVAL &PRINT &FORCES ON,
+    &MO_MOLDEN print if orbitals are needed). This function rewrites:
+
+      - PROJECT / PROJECT_NAME             -> params["project"]
+      - COORD_FILE_NAME                    -> params["coord_file"]
+      - WFN_RESTART_FILE_NAME  *.wfn       -> {project}-RESTART.wfn
+      - WFN_RESTART_FILE_NAME  *.tdwfn     -> {project}-RESTART.tdwfn
+      - SCF_GUESS                          -> RESTART (CP2K falls back to ATOMIC
+                                              if the restart file does not exist)
+      - STATE   (inside &EXCITED_STATES)   -> params["act_state"]  (1-based excited index)
+      - RUN_TYPE                           -> ENERGY when params["force_source"] == "none"
+      - NSTATES (inside &TDDFPT)           -> params["number_of_states"] (if given)
+
+    If params["act_state"] == 0 (ground state), the whole &EXCITED_STATES ...
+    &END block is omitted, so the forces/energy are ground-state ones, while
+    the TDDFPT property section still runs (excitation energies + tdwfn
+    continuity are preserved).
+
+    Args:
+        params (dict):
+            input_template (str): path to the template file  [required]
+            act_state (int): active state; 0 = ground state   [default: 0]
+            project (str): CP2K project name                  [default: "libra"]
+            coord_file (str): xyz file name (relative to wd)  [default: "coord.xyz"]
+            number_of_states (int or None): rewrite TDDFPT NSTATES  [default: None = keep template]
+            input_name (str): output file name                [default: "input.inp"]
+            wfn_restart_file (str or None): explicit SCF restart source; injected
+                as a DFT-level WFN_RESTART_FILE_NAME if the template has none
+                (used by the OT+diag mode)                    [default: None]
+        working_directory (str): where the input file is written
+
+    Returns:
+        str: path of the generated input file
+    """
+    template = params["input_template"]
+    act_state = int(params.get("act_state", 0))
+    project = params.get("project", "libra")
+    coord_file = params.get("coord_file", "coord.xyz")
+    number_of_states = params.get("number_of_states", None)
+    input_name = params.get("input_name", "input.inp")
+    # explicit SCF restart source (OT+diag mode); None -> CP2K's default
+    # {project}-RESTART.wfn, which our fixed project name chains automatically
+    wfn_restart_file = params.get("wfn_restart_file", None)
+
+    with open(template) as f:
+        lines = f.readlines()
+
+    # an &EXCITED_STATES block carrying OVERLAP_DELTAT is an overlap-run
+    # directive, not an excited-forces request - never drop it for act_state=0
+    keep_excited = any("OVERLAP_DELTAT" in ln.upper() for ln in lines)
+
+    # inject a DFT-level WFN_RESTART_FILE_NAME only if the template has none
+    # (templates typically rely on the default restart name)
+    inject_restart = wfn_restart_file is not None and not any(
+        ln.split() and ln.split()[0].upper() == "WFN_RESTART_FILE_NAME"
+        and ".tdwfn" not in ln.lower() for ln in lines)
+
+    out = []
+    stack = []  # CP2K section stack, upper-case names
+    for line in lines:
+        tokens = line.split()
+        keyword = tokens[0].upper() if tokens else ""
+
+        # --- maintain the section stack ---
+        entering, ending = None, keyword.startswith("&END")
+        if keyword.startswith("&") and not ending:
+            entering = keyword[1:]
+
+        # membership must be evaluated BEFORE the pop so that the
+        # "&END EXCITED_STATES" line itself still counts as inside the block
+        in_excited = "EXCITED_STATES" in stack or entering == "EXCITED_STATES"
+        in_tddfpt = "TDDFPT" in stack or entering == "TDDFPT"
+
+        if ending:
+            if stack:
+                stack.pop()
+        elif entering is not None:
+            stack.append(entering)
+
+        # --- drop the whole &EXCITED_STATES block for ground-state runs ---
+        if in_excited and act_state == 0 and not keep_excited:
+            continue
+
+        # --- keyword rewrites ---
+        if keyword in ("PROJECT", "PROJECT_NAME"):
+            out.append(f"  PROJECT {project}\n")
+        elif keyword == "COORD_FILE_NAME":
+            out.append(f"      COORD_FILE_NAME {coord_file}\n")
+        elif keyword == "WFN_RESTART_FILE_NAME" and ".tdwfn" in line.lower():
+            out.append(f"      WFN_RESTART_FILE_NAME {project}-RESTART.tdwfn\n")
+        elif keyword == "WFN_RESTART_FILE_NAME":
+            out.append(f"      WFN_RESTART_FILE_NAME "
+                       f"{wfn_restart_file or f'{project}-RESTART.wfn'}\n")
+        elif keyword == "SCF_GUESS":
+            out.append("      SCF_GUESS RESTART\n")
+        elif keyword == "RUN_TYPE" and params.get("force_source", "active_state") == "none":
+            out.append("  RUN_TYPE ENERGY\n")
+        elif keyword == "STATE" and in_excited:
+            out.append(f"      STATE {act_state}\n")
+        elif keyword == "NSTATES" and in_tddfpt and number_of_states is not None:
+            out.append(f"      NSTATES {int(number_of_states)}\n")
+        elif keyword == "LIST" and in_tddfpt and number_of_states is not None:
+            states = " ".join(str(k + 1) for k in range(int(number_of_states)))
+            out.append(f"          LIST {states}\n")
+        else:
+            out.append(line)
+            if inject_restart and entering == "DFT":
+                out.append(f"    WFN_RESTART_FILE_NAME {wfn_restart_file}\n")
+                inject_restart = False
+
+    os.makedirs(working_directory, exist_ok=True)
+    input_path = os.path.join(working_directory, input_name)
+    with open(input_path, "w") as f:
+        f.writelines(out)
+    return input_path
+
+
+def run_cp2k(coords_bohr, params):
+    """
+    Execute one CP2K calculation in a trajectory-specific working directory.
+
+    Thread-safe (no os.chdir; subprocess runs with cwd=working_directory), so
+    multiple trajectories can run concurrently in separate directories.
+    Restart chaining is automatic: with a fixed project name, CP2K overwrites
+    {project}-RESTART.wfn / .tdwfn at every step and the generated input
+    points SCF_GUESS RESTART at those same files.
+
+    Args:
+        coords_bohr (array-like, 3N): current geometry, Bohr
+        params (dict):
+            atom_labels (list of str): atomic symbols                       [required]
+            input_template (str): path to the CP2K template            [required]
+            act_state (int): active state (0 = GS)                     [default 0]
+            cp2k_exe (str): CP2K executable                            [default "cp2k.psmp"]
+            mpi_executable (str or None): e.g. "mpirun"; None = serial [default None]
+            nprocs (int): MPI ranks (used with mpi_executable)         [default 1]
+            omp_num_threads (int): OMP threads for the run             [default 1]
+            cp2k_data_dir (str or None): sets CP2K_DATA_DIR            [default None]
+            working_directory (str): run directory                     [default "wd"]
+            ot_template (str or None): OT pre-convergence template. When given,
+                each call first runs a cheap OT ENERGY calculation (project
+                {project}_ot, restart chained across steps) and the main run
+                restarts from its wavefunction - the two-run scheme of the
+                NBRA step2 xTB workflow, for large/hard-SCF systems [default None]
+            project (str), coord_file (str), number_of_states (int): see make_cp2k_input
+
+    Returns:
+        str: path to the output log file
+
+    Raises:
+        RuntimeError: if CP2K exits non-zero (tail of the log is included)
+    """
+    atom_labels = params["atom_labels"]
+    exe = params.get("cp2k_exe", "cp2k.psmp")
+    mpi = params.get("mpi_executable", None)
+    nprocs = int(params.get("nprocs", 1))
+    wd = params.get("working_directory", "wd")
+    coord_file = params.get("coord_file", "coord.xyz")
+
+    os.makedirs(wd, exist_ok=True)
+    write_xyz(os.path.join(wd, coord_file), atom_labels, coords_bohr)
+
+    env = dict(os.environ)
+    env["OMP_NUM_THREADS"] = str(params.get("omp_num_threads", 1))
+    if params.get("cp2k_data_dir", None):
+        env["CP2K_DATA_DIR"] = params["cp2k_data_dir"]
+
+    def _execute(input_name, logname):
+        logfile = os.path.join(wd, logname)
+        if os.path.exists(logfile):
+            os.remove(logfile)  # CP2K's -o APPENDS; keep one run per log
+        cmd = [exe, "-i", input_name, "-o", logname]
+        if mpi is not None:
+            cmd = [mpi, "-n", str(nprocs)] + cmd
+        res = subprocess.run(cmd, cwd=wd, env=env,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if res.returncode != 0:
+            tail = ""
+            if os.path.exists(logfile):
+                with open(logfile) as f:
+                    tail = "".join(f.readlines()[-30:])
+            raise RuntimeError(
+                f"CP2K failed (exit {res.returncode}) in {wd} ({input_name})\n"
+                f"stderr: {res.stderr.decode()[-2000:]}\nlog tail:\n{tail}")
+        return logfile
+
+    # ---- optional OT pre-convergence run (large systems / hard SCF) ----
+    # Two-run scheme a la the NBRA step2 xTB workflow: a cheap OT ENERGY run
+    # converges the density robustly ({project}_ot-RESTART.wfn, chained across
+    # steps), then the main diagonalization run restarts from it.
+    project = params.get("project", "libra")
+    main_params = params
+    if params.get("ot_template", None):
+        ot_params = dict(params)
+        ot_params.update({"input_template": params["ot_template"],
+                          "project": f"{project}_ot",
+                          "input_name": "ot_input.inp",
+                          "act_state": 0})
+        make_cp2k_input(ot_params, working_directory=wd)
+        _execute("ot_input.inp", "ot.log")
+        main_params = dict(params)
+        main_params["wfn_restart_file"] = f"{project}_ot-RESTART.wfn"
+
+    make_cp2k_input(main_params, working_directory=wd)
+    return _execute(main_params.get("input_name", "input.inp"), "out.log")
+
+
+def read_cp2k_forces(logfile):
+    """
+    Parse atomic forces from a CP2K log ("FORCES| Atomic forces [hartree/bohr]").
+
+    Takes the LAST such block in the file. With &DFT &EXCITED_STATES active,
+    these are the excited-state (GS + linear-response) forces of the selected
+    state; otherwise ground-state forces.
+
+    Returns:
+        np.ndarray (natoms, 3): forces in Hartree/Bohr
+    """
+    forces, current = [], None
+    with open(logfile) as f:
+        for line in f:
+            if line.lstrip().startswith("FORCES| Atomic forces"):
+                current = []
+            elif current is not None:
+                m = re.match(r"\s*FORCES\|\s+(\d+)\s+(\S+)\s+(\S+)\s+(\S+)", line)
+                if m:
+                    current.append([float(m.group(k)) for k in (2, 3, 4)])
+                elif current:  # rows collected and a non-row line -> block ended
+                    forces = current
+                    current = None
+                elif not line.lstrip().startswith("FORCES|"):
+                    current = None  # left the FORCES| region without any rows
+                # else: the "FORCES| Atom x y z |f|" header row - keep waiting
+    if not forces:
+        raise ValueError(f"No 'FORCES| Atomic forces' block found in {logfile}")
+    arr = np.array(forces, dtype=float)
+    if not np.all(np.isfinite(arr)):
+        raise ValueError(f"Non-finite forces parsed from {logfile} (NaN/Inf)")
+    return arr
+
+
+def read_cp2k_total_energy(logfile):
+    """
+    Read the final total energy: the LAST "ENERGY| Total FORCE_EVAL" line, Hartree.
+
+    NOTE: when &DFT &EXCITED_STATES is active, this already INCLUDES the
+    excitation energy (E = E_GS + omega_state) — verified against the
+    'Excited State Energy' block and against E_GS + omega explicitly.
+    """
+    e = None
+    with open(logfile) as f:
+        for line in f:
+            if line.lstrip().startswith("ENERGY| Total FORCE_EVAL"):
+                e = float(line.split()[-1])
+    if e is None:
+        raise ValueError(f"No 'ENERGY| Total FORCE_EVAL' line found in {logfile}")
+    return e
+
+
+def read_cp2k_excitation_energies(logfile):
+    """
+    R-TDDFPT excitation energies and oscillator strengths.
+
+    Thin wrapper around cp2k_find_excitation_energies (which parses the
+    "TDDFPT|" states table and returns plain eV lists).
+
+    Returns:
+        omegas (np.ndarray, nstates): excitation energies in Hartree
+        fosc   (np.ndarray, nstates): oscillator strengths
+    """
+    E, F = cp2k_find_excitation_energies(logfile)
+    if len(E) == 0:
+        raise ValueError(f"No TDDFPT states table found in {logfile}")
+    return np.array(E) * units.ev2Ha, np.array(F)
+
+
+def read_cp2k_excited_state_info(logfile):
+    """
+    Parse the 'Excited State Energy'/forces block printed by &EXCITED_STATES.
+
+    Returns:
+        dict with keys 'omega' (Hartree, precise 10-decimal value for the
+        active state) and, for energy-only runs, 'etot'; or None if the block
+        is absent (ground-state run).
+    """
+    omega, etot = None, None
+    with open(logfile) as f:
+        for line in f:
+            if "Excitation Energy [Hartree]" in line:
+                omega = float(line.split()[-1])
+            elif "Total Energy [Hartree]" in line:
+                etot = float(line.split()[-1])
+    if omega is None:
+        return None
+    return {"omega": omega, "etot": etot}
+
+
+def compute_state_energy_and_force(coords_bohr, params):
+    """
+    One full electronic-structure evaluation for the non-NBRA driver:
+    run CP2K at `coords_bohr` for state params["act_state"], parse everything.
+
+    Returns:
+        dict:
+            E_total (float): total energy of the ACTIVE state, Hartree
+                             (E_GS + omega for excited states)
+            E_gs (float): ground-state total energy, Hartree
+            forces (np.ndarray (nat,3)): active-state forces, Ha/Bohr
+            omegas (np.ndarray): TDDFPT excitation energies, Hartree
+            fosc (np.ndarray): oscillator strengths
+            E_adi (np.ndarray, nstates+1): total energies of ALL states
+                                           [E_gs, E_gs+omega_1, ...]
+            logfile (str): path to the CP2K log (for further parsing, e.g.
+                           CI amplitudes via read_cp2k_tddfpt_log_file)
+
+    With params["time_dependent"] = False (ground-state-only mode, template
+    without &PROPERTIES &TDDFPT and without &EXCITED_STATES): one GS run,
+    E_adi = [E_gs], omegas/fosc empty, forces = ground-state forces.
+    """
+    if not params.get("time_dependent", True):
+        run_params = dict(params)
+        run_params["act_state"] = 0
+        logfile = run_cp2k(coords_bohr, run_params)
+        E_gs = read_cp2k_total_energy(logfile)
+        forces = read_cp2k_forces(logfile)
+        return {"E_total": E_gs, "E_gs": E_gs, "forces": forces,
+                "omegas": np.array([]), "fosc": np.array([]),
+                "E_adi": np.array([E_gs]), "logfile": logfile}
+
+    act_state = int(params.get("act_state", 0))
+
+    if params.get("force_source", "active_state") == "all_states":
+        # ---- mechanism B: one GS run + Z-vector solves for ALL listed states.
+        # Template must have NO &EXCITED_STATES (main forces = ground state)
+        # and must carry &TDDFPT &PRINT &FORCES with a LIST line (rewritten
+        # from number_of_states). Returns the extra key forces_all (nstates+1, nat, 3).
+        logfile = run_cp2k(coords_bohr, params)
+        E_gs = read_cp2k_total_energy(logfile)          # no omega included here
+        f_gs = read_cp2k_forces(logfile)
+        omegas, fosc = read_cp2k_excitation_energies(logfile)
+        wd = params.get("working_directory", "wd")
+        project = params.get("project", "libra")
+        tdfrc = os.path.join(wd, f"{project}-TDFORCE-1_0.tdfrc")
+        f_ex, _, _ = read_cp2k_tdfrc(tdfrc)
+        nexc = len(omegas)
+        missing = [k for k in range(1, nexc + 1) if k not in f_ex]
+        if missing:
+            raise ValueError(f"states {missing} have no forces in {tdfrc} - "
+                             f"check the LIST line and keep THRESHOLD 0.0 "
+                             f"(dark states are screened otherwise)")
+        forces_all = np.stack([f_gs] + [f_ex[k] for k in range(1, nexc + 1)])
+        E_adi = np.concatenate(([E_gs], E_gs + omegas))
+        return {"E_total": float(E_adi[act_state]), "E_gs": E_gs,
+                "forces": forces_all[act_state], "forces_all": forces_all,
+                "omegas": omegas, "fosc": fosc, "E_adi": E_adi, "logfile": logfile}
+
+    logfile = run_cp2k(coords_bohr, params)
+
+    E_total = read_cp2k_total_energy(logfile)
+    if params.get("force_source", "active_state") == "none":
+        forces = np.zeros((len(params["atom_labels"]), 3))
+    else:
+        forces = read_cp2k_forces(logfile)
+    omegas, fosc = read_cp2k_excitation_energies(logfile)
+
+    if act_state == 0:
+        E_gs = E_total
+    else:
+        info = read_cp2k_excited_state_info(logfile)
+        # prefer the 10-decimal omega from the excited-state block
+        omega_act = info["omega"] if info is not None else omegas[act_state - 1]
+        E_gs = E_total - omega_act
+
+    E_adi = np.concatenate(([E_gs], E_gs + omegas))
+    return {"E_total": E_total, "E_gs": E_gs, "forces": forces,
+            "omegas": omegas, "fosc": fosc, "E_adi": E_adi, "logfile": logfile}
+
+
+def fd_force_check(coords_bohr, params, atom, dim, h=0.01):
+    """
+    Finite-difference validation of the analytic force on one component.
+
+    Runs two displaced CP2K calculations (+h/-h Bohr on atom/dim) in separate
+    subdirectories and returns the central-difference force of the ACTIVE
+    state's total energy. Compare with read_cp2k_forces()[atom, dim].
+
+    Args:
+        coords_bohr (array-like, 3N): geometry, Bohr
+        params (dict): same as run_cp2k (act_state selects the state)
+        atom (int): 0-based atom index
+        dim (int): 0=x, 1=y, 2=z
+        h (float): displacement, Bohr
+
+    Returns:
+        float: -(E(+h) - E(-h)) / (2h), Hartree/Bohr
+    """
+    wd0 = params.get("working_directory", "wd")
+    E = {}
+    for sgn, tag in ((+1.0, "p"), (-1.0, "m")):
+        qd = np.array(coords_bohr, dtype=float).copy()
+        qd[3 * atom + dim] += sgn * h
+        pd = dict(params)
+        pd["working_directory"] = f"{wd0}_fd_{atom}{'xyz'[dim]}{tag}"
+        E[tag] = compute_state_energy_and_force(qd, pd)["E_total"]
+    return -(E["p"] - E["m"]) / (2.0 * h)
 
 
 class tmp:
