@@ -35,7 +35,7 @@ import os
 import time
 import glob
 import numpy as np
-import multiprocessing as mp
+from libra_py.workflows.nbra.mp_context import MP_CTX as _MP_CTX
 from scipy.linalg import fractional_matrix_power
 import scipy.sparse as sp
 if sys.platform == "cygwin":
@@ -2044,7 +2044,7 @@ def run_step3_ks_nacs_libint(params):
         for step in range(start_time, finish_time):
             var_pool.append((step, params))
 
-        with mp.Pool(nprocs) as pool:
+        with _MP_CTX.Pool(nprocs) as pool:
             # Reading and orthonormalizing the KS overlaps
             pool.starmap(orthonormalize_ks_overlaps, var_pool)
             pool.close()
@@ -2529,7 +2529,7 @@ def run_step3_sd_nacs_libint(params):
 
     t2 = time.time()
     if params['use_multiprocessing']:
-        with mp.Pool(nprocs) as pool:
+        with _MP_CTX.Pool(nprocs) as pool:
             St_sds = pool.starmap(compute_sd_overlaps_in_parallel, var_pool)
             pool.close()
             pool.join()
