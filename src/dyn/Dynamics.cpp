@@ -845,7 +845,7 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
         if (is_ssy) {
           SSY_correction(Hvib_old, dyn_var, ham_prev, itraj);
         }
-        A = exp_(Hvib, complex<double>(0.0, -0.5 * dt));
+        A = exp_(Hvib_old, complex<double>(0.0, -0.5 * dt));
         C = A * C;
 
         // Reorder:
@@ -1079,7 +1079,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
 
       } // method == 11 && 111
 
-      else if (method == 12 || method == 12) {
+      else if (method == 12 || method == 112) {
         // The local diabatization approach, but with rotation
         Hvib_old = ham_prev->get_ham_adi(); // T is the identity matrix
         if (is_ssy) {
