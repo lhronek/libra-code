@@ -713,7 +713,7 @@ def run_tsh(common_params, compute_model, model_params):
     params = dict(common_params)
 
     critical_params = []
-    default_params = {"wait_time": 0.0, "ntraj": 1, "nstates": 1, "istate": [1, 0],
+    default_params = {"wait_time": 0.0, "seed": None, "ntraj": 1, "nstates": 1, "istate": [1, 0],
                       "x0": [0.0], "p0": [0.0], "masses": [1.0], "k": [0.01],
                       "nucl_init_type": 2, "elec_init_type": 3
                       }
@@ -721,8 +721,13 @@ def run_tsh(common_params, compute_model, model_params):
 
     time.sleep(int(params["wait_time"]))
 
-    # Random numbers generator object
-    rnd = Random()
+    # Random numbers generator object. An explicit per-batch seed makes parallel
+    # batches statistically independent AND reproducible: the default Random()
+    # seeds from time(0) with 1 s granularity, so Pool workers starting within
+    # the same second produce bit-identical trajectories (the historical
+    # wait_time stagger only made such collisions less likely, not impossible).
+    seed = params["seed"]
+    rnd = Random() if seed is None else Random(int(seed))
 
     # ============ Initialize dynamical variables ==================
     x0, p0, masses, k0 = params["x0"], params["p0"], params["masses"], params["k"]
@@ -813,7 +818,9 @@ def make_var_pool(dyn_params, compute_model, model_params, _rnd,
 
                 prms = dict(dyn_params)
 
-                prms["wait_time"] = _rnd.uniform(0.0, 5.0)
+                # independent, reproducible random stream per batch (drawn from
+                # the master generator) - replaces the wait_time stagger
+                prms["seed"] = int(_rnd.uniform(1.0, 2147483647.0))
                 dir_prefix = prms["dir_prefix"]
 
                 prms["prefix"] = F"{dir_prefix}/start_s{istate}_{name}_batch{batch}"

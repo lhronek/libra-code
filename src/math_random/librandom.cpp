@@ -37,6 +37,7 @@ void export_Random_objects(){
 //  def("scale", expt_scale1);
 
   class_<Random>("Random",init<>())
+      .def(init<int>())
 //      .def("__copy__", &generic__copy__<Random>)
 //      .def("__deepcopy__", &generic__deepcopy__<Random>)
 

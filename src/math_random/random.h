@@ -45,6 +45,7 @@ class Random{
   public:
 
   Random(){   srand(time(0)); }
+  Random(int seed_){ srand(seed_); }  ///< reproducible / worker-safe seeding
   ~Random(){ ;; }
 
 
