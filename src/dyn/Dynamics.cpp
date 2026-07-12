@@ -663,158 +663,24 @@ int need_active_states_diff_rep(dyn_control_params &prms) {
   return res;
 }
 
-void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
-                          nHamiltonian *Ham_prev, dyn_control_params &prms) {
-
-  int itraj;
-
-  int num_el = prms.num_electronic_substeps;
-  double dt = prms.dt / num_el;
-  int rep = prms.rep_tdse;
-  int method = prms.electronic_integrator;
-  int is_ssy = prms.do_ssy;
-
-  //======= Parameters of the dyn variables ==========
-  // int ndof = dyn_var.ndof;
-  int ntraj = dyn_var.ntraj;
-  int nadi = dyn_var.nadi;
-  int ndia = dyn_var.ndia;
-
-  int nst;
-  if (prms.rep_tdse == 0 || prms.rep_tdse == 2) {
-    nst = ndia;
-  } else if (prms.rep_tdse == 1 || prms.rep_tdse == 3 || prms.rep_tdse == 4) {
-    nst = nadi;
-  } else {
-    nst = -1;
-  } // to throw an error
-
-  // int ampl_transformation_method = prms.ampl_transformation_method;
-
-  CMATRIX C(nst, 1);
-  CMATRIX vRHO(nst * nst, 1);      // vectorized DM
-  CMATRIX RHO(nst, nst);           // DM
-  CMATRIX L(nst * nst, nst * nst); // Liouvillian
-  CMATRIX Coeff(nst, ntraj);
-  if (prms.rep_tdse == 0) {
-    Coeff = *dyn_var.ampl_dia;
-  } else if (prms.rep_tdse == 1) {
-    Coeff = *dyn_var.ampl_adi;
-  }
-
-  //  dyn_var.compute_kinetic_energies()
-
-  ///======================== Now do the integration of the TD-SE
-  ///===================
-  for (itraj = 0; itraj < ntraj; itraj++) {
-
-    C = Coeff.col(itraj);
-
-    int traj1 = itraj;
-    if (method >= 100 && method < 200) {
-      traj1 = 0;
-    }
-    // NBRA runs (isNBRA==1) carry a single child Hamiltonian shared by all
-    // trajectories - never index children beyond what actually exists
-    if (traj1 >= (int)Ham->children.size()) {
-      traj1 = 0;
-    }
-
-    nHamiltonian *ham = Ham->children[traj1];
-    nHamiltonian *ham_prev = Ham_prev->children[traj1];
-    /*
-
-        //================= Basis re-expansion ===================
-        CMATRIX P(ham->nadi, ham->nadi);
-        //proj[itraj]->load_identity();
-        CMATRIX T(*dyn_var.proj_adi[itraj]);  T.load_identity();
-        CMATRIX T_new(ham->nadi, ham->nadi);
-
-        P = ham->get_time_overlap_adi();  // U_old.H() * U;
-
-    //    if(prms.thermally_corrected_nbra){
-    //      P = thermally_corrected_time_overlap(dyn_var, ham, prms, itraj);
-    //    }
-
-        // More consistent with the new derivations:
-        FullPivLU_inverse(P, T_new);
-        T_new = orthogonalized_T( T_new );
-
-        *dyn_var.proj_adi[itraj] = T_new;
-
-    */
-    CMATRIX T_new(*dyn_var.proj_adi[itraj]);
-    if (prms.assume_always_consistent) {
-      T_new.identity();
-    }
-
-    //    if ampl_transformation_method
-
-    if (rep == 0) { // diabatic
-      CMATRIX Hvib(ham->ndia, ham->ndia);
-      CMATRIX Sdia(ham->ndia, ham->ndia);
-
-      if (method == -1) {
-        ;
-        ;
-      } // No evolution
-      else if (method == 0 || method == 100) {
-        // Based on Lowdin transformations, using mid-point Hvib
-        Hvib = 0.5 * (ham->get_hvib_dia() + ham_prev->get_hvib_dia());
-        Sdia = ham->get_ovlp_dia();
-        propagate_electronic_eig(dt, C, Hvib,
-                                 Sdia); // in this case C - diabatic coeffs
-      } else if (method == 1 || method == 101) {
-        Hvib = 0.5 * (ham->get_hvib_dia() + ham_prev->get_hvib_dia());
-        Sdia = ham->get_ovlp_dia();
-        propagate_electronic_qtag(dt, C, Hvib,
-                                  Sdia); // in this case C - diabatic coeffs
-      } else if (method == 2 || method == 102) {
-        Hvib = ham->get_ham_dia();
-        Sdia = ham->get_ovlp_dia();
-        CMATRIX Hvib_old(ham->ndia, ham->ndia);
-        Hvib_old = ham_prev->get_ham_dia();
-        CMATRIX Sdia_old(ham->ndia, ham->ndia);
-        Sdia_old = ham_prev->get_ovlp_dia();
-
-        propagate_electronic_qtag2(dt, C, Hvib, Hvib_old, Sdia, Sdia_old);
-      } else if (method == 3 || method == 103) {
-        // Using exp(S^-1 * Hvib_dia * dt)
-        Hvib = 0.5 * (ham->get_hvib_dia() + ham_prev->get_hvib_dia());
-        Sdia = ham->get_ovlp_dia();
-        CMATRIX invS(ham->ndia, ham->ndia);
-        FullPivLU_inverse(Sdia, invS);
-        Hvib = invS * Hvib;
-        propagate_electronic_nonHermitian(dt, C, Hvib);
-      }
-
-    } // rep == 0 // diabatic
-
-    else if (rep == 1) { // adiabatic
-      /**
-          -1              -  No
-
-           0              -  ld, with crude splitting,  with exp_
-           1              -  ld, with symmetric splitting, with exp_
-           2              -  ld, original, with exp_
-           3              -  1-point, Hvib integration, with exp_
-           4              -  2-points, Hvib integration, with exp_
-           5              -  2-points, Hvib, integration with the second-point
-         correction of Hvib, with exp_ 6              -  2-points, Hvib, no
-         reordering
-
-          10              -  same as 0, but with rotations
-          11              -  same as 1, but with rotations
-          12              -  same as 2, but with rotations
-          13              -  same as 3, but with rotations
-          14              -  same as 4, but with rotations
-          15              -  same as 5, but with rotations
-
-      */
-      CMATRIX Hvib(ham->nadi, ham->nadi);
-      CMATRIX Hvib_old(ham->nadi, ham->nadi);
-      CMATRIX A(ham->nadi, ham->nadi); /// this is A(t)
-      CMATRIX B(ham->nadi, ham->nadi); /// this is actually A(t+dt)
+static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
+                                          CMATRIX &T_new, nHamiltonian *ham,
+                                          nHamiltonian *ham_prev, int is_ssy,
+                                          dyn_variables &dyn_var, int itraj) {
+  /**
+    One step of the adiabatic-amplitude propagation for the exp_-based
+    integrators (electronic_integrator = -1..8 and 100..108), extracted
+    verbatim from propagate_electronic. C holds amplitudes as columns: a
+    single trajectory when called from the per-trajectory loop, or the whole
+    (nadi x ntraj) batch at once on the NBRA fast path, where the one-step
+    propagator is common to all trajectories. The rotation-based integrators
+    (10-15) remain in the per-trajectory loop - propagate_electronic_rot
+    works on single columns by construction.
+  */
+  CMATRIX Hvib(ham->nadi, ham->nadi);
+  CMATRIX Hvib_old(ham->nadi, ham->nadi);
+  CMATRIX A(ham->nadi, ham->nadi); /// this is A(t)
+  CMATRIX B(ham->nadi, ham->nadi); /// this is actually A(t+dt)
 
       if (method == -1) {
         ;
@@ -998,6 +864,181 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         // C = T_new * C;
 
       } // method == 8 && 108
+}
+
+void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
+                          nHamiltonian *Ham_prev, dyn_control_params &prms) {
+
+  int itraj;
+
+  int num_el = prms.num_electronic_substeps;
+  double dt = prms.dt / num_el;
+  int rep = prms.rep_tdse;
+  int method = prms.electronic_integrator;
+  int is_ssy = prms.do_ssy;
+
+  //======= Parameters of the dyn variables ==========
+  // int ndof = dyn_var.ndof;
+  int ntraj = dyn_var.ntraj;
+  int nadi = dyn_var.nadi;
+  int ndia = dyn_var.ndia;
+
+  int nst;
+  if (prms.rep_tdse == 0 || prms.rep_tdse == 2) {
+    nst = ndia;
+  } else if (prms.rep_tdse == 1 || prms.rep_tdse == 3 || prms.rep_tdse == 4) {
+    nst = nadi;
+  } else {
+    nst = -1;
+  } // to throw an error
+
+  // int ampl_transformation_method = prms.ampl_transformation_method;
+
+  CMATRIX C(nst, 1);
+  CMATRIX vRHO(nst * nst, 1);      // vectorized DM
+  CMATRIX RHO(nst, nst);           // DM
+  CMATRIX L(nst * nst, nst * nst); // Liouvillian
+  CMATRIX Coeff(nst, ntraj);
+  if (prms.rep_tdse == 0) {
+    Coeff = *dyn_var.ampl_dia;
+  } else if (prms.rep_tdse == 1) {
+    Coeff = *dyn_var.ampl_adi;
+  }
+
+  //  dyn_var.compute_kinetic_energies()
+
+  ///======================== Now do the integration of the TD-SE
+  ///===================
+
+  // ============================ NBRA fast path ============================
+  // Under isNBRA there is a single shared child Hamiltonian and
+  // update_proj_adi builds every proj_adi[i] from it, so the one-step
+  // propagator is identical for all trajectories: build it once and
+  // propagate the whole amplitude batch with one matrix product, instead of
+  // ntraj matrix exponentials per step. Falls back to the per-trajectory
+  // loop for the rotation-based integrators (single-column by construction),
+  // SSY corrections (trajectory-dependent) and non-amplitude representations.
+  if (prms.isNBRA == 1 && is_ssy == 0 && rep == 1 && ntraj > 0 &&
+      (method <= 8 || (method >= 100 && method <= 108))) {
+    CMATRIX T_new(*dyn_var.proj_adi[0]);
+    propagate_amplitudes_adi_exp(method, dt, Coeff, T_new, Ham->children[0],
+                                 Ham_prev->children[0], 0, dyn_var, 0);
+  } else {
+
+  for (itraj = 0; itraj < ntraj; itraj++) {
+
+    C = Coeff.col(itraj);
+
+    int traj1 = itraj;
+    if (method >= 100 && method < 200) {
+      traj1 = 0;
+    }
+    // NBRA runs (isNBRA==1) carry a single child Hamiltonian shared by all
+    // trajectories - never index children beyond what actually exists
+    if (traj1 >= (int)Ham->children.size()) {
+      traj1 = 0;
+    }
+
+    nHamiltonian *ham = Ham->children[traj1];
+    nHamiltonian *ham_prev = Ham_prev->children[traj1];
+    /*
+
+        //================= Basis re-expansion ===================
+        CMATRIX P(ham->nadi, ham->nadi);
+        //proj[itraj]->load_identity();
+        CMATRIX T(*dyn_var.proj_adi[itraj]);  T.load_identity();
+        CMATRIX T_new(ham->nadi, ham->nadi);
+
+        P = ham->get_time_overlap_adi();  // U_old.H() * U;
+
+    //    if(prms.thermally_corrected_nbra){
+    //      P = thermally_corrected_time_overlap(dyn_var, ham, prms, itraj);
+    //    }
+
+        // More consistent with the new derivations:
+        FullPivLU_inverse(P, T_new);
+        T_new = orthogonalized_T( T_new );
+
+        *dyn_var.proj_adi[itraj] = T_new;
+
+    */
+    CMATRIX T_new(*dyn_var.proj_adi[itraj]);
+    if (prms.assume_always_consistent) {
+      T_new.identity();
+    }
+
+    //    if ampl_transformation_method
+
+    if (rep == 0) { // diabatic
+      CMATRIX Hvib(ham->ndia, ham->ndia);
+      CMATRIX Sdia(ham->ndia, ham->ndia);
+
+      if (method == -1) {
+        ;
+        ;
+      } // No evolution
+      else if (method == 0 || method == 100) {
+        // Based on Lowdin transformations, using mid-point Hvib
+        Hvib = 0.5 * (ham->get_hvib_dia() + ham_prev->get_hvib_dia());
+        Sdia = ham->get_ovlp_dia();
+        propagate_electronic_eig(dt, C, Hvib,
+                                 Sdia); // in this case C - diabatic coeffs
+      } else if (method == 1 || method == 101) {
+        Hvib = 0.5 * (ham->get_hvib_dia() + ham_prev->get_hvib_dia());
+        Sdia = ham->get_ovlp_dia();
+        propagate_electronic_qtag(dt, C, Hvib,
+                                  Sdia); // in this case C - diabatic coeffs
+      } else if (method == 2 || method == 102) {
+        Hvib = ham->get_ham_dia();
+        Sdia = ham->get_ovlp_dia();
+        CMATRIX Hvib_old(ham->ndia, ham->ndia);
+        Hvib_old = ham_prev->get_ham_dia();
+        CMATRIX Sdia_old(ham->ndia, ham->ndia);
+        Sdia_old = ham_prev->get_ovlp_dia();
+
+        propagate_electronic_qtag2(dt, C, Hvib, Hvib_old, Sdia, Sdia_old);
+      } else if (method == 3 || method == 103) {
+        // Using exp(S^-1 * Hvib_dia * dt)
+        Hvib = 0.5 * (ham->get_hvib_dia() + ham_prev->get_hvib_dia());
+        Sdia = ham->get_ovlp_dia();
+        CMATRIX invS(ham->ndia, ham->ndia);
+        FullPivLU_inverse(Sdia, invS);
+        Hvib = invS * Hvib;
+        propagate_electronic_nonHermitian(dt, C, Hvib);
+      }
+
+    } // rep == 0 // diabatic
+
+    else if (rep == 1) { // adiabatic
+      /**
+          -1              -  No
+
+           0              -  ld, with crude splitting,  with exp_
+           1              -  ld, with symmetric splitting, with exp_
+           2              -  ld, original, with exp_
+           3              -  1-point, Hvib integration, with exp_
+           4              -  2-points, Hvib integration, with exp_
+           5              -  2-points, Hvib, integration with the second-point
+         correction of Hvib, with exp_ 6              -  2-points, Hvib, no
+         reordering
+
+          10              -  same as 0, but with rotations
+          11              -  same as 1, but with rotations
+          12              -  same as 2, but with rotations
+          13              -  same as 3, but with rotations
+          14              -  same as 4, but with rotations
+          15              -  same as 5, but with rotations
+
+      */
+      CMATRIX Hvib(ham->nadi, ham->nadi);
+      CMATRIX Hvib_old(ham->nadi, ham->nadi);
+      CMATRIX A(ham->nadi, ham->nadi); /// this is A(t)
+      CMATRIX B(ham->nadi, ham->nadi); /// this is actually A(t+dt)
+
+      if (method <= 8 || (method >= 100 && method <= 108)) {
+        propagate_amplitudes_adi_exp(method, dt, C, T_new, ham, ham_prev,
+                                     is_ssy, dyn_var, itraj);
+      }
 
       //========================== Rotation-based ============================
       else if (method == 10 || method == 110) {
@@ -1214,6 +1255,8 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
     }
 
   } // for itraj - all trajectories
+
+  } // NBRA fast path vs per-trajectory loop
 
   if (prms.rep_tdse == 0) {
     *dyn_var.ampl_dia = Coeff;
