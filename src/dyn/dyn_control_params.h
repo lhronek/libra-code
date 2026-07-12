@@ -818,6 +818,18 @@ class dyn_control_params{
   */
   int isNBRA;
 
+  /**
+    Whether to keep the diabatic density matrix dm_dia updated along the
+    dynamics. In the adiabatic representations (rep_tdse = 1 or 3) it is a
+    derived quantity costing two nadi x nadi matrix products per trajectory
+    per step. Options:
+      -  1: always compute [ the legacy behavior and the C++-level default ]
+      -  0: never compute
+      - -1: auto - resolved to 0/1 by dynamics/tsh/compute.py based on
+            rep_tdse, rep_sh and the requested outputs ("D_dia")
+  */
+  int compute_dm_dia;
+
 
   ///===============================================================================
   ///================= Entanglement of trajectories ================================

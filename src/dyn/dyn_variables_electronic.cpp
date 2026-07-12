@@ -225,6 +225,14 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params){
   CMATRIX cd(ndia, 1);
   CMATRIX ca(nadi, 1);
 
+  int rep = dyn_params.rep_tdse;
+  // In the adiabatic representations (rep_tdse 1 and 3) dm_dia is a derived
+  // quantity costing two nadi x nadi matrix products per trajectory - skip it
+  // when nothing consumes it: compute_dm_dia == 0; the "auto" value (-1) is
+  // resolved to 0/1 in dynamics/tsh/compute.py from rep_tdse, rep_sh and the
+  // requested outputs ("D_dia")
+  int skip_dia = (dyn_params.compute_dm_dia == 0) && (rep == 1 || rep == 3);
+
   // Assuming that in the diabatic representation, the overlap 
   // matrix is identity S = I
   for(int traj=0; traj<ntraj; traj++){
@@ -232,24 +240,28 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params){
     CMATRIX& U = (*basis_transform[traj]); // * (*proj_adi[indx]); // U_eff - let's wait with this
 
     /// Diabatic wfc representation
-    if(dyn_params.rep_tdse==0){
+    if(rep==0){
       cd = ampl_dia->col(traj);
       *dm_dia[traj] = (cd * cd.H());
       *dm_adi[traj] = U.H() * (*dm_dia[traj]) * U;
     }
     /// Adiabatic wfc representation
-    else if(dyn_params.rep_tdse==1){
+    else if(rep==1){
       ca = ampl_adi->col(traj);
       *dm_adi[traj] = ca * ca.H();
-      *dm_dia[traj] =  U * (*dm_adi[traj]) * U.H();
+      if(!skip_dia){
+        *dm_dia[traj] =  U * (*dm_adi[traj]) * U.H();
+      }
     }
     /// Diabatic DM representation
-    else if(dyn_params.rep_tdse==2){
+    else if(rep==2){
       *dm_adi[traj] = U.H() * (*dm_dia[traj]) * U;
     }
     /// Adiabatic DM representation
-    else if(dyn_params.rep_tdse==3){
-      *dm_dia[traj] =  U * (*dm_adi[traj]) * U.H();
+    else if(rep==3){
+      if(!skip_dia){
+        *dm_dia[traj] =  U * (*dm_adi[traj]) * U.H();
+      }
     }
 
   }// for traj
@@ -306,39 +318,60 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params, nHamil
   CMATRIX ca(nadi, 1);
 
   //cout<<"In update density matrix\n";
-  vector<int> indx;    
+  vector<int> indx;
   if(lvl==0){ indx = vector<int>(1, 0); }
-  else if(lvl==1) { indx = vector<int>(2, 0); } 
+  else if(lvl==1) { indx = vector<int>(2, 0); }
+
+  int rep = dyn_params.rep_tdse;
+  // In the adiabatic representations (rep_tdse 1 and 3) dm_dia is a derived
+  // quantity costing two nadi x nadi matrix products per trajectory per step.
+  // Skip it when nothing consumes it: compute_dm_dia == 0; the "auto" value
+  // (-1) is resolved to 0/1 in dynamics/tsh/compute.py from rep_tdse, rep_sh
+  // and the requested outputs ("D_dia")
+  int skip_dia = (dyn_params.compute_dm_dia == 0) && (rep == 1 || rep == 3);
+  // With a single child Hamiltonian (NBRA) S, U and su are the same for
+  // every trajectory - fetch and multiply them once
+  int nchildren = ham.children.size();
+  int shared = (lvl == 0) || (nchildren == 1);
+  if(shared && !skip_dia){
+    S = ham.get_ovlp_dia(indx);
+    U = ham.get_basis_transform(indx);
+    if(rep == 1 || rep == 3){ su = S * U; }
+  }
 
   for(int traj=0; traj<ntraj; traj++){
 
-    // NBRA runs carry a single child Hamiltonian shared by all trajectories
-    if(lvl==1){  indx[1] = (traj < (int)ham.children.size()) ? traj : 0; }
-  
-    S = ham.get_ovlp_dia(indx);
-    U = ham.get_basis_transform(indx);
+    if(!shared && !skip_dia){
+      // NBRA runs carry a single child Hamiltonian shared by all trajectories
+      if(lvl==1){  indx[1] = (traj < nchildren) ? traj : 0; }
+      S = ham.get_ovlp_dia(indx);
+      U = ham.get_basis_transform(indx);
+      if(rep == 1 || rep == 3){ su = S * U; }
+    }
 
     /// Diabatic wfc representation
-    if(dyn_params.rep_tdse==0){
+    if(rep==0){
       cd = ampl_dia->col(traj);
-      *dm_dia[traj] = S * (cd * cd.H()) * S; 
+      *dm_dia[traj] = S * (cd * cd.H()) * S;
       *dm_adi[traj] = U.H() * (*dm_dia[traj]) * U;
-    }  
+    }
     /// Adiabatic wfc representation
-    else if(dyn_params.rep_tdse==1){  
+    else if(rep==1){
       ca = ampl_adi->col(traj);
-      *dm_adi[traj] = ca * ca.H();            
-      su = S * U; 
-      *dm_dia[traj] =  su * (*dm_adi[traj]) * su.H();       
+      *dm_adi[traj] = ca * ca.H();
+      if(!skip_dia){
+        *dm_dia[traj] =  su * (*dm_adi[traj]) * su.H();
+      }
     }
     /// Diabatic DM representation
-    else if(dyn_params.rep_tdse==2){
+    else if(rep==2){
       *dm_adi[traj] = U.H() * (*dm_dia[traj]) * U;
     }
     /// Adiabatic DM representation
-    else if(dyn_params.rep_tdse==3){
-      su = S * U;
-      *dm_dia[traj] =  su * (*dm_adi[traj]) * su.H();
+    else if(rep==3){
+      if(!skip_dia){
+        *dm_dia[traj] =  su * (*dm_adi[traj]) * su.H();
+      }
     }
 
   }// for traj

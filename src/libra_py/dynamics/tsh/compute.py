@@ -1164,6 +1164,16 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
     # rest of the machinery still assumes one child per trajectory.
     is_nbra = dyn_params.get("isNBRA", dyn_params.get("is_nbra", 0))
     dyn_params["isNBRA"] = dyn_params["is_nbra"] = is_nbra
+
+    # Resolve the "auto" policy for maintaining the diabatic density matrix.
+    # dm_dia is a derived quantity in the adiabatic representations, costing
+    # two nadi x nadi matrix products per trajectory per step, and is consumed
+    # only by diabatic-representation hopping/dynamics and the "D_dia" output.
+    if dyn_params.get("compute_dm_dia", -1) == -1:
+        props = dyn_params.get("properties_to_save", [])
+        need = (dyn_params.get("rep_tdse", 1) in (0, 2)) or (dyn_params.get("rep_sh", 1) == 0) \
+            or ("D_dia" in props) or ("D_dia_raw" in props)
+        dyn_params["compute_dm_dia"] = 1 if need else 0
     ntraj = dyn_params["ntraj"]
     direct_init = dyn_params["direct_init"]
 
