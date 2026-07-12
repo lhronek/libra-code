@@ -26,7 +26,7 @@ import os
 import time
 import copy
 from distutils.spawn import find_executable
-import multiprocessing as mp
+from libra_py.workflows.nbra.mp_context import MP_CTX as _MP_CTX
 
 # Concurrency for large systems
 import concurrent.futures
@@ -275,7 +275,7 @@ def compute_cube_ks_overlaps(cubefiles_prev, params):
     print('Reading cube files with %i number of processors' % nprocs)
     # First read all the .cube files (This is the most time consuming part)
     # Creating a pool and assigning the number of processors for mp.Pool
-    pool = mp.Pool(processes=nprocs)
+    pool = _MP_CTX.Pool(processes=nprocs)
 
     # for curr_step
     print("Reading the cubes for step ", curr_step)
@@ -828,7 +828,7 @@ def run_step2_many_body(params):
     print("Reading the initial step using pool")
     print("nprocs", nprocs)
     # Creating a pool with nprocs
-    pool = mp.Pool(processes=nprocs)
+    pool = _MP_CTX.Pool(processes=nprocs)
 
     # The cube file names produced by CP2K, Here we set it as prev since we
     # don't want to read the cubes twice.

@@ -24,7 +24,7 @@ import numpy as np
 import scipy.sparse as sp
 import h5py
 import time
-import multiprocessing as mp
+from libra_py.workflows.nbra.mp_context import MP_CTX as _MP_CTX
 if sys.platform == "cygwin":
     from cyglibra_core import *
 elif sys.platform == "linux" or sys.platform == "linux2":
@@ -447,7 +447,7 @@ def run_sum(rpi_sum_params):
     time = np.array([x for x in range(npatches * nstep_patch + 1)]) * dt
     pops_avg = np.zeros((npatches * nstep_patch + 1, nstates))
     
-    with mp.Pool(processes=nprocs) as pool:
+    with _MP_CTX.Pool(processes=nprocs) as pool:
         results = pool.map(process_batch, [(ibatch, rpi_sum_params) for ibatch in range(nbatches)])
     
     for pops in results:

@@ -888,7 +888,11 @@ def namd_workflow(dyn_params, compute_model, model_params, _rnd, nthreads=4,
 
     if parallel:
         t1 = time.time()
-        pool = mp.get_context(F"{fork_or_spawn}").Pool(nthreads)
+        try:
+            ctx = mp.get_context(F"{fork_or_spawn}")
+        except ValueError:            # start method unavailable on this platform
+            ctx = mp
+        pool = ctx.Pool(nthreads)
     #    pool = mp.Pool( nthreads )
         pool.starmap(run_tsh, var_pool)
         pool.close()
