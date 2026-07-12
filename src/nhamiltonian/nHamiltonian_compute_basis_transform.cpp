@@ -179,7 +179,8 @@ void nHamiltonian::ampl_dia2adi(CMATRIX &ampl_dia, CMATRIX &ampl_adi, int lvl,
       ampl_dia2adi(ampl_dia, ampl_adi);
     } else if (split == 1) {
       // Check whether we have enough sub-Hamiltonians
-      if (children.size() != static_cast<std::size_t>(ampl_dia.n_cols)) {
+      if (children.size() != static_cast<std::size_t>(ampl_dia.n_cols) &&
+          children.size() != 1) {
         cout << "ERROR in void nHamiltonian::ampl_dia2adi(CMATRIX& ampl_dia, "
                 "CMATRIX& ampl_adi, int lvl, int split):\n";
         cout << "The number of columns of the ampl_dia (" << ampl_dia.n_cols
@@ -189,7 +190,8 @@ void nHamiltonian::ampl_dia2adi(CMATRIX &ampl_dia, CMATRIX &ampl_adi, int lvl,
         cout << "Exiting...\n";
         exit(0);
       }
-      if (children.size() != static_cast<std::size_t>(ampl_adi.n_cols)) {
+      if (children.size() != static_cast<std::size_t>(ampl_adi.n_cols) &&
+          children.size() != 1) {
         cout << "ERROR in void nHamiltonian::ampl_dia2adi(CMATRIX& ampl_dia, "
                 "CMATRIX& ampl_adi, int lvl, int split):\n";
         cout << "The number of columns of the ampl_adi (" << ampl_adi.n_cols
@@ -214,12 +216,13 @@ void nHamiltonian::ampl_dia2adi(CMATRIX &ampl_dia, CMATRIX &ampl_adi, int lvl,
         stenc_adi1[i] = i;
       }
 
-      for (auto i = 0u; i < children.size(); i++) {
+      // NBRA: a single child Hamiltonian may serve all trajectory columns
+      for (auto i = 0u; i < static_cast<unsigned int>(ampl_dia.n_cols); i++) {
         stenc_col[0] = i;
 
         pop_submatrix(ampl_dia, dia_tmp, stenc_dia1, stenc_col);
 
-        children[i]->ampl_dia2adi(dia_tmp, adi_tmp);
+        children[(i < children.size()) ? i : 0]->ampl_dia2adi(dia_tmp, adi_tmp);
 
         push_submatrix(ampl_adi, adi_tmp, stenc_adi1, stenc_col);
 
@@ -289,7 +292,7 @@ void nHamiltonian::ampl_dia2adi(CMATRIX *ampl_dia, CMATRIX *ampl_adi, int lvl,
       ampl_dia2adi(ampl_dia, ampl_adi);
     } else if (split == 1) {
       // Check whether we have enough sub-Hamiltonians
-      if (children.size() != ampl_dia->n_cols) {
+      if (children.size() != ampl_dia->n_cols && children.size() != 1) {
         cout << "ERROR in void nHamiltonian::ampl_dia2adi(CMATRIX& ampl_dia, "
                 "CMATRIX& ampl_adi, int lvl, int split):\n";
         cout << "The number of columns of the ampl_dia (" << ampl_dia->n_cols
@@ -299,7 +302,7 @@ void nHamiltonian::ampl_dia2adi(CMATRIX *ampl_dia, CMATRIX *ampl_adi, int lvl,
         cout << "Exiting...\n";
         exit(0);
       }
-      if (children.size() != ampl_adi->n_cols) {
+      if (children.size() != ampl_adi->n_cols && children.size() != 1) {
         cout << "ERROR in void nHamiltonian::ampl_dia2adi(CMATRIX& ampl_dia, "
                 "CMATRIX& ampl_adi, int lvl, int split):\n";
         cout << "The number of columns of the ampl_adi (" << ampl_adi->n_cols
@@ -324,12 +327,13 @@ void nHamiltonian::ampl_dia2adi(CMATRIX *ampl_dia, CMATRIX *ampl_adi, int lvl,
         stenc_adi1[i] = i;
       }
 
-      for (i = 0; i < children.size(); i++) {
+      // NBRA: a single child Hamiltonian may serve all trajectory columns
+      for (i = 0; i < ampl_dia->n_cols; i++) {
         stenc_col[0] = i;
 
         pop_submatrix(ampl_dia, &dia_tmp, stenc_dia1, stenc_col);
 
-        children[i]->ampl_dia2adi(dia_tmp, adi_tmp);
+        children[(static_cast<std::size_t>(i) < children.size()) ? i : 0]->ampl_dia2adi(dia_tmp, adi_tmp);
 
         push_submatrix(ampl_adi, &adi_tmp, stenc_adi1, stenc_col);
 
@@ -491,7 +495,7 @@ void nHamiltonian::ampl_adi2dia(CMATRIX &ampl_dia, CMATRIX &ampl_adi, int lvl,
       ampl_adi2dia(ampl_dia, ampl_adi);
     } else if (split == 1) {
       // Check whether we have enough sub-Hamiltonians
-      if (children.size() != ampl_dia.n_cols) {
+      if (children.size() != ampl_dia.n_cols && children.size() != 1) {
         cout << "ERROR in void nHamiltonian::ampl_adi2dia(CMATRIX& ampl_dia, "
                 "CMATRIX& ampl_adi, int lvl, int split):\n";
         cout << "The number of columns of the ampl_dia (" << ampl_dia.n_cols
@@ -501,7 +505,7 @@ void nHamiltonian::ampl_adi2dia(CMATRIX &ampl_dia, CMATRIX &ampl_adi, int lvl,
         cout << "Exiting...\n";
         exit(0);
       }
-      if (children.size() != ampl_adi.n_cols) {
+      if (children.size() != ampl_adi.n_cols && children.size() != 1) {
         cout << "ERROR in void nHamiltonian::ampl_adi2dia(CMATRIX& ampl_dia, "
                 "CMATRIX& ampl_adi, int lvl, int split):\n";
         cout << "The number of columns of the ampl_adi (" << ampl_adi.n_cols
@@ -526,12 +530,13 @@ void nHamiltonian::ampl_adi2dia(CMATRIX &ampl_dia, CMATRIX &ampl_adi, int lvl,
         stenc_adi1[i] = i;
       }
 
-      for (i = 0; i < children.size(); i++) {
+      // NBRA: a single child Hamiltonian may serve all trajectory columns
+      for (i = 0; i < ampl_adi.n_cols; i++) {
         stenc_col[0] = i;
 
         pop_submatrix(ampl_adi, adi_tmp, stenc_adi1, stenc_col);
 
-        children[i]->ampl_adi2dia(dia_tmp, adi_tmp);
+        children[(static_cast<std::size_t>(i) < children.size()) ? i : 0]->ampl_adi2dia(dia_tmp, adi_tmp);
 
         push_submatrix(ampl_dia, dia_tmp, stenc_dia1, stenc_col);
 
@@ -601,7 +606,7 @@ void nHamiltonian::ampl_adi2dia(CMATRIX *ampl_dia, CMATRIX *ampl_adi, int lvl,
       ampl_adi2dia(ampl_dia, ampl_adi);
     } else if (split == 1) {
       // Check whether we have enough sub-Hamiltonians
-      if (children.size() != ampl_dia->n_cols) {
+      if (children.size() != ampl_dia->n_cols && children.size() != 1) {
         cout << "ERROR in void nHamiltonian::ampl_adi2dia(CMATRIX& ampl_dia, "
                 "CMATRIX& ampl_adi, int lvl, int split):\n";
         cout << "The number of columns of the ampl_dia (" << ampl_dia->n_cols
@@ -611,7 +616,7 @@ void nHamiltonian::ampl_adi2dia(CMATRIX *ampl_dia, CMATRIX *ampl_adi, int lvl,
         cout << "Exiting...\n";
         exit(0);
       }
-      if (children.size() != ampl_adi->n_cols) {
+      if (children.size() != ampl_adi->n_cols && children.size() != 1) {
         cout << "ERROR in void nHamiltonian::ampl_adi2dia(CMATRIX& ampl_dia, "
                 "CMATRIX& ampl_adi, int lvl, int split):\n";
         cout << "The number of columns of the ampl_adi (" << ampl_adi->n_cols
@@ -636,12 +641,13 @@ void nHamiltonian::ampl_adi2dia(CMATRIX *ampl_dia, CMATRIX *ampl_adi, int lvl,
         stenc_adi1[i] = i;
       }
 
-      for (i = 0; i < children.size(); i++) {
+      // NBRA: a single child Hamiltonian may serve all trajectory columns
+      for (i = 0; i < ampl_adi->n_cols; i++) {
         stenc_col[0] = i;
 
         pop_submatrix(ampl_adi, &adi_tmp, stenc_adi1, stenc_col);
 
-        children[i]->ampl_adi2dia(dia_tmp, adi_tmp);
+        children[(static_cast<std::size_t>(i) < children.size()) ? i : 0]->ampl_adi2dia(dia_tmp, adi_tmp);
 
         push_submatrix(ampl_dia, &dia_tmp, stenc_dia1, stenc_col);
 

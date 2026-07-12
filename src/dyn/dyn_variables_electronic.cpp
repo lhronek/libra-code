@@ -145,8 +145,11 @@ void dyn_variables::update_basis_transform(nHamiltonian& Ham){
 /**
 
 */
-  for(int itraj=0; itraj<ntraj; itraj++){ 
-    nHamiltonian* ham = Ham.children[itraj];
+  // NBRA runs (isNBRA==1) carry a single child Hamiltonian shared by all
+  // trajectories - never index children beyond what actually exists
+  int nchildren = Ham.children.size();
+  for(int itraj=0; itraj<ntraj; itraj++){
+    nHamiltonian* ham = Ham.children[ (itraj < nchildren) ? itraj : 0 ];
     *basis_transform[itraj] = *(ham->basis_transform);
 
   }// for itraj
@@ -309,7 +312,8 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params, nHamil
 
   for(int traj=0; traj<ntraj; traj++){
 
-    if(lvl==1){  indx[1] = traj; }
+    // NBRA runs carry a single child Hamiltonian shared by all trajectories
+    if(lvl==1){  indx[1] = (traj < (int)ham.children.size()) ? traj : 0; }
   
     S = ham.get_ovlp_dia(indx);
     U = ham.get_basis_transform(indx);

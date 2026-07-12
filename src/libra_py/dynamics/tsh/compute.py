@@ -1157,8 +1157,13 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
                                   "quantum_dofs": list(range(ndof))
                                   }, [])
 
-    # Extract info from the updated dyn_params:
-    is_nbra = dyn_params["isNBRA"]
+    # Extract info from the updated dyn_params. Historically two spellings of
+    # the NBRA flag coexist: the init path read "isNBRA" while the dynamics
+    # loop and the save layer read "is_nbra" - accept either and sync both,
+    # otherwise an isNBRA=1 run creates a single child Hamiltonian but the
+    # rest of the machinery still assumes one child per trajectory.
+    is_nbra = dyn_params.get("isNBRA", dyn_params.get("is_nbra", 0))
+    dyn_params["isNBRA"] = dyn_params["is_nbra"] = is_nbra
     ntraj = dyn_params["ntraj"]
     direct_init = dyn_params["direct_init"]
 

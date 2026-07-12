@@ -363,8 +363,12 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
   MATRIX p(dyn_var.ndof, 1);
   double dt = prms.dt;
 
+  // NBRA runs (isNBRA==1) carry a single child Hamiltonian shared by all
+  // trajectories - never index children beyond what actually exists
+  int nchildren = Ham.children.size();
   for (auto itraj = 0; itraj < ntraj; itraj++) {
-    int traj1 = itraj; // if(method >=100 && method <200){ traj1 = 0; }
+    int traj1 = itraj;
+    if (traj1 >= nchildren) { traj1 = 0; }
     traj_id[0] = traj1;
 
     nHamiltonian *ham = Ham.children[traj1];

@@ -714,6 +714,11 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
     if (method >= 100 && method < 200) {
       traj1 = 0;
     }
+    // NBRA runs (isNBRA==1) carry a single child Hamiltonian shared by all
+    // trajectories - never index children beyond what actually exists
+    if (traj1 >= (int)Ham->children.size()) {
+      traj1 = 0;
+    }
 
     nHamiltonian *ham = Ham->children[traj1];
     nHamiltonian *ham_prev = Ham_prev->children[traj1];
@@ -2208,8 +2213,10 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   // GFSH (original)
   dyn_var.save_curr_dm_into_prev();
 
+  // NBRA runs (isNBRA==1) size decoherence_rates with a single shared entry
+  int nrates = decoherence_rates.size();
   for (traj = 0; traj < ntraj; traj++) {
-    *dyn_var.ave_decoherence_rates += decoherence_rates[traj];
+    *dyn_var.ave_decoherence_rates += decoherence_rates[(traj < nrates) ? traj : 0];
   }
   *dyn_var.ave_decoherence_rates /= ntraj;
 

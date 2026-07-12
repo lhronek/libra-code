@@ -199,7 +199,7 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
     // Diabatic 
     if(prms.rep_force==0){  
       for(itraj=0; itraj<ntraj; itraj++){
-        id[1] = itraj;
+        id[1] = (itraj < (int)ham.children.size()) ? itraj : 0;  // NBRA: 1 shared child
         int ist = effective_states[itraj];
         res[itraj] = ham.get_ham_dia(id).get(ist, ist).real();   
       }
@@ -207,7 +207,7 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
     // Adiabatic 
     else if(prms.rep_force==1){  
       for(itraj=0; itraj<ntraj; itraj++){
-        id[1] = itraj;
+        id[1] = (itraj < (int)ham.children.size()) ? itraj : 0;  // NBRA: 1 shared child
         int ist = effective_states[itraj];
 
         //CMATRIX& T = *dyn_vars.proj_adi[itraj];
@@ -223,7 +223,7 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
     if(prms.rep_force==0){ 
       CMATRIX coeff(ndia, 1);
       for(itraj=0; itraj<ntraj; itraj++){
-        id[1] = itraj;
+        id[1] = (itraj < (int)ham.children.size()) ? itraj : 0;  // NBRA: 1 shared child
         coeff = dyn_vars.ampl_dia->col(itraj);
         res[itraj] = ham.Ehrenfest_energy_dia(coeff, id).real();
       }
@@ -232,7 +232,7 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
     else if(prms.rep_force==1){  
       CMATRIX coeff(nadi, 1);
       for(itraj=0; itraj<ntraj; itraj++){
-        id[1] = itraj;
+        id[1] = (itraj < (int)ham.children.size()) ? itraj : 0;  // NBRA: 1 shared child
         coeff = dyn_vars.ampl_adi->col(itraj);
         res[itraj] = ham.Ehrenfest_energy_adi(coeff, id, *(dyn_vars.proj_adi[itraj]) ).real();
       }
@@ -254,7 +254,7 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
     if(prms.rep_force==0){ 
       CMATRIX coeff(ndia, 1);
       for(itraj=0; itraj<ntraj; itraj++){
-        id[1] = itraj;
+        id[1] = (itraj < (int)ham.children.size()) ? itraj : 0;  // NBRA: 1 shared child
         int ist = effective_states[itraj];
         res[itraj] = ham.get_ham_dia(id).get(ist, ist).real(); // diagonal energy
         
@@ -266,7 +266,7 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
     else if(prms.rep_force==1){  
       //CMATRIX coeff(nadi, 1);
       for(itraj=0; itraj<ntraj; itraj++){
-        id[1] = itraj;
+        id[1] = (itraj < (int)ham.children.size()) ? itraj : 0;  // NBRA: 1 shared child
         int ist = effective_states[itraj];
         res[itraj] = ham.get_ham_adi(id).get(ist,ist).real(); // diagonal energy
 
@@ -289,7 +289,7 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
       double c = prms.kcrpmd_c; 
       Veff = ham.kcrpmd_effective_potential(dyn_vars.y_aux_var, *dyn_vars.q, *dyn_vars.iM, beta, eta, a, b, c);
       for(itraj=0; itraj<ntraj; itraj++){
-        id[1] = itraj;
+        id[1] = (itraj < (int)ham.children.size()) ? itraj : 0;  // NBRA: 1 shared child
         res[itraj] = Veff;
       }
     }
