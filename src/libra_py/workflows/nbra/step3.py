@@ -2303,7 +2303,8 @@ def run_step3_sd_nacs_libint(params):
                     hybrid parallelism: nprocs workers x blas_num_threads threads each.
             * **params['sd_overlap_kernel']** (string): kernel for the SD overlap matrices
                     - "auto" : batched LAPACK determinants with the determinant-lemma shortcut
-                               for singly-excited pairs; bit-exact vs "per_pair" [ default ]
+                               for low-degree excitations (singles, doubles, ...); machine
+                               precision vs "per_pair" [ default ]
                     - "batched" : batched LAPACK determinants only
                     - "lemma" : determinant-lemma kernel only
                     - "per_pair" : the original per-pair mapping.ovlp_mat_arb loop
@@ -2814,8 +2815,8 @@ def _compute_sd_overlaps(step, params):
     sd_states_reindexed_sorted = params['sd_states_reindexed_sorted']
 
     # SD overlap kernel: "auto" = batched LAPACK determinants + determinant-lemma shortcut
-    # for singly-excited pairs (bit-exact vs the legacy per-pair loop, orders of magnitude
-    # faster for large SD bases); "batched"/"lemma" force one of the two; "per_pair" = ovlp_mat_arb
+    # for low-degree excitations (machine precision vs the legacy per-pair loop, orders of
+    # magnitude faster for large SD bases); "batched"/"lemma" force one; "per_pair" = ovlp_mat_arb
     kernel = params.get('sd_overlap_kernel', 'auto')
     ovlp = {'per_pair': mapping.ovlp_mat_arb,
             'batched': mapping.ovlp_mat_arb_batched,

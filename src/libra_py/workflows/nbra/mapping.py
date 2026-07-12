@@ -462,76 +462,115 @@ def _sd_indices(SDs, n_half):
     return np.array(_sd_index_rows(SDs, n_half))
 
 
-def _single_exc_structure(idx):
-    """
-    For SD index lists differing from a common reference in at most one
-    position, return (ref_row, p, a, is_gs): the reference index vector, the
-    replaced position per SD, the replacement index per SD, and the GS mask.
-    Returns None if any SD differs in more than one position (not singly
-    excited) or no reference determinant is present.
-    """
-    # the GS determinant is the reference: replacing an occupied index by a
-    # virtual one strictly increases the index sum, so the GS row is the
-    # unique row of minimal sum
-    ref = idx[np.argmin(idx.sum(axis=1))]
-    p = np.zeros(len(idx), dtype=int)
-    a = np.zeros(len(idx), dtype=int)
-    is_gs = np.zeros(len(idx), dtype=bool)
-    for k, row in enumerate(idx):
-        diff = np.nonzero(row != ref)[0]
-        if len(diff) == 0:
-            is_gs[k] = True
-        elif len(diff) == 1:
-            p[k] = diff[0]
-            a[k] = row[diff[0]]
-        else:
-            return None
-    return ref, p, a, is_gs
+def _perm_parity(row):
+    """Sign of the permutation that sorts `row` (via cycle decomposition)."""
+    perm = np.argsort(row, kind="stable")
+    visited = np.zeros(len(row), dtype=bool)
+    sign = 1
+    for start in range(len(row)):
+        if visited[start]:
+            continue
+        j, cyc = start, 0
+        while not visited[j]:
+            visited[j] = True
+            j = perm[j]
+            cyc += 1
+        if cyc % 2 == 0:
+            sign = -sign
+    return sign
 
 
 def _sort_parities(idx):
     """Per-row sign of the permutation that sorts the mapped indices -
     converts list-order determinants to the canonical (sorted) convention
     used by ovlp_arb."""
-    out = np.empty(len(idx))
-    for k, row in enumerate(idx):
-        perm = np.argsort(row, kind="stable")
-        visited = np.zeros(len(row), dtype=bool)
-        sign = 1
-        for start in range(len(row)):
-            if visited[start]:
-                continue
-            j, cyc = start, 0
-            while not visited[j]:
-                visited[j] = True
-                j = perm[j]
-                cyc += 1
-            if cyc % 2 == 0:
-                sign = -sign
-        out[k] = sign
-    return out
+    return np.array([_perm_parity(row) for row in idx], dtype=float)
 
 
-def ovlp_mat_arb_lemma(SD1, SD2, S2, active_space=None):
+def _excitation_structure(idx):
     """
-    O(1)-per-pair SD overlaps for singly-substituted determinant bases via the
-    generalized matrix determinant lemma.
+    Excitation structure of SD index rows relative to a common reference,
+    treating every row as a SET of spin-orbitals (input order irrelevant).
 
-    Requirements (checked automatically): each list must contain a common
-    reference determinant (the row of minimal index sum) from which every
-    other SD differs in exactly one position. Any spin structure is fine -
-    indices are spin-orbitals. With A = S2[ref_bra, ref_ket], D0 = det(A),
-    G = A^-1, a pair replacing bra row p by orbital a and ket column q by
-    orbital b evaluates as D0*(R_p*C_q - G[q,p]*(T - w)); the only O(nSD^2)
-    heavy operation is one GEMM. Complexity O(nSD^2 * nelec) vs
-    O(nSD^2 * nelec^3) for the batched kernel; agreement ~1e-15 relative.
+    The reference is the sorted row of minimal index sum (replacing an
+    occupied spin-orbital by a higher one strictly increases the sum).
+
+    Returns (ref, deg, holes, parts, sigma), or None if a row carries a
+    repeated spin-orbital:
+        ref: sorted reference row (nelec,)
+        deg[i]: excitation degree of row i relative to ref
+        holes[i]: POSITIONS in ref of the removed orbitals, ascending
+        parts[i]: the replacement spin-orbitals, ascending
+        sigma[i]: parity converting the in-place arrangement (ref with
+            ref[holes] := parts, paired in ascending order) to the canonical
+            sorted order of row i
+    """
+    srt = np.sort(idx, axis=1)
+    if srt.shape[1] > 1 and np.any(np.diff(srt, axis=1) == 0):
+        return None                       # repeated spin-orbital
+    ref = srt[np.argmin(srt.sum(axis=1))]
+    ref_set = set(ref.tolist())
+    pos = {o: m for m, o in enumerate(ref.tolist())}
+    deg = np.empty(len(srt), dtype=int)
+    holes, parts = [], []
+    sigma = np.empty(len(srt))
+    for k, row in enumerate(srt):
+        row_set = set(row.tolist())
+        prt = sorted(row_set - ref_set)
+        hol = sorted(pos[o] for o in ref_set - row_set)
+        deg[k] = len(prt)
+        holes.append(hol)
+        parts.append(prt)
+        L = ref.copy()
+        L[hol] = prt
+        sigma[k] = _perm_parity(L)
+    return ref, deg, holes, parts, sigma
+
+
+def _degree_groups(deg, holes, parts, table_orbs):
+    """Pack per-SD hole positions / particle table rows into per-degree
+    arrays: {degree: (sd_indices, holes (n,d), particle_rows (n,d))}."""
+    groups = {}
+    for i, d in enumerate(deg):
+        groups.setdefault(int(d), []).append(i)
+    packed = {}
+    for d, idxs in groups.items():
+        idxs = np.asarray(idxs, dtype=int)
+        P = np.array([holes[i] for i in idxs], dtype=int).reshape(len(idxs), d)
+        X = np.array([parts[i] for i in idxs], dtype=int).reshape(len(idxs), d)
+        packed[d] = (idxs, P, np.searchsorted(table_orbs, X))
+    return packed
+
+
+def ovlp_mat_arb_lemma(SD1, SD2, S2, active_space=None, mem_limit_mb=256):
+    """
+    Fast SD overlaps for common-reference excited bases via the generalized
+    matrix determinant lemma - ARBITRARY excitation degrees.
+
+    Every SD is treated as an excitation of the reference determinant of its
+    list (the row of minimal spin-orbital index sum). A bra SD replacing k
+    reference orbitals {p}->{a} against a ket SD replacing l of them {q}->{b}
+    evaluates as the (k+l) x (k+l) determinant of precomputed tables
+
+        det(M_ij) = det(A) * det( [[ R[a,p],  (T-W)[a,b] ],
+                                   [ G[q,p],   C[q,b]    ]] )
+
+    with A = S2[ref1, ref2], G = A^-1, R = U G, C = G V, T = R V,
+    W = S2[a, b], where U/V hold the replacement rows/columns against the
+    opposite reference. Singly-excited pairs (the TDDFPT/CIS case) reduce to
+    the scalar identity R_p C_q - G[q,p] (T - w); doubles cost a 4x4
+    determinant per pair - still O(1) in nelec. Pairs are processed per
+    (k, l) degree group with one batched LAPACK det call per group, so the
+    only O(nSD^2 * nelec) operation remains a single GEMM.
 
     Args:
         active_space: same filtering rule as ovlp_arb, applied before the
             structure detection
+        mem_limit_mb: cap for the temporary per-group det stacks
 
-    Returns None when either list is not a singly-substituted common-reference
-    basis or the reference block is near-singular - callers fall back to
+    Returns None when the SDs carry repeated spin-orbitals, the maximal bra
+    degree + maximal ket degree reaches nelec (a direct determinant is as
+    cheap), or the reference block is near-singular - callers fall back to
     ovlp_mat_arb_batched (ovlp_mat_arb_auto does this automatically).
     """
     n_half = S2.shape[0] // 2
@@ -545,12 +584,15 @@ def ovlp_mat_arb_lemma(SD1, SD2, S2, active_space=None):
     i1, i2 = indices(SD1), indices(SD2)
     if i1 is None or i2 is None or i1.shape[1] != i2.shape[1]:
         return None
-    s1 = _single_exc_structure(i1)
-    s2 = _single_exc_structure(i2)
+    ne = i1.shape[1]
+    s1 = _excitation_structure(i1)
+    s2 = _excitation_structure(i2)
     if s1 is None or s2 is None:
         return None
-    ref1, p, a, gs1 = s1
-    ref2, q, b, gs2 = s2
+    ref1, deg1, holes1, parts1, sig1 = s1
+    ref2, deg2, holes2, parts2, sig2 = s2
+    if deg1.max() + deg2.max() >= ne:
+        return None
 
     A = S2[np.ix_(ref1, ref2)]
     sign, logdet = np.linalg.slogdet(A)
@@ -559,31 +601,58 @@ def ovlp_mat_arb_lemma(SD1, SD2, S2, active_space=None):
     D0 = sign * np.exp(logdet)
     G = np.linalg.inv(A)
 
-    U = S2[a][:, ref2]                            # (n1, ne): bra replacement rows
-    V = S2[ref1][:, b]                            # (ne, n2): ket replacement cols
-    W = S2[np.ix_(a, b)]                          # (n1, n2)
-    R = U @ G                                     # (n1, ne)
-    C = G @ V                                     # (ne, n2)
-    T = R @ V                                     # (n1, n2) = u A^-1 v - the one GEMM
+    pa = np.unique(np.concatenate([np.asarray(x, dtype=int) for x in parts1] +
+                                  [np.empty(0, dtype=int)]))
+    pb = np.unique(np.concatenate([np.asarray(x, dtype=int) for x in parts2] +
+                                  [np.empty(0, dtype=int)]))
+    U = S2[pa][:, ref2]                           # (na, ne): bra particle rows
+    V = S2[ref1][:, pb]                           # (ne, nb): ket particle cols
+    W = S2[np.ix_(pa, pb)]                        # (na, nb)
+    R = U @ G                                     # (na, ne)
+    C = G @ V                                     # (ne, nb)
+    TW = R @ V - W                                # (na, nb) - the one GEMM
 
-    # det(M)/D0 for row p -> u and column q -> v (with M[p,q] = w) reduces,
-    # via the generalized matrix determinant lemma, to
-    #     R_p * C_q - G[q,p] * (T - w)
-    # (all first-order correction terms cancel exactly)
-    n1, n2 = len(i1), len(i2)
-    k = np.arange(n1)[:, None]
-    l = np.arange(n2)[None, :]
-    Rp  = R[np.arange(n1), p][:, None]            # (n1, 1)
-    Cq  = C[q, np.arange(n2)][None, :]            # (1, n2)
-    Gqp = G[q[l], p[k]]                           # (n1, n2)
-    res = D0 * (Rp * Cq - Gqp * (T - W))
+    g1 = _degree_groups(deg1, holes1, parts1, pa)
+    g2 = _degree_groups(deg2, holes2, parts2, pb)
 
-    # boundary rows/cols: reference (ground-state) bra and/or ket
-    res[gs1, :] = D0 * Cq                         # <GS | exc_l>
-    res[:, gs2] = (D0 * Rp)                       # <exc_k | GS>
-    res[np.ix_(gs1, gs2)] = D0                    # <GS | GS>
-    # convert from list-order determinants to the canonical sorted convention
-    res *= np.outer(_sort_parities(i1), _sort_parities(i2))
+    res = np.empty((len(i1), len(i2)))
+    for k, (I, P, Ax) in g1.items():
+        for l, (J, Q, Bx) in g2.items():
+            nk, ml = len(I), len(J)
+            if k == 0 and l == 0:
+                block = np.full((nk, ml), D0)
+            elif l == 0:
+                d = (R[Ax[:, 0], P[:, 0]] if k == 1 else
+                     np.linalg.det(R[Ax[:, :, None], P[:, None, :]]))
+                block = np.repeat(D0 * d[:, None], ml, axis=1)
+            elif k == 0:
+                d = (C[Q[:, 0], Bx[:, 0]] if l == 1 else
+                     np.linalg.det(C[Q[:, :, None], Bx[:, None, :]]))
+                block = np.repeat(D0 * d[None, :], nk, axis=0)
+            elif k == 1 and l == 1:
+                Rp = R[Ax[:, 0], P[:, 0]][:, None]
+                Cq = C[Q[:, 0], Bx[:, 0]][None, :]
+                Gqp = G[Q[None, :, 0], P[:, None, 0]]
+                TWab = TW[Ax[:, None, 0], Bx[None, :, 0]]
+                block = D0 * (Rp * Cq - Gqp * TWab)
+            else:
+                m = k + l
+                Rblk = R[Ax[:, :, None], P[:, None, :]]            # (nk, k, k)
+                Cblk = C[Q[:, :, None], Bx[:, None, :]]            # (ml, l, l)
+                block = np.empty((nk, ml))
+                chunk = max(1, int(mem_limit_mb * 1e6 / (ml * m * m * 8)))
+                for s in range(0, nk, chunk):
+                    e = min(s + chunk, nk)
+                    B = np.empty((e - s, ml, m, m))
+                    B[:, :, :k, :k] = Rblk[s:e, None]
+                    B[:, :, :k, k:] = TW[Ax[s:e, None, :, None], Bx[None, :, None, :]]
+                    B[:, :, k:, :k] = G[Q[None, :, :, None], P[s:e, None, None, :]]
+                    B[:, :, k:, k:] = Cblk[None, :]
+                    block[s:e] = np.linalg.det(B)
+                block *= D0
+            res[np.ix_(I, J)] = block
+    # convert from the in-place arrangement to the canonical sorted convention
+    res *= np.outer(sig1, sig2)
     return res
 
 
