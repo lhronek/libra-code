@@ -354,6 +354,17 @@ def component_to_index(components):
     return emultipole_index, emultipole_labels
 
 
+def _read_xyz_frame(filename, step):
+    """Labels and coordinates (Angstrom, shape (N, 3)) of the step-th frame of an xyz trajectory."""
+    with open(filename) as f:
+        lines = f.readlines()
+    nat = int(lines[0].split()[0])
+    off = step * (nat + 2) + 2
+    labels = [line.split()[0] for line in lines[off:off + nat]]
+    R = np.array([[float(x) for x in line.split()[1:4]] for line in lines[off:off + nat]])
+    return labels, R
+
+
 def run_cp2k_libint_step2(params):
     """
     This function runs the step2 for computing the MO overlaps for both DFT and xTB calculations and saves them as sparse
@@ -387,6 +398,24 @@ def run_cp2k_libint_step2(params):
                              remove_molden (bool): Flag for removing the molden files after computing the MO overlaps.
 
                              nprocs (integer): Number of processors.
+
+                             ao_overlap_method (string): "cp2k" (default) computes the AO overlaps with a CP2K
+                                                         OVERLAP_DELTAT run on the doubled geometry (one call per step
+                                                         yields both S and St; periodic cells are handled natively by
+                                                         the overlap template - no translational_vectors needed;
+                                                         requires overlap_template); "libint" computes them in-process
+                                                         with libint from the molden shells (no extra CP2K run).
+
+                             mo_source (string): "wfn" (default) - read the MO coefficients, eigenvalues
+                                                 and HOMO from the binary RESTART.wfn file (molden-free, binary
+                                                 precision; requires ao_overlap_method="cp2k"); or "molden" - the
+                                                 ASCII molden print (needs the &MO_MOLDEN print, precision capped
+                                                 by the printed digits).
+
+                             overlap_template (string): CP2K input template for the OVERLAP_DELTAT runs (required for
+                                                        ao_overlap_method="cp2k"): &EXCITED_STATES OVERLAP_DELTAT T,
+                                                        &S_CSR_WRITE (or &AO_MATRICES OVERLAP), CONNECTIVITY OFF and
+                                                        no &VDW_POTENTIAL.
 
                              cp2k_ot_input_template (string): The CP2K OT input template file name (just for the xTB).
 
@@ -453,6 +482,11 @@ def run_cp2k_libint_step2(params):
         "remove_cube": True,
         'together_mode': False,
         'restart_file': True,
+        'ao_overlap_method': 'cp2k',
+        'mo_source': 'wfn',
+        'overlap_template': '',
+        'cp2k_data_dir': '',
+        'omp_num_threads': 1,
         'use_emultipole': False,
         'emultipole_components': [
             'S',
@@ -497,6 +531,23 @@ def run_cp2k_libint_step2(params):
 
     # Periodic calculation falg
     is_periodic = params['is_periodic']
+
+    # Alternative overlap routes
+    ao_overlap_method = params['ao_overlap_method'].lower()
+    mo_source = params['mo_source'].lower()
+    if mo_source == 'wfn' and ao_overlap_method != 'cp2k':
+        raise ValueError('mo_source="wfn" requires ao_overlap_method="cp2k" (no libint shells from a wfn)')
+    if ao_overlap_method == 'cp2k':
+        if isUKS or params['use_emultipole']:
+            raise ValueError('ao_overlap_method="cp2k" is implemented for restricted, non-emultipole runs')
+        if not params['overlap_template']:
+            raise ValueError('ao_overlap_method="cp2k" (the default) needs params["overlap_template"] '
+                             '(an es_overlap_deltat_* input); set ao_overlap_method="libint" for '
+                             'in-process libint overlaps from the molden files')
+        if not params['overlap_template']:
+            raise ValueError('ao_overlap_method="cp2k" requires overlap_template - a CP2K input with '
+                             '&EXCITED_STATES OVERLAP_DELTAT T (plus &S_CSR_WRITE or &AO_MATRICES OVERLAP), '
+                             'CONNECTIVITY OFF and no &VDW_POTENTIAL')
 
     # Cube visualization
     cube_visualization = params['cube_visualization']
@@ -557,6 +608,60 @@ def run_cp2k_libint_step2(params):
 #        else:
         lowest_orbital = params['lowest_orbital']
         highest_orbital = params['highest_orbital']
+
+        if ao_overlap_method == 'cp2k':
+            # ---- CP2K-native route: one OVERLAP_DELTAT run on the doubled geometry per
+            # step yields both the time-overlap (prev|curr block) and the current-step
+            # overlap; the overlap template carries the cell, so periodic systems need
+            # no translational-vector summation ----
+            t1 = time.time()
+            print('Computing MO overlaps via a CP2K OVERLAP_DELTAT run...')
+            labels_step, R_ang = _read_xyz_frame(params['trajectory_xyz_filename'], step)
+            R_curr = R_ang.flatten() * units.Angst
+            if mo_source == 'wfn':
+                # molden-free: MOs, exact eigenvalues and HOMO from the binary restart file
+                wfn_file = F'Diag_{step}-RESTART.wfn' if isxTB else F'Diag_libra-{step}-RESTART.wfn'
+                mo_curr = CP2K_methods.load_wfn_mo_data(wfn_file)
+            else:
+                mo_curr = CP2K_methods.load_molden_data(molden_filename, is_spherical)
+            odt_params = {'atom_labels': labels_step,
+                          'overlap_template': params['overlap_template'],
+                          'working_directory': 'odt_wd',
+                          'cp2k_exe': cp2k_exe,
+                          'mpi_executable': mpi_executable,
+                          'nprocs': nprocs,
+                          'omp_num_threads': params['omp_num_threads']}
+            if params['cp2k_data_dir']:
+                odt_params['cp2k_data_dir'] = params['cp2k_data_dir']
+            if counter == 0:
+                mo_prev, R_prev = mo_curr, R_curr
+            St, S_prev, S = CP2K_methods.mo_overlaps_via_cp2k(mo_prev, mo_curr, R_prev, R_curr,
+                                                              lowest_orbital, highest_orbital,
+                                                              odt_params)
+            zero_mat = np.zeros_like(S)
+            S_step_sparse = scipy.sparse.csc_matrix(data_conv.form_block_matrix(S, zero_mat, zero_mat, S))
+            scipy.sparse.save_npz(params['res_dir'] + F'/S_ks_{step}.npz', S_step_sparse)
+            E_w = np.diag(mo_curr['E'][lowest_orbital - 1:highest_orbital])
+            E_step_sparse = scipy.sparse.csc_matrix(data_conv.form_block_matrix(E_w, zero_mat, zero_mat, E_w))
+            scipy.sparse.save_npz(params['res_dir'] + F'/E_ks_{step}.npz', E_step_sparse)
+            if counter > 0:
+                St_step_sparse = scipy.sparse.csc_matrix(data_conv.form_block_matrix(St, zero_mat, zero_mat, St))
+                scipy.sparse.save_npz(params['res_dir'] + F'/St_ks_{step-1}.npz', St_step_sparse)
+            mo_prev, R_prev = mo_curr, R_curr
+            print('Done with computing molecular orbital overlaps. Elapsed time:', time.time() - t1)
+            if params['remove_molden'] and os.path.exists(molden_filename):
+                os.system(F'rm {molden_filename}')
+            if counter > 0:
+                if isxTB:
+                    print('Removing unnecessary wfn files...')
+                    os.system(F'rm OT_{step-1}-RESTART*')
+                    os.system(F'rm Diag_{step-1}-RESTART*')
+                else:
+                    os.system(F'rm Diag_libra-{step-1}-RESTART*')
+            print(F'Done with step {step}.', 'Elapsed time:', time.time() - t1_all)
+            counter += 1
+            os.system(F'mv *pdos {params["all_pdosfiles"]}/.')
+            continue
 
         # now if the counter is equal to zero
         # just compute the MO overlap of that step.
