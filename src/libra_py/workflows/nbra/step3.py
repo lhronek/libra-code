@@ -30,6 +30,7 @@
 
 import sys
 import cmath
+import contextlib
 import math
 import os
 import time
@@ -1945,6 +1946,58 @@ def sort_unique_SD_basis_scipy(step, sd_states_unique, sd_states_reindexed, _par
     return E_this_sd_sparse, sd_states_unique_sorted, sd_states_reindexed_sorted, reindex_nsteps
 
 
+@contextlib.contextmanager
+def _blas_thread_limit(n):
+    """Best-effort cap on the BLAS/OpenMP thread count inside the with-block.
+
+    numpy's BLAS (OpenBLAS/MKL) threads on its own, independently of
+    use_multiprocessing, silently occupying every core; on the small matrices
+    handled per step that oversubscription is pure overhead (and with a Pool it
+    multiplies with the number of workers). Uses threadpoolctl when installed,
+    otherwise talks to the loaded OpenBLAS directly; restores the old value.
+    """
+    n = max(1, int(n))
+    limiter = None
+    try:
+        from threadpoolctl import threadpool_limits
+        limiter = threadpool_limits(limits=n)
+    except ImportError:
+        pass
+    if limiter is not None:
+        with limiter:
+            yield
+        return
+    saved = []
+    try:
+        import ctypes
+        with open('/proc/self/maps') as f:
+            libs = sorted({line.split()[-1] for line in f
+                           if 'openblas' in line.lower() and '.so' in line.split()[-1]})
+        for path in libs:
+            try:
+                handle = ctypes.CDLL(path)     # already loaded - same handle
+                get = getattr(handle, 'openblas_get_num_threads', None)
+                set_ = getattr(handle, 'openblas_set_num_threads', None)
+                if set_ is not None:
+                    saved.append((set_, get() if get is not None else 0))
+                    set_(n)
+            except OSError:
+                pass
+    except OSError:
+        pass
+    try:
+        yield
+    finally:
+        for set_, old in saved:
+            if old > 0:
+                set_(old)
+
+
+def _worker_blas_threads(params):
+    """1 thread per Pool worker; the nprocs budget when running serially."""
+    return 1 if params.get('use_multiprocessing', False) else int(params.get('nprocs', 1))
+
+
 def run_step3_ks_nacs_libint(params):
     """
     This function runs the step3 for computing NACs for Kohn-Sham states.
@@ -2151,6 +2204,11 @@ def orthonormalize_ks_overlaps(step, params):
     This fuction is an auiliary function used in run_step3_ks_nacs_libint function
     to perform orthonormalization of the overlaps.
     """
+    with _blas_thread_limit(_worker_blas_threads(params)):
+        return _orthonormalize_ks_overlaps(step, params)
+
+
+def _orthonormalize_ks_overlaps(step, params):
     active_space = params['active_space']
     start_time = params['start_time']
     t2 = time.time()
@@ -2519,13 +2577,9 @@ def run_step3_sd_nacs_libint(params):
             SD2CI[i] = data_conv.MATRIX2nparray(SD2CI[i].real())
 
         # We create the var_pool whether we use the multiprocessing or not
-        var_pool = []
-        for step in range(finish_time - start_time - 1):
-            var_pool.append((step, params))
+        var_pool = make_var_pool(params, sd_states_reindexed_sorted, start_time, finish_time)
     else:
-        var_pool = []
-        for step in range(finish_time - start_time - 1):
-            var_pool.append((step, params))
+        var_pool = make_var_pool(params, sd_states_reindexed_sorted, start_time, finish_time)
 
     t2 = time.time()
     if params['use_multiprocessing']:
@@ -2716,12 +2770,31 @@ def run_step3_sd_nacs_libint(params):
                     sp.csc_matrix(St_ci_step))
 
 
+def make_var_pool(params, sd_states_reindexed_sorted, start_time, finish_time):
+    """Per-step argument tuples for compute_sd_overlaps_in_parallel.
+
+    Each task ships only the two SD lists it consumes - putting the full
+    per-step list into every task makes the Pool pickling cost O(nsteps^2).
+    """
+    var_pool = []
+    for step in range(finish_time - start_time - 1):
+        p_task = dict(params)
+        p_task['sd_states_reindexed_sorted'] = {step: sd_states_reindexed_sorted[step],
+                                                step + 1: sd_states_reindexed_sorted[step + 1]}
+        var_pool.append((step, p_task))
+    return var_pool
+
+
 def compute_sd_overlaps_in_parallel(step, params):
     """
     This function is used as an auxilary function that computes the SDs overlaps.
     It is used in the run_step3_sd_nacs_libint function.
     """
+    with _blas_thread_limit(_worker_blas_threads(params)):
+        return _compute_sd_overlaps(step, params)
 
+
+def _compute_sd_overlaps(step, params):
     start_time = params['start_time']
     res_dir_1 = params['path_to_npz_files']
     active_space = params.get('active_space', None)
