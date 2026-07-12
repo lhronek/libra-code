@@ -397,7 +397,11 @@ def run_cp2k_libint_step2(params):
 
                              remove_molden (bool): Flag for removing the molden files after computing the MO overlaps.
 
-                             nprocs (integer): Number of processors.
+                             nprocs (integer): Number of processors (MPI ranks for CP2K, threads for libint).
+
+                             omp_num_threads (integer): OMP threads per CP2K rank - exported to every CP2K
+                                                        subprocess; total CP2K load is nprocs x omp_num_threads
+                                                        [default: 1].
 
                              ao_overlap_method (string): "cp2k" (default) computes the AO overlaps with a CP2K
                                                          OVERLAP_DELTAT run on the doubled geometry (one call per step
@@ -584,7 +588,8 @@ def run_cp2k_libint_step2(params):
                 step)
             if params["restart_file"]:
                 os.system(f'cp {params["restart_file"]} ./Diag_libra-{step}-RESTART.wfn')
-            os.system(F'{mpi_executable} -n {nprocs} {cp2k_exe} -i Diag_libra-{step}.inp -o step_{step}.log')
+            os.system(F'OMP_NUM_THREADS={params["omp_num_threads"]} {mpi_executable} -n {nprocs} '
+                      F'{cp2k_exe} -i Diag_libra-{step}.inp -o step_{step}.log')
             molden_filename = F'Diag_libra-{step}-1_0.molden'
         print('Done with step', step, 'Elapsed time:', time.time() - t1)
 #        if params['is_many_body']:

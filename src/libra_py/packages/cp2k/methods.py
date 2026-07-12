@@ -1827,7 +1827,8 @@ def run_cp2k_xtb(params):
 
           * **cp2k_exe** (string): The full path to CP2K executable.
 
-          * **nprocs** (integer): Number of processors.
+          * **nprocs** (integer): Number of processors (MPI ranks).
+          * **omp_num_threads** (integer): OMP threads per rank [default: 1].
 
     """
 
@@ -1839,20 +1840,24 @@ def run_cp2k_xtb(params):
     cp2k_exe = params['cp2k_exe']
     mpi_executable = params['mpi_executable']
     nprocs = params['nprocs']
+    # threads per MPI rank - without an explicit value many psmp builds default
+    # to ALL cores per rank, oversubscribing the node for nprocs > 1
+    omp = int(params.get('omp_num_threads', 1))
 
     # Run OT
     print('Step', step, 'Computing the OT method wfn file...')
     cp2k_xtb_ot_inp(ot_input_template, trajectory_xyz_filename, step)
     t1 = time.time()
-    os.system('%s -n %d %s -i xtb_ot_step_%d.inp -o OUT-ot_%d.log' % (mpi_executable, nprocs, cp2k_exe, step, step))
+    os.system('OMP_NUM_THREADS=%d %s -n %d %s -i xtb_ot_step_%d.inp -o OUT-ot_%d.log' %
+              (omp, mpi_executable, nprocs, cp2k_exe, step, step))
     print('Done with OT wfn. Elapsed time:', time.time() - t1)
 
     # Run diagonalization
     t1 = time.time()
     print('Computing the wfn file using diagonalization method...')
     cp2k_xtb_diag_inp(diag_input_template, step)
-    os.system('%s -n %d %s -i xtb_diag_step_%d.inp -o OUT-diag_%d.log' %
-              (mpi_executable, nprocs, cp2k_exe, step, step))
+    os.system('OMP_NUM_THREADS=%d %s -n %d %s -i xtb_diag_step_%d.inp -o OUT-diag_%d.log' %
+              (omp, mpi_executable, nprocs, cp2k_exe, step, step))
     print('Done with diagonalization. Elapsed time:', time.time() - t1)
 
 
