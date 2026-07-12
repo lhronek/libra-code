@@ -262,8 +262,8 @@ def map_gen_matrix(SD1, SD2, X):
 
     nbasis = X.num_of_rows
     # Converting the SDs provided by the user into the internal format to be read by Libra
-    sd1 = sd2indx(SD1, nbasis, False, 0)
-    sd2 = sd2indx(SD2, nbasis, False, 0)
+    sd1, _ = sd2indx(SD1, nbasis, False, 0)
+    sd2, _ = sd2indx(SD2, nbasis, False, 0)
 
     res = delta(Py2Cpp_int(sd1), Py2Cpp_int(sd2))
 
@@ -305,7 +305,7 @@ def energy_arb(SD, e):
     """
     if isinstance(e, np.ndarray)==True:
         nbasis = e.shape[0]
-        sd = sd2indx(SD, nbasis)
+        sd, _ = sd2indx(SD, nbasis)
         res = 0.0
         for i in sd:
             res = res + e[i, i]
@@ -313,8 +313,8 @@ def energy_arb(SD, e):
 
     elif isinstance(e, CMATRIX)==True or isinstance(e, MATRIX)==True:
         nbasis = e.num_of_rows
-        sd = sd2indx(SD, nbasis)
-        res = 0.0+0.0j  
+        sd, _ = sd2indx(SD, nbasis)
+        res = 0.0+0.0j
         for i in sd:
             res = res + e.get(i,i)
 

@@ -1539,7 +1539,7 @@ def map_Hvib(H, basis, dE):
                 if res[1] * res[2] > 0:
                     # This means the two configurations are coupled, so we take the
                     # corresponding 1-particles matrix elements and insert them here
-                    a = mapping.sd2indx([res[1], res[2]], nbasis, False)
+                    a, _ = mapping.sd2indx([res[1], res[2]], nbasis, False)
                     H_vib.add(i, j, H.get(a[0], a[1]))
 
     return H_vib
