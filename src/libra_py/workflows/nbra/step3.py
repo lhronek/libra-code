@@ -2231,6 +2231,12 @@ def run_step3_sd_nacs_libint(params):
             * **params['nac_algo']** ( int ): selection of a method to compute NACs
                     - 0 : Hamess-Shiffer-Tully (HST), finite difference [ default ]
                     - 1 : Meek-Levine NPI
+            * **params['sd_overlap_kernel']** (string): kernel for the SD overlap matrices
+                    - "auto" : batched LAPACK determinants with the determinant-lemma shortcut
+                               for singly-excited pairs; bit-exact vs "per_pair" [ default ]
+                    - "batched" : batched LAPACK determinants only
+                    - "lemma" : determinant-lemma kernel only
+                    - "per_pair" : the original per-pair mapping.ovlp_mat_arb loop
 
     Returns:
 
@@ -2248,7 +2254,8 @@ def run_step3_sd_nacs_libint(params):
                       'num_occ_alpha': 1, 'num_unocc_alpha': 1,
                       'num_occ_beta': 1, 'num_unocc_beta': 1, 'active_space_num_occ_orbitals': 0,
                       'num_unocc_states': 1, 'verbosity': 0, 'isUKS': 0, 'es_software': 'cp2k',
-                      'use_multiprocessing': False, 'logfile_directory': os.getcwd() + '/all_logfiles', 'nac_algo': 0
+                      'use_multiprocessing': False, 'logfile_directory': os.getcwd() + '/all_logfiles', 'nac_algo': 0,
+                      'sd_overlap_kernel': 'auto'
                       }
 
     if params['is_many_body'] and params['isUKS']:
@@ -2721,6 +2728,15 @@ def compute_sd_overlaps_in_parallel(step, params):
     active_space2 = ( np.array(active_space) + 1 ).tolist() # conversion to a different convention
     sd_states_reindexed_sorted = params['sd_states_reindexed_sorted']
 
+    # SD overlap kernel: "auto" = batched LAPACK determinants + determinant-lemma shortcut
+    # for singly-excited pairs (bit-exact vs the legacy per-pair loop, orders of magnitude
+    # faster for large SD bases); "batched"/"lemma" force one of the two; "per_pair" = ovlp_mat_arb
+    kernel = params.get('sd_overlap_kernel', 'auto')
+    ovlp = {'per_pair': mapping.ovlp_mat_arb,
+            'batched': mapping.ovlp_mat_arb_batched,
+            'lemma': mapping.ovlp_mat_arb_lemma,
+            'auto': mapping.ovlp_mat_arb_auto}[kernel]
+
     #print("active_space = ", active_space)
     #print("active_space2 = ", active_space2)
     #print("sd_states_reindexed_sorted = ", sd_states_reindexed_sorted)
@@ -2745,21 +2761,21 @@ def compute_sd_overlaps_in_parallel(step, params):
     t2 = time.time()
     
     if params['apply_orthonormalization']:
-        s_sd_1 = mapping.ovlp_mat_arb(
+        s_sd_1 = ovlp(
             sd_states_reindexed_sorted[step],
             sd_states_reindexed_sorted[step],
             s_ks_1,
             None)
-        s_sd_2 = mapping.ovlp_mat_arb(
-            sd_states_reindexed_sorted[step + 1], 
-            sd_states_reindexed_sorted[step + 1], 
-            s_ks_2, 
+        s_sd_2 = ovlp(
+            sd_states_reindexed_sorted[step + 1],
+            sd_states_reindexed_sorted[step + 1],
+            s_ks_2,
             None)
 
-    st_sd = mapping.ovlp_mat_arb(sd_states_reindexed_sorted[step],
-                                 sd_states_reindexed_sorted[step + 1],
-                                 st_ks,
-                                 None)
+    st_sd = ovlp(sd_states_reindexed_sorted[step],
+                 sd_states_reindexed_sorted[step + 1],
+                 st_ks,
+                 None)
 
     if params['apply_orthonormalization']:
         print('Applying orthonormalization for SDs for step', step)
