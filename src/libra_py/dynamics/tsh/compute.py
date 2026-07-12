@@ -1077,10 +1077,13 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd):
 
         compute_dynamics(dyn_var, dyn_params, ham, ham_aux, compute_model, model_params, rnd, therm)
 
-        if _savers["txt_saver"] is not None:
-            _savers["txt_saver"].save_data_txt(F"{prefix}", properties_to_save, "a", i)
+        # the text tables follow the same saving stride as the HDF5/mem savers:
+        # the buffers hold ceil(nsteps/nprint) rows, so append only on the
+        # steps that actually stored data, addressing the STRIDED row
+        if _savers["txt_saver"] is not None and i % nprint == 0:
+            _savers["txt_saver"].save_data_txt(F"{prefix}", properties_to_save, "a", int(i / nprint))
 
-        if _savers["txt2_saver"] is not None:
+        if _savers["txt2_saver"] is not None and i % nprint == 0:
             _savers["txt2_saver"].save_data_txt(F"{prefix2}", properties_to_save, "a", 0)
 
     if _savers["mem_saver"] is not None:

@@ -971,7 +971,7 @@ def save_tsh_data_123(_savers, params,
     txt2_output_level = params["txt2_output_level"]
 
     nsteps = params["nsteps"]
-    print_freq = int(params["progress_frequency"] * nsteps)
+    print_freq = max(1, int(params["progress_frequency"] * nsteps))
 
     if i % print_freq == 0:
         print(F" step= {i}")
@@ -1024,7 +1024,7 @@ def save_tsh_data_1234_new(_savers, params, i, dyn_var, ham):
 
     nsteps = params["nsteps"]
     nprint = params["nprint"]
-    print_freq = int(params["progress_frequency"] * nsteps)
+    print_freq = max(1, int(params["progress_frequency"] * nsteps))
 
     if i % print_freq == 0:
         print(F" step= {i}")
