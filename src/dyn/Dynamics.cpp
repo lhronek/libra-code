@@ -894,10 +894,10 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
 
   // int ampl_transformation_method = prms.ampl_transformation_method;
 
-  CMATRIX C(nst, 1);
-  CMATRIX vRHO(nst * nst, 1);      // vectorized DM
-  CMATRIX RHO(nst, nst);           // DM
-  CMATRIX L(nst * nst, nst * nst); // Liouvillian
+  // NOTE: the amplitude column C is a per-trajectory local (see the loop),
+  // and the Liouvillian-space work matrices vRHO/RHO/L are declared inside
+  // the density-matrix branches (rep >= 2) - L alone is (nst^2 x nst^2),
+  // a large pointless allocation for the common amplitude representations
   CMATRIX Coeff(nst, ntraj);
   if (prms.rep_tdse == 0) {
     Coeff = *dyn_var.ampl_dia;
@@ -925,9 +925,16 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
                                  Ham_prev->children[0], 0, dyn_var, 0);
   } else {
 
-  for (itraj = 0; itraj < ntraj; itraj++) {
+  // Deterministic per-trajectory propagation: every iteration works only on
+  // its own amplitude column and Hamiltonian child, so the loop parallelizes
+  // cleanly and the results are identical for any thread count. The
+  // density-matrix representations (rep >= 2) stay serial - their per-
+  // iteration Liouvillian workspaces would multiply a large memory footprint.
+  #pragma omp parallel for num_threads(prms.omp_num_threads) \
+      if (prms.omp_num_threads > 1 && rep <= 1)
+  for (int itraj = 0; itraj < ntraj; itraj++) {
 
-    C = Coeff.col(itraj);
+    CMATRIX C(Coeff.col(itraj));
 
     int traj1 = itraj;
     if (method >= 100 && method < 200) {
@@ -1150,6 +1157,9 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
     } // rep == 1 - adiabatic
 
     else if (rep == 2) { // diabatic, density matrix formalism
+      CMATRIX vRHO(nst * nst, 1);      // vectorized DM
+      CMATRIX RHO(nst, nst);           // DM
+      CMATRIX L(nst * nst, nst * nst); // Liouvillian
 
       if (method == 0 || method == 100) {
         // Based on Lowdin transformations, using mid-point Hvib
@@ -1170,6 +1180,9 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
     } // rep == 2 - diabatic, density matrix
 
     else if (rep == 3) { // adiabatic, density matrix formalism
+      CMATRIX vRHO(nst * nst, 1);      // vectorized DM
+      CMATRIX RHO(nst, nst);           // DM
+      CMATRIX L(nst * nst, nst * nst); // Liouvillian
       /**
            0              -  mid-point Hvib with the second-point correction of
          Hvib 1              -  Zhu Liouvillian

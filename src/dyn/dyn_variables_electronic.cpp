@@ -166,25 +166,27 @@ void dyn_variables::update_amplitudes(dyn_control_params& dyn_params){
 
    C_adi = U.H() C_dia
 */
-  int i,j;
-  CMATRIX cd(ndia, 1);
-  CMATRIX ca(nadi, 1);
-
+  // Deterministic per-trajectory transforms - parallel-safe (each iteration
+  // reads/writes only its own column); results identical for any thread count
+  #pragma omp parallel for num_threads(dyn_params.omp_num_threads) \
+      if (dyn_params.omp_num_threads > 1)
   for(int traj=0; traj<ntraj; traj++){
 
+    CMATRIX cd(ndia, 1);
+    CMATRIX ca(nadi, 1);
     CMATRIX& U = (*basis_transform[traj]);
 
     /// Diabatic wfc representation
     if(dyn_params.rep_tdse==0){
       cd = ampl_dia->col(traj);
       ca = U.H() * cd;
-      for(i=0;i<nadi;i++){ ampl_adi->set(i, traj, ca.get(i,0) ); }
+      for(int i=0;i<nadi;i++){ ampl_adi->set(i, traj, ca.get(i,0) ); }
     }
     /// Adiabatic wfc representation
     else if(dyn_params.rep_tdse==1){
       ca = ampl_adi->col(traj);
       cd = U * ca; 
-      for(i=0;i<ndia;i++){ ampl_dia->set(i, traj, cd.get(i,0) ); }
+      for(int i=0;i<ndia;i++){ ampl_dia->set(i, traj, cd.get(i,0) ); }
     }
 
   }// for traj
@@ -222,9 +224,6 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params){
     """
 */
 
-  CMATRIX cd(ndia, 1);
-  CMATRIX ca(nadi, 1);
-
   int rep = dyn_params.rep_tdse;
   // In the adiabatic representations (rep_tdse 1 and 3) dm_dia is a derived
   // quantity costing two nadi x nadi matrix products per trajectory - skip it
@@ -235,8 +234,14 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params){
 
   // Assuming that in the diabatic representation, the overlap 
   // matrix is identity S = I
+  // Deterministic per-trajectory updates - parallel-safe (each iteration
+  // writes only its own dm slots); results identical for any thread count
+  #pragma omp parallel for num_threads(dyn_params.omp_num_threads) \
+      if (dyn_params.omp_num_threads > 1)
   for(int traj=0; traj<ntraj; traj++){
 
+    CMATRIX cd(ndia, 1);
+    CMATRIX ca(nadi, 1);
     CMATRIX& U = (*basis_transform[traj]); // * (*proj_adi[indx]); // U_eff - let's wait with this
 
     /// Diabatic wfc representation

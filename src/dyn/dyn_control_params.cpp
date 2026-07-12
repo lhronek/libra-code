@@ -63,6 +63,7 @@ dyn_control_params::dyn_control_params(){
   min_probability_reordering = 0.0;
   isNBRA = 0;
   compute_dm_dia = -1;
+  omp_num_threads = 1;
 
   ///================= Surface hopping: proposal, acceptance =======================
   tsh_method = 0;
@@ -185,6 +186,7 @@ dyn_control_params::dyn_control_params(const dyn_control_params& x){
   min_probability_reordering = x.min_probability_reordering;
   isNBRA = x.isNBRA;
   compute_dm_dia = x.compute_dm_dia;
+  omp_num_threads = x.omp_num_threads;
 
   ///================= Surface hopping: proposal, acceptance =======================
   tsh_method = x.tsh_method;
@@ -399,6 +401,7 @@ void dyn_control_params::set_parameters(bp::dict params){
     else if(key=="min_probability_reordering") { min_probability_reordering = bp::extract<double>(params.values()[i]);  }
     else if(key=="isNBRA") { isNBRA = bp::extract<int>(params.values()[i]);   }
     else if(key=="compute_dm_dia") { compute_dm_dia = bp::extract<int>(params.values()[i]);   }
+    else if(key=="omp_num_threads") { omp_num_threads = bp::extract<int>(params.values()[i]);   }
 
     ///================= Surface hopping: proposal, acceptance =======================
     else if(key=="tsh_method") { tsh_method = bp::extract<int>(params.values()[i]);  }

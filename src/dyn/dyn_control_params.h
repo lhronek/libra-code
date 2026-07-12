@@ -830,6 +830,17 @@ class dyn_control_params{
   */
   int compute_dm_dia;
 
+  /**
+    The number of OpenMP threads used in the per-trajectory loops of the TSH
+    machinery (electronic propagation, amplitude and density-matrix updates,
+    projector updates). Only deterministic, per-trajectory-independent work is
+    parallelized - hop decisions and the other consumers of the random number
+    generator stay serial - so the results are identical for any value of
+    this parameter. Compose the total budget with any process-level
+    parallelism (e.g. Pool batches x omp_num_threads). [ default: 1 ]
+  */
+  int omp_num_threads;
+
 
   ///===============================================================================
   ///================= Entanglement of trajectories ================================

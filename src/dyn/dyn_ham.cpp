@@ -354,19 +354,23 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
 
   //======= Parameters of the dyn variables ==========
   int ntraj = dyn_var.ntraj;
-  vector<int> traj_id(1, 0);
 
-  CMATRIX f_prev(dyn_var.nadi, dyn_var.ndof);
-  CMATRIX f_curr(dyn_var.nadi, dyn_var.ndof);
   MATRIX iM(dyn_var.get_imass());
   MATRIX momenta(dyn_var.get_momenta());
-  MATRIX p(dyn_var.ndof, 1);
   double dt = prms.dt;
 
   // NBRA runs (isNBRA==1) carry a single child Hamiltonian shared by all
   // trajectories - never index children beyond what actually exists
   int nchildren = Ham.children.size();
-  for (auto itraj = 0; itraj < ntraj; itraj++) {
+  // Deterministic per-trajectory projector updates - parallel-safe (each
+  // iteration writes only proj_adi[itraj]); identical for any thread count
+  #pragma omp parallel for num_threads(prms.omp_num_threads) \
+      if (prms.omp_num_threads > 1)
+  for (int itraj = 0; itraj < ntraj; itraj++) {
+    vector<int> traj_id(1, 0);
+    CMATRIX f_prev(dyn_var.nadi, dyn_var.ndof);
+    CMATRIX f_curr(dyn_var.nadi, dyn_var.ndof);
+    MATRIX p(dyn_var.ndof, 1);
     int traj1 = itraj;
     if (traj1 >= nchildren) { traj1 = 0; }
     traj_id[0] = traj1;
