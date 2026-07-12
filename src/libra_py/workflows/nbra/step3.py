@@ -1994,7 +1994,16 @@ def _blas_thread_limit(n):
 
 
 def _worker_blas_threads(params):
-    """1 thread per Pool worker; the nprocs budget when running serially."""
+    """BLAS threads for one worker.
+
+    An explicit blas_num_threads wins (hybrid mode: nprocs Pool workers x
+    blas_num_threads BLAS threads each - worthwhile when the per-step matrices
+    are large enough for threaded BLAS). Otherwise: 1 thread per Pool worker,
+    or the whole nprocs budget when running serially.
+    """
+    n = params.get('blas_num_threads', None)
+    if n is not None:
+        return int(n)
     return 1 if params.get('use_multiprocessing', False) else int(params.get('nprocs', 1))
 
 
@@ -2045,7 +2054,7 @@ def run_step3_ks_nacs_libint(params):
                       'time_step': 1.0, 'start_time': 0, 'finish_time': 1,
                       'apply_phase_correction': False, 'apply_orthonormalization': False,
                       'do_state_reordering': 0, 'state_reordering_alpha': 0, 'es_software': 'cp2k',
-                      'nac_algo': 0
+                      'nac_algo': 0, 'blas_num_threads': None
                       }
     comn.check_input(params, default_params, critical_params)
     if params['es_software'].lower() == 'cp2k':
@@ -2289,6 +2298,9 @@ def run_step3_sd_nacs_libint(params):
             * **params['nac_algo']** ( int ): selection of a method to compute NACs
                     - 0 : Hamess-Shiffer-Tully (HST), finite difference [ default ]
                     - 1 : Meek-Levine NPI
+            * **params['blas_num_threads']** (integer): BLAS threads per worker. Default (None):
+                    1 per worker with use_multiprocessing, else nprocs. Set explicitly for
+                    hybrid parallelism: nprocs workers x blas_num_threads threads each.
             * **params['sd_overlap_kernel']** (string): kernel for the SD overlap matrices
                     - "auto" : batched LAPACK determinants with the determinant-lemma shortcut
                                for singly-excited pairs; bit-exact vs "per_pair" [ default ]
@@ -2313,7 +2325,7 @@ def run_step3_sd_nacs_libint(params):
                       'num_occ_beta': 1, 'num_unocc_beta': 1, 'active_space_num_occ_orbitals': 0,
                       'num_unocc_states': 1, 'verbosity': 0, 'isUKS': 0, 'es_software': 'cp2k',
                       'use_multiprocessing': False, 'logfile_directory': os.getcwd() + '/all_logfiles', 'nac_algo': 0,
-                      'sd_overlap_kernel': 'auto'
+                      'sd_overlap_kernel': 'auto', 'blas_num_threads': None
                       }
 
     if params['is_many_body'] and params['isUKS']:
