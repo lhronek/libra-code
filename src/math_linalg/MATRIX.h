@@ -206,6 +206,10 @@ void operator/=(double f)
   MATRIX operator-(double rhs);  ///< Subtraction operator 
 
   void product(const MATRIX& B, const MATRIX& C); ///< A = B * C: CBLAS dgemm for large products, base-class loop otherwise (shadows base_matrix::product)
+
+  ///< Chained in-place product: this = op1 * op2 * ... * opN (left-associated);
+  ///< see CMATRIX::product - operands are MATRIX or transposed(X) tags
+  template <typename... Ops> void product(const Ops&... ops);
   MATRIX operator*(const MATRIX& ob); ///< Multiplication operator
   friend MATRIX operator*(const MATRIX& ob, int f);
   friend MATRIX operator*(int f, const MATRIX& ob);
@@ -240,6 +244,30 @@ void operator/=(double f)
 
 };
 
+
+///< Tag: use the transpose of a matrix as a chain-product operand
+struct MATRIX_TTag { const MATRIX& m; };
+inline MATRIX_TTag transposed(const MATRIX& m){ return MATRIX_TTag{m}; }
+
+///< internal machinery of the chained product (defined in MATRIX.cpp)
+MATRIX& MATRIX_chain_scratch(int slot, int nr, int nc);
+const MATRIX* MATRIX_chain_fetch(const MATRIX& m, int& tagslot);
+const MATRIX* MATRIX_chain_fetch(const MATRIX_TTag& t, int& tagslot);
+
+template <typename... Ops>
+void MATRIX::product(const Ops&... ops){
+  static_assert(sizeof...(Ops) >= 2, "product() needs at least 2 operands");
+  int tagslot = 0;
+  const MATRIX* op[] = { MATRIX_chain_fetch(ops, tagslot)... };
+  const int N = (int)(sizeof...(Ops));
+  const MATRIX* cur = op[0];
+  for(int k = 1; k < N - 1; k++){
+    MATRIX& s = MATRIX_chain_scratch(k & 1, cur->n_rows, op[k]->n_cols);
+    s.product(*cur, *op[k]);
+    cur = &s;
+  }
+  this->product(*cur, *op[N - 1]);
+}
 
 typedef std::vector<MATRIX> MATRIXList;  ///< Data type for storing a vector of MATRIX objects
 typedef std::vector<vector<MATRIX> > MATRIXMap;  ///< Data type for storing a table (grid) of MATRIX objects

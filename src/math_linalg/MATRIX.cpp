@@ -18,6 +18,8 @@
 #include "../pch.h"
 #else
 #include <stdio.h>
+#include <memory>
+#include <iostream>
 #include <string.h>
 #endif
 
@@ -377,6 +379,37 @@ MATRIX MATRIX::operator-(double rhs){
   return res;
 }
 
+
+
+MATRIX& MATRIX_chain_scratch(int slot, int nr, int nc){
+/**
+  Thread-local scratch matrices for the chained product - see
+  CMATRIX_chain_scratch.
+*/
+  const int MAXSLOTS = 8;
+  thread_local std::unique_ptr<MATRIX> pool[8];
+  if(slot < 0 || slot >= MAXSLOTS){
+    std::cout << "Error in the chained product: too many transposed operands\n";
+    exit(0);
+  }
+  std::unique_ptr<MATRIX>& p = pool[slot];
+  if(!p || p->n_rows != nr || p->n_cols != nc){ p.reset(new MATRIX(nr, nc)); }
+  return *p;
+}
+
+const MATRIX* MATRIX_chain_fetch(const MATRIX& m, int& tagslot){ return &m; }
+
+const MATRIX* MATRIX_chain_fetch(const MATRIX_TTag& t, int& tagslot){
+  const MATRIX& src = t.m;
+  MATRIX& s = MATRIX_chain_scratch(2 + tagslot, src.n_cols, src.n_rows);
+  tagslot++;
+  for(int i = 0; i < src.n_rows; i++){
+    for(int j = 0; j < src.n_cols; j++){
+      s.M[j * s.n_cols + i] = src.M[i * src.n_cols + j];
+    }
+  }
+  return &s;
+}
 
 
 void MATRIX::product(const MATRIX& B, const MATRIX& C){

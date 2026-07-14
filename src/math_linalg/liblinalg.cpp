@@ -366,6 +366,8 @@ void export_MATRIX(){
 
   class_< MATRIX, boost::python::bases<base_matrix<double> > >("MATRIX",init<>())
       .def("product", static_cast<void (MATRIX::*)(const MATRIX&, const MATRIX&)>(&MATRIX::product))
+      .def("product", +[](MATRIX& s, const MATRIX& a, const MATRIX& b, const MATRIX& c){ s.product(a, b, c); })
+      .def("product", +[](MATRIX& s, const MATRIX& a, const MATRIX& b, const MATRIX& c, const MATRIX& d){ s.product(a, b, c, d); })
       .def(init<int,int>())
 //      .def(init<const base_matrix<double>&>())
       .def(init<const MATRIX&>())
@@ -568,6 +570,8 @@ void export_CMATRIX(){
 
   class_< CMATRIX, boost::python::bases<base_matrix<complex<double> > > >("CMATRIX",init<>())
       .def("product", static_cast<void (CMATRIX::*)(const CMATRIX&, const CMATRIX&)>(&CMATRIX::product))
+      .def("product", +[](CMATRIX& s, const CMATRIX& a, const CMATRIX& b, const CMATRIX& c){ s.product(a, b, c); })
+      .def("product", +[](CMATRIX& s, const CMATRIX& a, const CMATRIX& b, const CMATRIX& c, const CMATRIX& d){ s.product(a, b, c, d); })
       .def(init<int,int>())
       .def(init<MATRIX&>())
       .def(init<MATRIX&,MATRIX&>())

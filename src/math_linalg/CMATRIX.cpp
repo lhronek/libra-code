@@ -20,6 +20,7 @@
 #include "../pch.h"
 #else
 #include <cstdio>
+#include <memory>
 #include <cstdlib>
 #include <complex>
 #include <iostream>
@@ -515,6 +516,43 @@ void CMATRIX::operator+=(complex<double> f){
 }
 void CMATRIX::operator-=(complex<double> f){  
   for(int i=0;i<n_elts;i++) { M[i] -= f; }
+}
+
+
+CMATRIX& CMATRIX_chain_scratch(int slot, int nr, int nc){
+/**
+  Thread-local scratch matrices for the chained product: slots 0/1 ping-pong
+  the running partial product, slots 2+ hold materialized adjoint() operands.
+  unique_ptr reset on shape change (base_matrix::operator= does not resize).
+*/
+  const int MAXSLOTS = 8;
+  thread_local std::unique_ptr<CMATRIX> pool[8];
+  if(slot < 0 || slot >= MAXSLOTS){
+    std::cout << "Error in the chained product: too many adjoint operands\n";
+    exit(0);
+  }
+  std::unique_ptr<CMATRIX>& p = pool[slot];
+  if(!p || p->n_rows != nr || p->n_cols != nc){ p.reset(new CMATRIX(nr, nc)); }
+  return *p;
+}
+
+const CMATRIX* CMATRIX_chain_fetch(const CMATRIX& m, int& tagslot){ return &m; }
+
+const CMATRIX* CMATRIX_chain_fetch(const CMATRIX_HTag& t, int& tagslot){
+/**
+  Materialize X^H of a tagged operand into a scratch slot - element-wise
+  identical to X.H(), so chains using adjoint() stay bit-exact vs the
+  operator form.
+*/
+  const CMATRIX& src = t.m;
+  CMATRIX& s = CMATRIX_chain_scratch(2 + tagslot, src.n_cols, src.n_rows);
+  tagslot++;
+  for(int i = 0; i < src.n_rows; i++){
+    for(int j = 0; j < src.n_cols; j++){
+      s.M[j * s.n_cols + i] = std::conj(src.M[i * src.n_cols + j]);
+    }
+  }
+  return &s;
 }
 
 

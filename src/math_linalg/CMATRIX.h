@@ -155,6 +155,14 @@ public:
 
   void product(const CMATRIX& B, const CMATRIX& C); ///< A = B * C: CBLAS zgemm for large products, base-class loop otherwise (shadows base_matrix::product)
 
+  ///< Chained in-place product: this = op1 * op2 * ... * opN (left-associated),
+  ///< folded over the 2-argument product() with thread-local scratch storage -
+  ///< no per-call temporaries. Operands are CMATRIX or adjoint(X) tags (X enters
+  ///< as X^H, materialized bit-exactly into scratch). The destination may appear
+  ///< among the operands: it is only written at the final step, which inherits
+  ///< the aliasing guard of the 2-argument product().
+  template <typename... Ops> void product(const Ops&... ops);
+
   MATRIX real(); ///< Returns the real component of the matrix
   MATRIX imag(); ///< Returns the imaginary component of the matrix
   void get_components(MATRIX& re_part,MATRIX& im_part); ///< Split the matrix into real and imaginary components 
@@ -243,6 +251,30 @@ public:
 
                  
 };
+
+///< Tag: use the Hermitian conjugate of a matrix as a chain-product operand
+struct CMATRIX_HTag { const CMATRIX& m; };
+inline CMATRIX_HTag adjoint(const CMATRIX& m){ return CMATRIX_HTag{m}; }
+
+///< internal machinery of the chained product (defined in CMATRIX.cpp)
+CMATRIX& CMATRIX_chain_scratch(int slot, int nr, int nc);
+const CMATRIX* CMATRIX_chain_fetch(const CMATRIX& m, int& tagslot);
+const CMATRIX* CMATRIX_chain_fetch(const CMATRIX_HTag& t, int& tagslot);
+
+template <typename... Ops>
+void CMATRIX::product(const Ops&... ops){
+  static_assert(sizeof...(Ops) >= 2, "product() needs at least 2 operands");
+  int tagslot = 0;
+  const CMATRIX* op[] = { CMATRIX_chain_fetch(ops, tagslot)... };
+  const int N = (int)(sizeof...(Ops));
+  const CMATRIX* cur = op[0];
+  for(int k = 1; k < N - 1; k++){
+    CMATRIX& s = CMATRIX_chain_scratch(k & 1, cur->n_rows, op[k]->n_cols);
+    s.product(*cur, *op[k]);
+    cur = &s;
+  }
+  this->product(*cur, *op[N - 1]);
+}
 
 
 typedef std::vector<CMATRIX> CMATRIXList;  ///< Data type holding a list of arbitrary-size complex-valued matrices
