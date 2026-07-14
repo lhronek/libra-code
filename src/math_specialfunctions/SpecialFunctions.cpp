@@ -10,6 +10,9 @@
 *********************************************************************************/
 
 #include <memory>
+#include <vector>
+#include <cstring>
+#include "../math_linalg/blas_interface.h"
 #include "SpecialFunctions.h"
 #include "../math_meigen/mEigen.h"
 
@@ -1232,6 +1235,52 @@ void exp_(CMATRIX& res, CMATRIX& x, complex<double> dt){
   if(res.n_rows != sz || res.n_cols != sz){
     cout<<"Error in libspecialfunctions::exp_ : the output matrix does not match the input size\n"; exit(0);
   }
+#ifdef HAVE_LAPACK_ZHEEVD
+  {
+    // LAPACK divide-and-conquer path. x is Hermitian; its row-major buffer
+    // read column-major is x^T = conj(x), so it feeds zheevd_ without any
+    // transpose copy, and the eigenvectors come back as U = conj(V) of the
+    // true V. The reconstruction res = V f(w) V^H = conj(U) f(w) U^T is one
+    // conjugate-scale pass plus one gemm: a column-major U buffer read
+    // row-major IS U^T. Eigenvector phases cancel in the reconstruction,
+    // so the result matches the Eigen path to machine epsilon.
+    thread_local std::vector< std::complex<double> > a_buf, t_buf, zwork;
+    thread_local std::vector<double> w_buf, rwork;
+    thread_local std::vector<int> iwork;
+    if((int)a_buf.size() != sz*sz){
+      a_buf.resize(sz*sz); t_buf.resize(sz*sz); w_buf.resize(sz);
+    }
+    std::memcpy(a_buf.data(), x.M, sizeof(std::complex<double>)*sz*sz);
+    int n_ = sz, lda = sz, info = 0;
+    int lwork = -1, lrwork = -1, liwork = -1;
+    std::complex<double> wq; double rwq; int iwq;
+    zheevd_("V", "L", &n_, a_buf.data(), &lda, w_buf.data(),
+            &wq, &lwork, &rwq, &lrwork, &iwq, &liwork, &info, 1, 1);
+    if(info == 0){
+      lwork = (int)wq.real(); lrwork = (int)rwq; liwork = iwq;
+      if((int)zwork.size() < lwork){ zwork.resize(lwork); }
+      if((int)rwork.size() < lrwork){ rwork.resize(lrwork); }
+      if((int)iwork.size() < liwork){ iwork.resize(liwork); }
+      zheevd_("V", "L", &n_, a_buf.data(), &lda, w_buf.data(),
+              zwork.data(), &lwork, rwork.data(), &lrwork,
+              iwork.data(), &liwork, &info, 1, 1);
+    }
+    if(info == 0){
+      for(int k = 0; k < sz; k++){
+        std::complex<double> f = std::exp(dt * w_buf[k]);
+        for(i = 0; i < sz; i++){
+          t_buf[i*sz + k] = std::conj(a_buf[i + k*sz]) * f;
+        }
+      }
+      const std::complex<double> one(1.0, 0.0), zero(0.0, 0.0);
+      cblas_zgemm(liblinalg::CBLAS_ROW_MAJOR, liblinalg::CBLAS_NO_TRANS,
+                  liblinalg::CBLAS_NO_TRANS, sz, sz, sz, &one,
+                  t_buf.data(), sz, a_buf.data(), sz, &zero, res.M, sz);
+      return;
+    }
+    // info != 0: fall through to the Eigen path below
+  }
+#endif
   thread_local std::unique_ptr<CMATRIX> w_evec, w_eval;
   if(!w_evec || w_evec->n_rows != sz){
     w_evec.reset(new CMATRIX(sz, sz));
