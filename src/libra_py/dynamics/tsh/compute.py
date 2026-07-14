@@ -1033,7 +1033,6 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd):
         dyn_var.allocate_dish()
     if tsh_method == 7 or tsh_method == 8 or tsh_method == 9:  # FSSH2 or FSSH3 or original GFSH
         dyn_var.allocate_fssh2()
-        dyn_var.save_curr_dm_into_prev()
 
     if thermally_corrected_nbra == 1:
         dyn_var.allocate_tcnbra()
@@ -1052,6 +1051,16 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd):
 
     # Copy diabatic-to-adiabatic basis transformation to the dynamical variable
     dyn_var.update_basis_transform(ham)
+
+    # Re-derive the dependent electronic variables with the just-computed
+    # Hamiltonian: with ham_update_method==2 the generic_recipe-level init ran
+    # against a not-yet-computed ham (U = 0), leaving ampl_dia/dm_dia zero -
+    # the first save (which happens before the first step) would record them.
+    # The prev-dm snapshot (FSSH2/FSSH3/GFSH-orig; self-gated otherwise) must
+    # be taken from these refreshed matrices.
+    dyn_var.update_amplitudes(dyn_params, ham)
+    dyn_var.update_density_matrix(dyn_params, ham, 1)
+    dyn_var.save_curr_dm_into_prev()
 
     # Recompute the orthogonalized reprojection matrices, stored in
     # dyn_var.proj_adi this calculaitons used ham.children[i].time_overlap
