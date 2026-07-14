@@ -24,6 +24,7 @@
 */
 
 #include "../calculators/NPI.h"
+#include <memory>
 #include "Dynamics.h"
 #include "Energy_and_Forces.h"
 #include "Surface_Hopping.h"
@@ -666,7 +667,8 @@ int need_active_states_diff_rep(dyn_control_params &prms) {
 static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
                                           CMATRIX &T_new, nHamiltonian *ham,
                                           nHamiltonian *ham_prev, int is_ssy,
-                                          dyn_variables &dyn_var, int itraj) {
+                                          dyn_variables &dyn_var, int itraj,
+                                          int t_identity) {
   /**
     One step of the adiabatic-amplitude propagation for the exp_-based
     integrators (electronic_integrator = -1..8 and 100..108), extracted
@@ -677,10 +679,23 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
     (10-15) remain in the per-trajectory loop - propagate_electronic_rot
     works on single columns by construction.
   */
-  CMATRIX Hvib(ham->nadi, ham->nadi);
-  CMATRIX Hvib_old(ham->nadi, ham->nadi);
-  CMATRIX A(ham->nadi, ham->nadi); /// this is A(t)
-  CMATRIX B(ham->nadi, ham->nadi); /// this is actually A(t+dt)
+  // Thread-local workspaces (resized on nadi change): the helper runs both
+  // once per step (NBRA fast path) and per trajectory inside OpenMP regions;
+  // per-thread reuse removes four nadi^2 allocations+zeroings per call.
+  // Every branch assigns these before reading them. t_identity signals that
+  // T_new was loaded as the identity (assume_always_consistent), so its
+  // factors drop out of the chains exactly.
+  thread_local std::unique_ptr<CMATRIX> wHvib, wHvib_old, wA, wB;
+  if (!wHvib || wHvib->n_rows != ham->nadi) {
+    wHvib.reset(new CMATRIX(ham->nadi, ham->nadi));
+    wHvib_old.reset(new CMATRIX(ham->nadi, ham->nadi));
+    wA.reset(new CMATRIX(ham->nadi, ham->nadi));
+    wB.reset(new CMATRIX(ham->nadi, ham->nadi));
+  }
+  CMATRIX &Hvib = *wHvib;
+  CMATRIX &Hvib_old = *wHvib_old;
+  CMATRIX &A = *wA;      /// this is A(t)
+  CMATRIX &B = *wB;      /// this is actually A(t+dt)
 
       if (method == -1) {
         ;
@@ -688,122 +703,128 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
       } // No evolution
       else if (method == 0 || method == 100) {
         // A crude factorization of the Hamiltonian operator
-        Hvib = ham_prev->get_ham_adi(); // T is the identity matrix
+        Hvib = ham_prev->get_ham_adi_ref(); // T is the identity matrix
         if (is_ssy) {
           SSY_correction(Hvib, dyn_var, ham_prev, itraj);
         }
-        A = exp_(Hvib, complex<double>(0.0, -0.5 * dt));
+        exp_(A, Hvib, complex<double>(0.0, -0.5 * dt));
 
-        Hvib = ham->get_ham_adi();
+        Hvib = ham->get_ham_adi_ref();
         if (is_ssy) {
           SSY_correction(Hvib, dyn_var, ham, itraj);
         }
-        B = exp_(Hvib, complex<double>(0.0, -0.5 * dt));
+        exp_(B, Hvib, complex<double>(0.0, -0.5 * dt));
 
-        C = B * T_new * A * C;
+        if (t_identity) { C.product(B, A, C); }
+        else { C.product(B, T_new, A, C); }
       } // method == 0 && 100
 
       else if (method == 1 || method == 101) {
         // Trotter-based symmetric splitting
-        Hvib = ham_prev->get_ham_adi(); // T is the identity matrix
+        Hvib = ham_prev->get_ham_adi_ref(); // T is the identity matrix
         if (is_ssy) {
           SSY_correction(Hvib, dyn_var, ham_prev, itraj);
         }
-        B = exp_(Hvib, complex<double>(0.0, -0.25 * dt));
+        exp_(B, Hvib, complex<double>(0.0, -0.25 * dt));
 
-        Hvib = ham->get_ham_adi();
+        Hvib = ham->get_ham_adi_ref();
         if (is_ssy) {
           SSY_correction(Hvib, dyn_var, ham, itraj);
         }
-        A = exp_(Hvib, complex<double>(0.0, -0.5 * dt));
+        exp_(A, Hvib, complex<double>(0.0, -0.5 * dt));
 
-        C = T_new * B * T_new.H() * A * T_new * B * C;
+        if (t_identity) { C.product(B, A, B, C); }
+        else { C.product(T_new, B, adjoint(T_new), A, T_new, B, C); }
       } // method == 1 && 101
 
       else if (method == 2 || method == 102) {
         // The local diabatization approach
-        Hvib_old = ham_prev->get_ham_adi(); // T is the identity matrix
+        Hvib_old = ham_prev->get_ham_adi_ref(); // T is the identity matrix
         if (is_ssy) {
           SSY_correction(Hvib_old, dyn_var, ham_prev, itraj);
         }
 
-        Hvib = ham->get_ham_adi();
+        Hvib = ham->get_ham_adi_ref();
         if (is_ssy) {
           SSY_correction(Hvib, dyn_var, ham, itraj);
         }
-        Hvib = T_new.H() * Hvib * T_new;
+        if (!t_identity) { Hvib.product(adjoint(T_new), Hvib, T_new); }
         Hvib += Hvib_old;
 
-        A = exp_(Hvib, complex<double>(0.0, -0.5 * dt));
-        C = T_new * A * C;
+        exp_(A, Hvib, complex<double>(0.0, -0.5 * dt));
+        if (t_identity) { C.product(A, C); }
+        else { C.product(T_new, A, C); }
         //      C = A * C;
 
       } // method == 2 && 102
 
       else if (method == 3 || method == 103) {
         // 1-point with vibronic Hamiltonian
-        Hvib = ham_prev->get_hvib_adi();
+        Hvib = ham_prev->get_hvib_adi_ref();
 
         if (is_ssy) {
           SSY_correction(Hvib, dyn_var, ham_prev, itraj);
         }
 
-        A = exp_(Hvib, complex<double>(0.0, -dt));
-        C = T_new * A * C;
+        exp_(A, Hvib, complex<double>(0.0, -dt));
+        if (t_identity) { C.product(A, C); }
+        else { C.product(T_new, A, C); }
       } // method == 3 && 103
 
       else if (method == 4 || method == 104) {
         // 2-point with vibronic Hamiltonian
-        Hvib_old = ham_prev->get_hvib_adi();
+        Hvib_old = ham_prev->get_hvib_adi_ref();
         if (is_ssy) {
           SSY_correction(Hvib_old, dyn_var, ham_prev, itraj);
         }
 
-        Hvib = ham->get_hvib_adi();
+        Hvib = ham->get_hvib_adi_ref();
         if (is_ssy) {
           SSY_correction(Hvib, dyn_var, ham_prev, itraj);
         }
 
         Hvib += Hvib_old;
 
-        A = exp_(Hvib, complex<double>(0.0, -0.5 * dt));
-        C = T_new * A * C;
+        exp_(A, Hvib, complex<double>(0.0, -0.5 * dt));
+        if (t_identity) { C.product(A, C); }
+        else { C.product(T_new, A, C); }
       } // method == 4 && 104
 
       else if (method == 5 || method == 105) {
         // 2-point Hvib with vibronic Hamiltonian and correction
-        Hvib_old = ham_prev->get_hvib_adi(); // T is the identity matrix
+        Hvib_old = ham_prev->get_hvib_adi_ref(); // T is the identity matrix
         if (is_ssy) {
           SSY_correction(Hvib_old, dyn_var, ham_prev, itraj);
         }
 
-        Hvib = ham->get_hvib_adi();
-        Hvib = T_new.H() * Hvib * T_new;
+        Hvib = ham->get_hvib_adi_ref();
+        if (!t_identity) { Hvib.product(adjoint(T_new), Hvib, T_new); }
         if (is_ssy) {
           SSY_correction(Hvib, dyn_var, ham, itraj);
         }
 
         Hvib += Hvib_old;
-        A = exp_(Hvib, complex<double>(0.0, -0.5 * dt));
-        C = T_new * A * C;
+        exp_(A, Hvib, complex<double>(0.0, -0.5 * dt));
+        if (t_identity) { C.product(A, C); }
+        else { C.product(T_new, A, C); }
       } // method == 5 && 105
 
       else if (method == 6 || method == 106) {
         // 2-point with vibronic Hamiltonian, no reordering
-        Hvib_old = ham_prev->get_hvib_adi();
+        Hvib_old = ham_prev->get_hvib_adi_ref();
         if (is_ssy) {
           SSY_correction(Hvib_old, dyn_var, ham_prev, itraj);
         }
 
-        Hvib = ham->get_hvib_adi();
+        Hvib = ham->get_hvib_adi_ref();
         if (is_ssy) {
           SSY_correction(Hvib, dyn_var, ham_prev, itraj);
         }
 
         Hvib += Hvib_old;
 
-        A = exp_(Hvib_old, complex<double>(0.0, -0.5 * dt));
-        C = A * C;
+        exp_(A, Hvib_old, complex<double>(0.0, -0.5 * dt));
+        C.product(A, C);
 
         // dyn_var.proj_adi[itraj]->load_identity();
 
@@ -814,26 +835,26 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
         // 2-point Hvib with vibronic Hamiltonian and correction - same as 5,
         // but different order Propagate old coefficients using old Hamiltonian,
         // only half-way
-        Hvib_old = ham_prev->get_hvib_adi(); // T is the identity matrix
+        Hvib_old = ham_prev->get_hvib_adi_ref(); // T is the identity matrix
         if (is_ssy) {
           SSY_correction(Hvib_old, dyn_var, ham_prev, itraj);
         }
-        A = exp_(Hvib_old, complex<double>(0.0, -0.5 * dt));
-        C = A * C;
+        exp_(A, Hvib_old, complex<double>(0.0, -0.5 * dt));
+        C.product(A, C);
 
         // Reproject the coefficients
-        C = T_new.H() * C;
+        if (!t_identity) { C.product(adjoint(T_new), C); }
 
         // Propagate the new coefficients using the transformed new Hamiltonian,
         // half-way
-        Hvib = ham->get_hvib_adi();
-        Hvib = T_new.H() * Hvib * T_new;
+        Hvib = ham->get_hvib_adi_ref();
+        if (!t_identity) { Hvib.product(adjoint(T_new), Hvib, T_new); }
         if (is_ssy) {
           SSY_correction(Hvib, dyn_var, ham, itraj);
         }
 
-        A = exp_(Hvib, complex<double>(0.0, -0.5 * dt));
-        C = A * C;
+        exp_(A, Hvib, complex<double>(0.0, -0.5 * dt));
+        C.product(A, C);
 
       } // method == 7 && 107
 
@@ -841,24 +862,24 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
         // new LD: 2-point Ham - same as 2 but different order
 
         // Propagate with the old Ham
-        Hvib_old = ham_prev->get_hvib_adi(); // T is the identity matrix
+        Hvib_old = ham_prev->get_hvib_adi_ref(); // T is the identity matrix
         if (is_ssy) {
           SSY_correction(Hvib_old, dyn_var, ham_prev, itraj);
         }
-        A = exp_(Hvib_old, complex<double>(0.0, -0.5 * dt));
-        C = A * C;
+        exp_(A, Hvib_old, complex<double>(0.0, -0.5 * dt));
+        C.product(A, C);
 
         // Reorder:
         // C = T_new.H() * C;
 
         // Propagate with the new Ham
-        Hvib = ham->get_hvib_adi();
+        Hvib = ham->get_hvib_adi_ref();
         if (is_ssy) {
           SSY_correction(Hvib, dyn_var, ham, itraj);
         }
-        Hvib = T_new.H() * Hvib * T_new;
-        A = exp_(Hvib, complex<double>(0.0, -0.5 * dt));
-        C = A * C;
+        if (!t_identity) { Hvib.product(adjoint(T_new), Hvib, T_new); }
+        exp_(A, Hvib, complex<double>(0.0, -0.5 * dt));
+        C.product(A, C);
 
         // Reorder back:
         // C = T_new * C;
@@ -898,12 +919,15 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
   // and the Liouvillian-space work matrices vRHO/RHO/L are declared inside
   // the density-matrix branches (rep >= 2) - L alone is (nst^2 x nst^2),
   // a large pointless allocation for the common amplitude representations
-  CMATRIX Coeff(nst, ntraj);
-  if (prms.rep_tdse == 0) {
-    Coeff = *dyn_var.ampl_dia;
-  } else if (prms.rep_tdse == 1) {
-    Coeff = *dyn_var.ampl_adi;
-  }
+  // Operate directly on the propagated amplitude matrix in the wavefunction
+  // representations - the (nst x ntraj) round-trip copies were pure churn.
+  // Nothing inside this function reads the amplitudes besides the propagation
+  // itself (SSY corrections read momenta only); rep >= 2 propagates the
+  // density matrices instead and never touches Coeff (dummy target).
+  thread_local std::unique_ptr<CMATRIX> w_coeff_dummy;
+  if (!w_coeff_dummy) { w_coeff_dummy.reset(new CMATRIX(1, 1)); }
+  CMATRIX &Coeff = (prms.rep_tdse == 0) ? *dyn_var.ampl_dia :
+                   ((prms.rep_tdse == 1) ? *dyn_var.ampl_adi : *w_coeff_dummy);
 
   //  dyn_var.compute_kinetic_energies()
 
@@ -922,7 +946,8 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
       (method <= 8 || (method >= 100 && method <= 108))) {
     CMATRIX T_new(*dyn_var.proj_adi[0]);
     propagate_amplitudes_adi_exp(method, dt, Coeff, T_new, Ham->children[0],
-                                 Ham_prev->children[0], 0, dyn_var, 0);
+                                 Ham_prev->children[0], 0, dyn_var, 0,
+                                 prms.assume_always_consistent);
   } else {
 
   // Deterministic per-trajectory propagation: every iteration works only on
@@ -1037,14 +1062,21 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
           15              -  same as 5, but with rotations
 
       */
-      CMATRIX Hvib(ham->nadi, ham->nadi);
-      CMATRIX Hvib_old(ham->nadi, ham->nadi);
-      CMATRIX A(ham->nadi, ham->nadi); /// this is A(t)
-      CMATRIX B(ham->nadi, ham->nadi); /// this is actually A(t+dt)
+      // Workspaces for the rotation-based integrators below (thread-local:
+      // this loop body runs inside an OpenMP region); the exp-family helper
+      // manages its own workspaces. Every branch assigns before reading.
+      thread_local std::unique_ptr<CMATRIX> wHvib_rot, wHvib_old_rot;
+      if (!wHvib_rot || wHvib_rot->n_rows != ham->nadi) {
+        wHvib_rot.reset(new CMATRIX(ham->nadi, ham->nadi));
+        wHvib_old_rot.reset(new CMATRIX(ham->nadi, ham->nadi));
+      }
+      CMATRIX &Hvib = *wHvib_rot;
+      CMATRIX &Hvib_old = *wHvib_old_rot;
 
       if (method <= 8 || (method >= 100 && method <= 108)) {
         propagate_amplitudes_adi_exp(method, dt, C, T_new, ham, ham_prev,
-                                     is_ssy, dyn_var, itraj);
+                                     is_ssy, dyn_var, itraj,
+                                     prms.assume_always_consistent);
       }
 
       //========================== Rotation-based ============================
@@ -1270,12 +1302,6 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
   } // for itraj - all trajectories
 
   } // NBRA fast path vs per-trajectory loop
-
-  if (prms.rep_tdse == 0) {
-    *dyn_var.ampl_dia = Coeff;
-  } else if (prms.rep_tdse == 1) {
-    *dyn_var.ampl_adi = Coeff;
-  }
 }
 
 // Learn * vs &

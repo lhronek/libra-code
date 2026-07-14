@@ -9,6 +9,7 @@
 *
 *********************************************************************************/
 
+#include <memory>
 #include "SpecialFunctions.h"
 #include "../math_meigen/mEigen.h"
 
@@ -1216,6 +1217,41 @@ MATRIX exp_(MATRIX& x, double dt){
 }
 
 
+void exp_(CMATRIX& res, CMATRIX& x, complex<double> dt){
+/**
+  In-place variant: res = exp(x*dt) via diagonalization, with thread-local
+  workspaces for the eigenpairs and the chained product for the basis
+  back-transform - the same numerical path as the by-value exp_ (bit-exact),
+  no per-call temporaries.
+*/
+  if(x.n_cols != x.n_rows){
+    cout<<"Error in libspecialfunctions::exp_ : the input matrix is not square\n"; exit(0);
+  }
+  int i;
+  int sz = x.n_cols;
+  if(res.n_rows != sz || res.n_cols != sz){
+    cout<<"Error in libspecialfunctions::exp_ : the output matrix does not match the input size\n"; exit(0);
+  }
+  thread_local std::unique_ptr<CMATRIX> w_evec, w_eval;
+  if(!w_evec || w_evec->n_rows != sz){
+    w_evec.reset(new CMATRIX(sz, sz));
+    w_eval.reset(new CMATRIX(sz, sz));
+  }
+  CMATRIX& evec = *w_evec;  CMATRIX& eval = *w_eval;
+  evec = complex<double>(0.0, 0.0);
+  eval = complex<double>(0.0, 0.0);
+
+  libmeigen::solve_eigen(x, eval, evec, 0);  // x * evec = evec * eval
+
+  res = complex<double>(0.0, 0.0);
+  for(i=0;i<sz;i++){ res.M[i*sz+i] = std::exp(dt * eval.get(i,i)); }
+
+  // Convert to the original basis: res is read into scratch before the
+  // final in-place write (chained product)
+  res.product(evec, res, adjoint(evec));
+}
+
+
 CMATRIX exp_(CMATRIX& x, complex<double> dt){
 /**
   This function computes exp(x*dt) for a given matrix x via:  C.T() * x * C = D
@@ -1229,25 +1265,8 @@ CMATRIX exp_(CMATRIX& x, complex<double> dt){
     cout<<"Error in libspecialfunctions::exp_ : the input matrix is not square\n"; exit(0); 
   }
 
-  int i,j;
- 
-  // Let us first diagonalize the input matrix x
-  int sz = x.n_cols;  
-  CMATRIX* evec; evec = new CMATRIX(sz, sz);  *evec = complex<double>(0.0, 0.0);
-  CMATRIX* eval; eval = new CMATRIX(sz, sz);  *eval = complex<double>(0.0,0.0);
-  CMATRIX res(sz,sz);
-
-  // Find the eigenvalues of the the S matrix
-  libmeigen::solve_eigen(x, *eval, *evec, 0);  // x * evec = evec * eval  ==>  x = evec * eval * evec.H()
-
-  for(i=0;i<sz;i++){ res.M[i*sz+i]= std::exp(dt * eval->get(i,i)); }
-
-  // Convert to the original basis
-  res = (*evec) * res * ((*evec).H());
-
-  delete eval;
-  delete evec;
-
+  CMATRIX res(x.n_cols, x.n_cols);
+  exp_(res, x, dt);
   return res;
 }
 

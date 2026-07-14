@@ -390,6 +390,8 @@ public:
   CMATRIX get_dc1_adi(int i);
   CMATRIX get_dc1_adi(int i, vector<int>& id_);
   CMATRIX get_ham_adi();
+  const CMATRIX& get_ham_adi_ref() const;   ///< zero-copy access
+  const CMATRIX& get_hvib_adi_ref() const;  ///< zero-copy access
   CMATRIX get_ham_adi(vector<int>& id_);
   CMATRIX get_nac_adi();
   CMATRIX get_nac_adi(vector<int>& id_);

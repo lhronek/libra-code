@@ -98,6 +98,7 @@ double RANDOM(double a,double b);
 MATRIX3x3 exp_(MATRIX3x3&, double);
 MATRIX exp_(MATRIX&, double);
 CMATRIX exp_(CMATRIX&, complex<double>);
+void exp_(CMATRIX& res, CMATRIX& x, complex<double> dt); ///< in-place: res = exp(x*dt), no temporaries
 
 // === exp(x*dt) via Taylor sum ====
 MATRIX exp_2(MATRIX& x, double dt, int nterms, double max_tol);

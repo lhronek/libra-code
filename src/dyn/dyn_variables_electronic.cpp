@@ -179,13 +179,13 @@ void dyn_variables::update_amplitudes(dyn_control_params& dyn_params){
     /// Diabatic wfc representation
     if(dyn_params.rep_tdse==0){
       cd = ampl_dia->col(traj);
-      ca = U.H() * cd;
+      ca.product(adjoint(U), cd);
       for(int i=0;i<nadi;i++){ ampl_adi->set(i, traj, ca.get(i,0) ); }
     }
     /// Adiabatic wfc representation
     else if(dyn_params.rep_tdse==1){
       ca = ampl_adi->col(traj);
-      cd = U * ca; 
+      cd.product(U, ca);
       for(int i=0;i<ndia;i++){ ampl_dia->set(i, traj, cd.get(i,0) ); }
     }
 
@@ -247,25 +247,25 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params){
     /// Diabatic wfc representation
     if(rep==0){
       cd = ampl_dia->col(traj);
-      *dm_dia[traj] = (cd * cd.H());
-      *dm_adi[traj] = U.H() * (*dm_dia[traj]) * U;
+      dm_dia[traj]->product(cd, adjoint(cd));
+      dm_adi[traj]->product(adjoint(U), *dm_dia[traj], U);
     }
     /// Adiabatic wfc representation
     else if(rep==1){
       ca = ampl_adi->col(traj);
-      *dm_adi[traj] = ca * ca.H();
+      dm_adi[traj]->product(ca, adjoint(ca));
       if(!skip_dia){
-        *dm_dia[traj] =  U * (*dm_adi[traj]) * U.H();
+        dm_dia[traj]->product(U, *dm_adi[traj], adjoint(U));
       }
     }
     /// Diabatic DM representation
     else if(rep==2){
-      *dm_adi[traj] = U.H() * (*dm_dia[traj]) * U;
+      dm_adi[traj]->product(adjoint(U), *dm_dia[traj], U);
     }
     /// Adiabatic DM representation
     else if(rep==3){
       if(!skip_dia){
-        *dm_dia[traj] =  U * (*dm_adi[traj]) * U.H();
+        dm_dia[traj]->product(U, *dm_adi[traj], adjoint(U));
       }
     }
 
@@ -358,19 +358,19 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params, nHamil
     if(rep==0){
       cd = ampl_dia->col(traj);
       *dm_dia[traj] = S * (cd * cd.H()) * S;
-      *dm_adi[traj] = U.H() * (*dm_dia[traj]) * U;
+      dm_adi[traj]->product(adjoint(U), *dm_dia[traj], U);
     }
     /// Adiabatic wfc representation
     else if(rep==1){
       ca = ampl_adi->col(traj);
-      *dm_adi[traj] = ca * ca.H();
+      dm_adi[traj]->product(ca, adjoint(ca));
       if(!skip_dia){
         *dm_dia[traj] =  su * (*dm_adi[traj]) * su.H();
       }
     }
     /// Diabatic DM representation
     else if(rep==2){
-      *dm_adi[traj] = U.H() * (*dm_dia[traj]) * U;
+      dm_adi[traj]->product(adjoint(U), *dm_dia[traj], U);
     }
     /// Adiabatic DM representation
     else if(rep==3){

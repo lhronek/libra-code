@@ -2037,6 +2037,29 @@ CMATRIX nHamiltonian::get_dc1_adi(int i, vector<int> &id_) {
   }
 }
 
+const CMATRIX& nHamiltonian::get_ham_adi_ref() const {
+/**
+  Zero-copy access to the adiabatic Hamiltonian (see get_ham_adi)
+*/
+  if (ham_adi_mem_status == 0) {
+    std::cout << "Error in get_ham_adi_ref: The matrix is not allocated anywhere\nExiting...\n";
+    exit(0);
+  }
+  return *ham_adi;
+}
+
+const CMATRIX& nHamiltonian::get_hvib_adi_ref() const {
+/**
+  Zero-copy access to the adiabatic vibronic Hamiltonian (see get_hvib_adi)
+*/
+  if (hvib_adi_mem_status == 0) {
+    std::cout << "Error in get_hvib_adi_ref: The matrix is not allocated anywhere\nExiting...\n";
+    exit(0);
+  }
+  return *hvib_adi;
+}
+
+
 CMATRIX nHamiltonian::get_ham_adi() {
   /**
     Return the Hamiltonian matrix in the adiabatic basis
