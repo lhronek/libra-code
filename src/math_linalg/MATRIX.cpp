@@ -30,14 +30,7 @@
 // ========================= Matrices ================================
 // ------------------------- Constructors ----------------------------
 
-#ifdef HAVE_CBLAS_GEMM
-// CBLAS prototype declared locally to avoid a header dependency on cblas.h
-extern "C" {
-void cblas_dgemm(int layout, int transa, int transb, int m, int n, int k,
-                 double alpha, const double* a, int lda, const double* b,
-                 int ldb, double beta, double* c, int ldc);
-}
-#endif
+#include "blas_interface.h"
 
 /// liblibra namespace
 namespace liblibra{
@@ -429,7 +422,8 @@ void MATRIX::product(const MATRIX& B, const MATRIX& C){
   if(B.n_cols == C.n_rows && n_rows == B.n_rows && n_cols == C.n_cols){
     long nops = (long)n_rows * (long)B.n_cols * (long)n_cols;
     if(nops >= 128){
-      cblas_dgemm(101, 111, 111, n_rows, n_cols, B.n_cols, 1.0, B.M, B.n_cols,
+      cblas_dgemm(CBLAS_ROW_MAJOR, CBLAS_NO_TRANS, CBLAS_NO_TRANS,
+                  n_rows, n_cols, B.n_cols, 1.0, B.M, B.n_cols,
                   C.M, C.n_cols, 0.0, M, n_cols);
       return;
     }

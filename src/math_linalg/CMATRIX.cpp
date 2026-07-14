@@ -30,14 +30,7 @@
 
 
 /// liblibra 
-#ifdef HAVE_CBLAS_GEMM
-// CBLAS prototype declared locally to avoid a header dependency on cblas.h
-extern "C" {
-void cblas_zgemm(int layout, int transa, int transb, int m, int n, int k,
-                 const void* alpha, const void* a, int lda, const void* b,
-                 int ldb, const void* beta, void* c, int ldc);
-}
-#endif
+#include "blas_interface.h"
 
 namespace liblibra{
 
@@ -577,7 +570,8 @@ void CMATRIX::product(const CMATRIX& B, const CMATRIX& C){
     long nops = (long)n_rows * (long)B.n_cols * (long)n_cols;
     if(nops >= 128){
       const complex<double> one(1.0, 0.0), zero(0.0, 0.0);
-      cblas_zgemm(101, 111, 111, n_rows, n_cols, B.n_cols, &one, B.M, B.n_cols,
+      cblas_zgemm(CBLAS_ROW_MAJOR, CBLAS_NO_TRANS, CBLAS_NO_TRANS,
+                  n_rows, n_cols, B.n_cols, &one, B.M, B.n_cols,
                   C.M, C.n_cols, &zero, M, n_cols);
       return;
     }

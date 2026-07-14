@@ -4,6 +4,9 @@
    :synopsis: Best-effort control of the thread pool of the BLAS library
        loaded in this process (OpenBLAS via threadpoolctl or directly)
 
+The cap governs the library's single thread pool, which serves both its
+BLAS and its bundled LAPACK routines (zheevd etc.).
+
 The BLAS behind numpy and liblibra threads on its own, independently of any
 process- or OpenMP-level parallelism in libra. On the small per-step matrices
 handled by the NBRA workflows and the TSH dynamics the thread-pool handoff
