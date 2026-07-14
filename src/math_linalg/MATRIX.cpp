@@ -28,6 +28,15 @@
 // ========================= Matrices ================================
 // ------------------------- Constructors ----------------------------
 
+#ifdef HAVE_CBLAS_GEMM
+// CBLAS prototype declared locally to avoid a header dependency on cblas.h
+extern "C" {
+void cblas_dgemm(int layout, int transa, int transb, int m, int n, int k,
+                 double alpha, const double* a, int lda, const double* b,
+                 int ldb, double beta, double* c, int ldc);
+}
+#endif
+
 /// liblibra namespace
 namespace liblibra{
 
@@ -368,6 +377,33 @@ MATRIX MATRIX::operator-(double rhs){
   return res;
 }
 
+
+
+void MATRIX::product(const MATRIX& B, const MATRIX& C){
+/**
+  A = B * C, stored in the caller. Shadows base_matrix::product - see
+  CMATRIX::product for the full rationale (CBLAS dgemm for large
+  products, base-class loop for small ones and BLAS-less builds,
+  temporary for aliased calls).
+*/
+  if((M == B.M || M == C.M) && B.n_cols == C.n_rows && n_rows == B.n_rows && n_cols == C.n_cols){
+    MATRIX tmp(n_rows, n_cols);
+    tmp.product(B, C);
+    *this = tmp;
+    return;
+  }
+#ifdef HAVE_CBLAS_GEMM
+  if(B.n_cols == C.n_rows && n_rows == B.n_rows && n_cols == C.n_cols){
+    long nops = (long)n_rows * (long)B.n_cols * (long)n_cols;
+    if(nops >= 128){
+      cblas_dgemm(101, 111, 111, n_rows, n_cols, B.n_cols, 1.0, B.M, B.n_cols,
+                  C.M, C.n_cols, 0.0, M, n_cols);
+      return;
+    }
+  }
+#endif
+  base_matrix<double>::product(B, C);
+}
 
 
 MATRIX MATRIX::operator*(const MATRIX& ob){

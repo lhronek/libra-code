@@ -29,6 +29,15 @@
 
 
 /// liblibra 
+#ifdef HAVE_CBLAS_GEMM
+// CBLAS prototype declared locally to avoid a header dependency on cblas.h
+extern "C" {
+void cblas_zgemm(int layout, int transa, int transb, int m, int n, int k,
+                 const void* alpha, const void* a, int lda, const void* b,
+                 int ldb, const void* beta, void* c, int ldc);
+}
+#endif
+
 namespace liblibra{
 
 using namespace std;
@@ -506,6 +515,37 @@ void CMATRIX::operator+=(complex<double> f){
 }
 void CMATRIX::operator-=(complex<double> f){  
   for(int i=0;i<n_elts;i++) { M[i] -= f; }
+}
+
+
+void CMATRIX::product(const CMATRIX& B, const CMATRIX& C){
+/**
+  A = B * C, stored in the caller. Shadows base_matrix::product: large
+  products go through CBLAS zgemm when built with WITH_BLAS_GEMM
+  (row-major, no transposes); small products (n*k*m < 128, where the
+  call overhead exceeds the arithmetic) and BLAS-less builds use the
+  base-class loop. Aliased calls (the caller being B or C) are computed
+  via a temporary - the base implementation zeroes the target before
+  reading and would corrupt the operands.
+*/
+  if((M == B.M || M == C.M) && B.n_cols == C.n_rows && n_rows == B.n_rows && n_cols == C.n_cols){
+    CMATRIX tmp(n_rows, n_cols);
+    tmp.product(B, C);
+    *this = tmp;
+    return;
+  }
+#ifdef HAVE_CBLAS_GEMM
+  if(B.n_cols == C.n_rows && n_rows == B.n_rows && n_cols == C.n_cols){
+    long nops = (long)n_rows * (long)B.n_cols * (long)n_cols;
+    if(nops >= 128){
+      const complex<double> one(1.0, 0.0), zero(0.0, 0.0);
+      cblas_zgemm(101, 111, 111, n_rows, n_cols, B.n_cols, &one, B.M, B.n_cols,
+                  C.M, C.n_cols, &zero, M, n_cols);
+      return;
+    }
+  }
+#endif
+  base_matrix< complex<double> >::product(B, C);
 }
 
 

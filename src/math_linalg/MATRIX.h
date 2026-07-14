@@ -205,6 +205,7 @@ void operator/=(double f)
   MATRIX operator-(int rhs);     ///< Subtraction operator 
   MATRIX operator-(double rhs);  ///< Subtraction operator 
 
+  void product(const MATRIX& B, const MATRIX& C); ///< A = B * C: CBLAS dgemm for large products, base-class loop otherwise (shadows base_matrix::product)
   MATRIX operator*(const MATRIX& ob); ///< Multiplication operator
   friend MATRIX operator*(const MATRIX& ob, int f);
   friend MATRIX operator*(int f, const MATRIX& ob);

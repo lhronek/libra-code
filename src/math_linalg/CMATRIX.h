@@ -153,6 +153,8 @@ public:
   CMATRIX H();   ///< Returns the matrix which is Hermitian conjugate w.r.t. the caller matrix
   CMATRIX conj();///< Returns the matrix which is complex conjugate w.r.t. the caller matrix
 
+  void product(const CMATRIX& B, const CMATRIX& C); ///< A = B * C: CBLAS zgemm for large products, base-class loop otherwise (shadows base_matrix::product)
+
   MATRIX real(); ///< Returns the real component of the matrix
   MATRIX imag(); ///< Returns the imaginary component of the matrix
   void get_components(MATRIX& re_part,MATRIX& im_part); ///< Split the matrix into real and imaginary components 
