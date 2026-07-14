@@ -1171,11 +1171,18 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
     # Resolve the "auto" policy for maintaining the diabatic density matrix.
     # dm_dia is a derived quantity in the adiabatic representations, costing
     # two nadi x nadi matrix products per trajectory per step, and is consumed
-    # only by diabatic-representation hopping/dynamics and the "D_dia" output.
+    # only by diabatic-representation hopping/dynamics and the diabatic
+    # observables among the requested outputs.
     if dyn_params.get("compute_dm_dia", -1) == -1:
         props = dyn_params.get("properties_to_save", [])
+        # Saved properties backed by dm_dia: D_dia/D_dia_raw directly;
+        # se_pop_dia, coherence_dia and mash_pop_dia via compute_average_dm(0);
+        # sh_pop_adi_TR via compute_average_sh_pop_TR(1) - the transformed
+        # populations read the OPPOSITE representation's density matrix
+        dia_props = {"D_dia", "D_dia_raw", "se_pop_dia", "coherence_dia",
+                     "mash_pop_dia", "sh_pop_adi_TR"}
         need = (dyn_params.get("rep_tdse", 1) in (0, 2)) or (dyn_params.get("rep_sh", 1) == 0) \
-            or ("D_dia" in props) or ("D_dia_raw" in props)
+            or bool(dia_props.intersection(props))
         dyn_params["compute_dm_dia"] = 1 if need else 0
     ntraj = dyn_params["ntraj"]
     direct_init = dyn_params["direct_init"]
