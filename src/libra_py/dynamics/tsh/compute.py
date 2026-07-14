@@ -44,6 +44,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 
 import util.libutil as comn
+from libra_py.blas_threads import blas_thread_limit
 import libra_py.units as units
 import libra_py.data_outs as data_outs
 import libra_py.data_savers as data_savers
@@ -1069,31 +1070,36 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd):
     update_forces(prms, dyn_var, ham)
 
     # Do the propagation
-    for i in range(nsteps):
-        # Energies
-        Ekin, Epot, Etot, dEkin, dEpot, dEtot = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
-        Etherm, E_NHC = 0.0, 0.0
-        #print("Saving data for step ", i)
-        save.save_tsh_data_1234_new(_savers, dyn_params, i, dyn_var, ham)
+    # Cap the BLAS pool inside the propagation loop (restored on exit): the
+    # in-dynamics matrix products are too small for threaded BLAS - the pool
+    # handoff rivals the arithmetic. blas_num_threads: default 1; 0 = leave as is
+    nbt = dyn_params.get("blas_num_threads", 1)
+    with blas_thread_limit(1 if nbt is None else nbt):
+        for i in range(nsteps):
+            # Energies
+            Ekin, Epot, Etot, dEkin, dEpot, dEtot = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+            Etherm, E_NHC = 0.0, 0.0
+            #print("Saving data for step ", i)
+            save.save_tsh_data_1234_new(_savers, dyn_params, i, dyn_var, ham)
 
-        # ============ Propagate ===========
-        index = i + icond + 1  ### AVA: added +1 on 3/18/2026 for the debug
-        if nfiles > 0:
-            index = index % nfiles
-        model_params.update({"timestep": index})
-        model_params["act_state"] = { itraj : dyn_var.act_states[itraj] for itraj in range(ntraj)  } 
+            # ============ Propagate ===========
+            index = i + icond + 1  ### AVA: added +1 on 3/18/2026 for the debug
+            if nfiles > 0:
+                index = index % nfiles
+            model_params.update({"timestep": index})
+            model_params["act_state"] = { itraj : dyn_var.act_states[itraj] for itraj in range(ntraj)  } 
 
 
-        compute_dynamics(dyn_var, dyn_params, ham, ham_aux, compute_model, model_params, rnd, therm)
+            compute_dynamics(dyn_var, dyn_params, ham, ham_aux, compute_model, model_params, rnd, therm)
 
-        # the text tables follow the same saving stride as the HDF5/mem savers:
-        # the buffers hold ceil(nsteps/nprint) rows, so append only on the
-        # steps that actually stored data, addressing the STRIDED row
-        if _savers["txt_saver"] is not None and i % nprint == 0:
-            _savers["txt_saver"].save_data_txt(F"{prefix}", properties_to_save, "a", int(i / nprint))
+            # the text tables follow the same saving stride as the HDF5/mem savers:
+            # the buffers hold ceil(nsteps/nprint) rows, so append only on the
+            # steps that actually stored data, addressing the STRIDED row
+            if _savers["txt_saver"] is not None and i % nprint == 0:
+                _savers["txt_saver"].save_data_txt(F"{prefix}", properties_to_save, "a", int(i / nprint))
 
-        if _savers["txt2_saver"] is not None and i % nprint == 0:
-            _savers["txt2_saver"].save_data_txt(F"{prefix2}", properties_to_save, "a", 0)
+            if _savers["txt2_saver"] is not None and i % nprint == 0:
+                _savers["txt2_saver"].save_data_txt(F"{prefix2}", properties_to_save, "a", 0)
 
     if _savers["mem_saver"] is not None:
         _savers["mem_saver"].save_data(F"{prefix}/mem_data.hdf", properties_to_save, "w")

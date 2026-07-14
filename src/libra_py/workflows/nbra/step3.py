@@ -30,7 +30,6 @@
 
 import sys
 import cmath
-import contextlib
 import math
 import os
 import time
@@ -1946,51 +1945,10 @@ def sort_unique_SD_basis_scipy(step, sd_states_unique, sd_states_reindexed, _par
     return E_this_sd_sparse, sd_states_unique_sorted, sd_states_reindexed_sorted, reindex_nsteps
 
 
-@contextlib.contextmanager
-def _blas_thread_limit(n):
-    """Best-effort cap on the BLAS/OpenMP thread count inside the with-block.
-
-    numpy's BLAS (OpenBLAS/MKL) threads on its own, independently of
-    use_multiprocessing, silently occupying every core; on the small matrices
-    handled per step that oversubscription is pure overhead (and with a Pool it
-    multiplies with the number of workers). Uses threadpoolctl when installed,
-    otherwise talks to the loaded OpenBLAS directly; restores the old value.
-    """
-    n = max(1, int(n))
-    limiter = None
-    try:
-        from threadpoolctl import threadpool_limits
-        limiter = threadpool_limits(limits=n)
-    except ImportError:
-        pass
-    if limiter is not None:
-        with limiter:
-            yield
-        return
-    saved = []
-    try:
-        import ctypes
-        with open('/proc/self/maps') as f:
-            libs = sorted({line.split()[-1] for line in f
-                           if 'openblas' in line.lower() and '.so' in line.split()[-1]})
-        for path in libs:
-            try:
-                handle = ctypes.CDLL(path)     # already loaded - same handle
-                get = getattr(handle, 'openblas_get_num_threads', None)
-                set_ = getattr(handle, 'openblas_set_num_threads', None)
-                if set_ is not None:
-                    saved.append((set_, get() if get is not None else 0))
-                    set_(n)
-            except OSError:
-                pass
-    except OSError:
-        pass
-    try:
-        yield
-    finally:
-        for set_, old in saved:
-            if old > 0:
-                set_(old)
+# The BLAS thread cap lives in libra_py.blas_threads - it is shared with
+# the TSH dynamics loop (dyn_params["blas_num_threads"]); the old private
+# name is kept as an alias for the call sites below.
+from libra_py.blas_threads import blas_thread_limit as _blas_thread_limit
 
 
 def _worker_blas_threads(params):
