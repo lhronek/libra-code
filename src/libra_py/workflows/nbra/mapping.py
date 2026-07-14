@@ -568,10 +568,13 @@ def ovlp_mat_arb_lemma(SD1, SD2, S2, active_space=None, mem_limit_mb=256):
             structure detection
         mem_limit_mb: cap for the temporary per-group det stacks
 
-    Returns None when the SDs carry repeated spin-orbitals, the maximal bra
-    degree + maximal ket degree reaches nelec (a direct determinant is as
-    cheap), or the reference block is near-singular - callers fall back to
-    ovlp_mat_arb_batched (ovlp_mat_arb_auto does this automatically).
+    Returns None when the determinants have <= 2 electrons (decided before
+    the structure detection - the (k+l) x (k+l) lemma determinants are at
+    least as large as the direct ne x ne ones there), the SDs carry repeated
+    spin-orbitals, the maximal bra degree + maximal ket degree reaches nelec
+    (a direct determinant is as cheap), or the reference block is
+    near-singular - callers fall back to ovlp_mat_arb_batched
+    (ovlp_mat_arb_auto does this automatically).
     """
     n_half = S2.shape[0] // 2
 
@@ -585,6 +588,8 @@ def ovlp_mat_arb_lemma(SD1, SD2, S2, active_space=None, mem_limit_mb=256):
     if i1 is None or i2 is None or i1.shape[1] != i2.shape[1]:
         return None
     ne = i1.shape[1]
+    if ne <= 2:
+        return None
     s1 = _excitation_structure(i1)
     s2 = _excitation_structure(i2)
     if s1 is None or s2 is None:
