@@ -638,6 +638,7 @@ void nHamiltonian::init_ovlp_dia() {
   */
   if (ovlp_dia_mem_status == 0) {
     ovlp_dia = new CMATRIX(ndia, ndia);
+    ovlp_dia->identity();  // default: orthonormal diabatic basis (S = I)
     ovlp_dia_mem_status = 1;
   } else {
     cout << "WARNING in init_ovlp_dia: memory is already allocated\n";
