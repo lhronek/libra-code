@@ -728,14 +728,28 @@ def make_active_space(num_occ,
     num_states = int(data_dim / 2)
     # Check the input
     if (isUKS and num_occ_alpha == 0) and (isUKS and num_occ_beta == 0):
-        raise Exception('Please specify num_occ_alpha and num_occ_beta')
+        raise ValueError('please specify num_occ_alpha and num_occ_beta')
     if isinstance(ks_homo_index, list):  # isUKS = True
         homo_alpha, homo_beta = ks_homo_index
     elif isinstance(ks_homo_index, int):  # isUKS = False
         homo_alpha, homo_beta = ks_homo_index, ks_homo_index
     if not isUKS:
-        if (ks_homo_index + num_unocc) > num_states or (num_occ + num_unocc) > num_states:
-            raise Exception('Error: The number of states should not exceed the data dimension. Exiting now!')
+        # occupied-side and HOMO-bracketing violations would produce NEGATIVE
+        # window indices, which numpy fancy indexing silently wraps to the end
+        # of the matrix (beta-block data read as alpha occupied) - raise instead
+        if not 1 <= ks_homo_index <= num_states - 1:
+            raise ValueError(F"the stored orbital range does not bracket the HOMO "
+                             F"(per-spin HOMO index {ks_homo_index} of {num_states} "
+                             F"orbitals) - adjust lowest_orbital/highest_orbital in step2")
+        if not 1 <= num_occ <= ks_homo_index:
+            raise ValueError(F"num_occ={num_occ} but only {ks_homo_index} occupied "
+                             F"orbitals exist at/below the HOMO - reduce num_occ_states "
+                             F"or lower lowest_orbital in step2")
+        if not 1 <= num_unocc <= num_states - ks_homo_index:
+            raise ValueError(F"num_unocc={num_unocc} but only "
+                             F"{num_states - ks_homo_index} virtuals exist above the "
+                             F"HOMO - reduce num_unocc_states or raise highest_orbital "
+                             F"in step2")
         occ_indicies_alp = range(ks_homo_index - num_occ, ks_homo_index)
         unocc_indices_alp = range(ks_homo_index, ks_homo_index + num_unocc)
         occ_indicies_bet = range(ks_homo_index - num_occ + num_states, ks_homo_index + num_states)
@@ -745,10 +759,26 @@ def make_active_space(num_occ,
         new_ks_homo_index = num_occ
         return new_active_space, new_ks_homo_index
     elif isUKS:
-        if (homo_alpha + num_unocc) > num_states or (num_occ + num_unocc) > num_states:
-            raise Exception('Error: The number of states should not exceed the data dimension. Exiting now!')
+        # per-channel bounds (the old check compared the generic num_unocc
+        # against the alpha HOMO only, while the ranges below use the
+        # per-channel values)
+        if not 1 <= homo_alpha <= num_states - 1 or not 1 <= homo_beta <= num_states - 1:
+            raise ValueError(F"the stored orbital range does not bracket the HOMOs "
+                             F"(per-spin HOMO indices alpha={homo_alpha}, "
+                             F"beta={homo_beta} of {num_states} orbitals) - adjust "
+                             F"lowest_orbital/highest_orbital in step2")
+        if not 1 <= num_occ_alpha <= homo_alpha or not 1 <= num_occ_beta <= homo_beta:
+            raise ValueError(F"num_occ_alpha={num_occ_alpha}, num_occ_beta={num_occ_beta} "
+                             F"but only {homo_alpha}/{homo_beta} occupied orbitals exist "
+                             F"at/below the HOMOs")
+        if (not 1 <= num_unocc_alpha <= num_states - homo_alpha
+                or not 1 <= num_unocc_beta <= num_states - homo_beta):
+            raise ValueError(F"num_unocc_alpha={num_unocc_alpha}, "
+                             F"num_unocc_beta={num_unocc_beta} but only "
+                             F"{num_states - homo_alpha}/{num_states - homo_beta} "
+                             F"virtuals exist above the HOMOs")
         if not num_occ_alpha + num_unocc_alpha == num_occ_beta + num_unocc_beta:
-            raise Exception('Number of orbitals in both channels should be the same!')
+            raise ValueError("the number of orbitals in both spin channels must be the same")
         # Alpha channel
         occ_indicies_alp = range(homo_alpha - num_occ_alpha, homo_alpha)
         unocc_indices_alp = range(homo_alpha, homo_alpha + num_unocc_alpha)
