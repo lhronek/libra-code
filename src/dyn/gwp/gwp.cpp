@@ -15,6 +15,7 @@
 */
 
 #include "gwp.h"
+#include <stdexcept>
 
 /// liblibra namespace
 namespace liblibra{
@@ -30,22 +31,22 @@ namespace libgwp{
 
 int check_dimensions(std::string function_name, MATRIX& R1, MATRIX& P1, MATRIX& R2, MATRIX& P2){
 
-  if(R1.n_cols!=1){  cout<<"Error in "<<function_name<<": R1 should have only 1 colomn\n"; exit(0);  }
-  if(R2.n_cols!=1){  cout<<"Error in "<<function_name<<": R2 should have only 1 colomn\n"; exit(0);  }
-  if(P1.n_cols!=1){  cout<<"Error in "<<function_name<<": P1 should have only 1 colomn\n"; exit(0);  }
-  if(P2.n_cols!=1){  cout<<"Error in "<<function_name<<": P2 should have only 1 colomn\n"; exit(0);  }
+  if(R1.n_cols!=1){  cout<<"Error in "<<function_name<<": R1 should have only 1 colomn\n"; throw std::runtime_error("libra C++ error - see the message printed above");  }
+  if(R2.n_cols!=1){  cout<<"Error in "<<function_name<<": R2 should have only 1 colomn\n"; throw std::runtime_error("libra C++ error - see the message printed above");  }
+  if(P1.n_cols!=1){  cout<<"Error in "<<function_name<<": P1 should have only 1 colomn\n"; throw std::runtime_error("libra C++ error - see the message printed above");  }
+  if(P2.n_cols!=1){  cout<<"Error in "<<function_name<<": P2 should have only 1 colomn\n"; throw std::runtime_error("libra C++ error - see the message printed above");  }
 
   if(R1.n_rows!=P1.n_rows){ 
     cout<<"Error in "<<function_name<<": The dimensions of vectors R1 (given "<<R1.n_rows<<" ) "
-        <<"and P1 (given "<<P1.n_rows<<" ) do not match\n"; exit(0);     
+        <<"and P1 (given "<<P1.n_rows<<" ) do not match\n"; throw std::runtime_error("libra C++ error - see the message printed above");     
   }
   if(R1.n_rows!=R2.n_rows){ 
     cout<<"Error in "<<function_name<<": The dimensions of vectors R1 (given "<<R1.n_rows<<" ) "
-        <<"and R2 (given "<<R2.n_rows<<" ) do not match\n"; exit(0);     
+        <<"and R2 (given "<<R2.n_rows<<" ) do not match\n"; throw std::runtime_error("libra C++ error - see the message printed above");     
   }
   if(P1.n_rows!=P2.n_rows){ 
     cout<<"Error in "<<function_name<<": The dimensions of vectors P1 (given "<<P1.n_rows<<" ) "
-        <<"and P2 (given "<<P2.n_rows<<" ) do not match\n"; exit(0);     
+        <<"and P2 (given "<<P2.n_rows<<" ) do not match\n"; throw std::runtime_error("libra C++ error - see the message printed above");     
   }
 
   // At this point, we are sure that the dimensions of all input vectors are correct

@@ -15,6 +15,7 @@
 */
 
 #include "Electronic.h"
+#include <stdexcept>
 
 /// liblibra namespace
 namespace liblibra{
@@ -76,7 +77,7 @@ void Electronic::init(int n_,int st, double phi){
 */
 //  rnd_obj = new Random();
 
-  if(st>=n_){ std::cout<<"Error in Electronic::init - st("<<st<<") must be smaller than n_("<<n_<<")\n"; exit(0); }
+  if(st>=n_){ std::cout<<"Error in Electronic::init - st("<<st<<") must be smaller than n_("<<n_<<")\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
   nstates = n_;
   q = std::vector<double>(n_,0.0);

@@ -18,6 +18,7 @@
 */
 
 #include "Mulliken.h"
+#include <stdexcept>
 
 /// liblibra namespace
 namespace liblibra {
@@ -183,12 +184,12 @@ void update_Mull_charges(vector<int> &ao_to_atom_map, vector<double> &Zeff,
   if (static_cast<int>(Mull_charges_gross.size()) != Nat) {
     cout << "Error in update_Mull_charges: The size of Mull_charges_gross is "
             "inconsistent with the size of Zeff\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (static_cast<int>(Mull_charges_net.size()) != Nat) {
     cout << "Error in update_Mull_charges: The size of Mull_charges_gross is "
             "inconsistent with the size of Zeff\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   for (auto a = 0; a < Nat; a++) { // all atoms

@@ -15,6 +15,7 @@
 */
 
 #include "Fermi.h"
+#include <stdexcept>
 
 
 /// liblibra namespace
@@ -161,7 +162,7 @@ double fermi_energy(std::vector<double>& bnds,double Nel,double degen, double kT
     int var;
     if(i_m*i_r<=0.0 && i_m*i_l>=0.0){ var = 1; }
     else if(i_m*i_r>=0.0 && i_m*i_l<=0.0){ var = 2; }
-    else{ cout<<"Error in fermi_energy\n"; exit(0); }
+    else{ cout<<"Error in fermi_energy\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
     switch(var){
       case 1: {i_l = i_m; ef_l = ef_m; break; }

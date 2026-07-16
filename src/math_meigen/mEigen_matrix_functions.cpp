@@ -10,6 +10,7 @@
 *********************************************************************************/
 
 #include <Eigen/LU>
+#include <stdexcept>
 #include <Eigen/Dense>
 #include <Eigen/Eigenvalues>
 #include <Eigen/Core>
@@ -44,19 +45,19 @@ void sqrt_matrix(CMATRIX& S, CMATRIX& S_half, CMATRIX& S_i_half, double thresh, 
 */
 
   if(S.n_cols != S.n_rows){
-    cout<<"Error in libmeigen::sqrt_matrix : the input matrix is not square\n"; exit(0); 
+    cout<<"Error in libmeigen::sqrt_matrix : the input matrix is not square\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
   if(S_half.n_cols != S_half.n_rows){
-    cout<<"Error in libmeigen::sqrt_matrix : the output S^{1/2} matrix is not square\n"; exit(0); 
+    cout<<"Error in libmeigen::sqrt_matrix : the output S^{1/2} matrix is not square\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
   if(S_i_half.n_cols != S_i_half.n_rows){
-    cout<<"Error in libmeigen::sqrt_matrix : the output S^{-1/2} matrix is not square\n"; exit(0); 
+    cout<<"Error in libmeigen::sqrt_matrix : the output S^{-1/2} matrix is not square\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
   if(S.n_cols != S_half.n_cols){
-    cout<<"Error in libmeigen::sqrt_matrix : size of matrix S is not the same as that of matrix S^{1/2}\n"; exit(0); 
+    cout<<"Error in libmeigen::sqrt_matrix : size of matrix S is not the same as that of matrix S^{1/2}\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
   if(S.n_cols != S_i_half.n_cols){
-    cout<<"Error in libmeigen::sqrt_matrix : size of matrix S is not the same as that of matrix S^{-1/2}\n"; exit(0); 
+    cout<<"Error in libmeigen::sqrt_matrix : size of matrix S is not the same as that of matrix S^{-1/2}\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
 
 
@@ -85,8 +86,8 @@ void sqrt_matrix(CMATRIX& S, CMATRIX& S_half, CMATRIX& S_i_half, double thresh, 
       std::cout<<"\n Error in sqrt_matrix: One of the eigenvalues of the matrix S is "<< val
                <<"\n this is below the used threshold of "<<thresh
                <<"\n So... the matrix is likely singular or your threshold is too large"
-               <<"\n Exiting now...\n";
-      exit(0);
+               <<"\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
     else{
       S_i_half.M[i*sz+i] = 1.0/val;
@@ -128,7 +129,7 @@ void exp_matrix(CMATRIX& res, CMATRIX& S, complex<double> dt, int do_phase_corre
 */
 
   if(S.n_cols != S.n_rows){
-    cout<<"Error in libmeigen::exp_matrix : the input matrix is not square\n"; exit(0); 
+    cout<<"Error in libmeigen::exp_matrix : the input matrix is not square\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
 
 

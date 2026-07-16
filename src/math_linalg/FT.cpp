@@ -10,6 +10,7 @@
 *********************************************************************************/
 
 #include "FT.h"
+#include <stdexcept>
 
 
 /// liblibra 
@@ -57,11 +58,11 @@ void solve_linsys(CMATRIX& C,CMATRIX& D, CMATRIX& X,double eps,int maxiter,doubl
   int iter;    // number of iterations
 
   if(C.n_rows!=D.n_rows)
-      {std::cout<<"Error: The number of rows of matrices C and D in equation CX = D must be equal\n"; exit(35); } // n
+      {std::cout<<"Error: The number of rows of matrices C and D in equation CX = D must be equal\n"; throw std::runtime_error("libra C++ error - see the message printed above"); } // n
   if(C.n_cols!=X.n_rows)
-      {std::cout<<"Error: The number of cols of CMATRIX C and num of rows in CMATRIX D in equation CX = D must be equal\n"; exit(35); } // m
+      {std::cout<<"Error: The number of cols of CMATRIX C and num of rows in CMATRIX D in equation CX = D must be equal\n"; throw std::runtime_error("libra C++ error - see the message printed above"); } // m
   if(X.n_cols!=D.n_cols)
-      {std::cout<<"Error: The number of cols of matrices X and D in equation CX = D must be equal\n"; exit(35); } // p
+      {std::cout<<"Error: The number of cols of matrices X and D in equation CX = D must be equal\n"; throw std::runtime_error("libra C++ error - see the message printed above"); } // p
 
   // Set dimentions
   n = C.n_rows;
@@ -173,9 +174,9 @@ void solve_linsys1(CMATRIX& C, CMATRIX& X,double eps,int maxiter,double omega){
   int iter;    // number of iterations
 
   if(C.n_cols!=X.n_rows)
-      {std::cout<<"Error: The number of cols of CMATRIX C and num of rows in CMATRIX D in equation CX = D must be equal\n"; exit(35); } // m
+      {std::cout<<"Error: The number of cols of CMATRIX C and num of rows in CMATRIX D in equation CX = D must be equal\n"; throw std::runtime_error("libra C++ error - see the message printed above"); } // m
   if(X.n_cols!=1)
-      {std::cout<<"Error: The number of cols of matrices X and D in equation CX = D must be equal\n"; exit(35); } // p
+      {std::cout<<"Error: The number of cols of matrices X and D in equation CX = D must be equal\n"; throw std::runtime_error("libra C++ error - see the message printed above"); } // p
 
   // Set dimentions
   n = C.n_rows;
@@ -420,7 +421,7 @@ void cfft1(CMATRIX& in,CMATRIX& out,double xmin,double kmin,double dx){
 
   // Initial check 
   int N = in.n_elts; // N must be 2^n, n - some integer
-  if( (N>1) && (N%2!=0) ){  cout<<"N must be power of 2\n"; exit(0);}
+  if( (N>1) && (N%2!=0) ){  cout<<"N must be power of 2\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
 
   if(N>2){
 
@@ -586,8 +587,8 @@ void cfft1_2D(CMATRIX& in, CMATRIX& out,double xmin,double ymin, double kxmin, d
   //cout<<"cfft1_2D: Nx = "<<Nx<<endl;
   //cout<<"cfft1_2D: Ny = "<<Ny<<endl;
 
-  if( (Nx>1) && (Nx%2!=0) ){  cout<<"Nx must be power of 2\n"; exit(0);}
-  if( (Ny>1) && (Ny%2!=0) ){  cout<<"Ny must be power of 2\n"; exit(0);}
+  if( (Nx>1) && (Nx%2!=0) ){  cout<<"Nx must be power of 2\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
+  if( (Ny>1) && (Ny%2!=0) ){  cout<<"Ny must be power of 2\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
 
   // Case 1
   if(Nx>2 && Ny>2){
@@ -764,7 +765,7 @@ void cfft1_2D(CMATRIX& in, CMATRIX& out,double xmin,double ymin, double kxmin, d
     cft1_2D(in,out,xmin,ymin,kxmin,kymin,dx,dy);
   }// if Nx==2 && Ny==2 : case 4
 
-  else{ cout<<"Not implemented\n";  exit(0); }
+  else{ cout<<"Not implemented\n";  throw std::runtime_error("libra C++ error - see the message printed above"); }
 
 
 }
@@ -938,7 +939,7 @@ void inv_cfft1(CMATRIX& in,CMATRIX& out,double xmin,double kmin,double dx){
 
   // Initial check 
   int N = in.n_elts; // N must be 2^n, n - some integer
-  if( (N>1) && (N%2!=0) ){  cout<<"N must be power of 2\n"; exit(0);}
+  if( (N>1) && (N%2!=0) ){  cout<<"N must be power of 2\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
 
   if(N>2){
 
@@ -1080,8 +1081,8 @@ void inv_cfft1_2D(CMATRIX& in, CMATRIX& out,double xmin,double ymin, double kxmi
   int indx;
 
 
-  if( (Nx>1) && (Nx%2!=0) ){  cout<<"Nx must be power of 2\n"; exit(0);}
-  if( (Ny>1) && (Ny%2!=0) ){  cout<<"Ny must be power of 2\n"; exit(0);}
+  if( (Nx>1) && (Nx%2!=0) ){  cout<<"Nx must be power of 2\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
+  if( (Ny>1) && (Ny%2!=0) ){  cout<<"Ny must be power of 2\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
 
   // Case 1
   if(Nx>2 && Ny>2){
@@ -1258,7 +1259,7 @@ void inv_cfft1_2D(CMATRIX& in, CMATRIX& out,double xmin,double ymin, double kxmi
     inv_cft1_2D(in,out,xmin,ymin,kxmin,kymin,dx,dy);
   }// if Nx==2 && Ny==2 : case 4
 
-  else{ cout<<"Not implemented\n";  exit(0); }
+  else{ cout<<"Not implemented\n";  throw std::runtime_error("libra C++ error - see the message printed above"); }
 
 
 }

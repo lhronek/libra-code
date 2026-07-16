@@ -14,6 +14,7 @@
 */
 
 #include "dyn_control_params.h"
+#include <stdexcept>
 
 /// liblibra namespace
 namespace liblibra{
@@ -312,15 +313,15 @@ void dyn_control_params::sanity_check(){
      state_tracking_algo==4 || state_tracking_algo==5  || state_tracking_algo==6 ){ ; ; }
   else{
     std::cout<<"Error in dyn_control_params::sanity_check: state_tracking_algo = "
-        <<state_tracking_algo<<" is not allowed\nExiting...\n";
-    exit(0);
+        <<state_tracking_algo<<" is not allowed\n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   /// Shall not use DISH with the decoherence correction
   if(tsh_method==3 && decoherence_algo!=-1){
     cout<<"Error in dyn_control_params::sanity_check: Shall not use DISH (tsh_method == 3) with the \
-           decoherence correction (any but decoherence_algo == -1)\nExiting...\n";
-    exit(0);
+           decoherence correction (any but decoherence_algo == -1)\n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   /// Check that we don't constrian the thermostatted DOFs and also quantum DOFs
@@ -333,8 +334,7 @@ void dyn_control_params::sanity_check(){
       for(int i2=0; i2<sz2; i2++){
         if( constrained_dofs[i1] == thermostat_dofs[i2] ){
            cout<<"Error in dyn_control_params::sanity_check: can not constrain the thermostatted DOF "<<thermostat_dofs[i2]<<endl;
-           cout<<"Exiting...\n";
-           exit(0);
+           throw std::runtime_error("libra C++ error - see the message printed above");
         }
       }// for i2
     }// for i1
@@ -344,8 +344,7 @@ void dyn_control_params::sanity_check(){
       for(int i2=0; i2<sz2; i2++){
         if( constrained_dofs[i1] == quantum_dofs[i2] ){
            cout<<"Error in dyn_control_params::sanity_check: can not constrain the quantum DOF "<<quantum_dofs[i2]<<endl;
-           cout<<"Exiting...\n";
-           exit(0);
+           throw std::runtime_error("libra C++ error - see the message printed above");
         }
       }// for i2
     }// for i1
@@ -356,7 +355,6 @@ void dyn_control_params::sanity_check(){
   if(num_electronic_substeps<=0){
       cout<<"Error in dyn_control_params::sanity_check: num_electronic_substeps = "<<num_electronic_substeps
           <<" should be a positive integer"<<endl;
-      cout<<"Exiting...\n";
   }
 
 }

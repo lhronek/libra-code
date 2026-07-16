@@ -10,6 +10,7 @@
 *********************************************************************************/
 
 #include "Model_sin.h"
+#include <stdexcept>
 
 /// liblibra namespace
 namespace liblibra{
@@ -31,11 +32,11 @@ void sin_2D_Ham(double x, double y, MATRIX* H,
 // no cross-derivatives yet
 
 
-  if(H->n_elts!=4){ std::cout<<"Error in sin_2D_Ham: H matrix must be allocated\n"; exit(0);}
-  if(dH1->n_elts!=4){ std::cout<<"Error in sin_2D_Ham: dH1 matrix must be allocated\n"; exit(0);}
-  if(d2H1->n_elts!=4){ std::cout<<"Error in sin_2D_Ham: d2H1 matrix must be allocated\n"; exit(0);}
-  if(dH2->n_elts!=4){ std::cout<<"Error in sin_2D_Ham: dH2 matrix must be allocated\n"; exit(0);}
-  if(d2H2->n_elts!=4){ std::cout<<"Error in sin_2D_Ham: d2H2 matrix must be allocated\n"; exit(0);}
+  if(H->n_elts!=4){ std::cout<<"Error in sin_2D_Ham: H matrix must be allocated\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
+  if(dH1->n_elts!=4){ std::cout<<"Error in sin_2D_Ham: dH1 matrix must be allocated\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
+  if(d2H1->n_elts!=4){ std::cout<<"Error in sin_2D_Ham: d2H1 matrix must be allocated\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
+  if(dH2->n_elts!=4){ std::cout<<"Error in sin_2D_Ham: dH2 matrix must be allocated\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
+  if(d2H2->n_elts!=4){ std::cout<<"Error in sin_2D_Ham: d2H2 matrix must be allocated\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
 
 
   double e;

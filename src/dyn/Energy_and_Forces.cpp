@@ -18,6 +18,7 @@
 */
 
 #include "Energy_and_Forces.h"
+#include <stdexcept>
 #include "dyn_projectors.h"
 
 /// liblibra namespace
@@ -295,7 +296,7 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
     }
     // Adiabatic
     else if(prms.rep_force==1){
-      cout<<"Error in potential_energies(): KC-RPMD works exclusively within diabatic bases\n"; exit(0);
+      cout<<"Error in potential_energies(): KC-RPMD works exclusively within diabatic bases\n"; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   
   }// KC-RPMD
@@ -440,7 +441,7 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
     }
 
     // Adiabatic 
-    else if(prms.rep_force==1){ cout<<"Error in update_forces(): KC-RPMD works exclusively within diabatic bases\n"; exit(0); }
+    else if(prms.rep_force==1){ cout<<"Error in update_forces(): KC-RPMD works exclusively within diabatic bases\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
   }// KC-RPMD
 
 //  return F;

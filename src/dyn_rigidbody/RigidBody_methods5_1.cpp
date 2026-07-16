@@ -15,6 +15,7 @@
 */
 
 #include "RigidBody.h"
+#include <stdexcept>
 
 /// liblibra namespace
 namespace liblibra{
@@ -91,7 +92,7 @@ void RigidBody::initialize_exact_rb(){
 
     if(!status){
       cout<<"In symmetric top case. The necessary permutation can not be found"<<endl;
-      exit(1);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }else{
     // Update all variables to suit for the ordering just found
 //      MATRIX invU; U[permutindx].Inverse(invU);
@@ -132,7 +133,7 @@ void RigidBody::initialize_exact_rb(){
 
     if(!status){
       cout<<"In asymmetric top case. The necessary permutation can not be found"<<endl;
-      exit(1);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }else{
     top_w = U[permutindx] * top_w;
     top_l = U[permutindx] * top_l;
@@ -292,7 +293,7 @@ void RigidBody::propagate_exact_rb(double dt){
      (top_l.x==0.0 && top_l.y!=0.0 && top_l.z==0.0 ) ||
      (top_l.x==0.0 && top_l.y==0.0 && top_l.z!=0.0 )
     ){
-      exit(1);
+      throw std::runtime_error("libra C++ error - see the message printed above");
       T2.Rotation(-t*top_w);
       rb_A_I_to_e = T2 * rb_A_I_to_e;
   }
@@ -301,13 +302,13 @@ void RigidBody::propagate_exact_rb(double dt){
 
   //----------------- Spherical top case ---------------------
   if((I1==I2) && (I2==I3)){
-    exit(1);
+    throw std::runtime_error("libra C++ error - see the message printed above");
     T2.Rotation(-t*top_w);
     rb_A_I_to_e = T2 * rb_A_I_to_e;
   }
   //----------------- Symmetric top case ---------------------
   else if(I1==I2) {
-    exit(1);
+    throw std::runtime_error("libra C++ error - see the message printed above");
     dir = top_l/Lmod;
     psi = t*(top_l.length()/I1);
     cos_psi = cos(psi);

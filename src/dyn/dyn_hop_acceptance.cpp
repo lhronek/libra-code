@@ -14,6 +14,7 @@
 */
 
 #include "Surface_Hopping.h"
+#include <stdexcept>
 #include "Energy_and_Forces.h"
 #include "electronic/libelectronic.h"
 ///#include "Dynamics.h"
@@ -227,7 +228,7 @@ double Boltz_cl_prob(double E, double T){
     double D = (2.0*b/sqrt(M_PI)) * x * exp(-x);
     if( D>1.0 || D<0.0 ){
       cout<<"D = "<<D<<endl;
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     res = D;
@@ -266,7 +267,7 @@ double Boltz_cl_prob_up(double E, double T){
     double D = ERF(x) - sqrt(4.0/M_PI) * x * exp(-x*x);
     if( D>1.0 || D<0.0){
       cout<<"D = "<<D<<endl;
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     double res = 1.0 - D;

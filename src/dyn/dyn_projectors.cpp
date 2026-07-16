@@ -27,6 +27,7 @@
 */
 
 #include <vector>
+#include <stdexcept>
 #include <limits>
 #include <algorithm>
 
@@ -444,7 +445,7 @@ vector<int> get_stochastic_reordering(CMATRIX& time_overlap, Random& rnd){
             target = hop(0, g, ksi);    // internal (active states') state index
             if(target > act_st_sz-1){
                 cout<<"ERROR: target = "<<target<<" is larger than max possible value = "<<act_st_sz-1<<endl;
-                exit(0);
+                throw std::runtime_error("libra C++ error - see the message printed above");
             }
             target = active_states[target]; // actual state index
         }
@@ -462,7 +463,7 @@ vector<int> get_stochastic_reordering(CMATRIX& time_overlap, Random& rnd){
       if(!is_in_vector(i,perm)){
         for(j=0;j<sz;j++){ 
             cout<<"j= "<<j<<" perms[j] = "<<perm[j]<<endl; 
-            exit(0);
+            throw std::runtime_error("libra C++ error - see the message printed above");
         }
       }
     } 
@@ -715,8 +716,8 @@ vector<int> get_stochastic_reordering3
       std::cout << "Stochastic reordering did not converge in " << max_number_of_attempts << " attempts\nChoosing identity...\n"; 
     }
     if(!is_accepted && convergence){
-      std::cout << "Stochastic reordering did not converge in " << max_number_of_attempts << " attempts\nExiting now...\n";
-      exit(0);
+      std::cout << "Stochastic reordering did not converge in " << max_number_of_attempts << " attempts\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
     return chosen_perm;
@@ -1036,7 +1037,7 @@ CMATRIX raw_to_dynconsyst(CMATRIX& amplitudes, vector<CMATRIX>& projectors){
 
   if(projectors.size() != ntraj){  
     cout<<"ERROR in raw_to_dynconsyst: the dimensions do not agree\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
 
@@ -1082,7 +1083,7 @@ CMATRIX dynconsyst_to_raw(CMATRIX& amplitudes, vector<CMATRIX>& projectors){
 
   if(projectors.size() != ntraj){  
     cout<<"ERROR in raw_to_dynconsyst: the dimensions do not agree\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
 

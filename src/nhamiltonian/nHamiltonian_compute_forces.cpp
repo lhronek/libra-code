@@ -17,6 +17,7 @@
 
 #if defined(USING_PCH)
 #include "../pch.h"
+#include <stdexcept>
 #else
 #include <stdlib.h>
 #endif 
@@ -58,7 +59,7 @@ CMATRIX nHamiltonian::forces_adi(vector<int>& act_states){
     }// for traj
   }
   else{
-    cout<<"ERROR: the size of the input is different from the number of children\n"; exit(0); 
+    cout<<"ERROR: the size of the input is different from the number of children\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
 
   return res;
@@ -88,7 +89,7 @@ CMATRIX nHamiltonian::forces_dia(vector<int>& act_states){
     }// for traj
   }
   else{
-    cout<<"ERROR: the size of the input is different from the number of children\n"; exit(0); 
+    cout<<"ERROR: the size of the input is different from the number of children\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
 
   return res;
@@ -110,7 +111,7 @@ CMATRIX nHamiltonian::all_forces_adi(vector<int>& id_){
         if(d1ham_adi_mem_status[n]==0){ 
           cout<<"Error in all_forces_adi(): the derivatives of the Hamiltonian matrix in the \
                 adiabatic basis w.r.t. the nuclear DOF "<<n<<" is not allocated but is \
-                needed for the calculations \n"; exit(0); 
+                needed for the calculations \n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
         }
 
         for(int ist=0; ist<nadi; ist++){
@@ -122,7 +123,7 @@ CMATRIX nHamiltonian::all_forces_adi(vector<int>& id_){
       return res; 
 
     }// id_[0]==id
-    else{ cout<<"ERROR in all_forces_adi: No Hamiltonian matching the requested id\n"; exit(0); }
+    else{ cout<<"ERROR in all_forces_adi: No Hamiltonian matching the requested id\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
   }
   else{
     vector<int> next(id_.begin()+1,id_.end());
@@ -145,7 +146,7 @@ CMATRIX nHamiltonian::all_forces_dia(vector<int>& id_){
         if(d1ham_dia_mem_status[n]==0){
           cout<<"Error in all_forces_dia(): the derivatives of the Hamiltonian matrix in the \
                 adiabatic basis w.r.t. the nuclear DOF "<<n<<" is not allocated but is \
-                needed for the calculations \n"; exit(0);
+                needed for the calculations \n"; throw std::runtime_error("libra C++ error - see the message printed above");
         }
 
         for(int ist=0; ist<ndia; ist++){
@@ -157,7 +158,7 @@ CMATRIX nHamiltonian::all_forces_dia(vector<int>& id_){
       return res;
 
     }// id_[0]==id
-    else{ cout<<"ERROR in all_forces_dia: No Hamiltonian matching the requested id\n"; exit(0); }
+    else{ cout<<"ERROR in all_forces_dia: No Hamiltonian matching the requested id\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
   }
   else{
     vector<int> next(id_.begin()+1,id_.end());

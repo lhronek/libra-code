@@ -15,6 +15,7 @@
 */
 
 #include "Basis.h"
+#include <stdexcept>
 #include "../math_meigen/libmeigen.h"
 
 /// liblibra namespace
@@ -202,14 +203,12 @@ void MO_overlap(MATRIX& Smo, vector<AO>& ao_i, vector<AO>& ao_j, MATRIX& Ci, MAT
   if(Smo.n_rows != Norb_i_act){
     cout<<"Error in MO_overlap: The number of rows of the MO overlap matrix"<<Smo.n_rows
         <<" is not consistent with the number of <i| orbitals "<<Norb_i_act<<endl;
-    cout<<"Exiting..."; 
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if(Smo.n_cols != Norb_j_act){
     cout<<"Error in MO_overlap: The number of cols of the MO overlap matrix"<<Smo.n_cols
         <<" is not consistent with the number of |j> orbitals "<<Norb_j_act<<endl;
-    cout<<"Exiting..."; 
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
 
@@ -292,14 +291,12 @@ void MO_overlap(CMATRIX& Smo, vector<AO>& ao_i, vector<AO>& ao_j, CMATRIX& Ci, C
   if(Smo.n_rows != Norb_i_act){
     cout<<"Error in MO_overlap: The number of rows of the MO overlap matrix"<<Smo.n_rows
         <<" is not consistent with the number of <i| orbitals "<<Norb_i_act<<endl;
-    cout<<"Exiting..."; 
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if(Smo.n_cols != Norb_j_act){
     cout<<"Error in MO_overlap: The number of cols of the MO overlap matrix"<<Smo.n_cols
         <<" is not consistent with the number of |j> orbitals "<<Norb_j_act<<endl;
-    cout<<"Exiting..."; 
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
 
@@ -374,8 +371,7 @@ void MO_overlap(MATRIX& Smo, MATRIX& Ci, MATRIX& Cj,
   if(Nbas_i != Nbas_j){
     cout<<"Error in MO_overlap: The number of rows of the MO-LCAO matrix Ci "<<Ci.n_rows
         <<" is not equal to the number of rows of the MO-LCAO matrix Cj "<<Cj.n_rows<<endl;
-    cout<<"Exiting..."; 
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
 
@@ -390,14 +386,12 @@ void MO_overlap(MATRIX& Smo, MATRIX& Ci, MATRIX& Cj,
   if(Smo.n_rows != Norb_i_act){
     cout<<"Error in MO_overlap: The number of rows of the MO overlap matrix"<<Smo.n_rows
         <<" is not consistent with the number of <i| orbitals "<<Norb_i_act<<endl;
-    cout<<"Exiting..."; 
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if(Smo.n_cols != Norb_j_act){
     cout<<"Error in MO_overlap: The number of cols of the MO overlap matrix"<<Smo.n_cols
         <<" is not consistent with the number of |j> orbitals "<<Norb_j_act<<endl;
-    cout<<"Exiting..."; 
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
 
@@ -437,8 +431,7 @@ void MO_overlap(CMATRIX& Smo, CMATRIX& Ci, CMATRIX& Cj,
   if(Nbas_i != Nbas_j){
     cout<<"Error in MO_overlap: The number of rows of the MO-LCAO matrix Ci "<<Ci.n_rows
         <<" is not equal to the number of rows of the MO-LCAO matrix Cj "<<Cj.n_rows<<endl;
-    cout<<"Exiting..."; 
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
 
@@ -453,14 +446,12 @@ void MO_overlap(CMATRIX& Smo, CMATRIX& Ci, CMATRIX& Cj,
   if(Smo.n_rows != Norb_i_act){
     cout<<"Error in MO_overlap: The number of rows of the MO overlap matrix"<<Smo.n_rows
         <<" is not consistent with the number of <i| orbitals "<<Norb_i_act<<endl;
-    cout<<"Exiting..."; 
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if(Smo.n_cols != Norb_j_act){
     cout<<"Error in MO_overlap: The number of cols of the MO overlap matrix"<<Smo.n_cols
         <<" is not consistent with the number of |j> orbitals "<<Norb_j_act<<endl;
-    cout<<"Exiting..."; 
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
 
@@ -499,14 +490,12 @@ complex<double> SD_overlap(SD& sd_i, SD& sd_j){
   if(sd_i.N_bas != sd_j.N_bas){
     cout<<"Error in SD_overlap: The number of basis functions in which MOs of the SD sd_i are expanded "<<sd_i.N_bas
         <<" is not equal to the number of basis functions in which MOs of the SD sd_j are expanded "<<sd_j.N_bas<<endl;
-    cout<<"Exiting..."; 
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if(sd_i.N!=sd_j.N){
     cout<<"Error in SD_overlap: The number of MOs included in the SD sd_i "<<sd_i.N
         <<" is not equal to the number of MOs included in the SD sd_j"<<sd_j.N<<endl;
-    cout<<"Exiting..."; 
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   // Compute the matrix of 1-el MO overlaps
@@ -567,12 +556,12 @@ void SD_overlap(CMATRIX& SD_ovlp, vector<SD>& sd_i, vector<SD>& sd_j){
   if(SD_ovlp.n_rows!=Ni){
     std::cout<<"Error in SD_overlap : the # of rows of the output matrix, SD_ovlp ( "<<SD_ovlp.n_rows
              <<" ) is not equal to the number of Slater Determinants in the first (left) set ( "<<Ni<<" )\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if(SD_ovlp.n_cols!=Nj){
     std::cout<<"Error in SD_overlap : the # of cols of the output matrix, SD_ovlp ( "<<SD_ovlp.n_cols
              <<" ) is not equal to the number of Slater Determinants in the second (right) set ( "<<Nj<<" )\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
 

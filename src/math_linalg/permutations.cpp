@@ -16,6 +16,7 @@
 
 
 #include "permutations.h"
+#include <stdexcept>
 
 /// liblibra namespace
 namespace liblibra{
@@ -114,8 +115,7 @@ void check_permutation(vector<int>& perm, int n){
     if(sz!=n){
       cout<<"ERROR in void check_permutation(vector<int>& perm, int n)\n";
       cout<<"The number of items in the input permutation ("<<sz<<") is not equal to the expected size of the permutation ("<<n<<")\n";
-      cout<<"Exiting...\n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     int min_indx = perm[0];
@@ -128,16 +128,14 @@ void check_permutation(vector<int>& perm, int n){
     if(min_indx < 0){
       cout<<"ERROR in void check_permutation(vector<int>& perm, int n)\n";
       cout<<"The minimal mapping index of the permutation ("<<min_indx<<") is smaller than 0\n";
-      cout<<"Exiting...\n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     if(max_indx > n-1){
       cout<<"ERROR in void check_permutation(vector<int>& perm, int n)\n";
       cout<<"The maximal mapping index of the permutation ("<<max_indx<<") is larger than the \
              maximal allowed index of permutation ("<<n-1<<")\n";
-      cout<<"Exiting...\n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
 }

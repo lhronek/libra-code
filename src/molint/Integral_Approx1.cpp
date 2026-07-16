@@ -10,6 +10,7 @@
 *********************************************************************************/
 
 #include "Integral_Approx1.h"
+#include <stdexcept>
 #include "../math_specialfunctions/libspecialfunctions.h"
 
 
@@ -463,8 +464,8 @@ double Coulomb_Integral(double R,int n_i, double Jii, double ksi_i, std::string 
 
   default: {
   std::cout<<"Warning: To calculate two-center Coulomb integral there are options:"<<std::endl;
-  std::cout<<"0, 1, ... , 7. Exiting"<<std::endl;
-  exit(0);
+  std::cout<<"0, 1, ... , 7."<<std::endl;
+  throw std::runtime_error("libra C++ error - see the message printed above");
            }
   }
 

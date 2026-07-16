@@ -10,6 +10,7 @@
 *********************************************************************************/
 
 #include <memory>
+#include <stdexcept>
 #include <vector>
 #include <cstring>
 #include "../math_linalg/blas_interface.h"
@@ -325,15 +326,15 @@ double BINOM(int i,int n) {
 
   if(i<0) { 
     cout<<"Error in BINOM: i must be non-negative\n"; 
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if(n<0) { 
     cout<<"Error in BINOM: n must be non-negative\n"; 
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if(i>n) { 
     cout<<"Error in BINOM: i must be not larger than n\n"; 
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
 
@@ -748,11 +749,11 @@ void LEGENDRE(int n,double x,double a,double b,double& p,double& q){
 */
     if(x<a){ 
       cout<<"Error: Legendre polynomial is not defined for x = "<<x<<" < a = "<<a<<endl; 
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
     if(x>b){ 
       cout<<"Error: Legendre polynomial is not defined for x = "<<x<<" > b = "<<b<<endl; 
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     x = 0.5*((b+a)+(b-a)*x);
@@ -790,11 +791,11 @@ void CHEBYSHEV(int n,double x,double a,double b,double& p,double& q){
 */
     if(x<a){ 
       cout<<"Error: Chebychev polynomial is not defined for x = "<<x<<" < a = "<<a<<endl; 
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
     if(x>b){ 
       cout<<"Error: Chebychev polynomial is not defined for x = "<<x<<" > b = "<<b<<endl; 
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
 
@@ -835,7 +836,7 @@ void LAGUERRE(int n,double x,double& p,double& q){
 
     if(x<0.0){ 
       cout<<"Error: Laguerre polynomial is not defined for x = "<<x<<" < 0.0"<<endl; 
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
 
@@ -1060,7 +1061,7 @@ void Ellint(double m,double sinphi,double tol,double& Km_,double& value){
 //------ Precompute some quantities and the complete integral -------------
   if (m < 0.0) {
     fprintf(stderr, "ERROR: m < 0.0 in Ellint (m = %f): FIX IT!\n", m);
-    exit(1);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   int MAXN = 25;
@@ -1194,7 +1195,7 @@ MATRIX exp_(MATRIX& x, double dt){
 */
 
   if(x.n_cols != x.n_rows){
-    cout<<"Error in libspecialfunctions::exp_ : the input matrix is not square\n"; exit(0); 
+    cout<<"Error in libspecialfunctions::exp_ : the input matrix is not square\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
 
   int i,j;
@@ -1228,12 +1229,12 @@ void exp_(CMATRIX& res, CMATRIX& x, complex<double> dt){
   no per-call temporaries.
 */
   if(x.n_cols != x.n_rows){
-    cout<<"Error in libspecialfunctions::exp_ : the input matrix is not square\n"; exit(0);
+    cout<<"Error in libspecialfunctions::exp_ : the input matrix is not square\n"; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   int i;
   int sz = x.n_cols;
   if(res.n_rows != sz || res.n_cols != sz){
-    cout<<"Error in libspecialfunctions::exp_ : the output matrix does not match the input size\n"; exit(0);
+    cout<<"Error in libspecialfunctions::exp_ : the output matrix does not match the input size\n"; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 #ifdef HAVE_LAPACK_ZHEEVD
   {
@@ -1311,7 +1312,7 @@ CMATRIX exp_(CMATRIX& x, complex<double> dt){
 */
 
   if(x.n_cols != x.n_rows){
-    cout<<"Error in libspecialfunctions::exp_ : the input matrix is not square\n"; exit(0); 
+    cout<<"Error in libspecialfunctions::exp_ : the input matrix is not square\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
 
   CMATRIX res(x.n_cols, x.n_cols);
@@ -1331,7 +1332,7 @@ MATRIX exp_2(MATRIX& x, double dt, int nterms, double max_tol){
 */
 
   if(x.n_cols != x.n_rows){
-    cout<<"Error in libspecialfunctions::exp_ : the input matrix is not square\n"; exit(0); 
+    cout<<"Error in libspecialfunctions::exp_ : the input matrix is not square\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
 
   int sz = x.n_cols;  
@@ -1356,8 +1357,8 @@ MATRIX exp_2(MATRIX& x, double dt, int nterms, double max_tol){
 
   if(err > max_tol){
       cout<<"Error in exp_2(MATRIX...): The the sum has not converged to the defined tolerance of "<<max_tol
-          <<" in "<<nterms<<" iterations.\nExiting now...\n";
-      exit(0);
+          <<" in "<<nterms<<" iterations.\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return res;
@@ -1389,7 +1390,7 @@ CMATRIX exp_2(CMATRIX& x, complex<double> dt, int nterms, double max_tol){
 */
 
   if(x.n_cols != x.n_rows){
-    cout<<"Error in libspecialfunctions::exp_ : the input matrix is not square\n"; exit(0); 
+    cout<<"Error in libspecialfunctions::exp_ : the input matrix is not square\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
 
   int sz = x.n_cols;  
@@ -1413,8 +1414,8 @@ CMATRIX exp_2(CMATRIX& x, complex<double> dt, int nterms, double max_tol){
 
   if(err > max_tol){
       cout<<"Error in exp_2(CMATRIX...): The the sum has not converged to the defined tolerance of "<<max_tol
-          <<" in "<<nterms<<" iterations.\nExiting now...\n";
-      exit(0);
+          <<" in "<<nterms<<" iterations.\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
 

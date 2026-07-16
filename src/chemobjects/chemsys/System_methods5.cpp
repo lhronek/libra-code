@@ -15,6 +15,7 @@
 */
 
 #include "System.h"
+#include <stdexcept>
 
 /// liblibra namespace
 namespace liblibra{
@@ -38,7 +39,7 @@ void System::extract_atomic_q(vector<double>& q){
 
   if(q.size() != 3.0 * Number_of_atoms){
     cout<<"Error: in System::extract_atomic_q: dimensions of System and vector<double> objects are not compatible\n";  
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   for(int i=0;i<Number_of_atoms;i++){
@@ -65,7 +66,7 @@ void System::set_atomic_q(vector<double>& q){
 
   if(q.size() != 3.0 * Number_of_atoms){
     cout<<"Error: in System::set_atomic_q: dimensions of System and vector<double> objects are not compatible\n";  
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   for(int i=0;i<Number_of_atoms;i++){
@@ -90,7 +91,7 @@ void System::extract_atomic_p(vector<double>& p){
 
   if(p.size() != 3.0 * Number_of_atoms){
     cout<<"Error: in System::extract_atomic_p: dimensions of System and vector<double> objects are not compatible\n";  
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   for(int i=0;i<Number_of_atoms;i++){
@@ -117,7 +118,7 @@ void System::set_atomic_p(vector<double>& p){
 
   if(p.size() != 3.0 * Number_of_atoms){
     cout<<"Error: in System::set_atomic_p: dimensions of System and vector<double> objects are not compatible\n";  
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   for(int i=0;i<Number_of_atoms;i++){
@@ -140,7 +141,7 @@ void System::extract_atomic_v(vector<double>& v){
 
   if(v.size() != 3.0 * Number_of_atoms){
     cout<<"Error: in System::extract_atomic_v: dimensions of System and vector<double> objects are not compatible\n";  
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   for(int i=0;i<Number_of_atoms;i++){
@@ -166,7 +167,7 @@ void System::set_atomic_v(vector<double>& v){
 
   if(v.size() != 3.0 * Number_of_atoms){
     cout<<"Error: in System::set_atomic_v: dimensions of System and vector<double> objects are not compatible\n";  
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   for(int i=0;i<Number_of_atoms;i++){
@@ -192,7 +193,7 @@ void System::extract_atomic_f(vector<double>& f){
 
   if(f.size() != 3.0 * Number_of_atoms){
     cout<<"Error: in System::extract_atomic_f: dimensions of System and vector<double> objects are not compatible\n";  
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   for(int i=0;i<Number_of_atoms;i++){
@@ -217,7 +218,7 @@ void System::set_atomic_f(vector<double>& f){
 
   if(f.size() != 3.0 * Number_of_atoms){
     cout<<"Error: in System::set_atomic_f: dimensions of System and vector<double> objects are not compatible\n";  
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   for(int i=0;i<Number_of_atoms;i++){
@@ -242,7 +243,7 @@ void System::extract_atomic_mass(vector<double>& mass){
 
   if(mass.size() != 3.0 * Number_of_atoms){
     cout<<"Error: in System::extract_atomic_mass: dimensions of System and vector<double> objects are not compatible\n";  
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   for(int i=0;i<Number_of_atoms;i++){
@@ -267,7 +268,7 @@ void System::set_atomic_mass(vector<double>& mass){
 
   if(mass.size() != 3.0 * Number_of_atoms){
     cout<<"Error: in System::set_atomic_mass: dimensions of System and vector<double> objects are not compatible\n";  
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   for(int i=0;i<Number_of_atoms;i++){
@@ -287,7 +288,7 @@ void System::extract_fragment_q(vector<double>& q){
 
   if(q.size() != 3.0 * Number_of_fragments){
     cout<<"Error: in System::extract_fragment_q: dimensions of System and vector<double> objects are not compatible\n";  
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   for(int i=0;i<Number_of_fragments;i++){
@@ -308,7 +309,7 @@ void System::set_fragment_q(vector<double>& q){
 
   if(q.size() != 3.0 * Number_of_fragments){
     cout<<"Error: in System::set_fragment_q: dimensions of System and vector<double> objects are not compatible\n";  
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   for(int i=0;i<Number_of_fragments;i++){
@@ -330,7 +331,7 @@ void System::extract_fragment_p(vector<double>& p){
 
   if(p.size() != 3.0 * Number_of_fragments){
     cout<<"Error: in System::extract_fragment_p: dimensions of System and vector<double> objects are not compatible\n";  
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   for(int i=0;i<Number_of_fragments;i++){
@@ -351,7 +352,7 @@ void System::set_fragment_p(vector<double>& p){
 
   if(p.size() != 3.0 * Number_of_fragments){
     cout<<"Error: in System::set_fragment_p: dimensions of System and vector<double> objects are not compatible\n";  
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   for(int i=0;i<Number_of_fragments;i++){
@@ -371,7 +372,7 @@ void System::extract_fragment_v(vector<double>& v){
 
   if(v.size() != 3.0 * Number_of_fragments){
     cout<<"Error: in System::extract_fragment_v: dimensions of System and vector<double> objects are not compatible\n";  
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   for(int i=0;i<Number_of_fragments;i++){
@@ -391,7 +392,7 @@ void System::set_fragment_v(vector<double>& v){
 
   if(v.size() != 3.0 * Number_of_fragments){
     cout<<"Error: in System::set_fragments_v: dimensions of System and vector<double> objects are not compatible\n";  
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   for(int i=0;i<Number_of_fragments;i++){
@@ -413,7 +414,7 @@ void System::extract_fragment_f(vector<double>& f){
 
   if(f.size() != 3.0 * Number_of_fragments){
     cout<<"Error: in System::extract_fragment_f: dimensions of System and vector<double> objects are not compatible\n";  
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   for(int i=0;i<Number_of_fragments;i++){
@@ -434,7 +435,7 @@ void System::set_fragment_f(vector<double>& f){
 
   if(f.size() != 3.0 * Number_of_fragments){
     cout<<"Error: in System::set_fragment_f: dimensions of System and vector<double> objects are not compatible\n";  
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   for(int i=0;i<Number_of_fragments;i++){
@@ -455,7 +456,7 @@ void System::extract_fragment_mass(vector<double>& mass){
 
   if(mass.size() != 3.0 * Number_of_fragments){
     cout<<"Error: in System::extract_fragment_q: dimensions of System and vector<double> objects are not compatible\n";  
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   for(int i=0;i<Number_of_fragments;i++){
@@ -477,7 +478,7 @@ void System::set_fragment_mass(vector<double>& mass){
 
   if(mass.size() != 3.0 * Number_of_fragments){
     cout<<"Error: in System::extract_fragment_q: dimensions of System and vector<double> objects are not compatible\n";  
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   for(int i=0;i<Number_of_fragments;i++){

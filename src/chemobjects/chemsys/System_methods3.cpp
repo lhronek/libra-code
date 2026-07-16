@@ -15,6 +15,7 @@
 */
 
 #include "System.h"
+#include <stdexcept>
 #include "../../Units.h"
 
 /// liblibra namespace
@@ -392,7 +393,7 @@ void System::ROTATE_MOLECULE(double degree_amount, VECTOR direction,int Mol){
 
     cout<<"We also need to update the positions of the fragments' positions and orientations. \
            Since this is not yet implemented, we just exit for now. Don't use this function yet. \n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
 
     rotate_atoms_of_molecule(v,R);
   }

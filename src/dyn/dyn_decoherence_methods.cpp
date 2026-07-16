@@ -15,6 +15,7 @@
 */
 
 #include "../math_meigen/libmeigen.h"
+#include <stdexcept>
 #include "../math_specialfunctions/libspecialfunctions.h"
 #include "../nhamiltonian/libnhamiltonian.h"
 #include "Energy_and_Forces.h"
@@ -112,7 +113,7 @@ CMATRIX sdm(CMATRIX &Coeff, double dt, int act_st, MATRIX &decoh_rates,
       cout << "decoh_rates = \n";
       decoh_rates.show_matrix();
       cout << "initial total pop = " << (Coeff.H() * Coeff).get(0, 0).real();
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     double p_aa_new = 1.0 - inact_st_pop;
@@ -133,7 +134,7 @@ CMATRIX sdm(CMATRIX &Coeff, double dt, int act_st, MATRIX &decoh_rates,
       cout << "decoh_rates = \n";
       decoh_rates.show_matrix();
       cout << "initial total pop = " << (Coeff.H() * Coeff).get(0, 0).real();
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     sclf = sqrt(p_aa_new / p_aa_old); // scaling factor for the active state
@@ -161,7 +162,7 @@ CMATRIX sdm(CMATRIX &Coeff, double dt, int act_st, MATRIX &decoh_rates,
     cout << "decoh_rates = \n";
     decoh_rates.show_matrix();
     cout << "initial total pop = " << (Coeff.H() * Coeff).get(0, 0).real();
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return C;
@@ -375,24 +376,21 @@ void instantaneous_decoherence(CMATRIX &Coeff, vector<int> &accepted_states,
             "accepted_states are inconsistent\n";
     cout << "Coeff.num_of_cols = = " << ntraj << "\n";
     cout << "accepted_states.size() = " << accepted_states.size() << "\n";
-    cout << "exiting...\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (proposed_states.size() != static_cast<std::size_t>(ntraj)) {
     cout << "ERROR in ids: the sizes of the input variables Coeff and "
             "proposed_states are inconsistent\n";
     cout << "Coeff.num_of_cols = = " << ntraj << "\n";
     cout << "proposed_states.size() = " << proposed_states.size() << "\n";
-    cout << "exiting...\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (initial_states.size() != static_cast<std::size_t>(ntraj)) {
     cout << "ERROR in ids: the sizes of the input variables Coeff and "
             "initial_states are inconsistent\n";
     cout << "Coeff.num_of_cols = = " << ntraj << "\n";
     cout << "initial_states.size() = " << initial_states.size() << "\n";
-    cout << "exiting...\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   // ID-S
@@ -515,24 +513,21 @@ void instantaneous_decoherence_dia(CMATRIX &Coeff, nHamiltonian &ham,
             "accepted_states are inconsistent\n";
     cout << "Coeff.num_of_cols = = " << ntraj << "\n";
     cout << "accepted_states.size() = " << accepted_states.size() << "\n";
-    cout << "exiting...\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (proposed_states.size() != static_cast<std::size_t>(ntraj)) {
     cout << "ERROR in ids: the sizes of the input variables Coeff and "
             "proposed_states are inconsistent\n";
     cout << "Coeff.num_of_cols = = " << ntraj << "\n";
     cout << "proposed_states.size() = " << proposed_states.size() << "\n";
-    cout << "exiting...\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (initial_states.size() != static_cast<std::size_t>(ntraj)) {
     cout << "ERROR in ids: the sizes of the input variables Coeff and "
             "initial_states are inconsistent\n";
     cout << "Coeff.num_of_cols = = " << ntraj << "\n";
     cout << "initial_states.size() = " << initial_states.size() << "\n";
-    cout << "exiting...\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   // ID-S

@@ -15,6 +15,7 @@
 */
 
 #include "gwp.h"
+#include <stdexcept>
 
 /// liblibra namespace
 namespace liblibra{
@@ -50,8 +51,8 @@ complex<double> gwp_kinetic(double q1, double p1, double gamma1, double alp1,
   The function returns the value of the second derivative matrix element - a complex number
 */
 
-  if(alp1 <= 0.0){  cout<<"Error: alp1 should be positive.\nExiting...\n"; exit(0); }
-  if(alp2 <= 0.0){  cout<<"Error: alp2 should be positive.\nExiting...\n"; exit(0); }
+  if(alp1 <= 0.0){  cout<<"Error: alp1 should be positive.\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  if(alp2 <= 0.0){  cout<<"Error: alp2 should be positive.\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
   double alp = alp1 + alp2;
   double pref1 = 2.0 *alp1 * alp2 / alp; 
@@ -91,8 +92,8 @@ complex<double> gwp_kinetic(MATRIX& q1, MATRIX& p1, MATRIX& gamma1, MATRIX& alp1
 
   for(int  i=0; i<Ndof; i++){
 
-    if(alp1.get(i,0) <= 0.0){  cout<<"Error: alp1 should be positive.\nExiting...\n"; exit(0); }
-    if(alp2.get(i,0) <= 0.0){  cout<<"Error: alp2 should be positive.\nExiting...\n"; exit(0); }
+    if(alp1.get(i,0) <= 0.0){  cout<<"Error: alp1 should be positive.\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+    if(alp2.get(i,0) <= 0.0){  cout<<"Error: alp2 should be positive.\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
 
     double alp = alp1.get(i,0) + alp2.get(i,0);
@@ -140,8 +141,8 @@ complex<double> gwp_kinetic(MATRIX& q1, MATRIX& p1, MATRIX& gamma1, MATRIX& alp1
 
   for(int  i=0; i<Ndof; i++){
 
-    if(alp1.get(i,0) <= 0.0){  cout<<"Error: alp1 should be positive.\nExiting...\n"; exit(0); }
-    if(alp2.get(i,0) <= 0.0){  cout<<"Error: alp2 should be positive.\nExiting...\n"; exit(0); }
+    if(alp1.get(i,0) <= 0.0){  cout<<"Error: alp1 should be positive.\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+    if(alp2.get(i,0) <= 0.0){  cout<<"Error: alp2 should be positive.\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
 
     double alp = alp1.get(i,0) + alp2.get(i,0);

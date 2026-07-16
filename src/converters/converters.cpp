@@ -10,6 +10,7 @@
 *********************************************************************************/
 
 #include "converters.h"
+#include <stdexcept>
 
 /// liblibra namespace
 namespace liblibra{
@@ -23,7 +24,7 @@ void system_to_nuclear(System& syst, Nuclear& nucl){
   // Simple data converter - no object creation (nor reduction of dimension)
   if(nucl.nnucl != 3.0 * syst.Number_of_atoms){
     cout<<"Error: in system_to_nuclear: dimensions of System and Nuclear objects are not compatible\n";  
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
 
@@ -57,7 +58,7 @@ void nuclear_to_system(Nuclear& nucl,System& syst){
 
   if(nucl.nnucl != 3.0 * syst.Number_of_atoms){
     cout<<"Error: in system_to_nuclear: dimensions of System and Nuclear objects are not compatible\n";  
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
 

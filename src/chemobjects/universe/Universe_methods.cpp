@@ -14,6 +14,7 @@
 */
 
 #include "Universe.h"
+#include <stdexcept>
 
 /// liblibra namespace
 namespace liblibra{
@@ -75,7 +76,7 @@ Element Universe::Get_Element(std::string elt){
   }else{
     std::cout<<"Error:There is no any periodic system of elements defined in Universe"<<std::endl;
     std::cout<<"      First you shoud load properties of elements to existing Universe"<<std::endl;
-    exit(10);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   map<std::string,Element>::iterator it;
@@ -83,7 +84,7 @@ Element Universe::Get_Element(std::string elt){
   if(it!=PeriodicTable.end()){   res = 1;  }
   else{  res = 0;
     std::cout<<"Can not find element "<<elt<<" in periodic system defined in this Universe"<<std::endl;
-    exit(11);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   if(res){

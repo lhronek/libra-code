@@ -16,6 +16,7 @@
 
 #if defined(USING_PCH)
 #include "../pch.h"
+#include <stdexcept>
 #else
 #include <stdlib.h>
 #endif
@@ -49,14 +50,14 @@ CMATRIX nHamiltonian::QTSH_forces_dia_unit(CMATRIX &ampl_dia, int option) {
     cout
         << "Error in QTSH_forces_dia_unit(): the overlap matrix in the diabatic basis is not allocated \
   but it is needed for the calculations\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   if (ham_dia_mem_status == 0) {
     cout
         << "Error in QTSH_forces_dia_unit(): the diabatic Hamiltonian matrix is not allocated \
   but it is needed for the calculations\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   CMATRIX res(nnucl, 1);
@@ -78,7 +79,7 @@ CMATRIX nHamiltonian::QTSH_forces_dia_unit(CMATRIX &ampl_dia, int option) {
           << "Error in QTSH_forces_dia_unit(): the derivatives of the Hamiltonian matrix in the \
       diabatic basis w.r.t. the nuclear DOF "
           << n << " is not allocated but is needed for the calculations \n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     if (dc1_dia_mem_status[n] == 0) {
@@ -86,7 +87,7 @@ CMATRIX nHamiltonian::QTSH_forces_dia_unit(CMATRIX &ampl_dia, int option) {
           << "Error in QTSH_forces_dia_unit(): the derivatives couplings matrix in the diabatic \
       basis w.r.t. the nuclear DOF "
           << n << " is not allocated but is needed for the calculations \n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     if (option == 0) {
@@ -155,8 +156,7 @@ CMATRIX nHamiltonian::QTSH_forces_dia(CMATRIX &ampl_dia, int lvl, int option) {
            << ")";
       cout << " should be equal to the number of children Hamiltonians ("
            << children.size() << ")\n";
-      cout << "Exiting...\n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 
@@ -209,7 +209,7 @@ CMATRIX nHamiltonian::QTSH_forces_dia(CMATRIX& ampl_dia, vector<int>& id_){
   if(id_.size()==1){
     if(id_[0]==id){   return QTSH_forces_dia(ampl_dia);    }
     else{ cout<<"ERROR in QTSH_forces_dia: No Hamiltonian matching the requested
-id\n"; exit(0); }
+id\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
   }
   else{
     vector<int> next(id_.begin()+1,id_.end());
@@ -242,7 +242,7 @@ CMATRIX nHamiltonian::QTSH_forces_adi_unit(CMATRIX &ampl_adi, int option,
     cout
         << "Error in QTSH_forces_adi(): the adiabatic Hamiltonian matrix is not allocated \
   but it is needed for the calculations\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   complex<double> norm = (ampl_adi.H() * ampl_adi).M[0];
@@ -261,7 +261,7 @@ CMATRIX nHamiltonian::QTSH_forces_adi_unit(CMATRIX &ampl_adi, int option,
           << "Error in QTSH_forces_adi_unit(): the derivatives of the Hamiltonian matrix in the \
     adiabatic basis w.r.t. the nuclear DOF "
           << n << " is not allocated but is needed for the calculations \n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     if (dc1_adi_mem_status[n] == 0) {
@@ -269,7 +269,7 @@ CMATRIX nHamiltonian::QTSH_forces_adi_unit(CMATRIX &ampl_adi, int option,
           << "Error in QTSH_forces_adi_unit(): the derivatives couplings matrix in the adiabatic \
     basis w.r.t. the nuclear DOF "
           << n << " is not allocated but is needed for the calculations \n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     /**  Ehrenfest force for reference:
@@ -372,8 +372,7 @@ CMATRIX nHamiltonian::QTSH_forces_adi(CMATRIX &ampl_adi, int lvl, int option,
            << ")";
       cout << " should be equal to the number of children Hamiltonians ("
            << children.size() << ")\n";
-      cout << "Exiting...\n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 
@@ -464,7 +463,7 @@ CMATRIX nHamiltonian::QTSH_forces_adi(CMATRIX& ampl_adi, vector<int>& id_){
   if(id_.size()==1){
     if(id_[0]==id){   return QTSH_forces_adi(ampl_adi);    }
     else{ cout<<"ERROR in QTSH_forces_adi: No Hamiltonian matching the requested
-id\n"; exit(0); }
+id\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
   }
   else{
     vector<int> next(id_.begin()+1,id_.end());

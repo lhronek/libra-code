@@ -17,6 +17,7 @@
 */
 
 #include "Model_double_well.h"
+#include <stdexcept>
 
 /// liblibra namespace
 namespace liblibra{
@@ -49,9 +50,9 @@ void double_well_Ham(double x, MATRIX* H, MATRIX* dH, MATRIX* d2H, vector<double
 */
 
 
-  if(H->n_elts!=1){ std::cout<<"Error in double_well_Ham: H matrix must be allocated\n"; exit(0);}
-  if(dH->n_elts!=1){ std::cout<<"Error in double_well_Ham: dH matrix must be allocated\n"; exit(0);}
-  if(d2H->n_elts!=1){ std::cout<<"Error in double_well_Ham: d2H matrix must be allocated\n"; exit(0);}
+  if(H->n_elts!=1){ std::cout<<"Error in double_well_Ham: H matrix must be allocated\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
+  if(dH->n_elts!=1){ std::cout<<"Error in double_well_Ham: dH matrix must be allocated\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
+  if(d2H->n_elts!=1){ std::cout<<"Error in double_well_Ham: d2H matrix must be allocated\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
 
 
   // Default parameters: 

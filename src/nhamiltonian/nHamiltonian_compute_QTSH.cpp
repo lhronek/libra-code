@@ -17,6 +17,7 @@
 
 #if defined(USING_PCH)
 #include "../pch.h"
+#include <stdexcept>
 #else
 #include <stdlib.h>
 #endif
@@ -44,10 +45,10 @@ complex<double> nHamiltonian::QTSH_energy_dia(CMATRIX& ampl_dia){
 */
 
   if(ovlp_dia_mem_status==0){ cout<<"Error in QTSH_energy_dia(): the overlap matrix in the diabatic basis is not allocated \
-  but it is needed for the calculations\n"; exit(0); }
+  but it is needed for the calculations\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
   if(ham_dia_mem_status==0){ cout<<"Error in QTSH_energy_dia(): the diabatic Hamiltonian matrix is not allocated \
-  but it is needed for the calculations\n"; exit(0); }
+  but it is needed for the calculations\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
 //  if(ampl_dia_mem_status==0){ cout<<"Error in QTSH_energy_dia(): the amplitudes of the diabatic states are\
 //  not allocated, but they are needed for the calculations\n"; exit(0); }
@@ -76,7 +77,7 @@ complex<double> nHamiltonian::QTSH_energy_dia(CMATRIX& ampl_dia, vector<int>& id
 */
   if(id_.size()==1){
     if(id_[0]==id){   return QTSH_energy_dia(ampl_dia);    }
-    else{ cout<<"ERROR in force_dia: No Hamiltonian matching the requested id\n"; exit(0); }
+    else{ cout<<"ERROR in force_dia: No Hamiltonian matching the requested id\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
   }
   else{
     vector<int> next(id_.begin()+1,id_.end());
@@ -94,7 +95,7 @@ complex<double> nHamiltonian::QTSH_energy_adi(CMATRIX& ampl_adi, CMATRIX& transf
 */
 
   if(ham_adi_mem_status==0){ cout<<"Error in QTSH_energy_adi(): the adiabatic Hamiltonian matrix is not allocated \
-  but it is needed for the calculations\n"; exit(0); }
+  but it is needed for the calculations\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
 //  if(ampl_adi_mem_status==0){ cout<<"Error in QTSH_energy_adi(): the amplitudes of the adiabatic states are\
 //  not allocated, but they are needed for the calculations\n"; exit(0); }
@@ -120,7 +121,7 @@ complex<double> nHamiltonian::QTSH_energy_adi(CMATRIX& ampl_adi, vector<int>& id
 */
   if(id_.size()==1){
     if(id_[0]==id){   return QTSH_energy_adi(ampl_adi);    }
-    else{ cout<<"ERROR in force_dia: No Hamiltonian matching the requested id\n"; exit(0); }
+    else{ cout<<"ERROR in force_dia: No Hamiltonian matching the requested id\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
   }
   else{
     vector<int> next(id_.begin()+1,id_.end());

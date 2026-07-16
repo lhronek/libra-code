@@ -15,6 +15,7 @@
 */
 
 #include "dyn_ham.h"
+#include <stdexcept>
 #include "dyn_projectors.h"
 
 /// liblibra namespace
@@ -130,7 +131,7 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
     } else {
       cout << "ERROR in update_Hamiltonian_q_ethd: The entanglement option = "
            << prms.entanglement_opt << " is not avaialable\n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     //============================== Time-overlaps ======================
@@ -393,7 +394,7 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
       if (fabs((P * T_new).tr().real() - P.n_cols) > 0.1) {
         cout << "Problem inverting time-overlap matrix\n";
         P.show_matrix("p_matrix.txt");
-        exit(0);
+        throw std::runtime_error("libra C++ error - see the message printed above");
       }
       T_new = orthogonalized_T(T_new);
     } else if (prms.state_tracking_algo == 1 || prms.state_tracking_algo == 2 ||

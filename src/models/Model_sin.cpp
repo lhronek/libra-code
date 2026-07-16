@@ -10,6 +10,7 @@
 *********************************************************************************/
 
 #include "Model_sin.h"
+#include <stdexcept>
 
 /// liblibra namespace
 namespace liblibra{
@@ -24,9 +25,9 @@ namespace libmodels{
 void sin_Ham(double x, MATRIX* H, MATRIX* dH, MATRIX* d2H, vector<double>& params){ 
 // Rabi2 hamiltonian in diabatic representation
 
-  if(H->n_elts!=4){ std::cout<<"Error in sin_Ham: H matrix must be allocated\n"; exit(0);}
-  if(dH->n_elts!=4){ std::cout<<"Error in sin_Ham: dH matrix must be allocated\n"; exit(0);}
-  if(d2H->n_elts!=4){ std::cout<<"Error in sin_Ham: d2H matrix must be allocated\n"; exit(0);}
+  if(H->n_elts!=4){ std::cout<<"Error in sin_Ham: H matrix must be allocated\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
+  if(dH->n_elts!=4){ std::cout<<"Error in sin_Ham: dH matrix must be allocated\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
+  if(d2H->n_elts!=4){ std::cout<<"Error in sin_Ham: d2H matrix must be allocated\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
 
 
   double e;

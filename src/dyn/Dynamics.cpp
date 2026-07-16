@@ -24,6 +24,7 @@
 */
 
 #include "../calculators/NPI.h"
+#include <stdexcept>
 #include <memory>
 #include "Dynamics.h"
 #include "Energy_and_Forces.h"
@@ -1602,8 +1603,8 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
               "currently "
            << n_therm_dofs << ") must be \
       equal to the number of thermostat dofs set up by the `thermostat_dofs` parameter ( currently "
-           << prms.thermostat_dofs.size() << ")\nExiting...\n";
-      exit(0);
+           << prms.thermostat_dofs.size() << ")\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 
@@ -1797,16 +1798,16 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   }
 
   //cout<<"act_states: "; for(int a=0; a<ntraj; a++){ cout<<dyn_var.act_states[a]<<" "; }
-  //cout<<"\n";
+  //
   //cout<<"forces before: \n";
   //dyn_var.f->show_matrix();
-  //cout<<"\n";
+  //
 
   update_forces(prms, dyn_var, ham);
 
   //cout<<"forces after: \n";
   //dyn_var.f->show_matrix();
-  //cout<<"\n";
+  //
 
   if (prms.decoherence_algo == 6 and prms.use_xf_force == 1) {
     update_forces_xf(dyn_var, ham, ham_aux);
@@ -1963,8 +1964,8 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
           sdm(*dyn_var.ampl_adi, prms.dt, dyn_var.act_states, decoherence_rates,
               prms.sdm_norm_tolerance, prms.isNBRA);
     } else {
-      cout << "ERROR: SDM/mSDM requires rep_tdse = 1\nExiting now...\n";
-      exit(0);
+      cout << "ERROR: SDM/mSDM requires rep_tdse = 1\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else if (prms.decoherence_algo ==
              1) { /* ID-A. Nothing to do here, this is done in the surface
@@ -1980,8 +1981,8 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       *dyn_var.ampl_adi = bcsh(*dyn_var.ampl_adi, prms.dt, dyn_var.act_states,
                                *dyn_var.reversal_events);
     } else {
-      cout << "ERROR: BCSH requires rep_tdse = 1\nExiting now...\n";
-      exit(0);
+      cout << "ERROR: BCSH requires rep_tdse = 1\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
   // MFSD
@@ -1999,8 +2000,8 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       update_Hamiltonian_variables(prms, dyn_var, ham, ham_aux, py_funct,
                                    params, 1);
     } else {
-      cout << "ERROR: MFSD requires rep_tdse = 1\nExiting now...\n";
-      exit(0);
+      cout << "ERROR: MFSD requires rep_tdse = 1\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
   // SHXF
@@ -2008,8 +2009,8 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
     if (prms.rep_tdse == 1) {
       shxf(dyn_var, ham, ham_aux, prms);
     } else {
-      cout << "ERROR: SHXF requires rep_tdse = 1\nExiting now...\n";
-      exit(0);
+      cout << "ERROR: SHXF requires rep_tdse = 1\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
   // MQCXF
@@ -2017,8 +2018,8 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
     if (prms.rep_tdse == 1) {
       mqcxf(dyn_var, ham, ham_aux, prms);
     } else {
-      cout << "ERROR: MQCXF requires rep_tdse = 1\nExiting now...\n";
-      exit(0);
+      cout << "ERROR: MQCXF requires rep_tdse = 1\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 
@@ -2179,8 +2180,8 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
               prms.instantaneous_decoherence_variant, prms.collapse_option);
         } else {
           cout << "ERROR: Instantaneous Decoherence requires rep_tdse = "
-                  "1\nExiting now...\n";
-          exit(0);
+                  "1\n";
+          throw std::runtime_error("libra C++ error - see the message printed above");
         }
       } else if (prms.decoherence_algo == 2) {
         /// Temporarily commented AVA 11/7/2022
@@ -2199,8 +2200,8 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
           xf_hop_reset(dyn_var, act_states, old_states);
         } else {
           cout << "ERROR: Independent-trajectory XF methods require rep_sh = "
-                  "1\nExiting now...\n";
-          exit(0);
+                  "1\n";
+          throw std::runtime_error("libra C++ error - see the message printed above");
         }
       } // SHXF or MQCXF
       else if (prms.decoherence_algo == 7) {
@@ -2217,8 +2218,8 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
               prms.instantaneous_decoherence_variant, prms.collapse_option);
         } else {
           cout << "ERROR: Instantaneous Decoherence requires rep_tdse = "
-                  "1\nExiting now...\n";
-          exit(0);
+                  "1\n";
+          throw std::runtime_error("libra C++ error - see the message printed above");
         }
       } // algo == 8
 
@@ -2234,8 +2235,8 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
         ;
       } else {
         cout << "ERROR: DISH method should be used only with decoherence_algo "
-                "= -1\nExiting now...\n";
-        exit(0);
+                "= -1\n";
+        throw std::runtime_error("libra C++ error - see the message printed above");
       }
       act_states = dish(dyn_var, ham, decoherence_rates, prms, rnd);
     } // DISH
@@ -2280,8 +2281,8 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
 
   else {
     cout << "tsh_method == " << prms.tsh_method
-         << " is undefined.\nExiting...\n";
-    exit(0);
+         << " is undefined.\n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   // Update the amplitudes and DM, in response to state hopping and other

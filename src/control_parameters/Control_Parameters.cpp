@@ -14,6 +14,7 @@
 */
 
 #include "Control_Parameters.h"
+#include <stdexcept>
 
 /// liblibra namespace
 namespace liblibra{
@@ -631,28 +632,28 @@ void get_parameters_from_file(std::string filename, Control_Parameters& prms){
     cout<<" oda       - for optimal damping algorithm\n";
     cout<<" diis_fock - for DIIS with Fock matrix mixing/extrapolation\n";
     cout<<" diis_dm   - for DIIS with density matrix mixing/extrapolation\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   if(prms.compute_excitations==1 && prms.compute_dipole!=1){
     cout<<"To compute excitations (spectra) dipole moments must be computed. Set compute_dipole to value 1\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   if(prms.hamiltonian=="eht"){
     if(prms.eht_sce_formula==1){
       if(prms.eht_params_format=="eht+0"){
-        cout<<"Error: eht_sce_formula = 1 requires eht_params_format to be more general than eht+0\n"; exit(0);
+        cout<<"Error: eht_sce_formula = 1 requires eht_params_format to be more general than eht+0\n"; throw std::runtime_error("libra C++ error - see the message printed above");
       }       
     }// SC-EHT
 
 /*
     if(prms.eht_sce_formula==0 && prms.guess_type!="core"){
-      cout<<"Non self-consistent EHT must be used with guess_type=\"core\"\n"; exit(0);
+      cout<<"Non self-consistent EHT must be used with guess_type=\"core\"\n"; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     if(prms.eht_sce_formula>0 && prms.guess_type!="sad"){
-      cout<<"Self-consistent EHT must be used with guess_type=\"sad\"\n"; exit(0);
+      cout<<"Self-consistent EHT must be used with guess_type=\"sad\"\n"; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 */
 

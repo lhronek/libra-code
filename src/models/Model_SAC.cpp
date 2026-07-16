@@ -15,6 +15,7 @@
 */
 
 #include "Model_SAC.h"
+#include <stdexcept>
 
 /// liblibra namespace
 namespace liblibra{
@@ -118,9 +119,9 @@ void SAC_Ham(double x, MATRIX* H, MATRIX* dH, MATRIX* d2H, vector<double>& param
 */
 
 
-  if(H->n_elts!=4){ std::cout<<"Error in SAC_Ham: H matrix must be allocated\n"; exit(0);}
-  if(dH->n_elts!=4){ std::cout<<"Error in SAC_Ham: dH matrix must be allocated\n"; exit(0);}
-  if(d2H->n_elts!=4){ std::cout<<"Error in SAC_Ham: d2H matrix must be allocated\n"; exit(0);}
+  if(H->n_elts!=4){ std::cout<<"Error in SAC_Ham: H matrix must be allocated\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
+  if(dH->n_elts!=4){ std::cout<<"Error in SAC_Ham: dH matrix must be allocated\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
+  if(d2H->n_elts!=4){ std::cout<<"Error in SAC_Ham: d2H matrix must be allocated\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
 
 
   double e;

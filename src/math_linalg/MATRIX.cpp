@@ -16,6 +16,7 @@
 
 #if defined(USING_PCH)
 #include "../pch.h"
+#include <stdexcept>
 #else
 #include <stdio.h>
 #include <memory>
@@ -81,7 +82,7 @@ the corresponding given input vectors
   else{ 
     cout<<"Error in MATRIX::init function.\n";
     cout<<"This function works only for 3 x 3 matrices\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
 }
@@ -98,7 +99,7 @@ the corresponding given input vectors
   else{ 
     cout<<"Error in MATRIX::init function.\n";
     cout<<"This function works only for 3 x 3 matrices\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
 }
@@ -383,7 +384,7 @@ MATRIX& MATRIX_chain_scratch(int slot, int nr, int nc){
   thread_local std::unique_ptr<MATRIX> pool[8];
   if(slot < 0 || slot >= MAXSLOTS){
     std::cout << "Error in the chained product: too many transposed operands\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   std::unique_ptr<MATRIX>& p = pool[slot];
   if(!p || p->n_rows != nr || p->n_cols != nc){ p.reset(new MATRIX(nr, nc)); }
@@ -491,7 +492,7 @@ void MATRIX::get_vectors(VECTOR& u1,VECTOR& u2,VECTOR& u3){
   else{ 
     cout<<"Error in MATRIX::get_vectors function.\n";
     cout<<"This function works only for 3 x 3 matrices\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
 }
@@ -672,7 +673,7 @@ void save(boost::property_tree::ptree& pt,std::string path, char path_separator,
 
 // ----------- Load --------------
 void load(boost::property_tree::ptree& pt,std::string path, MATRIX& vt, int& status){ 
-  std::cout<<"Sorry: load function for MATRIX object is not defined yet\n"; exit(0); 
+  std::cout<<"Sorry: load function for MATRIX object is not defined yet\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
 }  /// Not useful
 
 MATRIX load(boost::property_tree::ptree& pt,std::string path, int& status){ 
@@ -702,7 +703,7 @@ MATRIX load(boost::property_tree::ptree& pt,std::string path, int& status){
 
 
 void load(boost::property_tree::ptree& pt,std::string path, char path_separator, MATRIX& vt, int& status){ 
-  std::cout<<"Sorry: load function for MATRIX object is not defined yet\n"; exit(0); 
+  std::cout<<"Sorry: load function for MATRIX object is not defined yet\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
 }
 
 
@@ -719,7 +720,7 @@ void load(boost::property_tree::ptree& pt,std::string path,vector<MATRIX>& vt,in
 }
 
 void load(boost::property_tree::ptree& pt,std::string path, char path_separator,vector<MATRIX>& vt,int& status){ 
-  std::cout<<"Sorry: load function for vector<MATRIX> object is not defined yet\n"; exit(0); 
+  std::cout<<"Sorry: load function for vector<MATRIX> object is not defined yet\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
 }
 
 

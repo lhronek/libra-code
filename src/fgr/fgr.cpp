@@ -18,6 +18,7 @@
 */
 
 #include "fgr.h"
+#include <stdexcept>
 
 
 /// liblibra namespace
@@ -585,8 +586,7 @@ double NEFGRL_rate(double tp, double omega_DA, double V,
           cout<<"3 - CD\n";
           cout<<"4 - W0\n";
           cout<<"5 - C0\n";
-          cout<<"Exiting now...\n";
-          exit(0);
+          throw std::runtime_error("libra C++ error - see the message printed above");
         }// default
       }// switch
     }// tau<=tp

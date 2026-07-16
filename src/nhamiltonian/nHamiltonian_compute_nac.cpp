@@ -17,6 +17,7 @@
 
 #if defined(USING_PCH)
 #include "../pch.h"
+#include <stdexcept>
 #else
 #include <stdlib.h>
 #endif
@@ -49,7 +50,7 @@ void nHamiltonian::compute_nac_dia(MATRIX &p, const MATRIX &invM) {
   if (nac_dia_mem_status == 0) {
     cout << "Error in compute_nac_dia(): the memory is not allocated for \
   nac_dia but is needed for the calculations \n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   nac_dia->set(-1, std::complex<double>(0.0, 0.0));
@@ -63,7 +64,7 @@ void nHamiltonian::compute_nac_dia(MATRIX &p, const MATRIX &invM) {
           << "Error in compute_nac_dia(): the derivatives couplings matrix in the adiabatic \
     basis w.r.t. the nuclear DOF "
           << n << " is not allocated but is needed for the calculations \n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     for (int i = 0; i < ndia; i++) {
@@ -86,7 +87,7 @@ void nHamiltonian::compute_nac_dia(MATRIX &p, const MATRIX &invM,
     } else {
       cout << "ERROR in compute_nac_dia: No Hamiltonian matching the requested "
               "id\n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -137,8 +138,7 @@ void nHamiltonian::compute_nac_dia(MATRIX &p, const MATRIX &invM, int lvl,
         cout << "The number of columns of the p (" << p.n_cols << ")";
         cout << " should be equal to the number of children Hamiltonians ("
              << children.size() << ")\n";
-        cout << "Exiting...\n";
-        exit(0);
+        throw std::runtime_error("libra C++ error - see the message printed above");
       }
 
       MATRIX p_tmp(p.n_rows, 1);
@@ -161,8 +161,7 @@ void nHamiltonian::compute_nac_dia(MATRIX &p, const MATRIX &invM, int lvl,
       cout << "ERROR in void nHamiltonian::compute_nac_dia(const MATRIX& p, "
               "const MATRIX& invM, int lvl, int split):\n";
       cout << "The parameters split = " << split << " is not defined\n";
-      cout << "Exiting...\n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } // lvl == level
 
@@ -191,13 +190,13 @@ void nHamiltonian::compute_nac_adi(double dt, int method) {
   if (time_overlap_adi_mem_status == 0) {
     cout << "Error in compute_nac_adi(): the memory is not allocated for \
   time_overlap_adi but is needed for the calculations \n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   if (nac_adi_mem_status == 0) {
     cout << "Error in compute_nac_adi(): the memory is not allocated for \
   nac_adi but is needed for the calculations \n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   nac_adi->set(-1, std::complex<double>(0.0, 0.0));
@@ -221,7 +220,7 @@ void nHamiltonian::compute_nac_adi(MATRIX &p, const MATRIX &invM) {
   if (nac_adi_mem_status == 0) {
     cout << "Error in compute_nac_adi(): the memory is not allocated for \
   nac_adi but is needed for the calculations \n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   nac_adi->set(-1, std::complex<double>(0.0, 0.0));
@@ -233,7 +232,7 @@ void nHamiltonian::compute_nac_adi(MATRIX &p, const MATRIX &invM) {
           << "Error in compute_nac_dia(): the derivatives couplings matrix in the adiabatic \
     basis w.r.t. the nuclear DOF "
           << n << " is not allocated but is needed for the calculations \n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     double v_n = p.get(n, 0) * invM.get(n, 0);
@@ -258,7 +257,7 @@ void nHamiltonian::compute_nac_adi(MATRIX &p, const MATRIX &invM,
     } else {
       cout << "ERROR in compute_nac_adi: No Hamiltonian matching the requested "
               "id\n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -308,8 +307,7 @@ void nHamiltonian::compute_nac_adi(MATRIX &p, const MATRIX &invM, int lvl,
         cout << "The number of columns of the p (" << p.n_cols << ")";
         cout << " should be equal to the number of children Hamiltonians ("
              << children.size() << ")\n";
-        cout << "Exiting...\n";
-        exit(0);
+        throw std::runtime_error("libra C++ error - see the message printed above");
       }
 
       MATRIX p_tmp(p.n_rows, 1);
@@ -332,8 +330,7 @@ void nHamiltonian::compute_nac_adi(MATRIX &p, const MATRIX &invM, int lvl,
       cout << "ERROR in void nHamiltonian::compute_nac_adi(const MATRIX& p, "
               "const MATRIX& invM, int lvl, int split):\n";
       cout << "The parameters split = " << split << " is not defined\n";
-      cout << "Exiting...\n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } // lvl == level
 
@@ -365,19 +362,19 @@ void nHamiltonian::compute_hvib_dia() {
   if (nac_dia_mem_status == 0) {
     cout << "Error in compute_hvib_dia(): the memory is not allocated for \
   nac_dia but is needed for the calculations \n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   if (ham_dia_mem_status == 0) {
     cout << "Error in compute_hvib_dia(): the memory is not allocated for \
   ham_dia but is needed for the calculations \n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   if (hvib_dia_mem_status == 0) {
     cout << "Error in compute_hvib_dia(): the memory is not allocated for \
   hvib_dia but is needed for the calculations \n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   for (int i = 0; i < ndia; i++) {
@@ -397,7 +394,7 @@ void nHamiltonian::compute_hvib_dia(vector<int> &id_) {
     } else {
       cout << "ERROR in compute_hvib_dia: No Hamiltonian matching the "
               "requested id\n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -445,19 +442,19 @@ void nHamiltonian::compute_hvib_adi() {
   if (nac_adi_mem_status == 0) {
     cout << "Error in compute_hvib_adi(): the memory is not allocated for \
   nac_adi but is needed for the calculations \n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   if (ham_adi_mem_status == 0) {
     cout << "Error in compute_hvib_adi(): the memory is not allocated for \
   ham_adi but is needed for the calculations \n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   if (hvib_adi_mem_status == 0) {
     cout << "Error in compute_hvib_adi(): the memory is not allocated for \
   hvib_adi but is needed for the calculations \n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   for (int i = 0; i < nadi; i++) {
@@ -477,7 +474,7 @@ void nHamiltonian::compute_hvib_adi(vector<int> &id_) {
     } else {
       cout << "ERROR in compute_hvib_adi: No Hamiltonian matching the "
               "requested id\n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());

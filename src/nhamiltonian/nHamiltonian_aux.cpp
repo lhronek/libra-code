@@ -16,6 +16,7 @@
 
 #if defined(USING_PCH)
 #include "../pch.h"
+#include <stdexcept>
 #else
 #include <stdlib.h>
 #endif
@@ -40,7 +41,7 @@ void check_mat_dimensions(CMATRIX *x, int nrows, int ncols) {
          << x->n_rows << "\
     does not match the expected dimensionality of "
          << nrows << endl;
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   if (x->n_cols != ncols) {
@@ -49,7 +50,7 @@ void check_mat_dimensions(CMATRIX *x, int nrows, int ncols) {
          << x->n_cols << "\
     does not match the expected dimensionality of "
          << ncols << endl;
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 }
 
@@ -64,21 +65,21 @@ void check_vector_dimensions(vector<CMATRIX *> ptx, vector<CMATRIX> &x_,
          << ptx.size() << ") is not equal to the \
     size of x_ ("
          << x_.size() << ")\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (ptx.size() != x_mem_status.size()) {
     cout << "Error in check_vector_dimensions: the size of the ptx ("
          << ptx.size() << ") is not equal to the \
     size of x_mem_status ("
          << x_mem_status.size() << ")\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (ptx.size() != static_cast<std::size_t>(nnucl)) {
     cout << "Error in check_vector_dimensions: the size of the ptx ("
          << ptx.size() << ") is not equal to the \
     nnucl in the input ("
          << nnucl << ")\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 }
 
@@ -156,7 +157,7 @@ void init_X1(CMATRIX *ptx, int &x_mem_status, int nrows, int ncols) {
            << "\
       does not match the expected dimensionality of "
            << nrows << endl;
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     if (ptx->n_cols != ncols) {
@@ -164,7 +165,7 @@ void init_X1(CMATRIX *ptx, int &x_mem_status, int nrows, int ncols) {
            << "\
       does not match the expected dimensionality of "
            << ncols << endl;
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 }
@@ -180,21 +181,21 @@ void set_X2_by_ref(vector<CMATRIX *> ptx, vector<CMATRIX> &x_,
          << ") is not equal to the \
     size of x_ ("
          << x_.size() << ")\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (ptx.size() != x_mem_status.size()) {
     cout << "Error in set_X2_by_ref: the size of the ptx (" << ptx.size()
          << ") is not equal to the \
     size of x_mem_status ("
          << x_mem_status.size() << ")\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (ptx.size() != static_cast<std::size_t>(nnucl)) {
     cout << "Error in set_X2_by_ref: the size of the ptx (" << ptx.size()
          << ") is not equal to the \
     nnucl in the input ("
          << nnucl << ")\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   // If we are here - we are good:
@@ -214,21 +215,21 @@ void set_X2_by_val(vector<CMATRIX *> ptx, vector<CMATRIX> &x_,
          << ") is not equal to the \
     size of x_ ("
          << x_.size() << ")\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (ptx.size() != x_mem_status.size()) {
     cout << "Error in set_X2_by_val: the size of the ptx (" << ptx.size()
          << ") is not equal to the \
     size of x_mem_status ("
          << x_mem_status.size() << ")\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (ptx.size() != static_cast<std::size_t>(nnucl)) {
     cout << "Error in set_X2_by_val: the size of the ptx (" << ptx.size()
          << ") is not equal to the \
     nnucl in the input ("
          << nnucl << ")\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   // If we are here - we are good:
@@ -245,14 +246,14 @@ void init_X2(vector<CMATRIX *> ptx, vector<int> &x_mem_status, int nrows,
          << ") is not equal to the \
     size of x_mem_status ("
          << x_mem_status.size() << ")\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (ptx.size() != static_cast<std::size_t>(nnucl)) {
     cout << "Error in init_X2: the size of the ptx (" << ptx.size()
          << ") is not equal to the \
     nnucl in the input ("
          << nnucl << ")\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   // If we are here - we are good:
@@ -276,16 +277,16 @@ void nHamiltonian::check_cmatrix(bp::object obj, std::string matrix_name,
     cout << "The number of rows in the extracted " << matrix_name << " object ("
          << tmp.n_rows << ")"
          << " is not equal to the expected number of rows = " << nrows
-         << "\nExiting...\n";
-    exit(0);
+         << "\n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (tmp.n_cols != ncols) {
     cout << "ERROR in nHamiltonian...\n";
     cout << "The number of rows in the extracted " << matrix_name << " object ("
          << tmp.n_cols << ")"
          << " is not equal to the expected number of columns = " << ncols
-         << "\nExiting...\n";
-    exit(0);
+         << "\n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 }
 
@@ -307,8 +308,8 @@ void nHamiltonian::check_cmatrix_list(bp::object obj, std::string matrix_name,
     cout << "The number of elements in the extracted " << matrix_name
          << " object (" << tmp.size() << ")"
          << "is not equal to the expected number of elements = " << length
-         << "\nExiting...\n";
-    exit(0);
+         << "\n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   // For speed, check the dimensions of only the first element
@@ -319,16 +320,16 @@ void nHamiltonian::check_cmatrix_list(bp::object obj, std::string matrix_name,
       cout << "The number of rows in the extracted " << matrix_name
            << "[0] object (" << tmp[0].n_rows << ")"
            << " is not equal to the expected number of rows = " << nrows
-           << "\nExiting...\n";
-      exit(0);
+           << "\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
     if (tmp[0].n_cols != ncols) {
       cout << "ERROR in nHamiltonian...\n";
       cout << "The number of rows in the extracted " << matrix_name
            << "[0] object (" << tmp[0].n_cols << ")"
            << " is not equal to the expected number of columns = " << ncols
-           << "\nExiting...\n";
-      exit(0);
+           << "\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 }

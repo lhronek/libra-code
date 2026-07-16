@@ -16,6 +16,7 @@
 */
 
 #include "io.h"
+#include <stdexcept>
 
 /// liblibra
 namespace liblibra {
@@ -325,7 +326,7 @@ void file2matrix(std::string filename, vector<vector<double>> &M) {
   } else {
     cout << "Error: Can not open file " << filename
          << ". Check if this file exists\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   in.close();
 }
@@ -359,7 +360,7 @@ void file2matrix(std::string filename, vector<vector<double>> &M, double scl) {
   } else {
     cout << "Error: Can not open file " << filename
          << ". Check if this file exists\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   in.close();
 }
@@ -393,7 +394,7 @@ void file2matrix(std::string filename, vector<vector<int>> &M) {
   } else {
     cout << "Error: Can not open file " << filename
          << ". Check if this file exists\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   in.close();
 }

@@ -16,6 +16,7 @@
 
 #if defined(USING_PCH)
 #include "../../pch.h"
+#include <stdexcept>
 #else
 #include <map>
 #endif
@@ -1568,7 +1569,7 @@ void System::CLONE_MOLECULE(int mol_id){
   m = get_molecule_index_by_molecule_id(mol_id);
   if(m==-1){
     std::cout<<"Error: Can not duplicate (clone) molecule with mol_id = "<<mol_id<<" No such molecule\n";
-    exit(97);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   //================= Create corresponding atoms =====================
   int init_size = Number_of_atoms;

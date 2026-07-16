@@ -14,6 +14,7 @@
 */
 
 #include "PW.h"
+#include <stdexcept>
 #include "../util/libutil.h"
 
 /// liblibra namespace
@@ -47,7 +48,7 @@ PW PW::operator+(const PW& m){
 
   if(!(m.kx==this->kx && m.ky==this->ky && m.kz==this->kz)){  
     cout<<"Error in PW::operator+: can add orbitals only if the k-points are the same!\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   PW res(*this);
@@ -64,7 +65,7 @@ PW PW::operator-(const PW& m){
 
   if(!(m.kx==this->kx && m.ky==this->ky && m.kz==this->kz)){  
     cout<<"Error in PW::operator-: can subtract orbitals only if the k-points are the same!\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   PW res(*this);
@@ -81,7 +82,7 @@ void PW::operator+=(const PW& m){
 
   if(!(m.kx==this->kx && m.ky==this->ky && m.kz==this->kz)){  
     cout<<"Error in PW::operator+=: can increment orbitals only if the k-points are the same!\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   for(int i=0;i<npw;i++){ coeff[i] += m.coeff[i]; }
@@ -96,7 +97,7 @@ void PW::operator-=(const PW& m){
 
   if(!(m.kx==this->kx && m.ky==this->ky && m.kz==this->kz)){  
     cout<<"Error in PW::operator-=: can increment orbitals only if the k-points are the same!\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   for(int i=0;i<npw;i++){ coeff[i] -= m.coeff[i]; }
@@ -178,7 +179,7 @@ void PW::complete(){
   }
   else{
     cout<<"Error in PW::complete() - can't complete non-Gamma-point orbitals\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
     
@@ -204,7 +205,7 @@ PW operator*(const PW& m1, const complex<float>& f){ return multiply<const compl
 
 complex<double> operator*(const PW& m1, const PW& m2){
   complex<double> res(0.0,0.0);
-  if(m1.npw!=m2.npw){ cout<<"Error: Can not multiply MOs with different basis sizes\n"; exit(0); }
+  if(m1.npw!=m2.npw){ cout<<"Error: Can not multiply MOs with different basis sizes\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
   
   else{   for(int i=0;i<m1.npw;i++){ res += m1.coeff[i] * m2.coeff[i];}  }
   return res;
@@ -370,9 +371,9 @@ CMATRIX QE_read_acsii_wfc(std::string filename, int kpt, vector<int>& act_space,
   vector< vector<int> > kbeg( nkpts,vector<int>() );
   vector< vector<int> > kend( nkpts,vector<int>() );
 
-  if(kpt<0){ cout<<"Error: The k-point index ( "<<kpt<<" ) can not be less than 0\n"; exit(0); }
+  if(kpt<0){ cout<<"Error: The k-point index ( "<<kpt<<" ) can not be less than 0\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
   if(kpt>nkpts-1){ cout<<"Error: The k-point index ("<<kpt<<" ) is not allowed. The maximal\
-                   value is = "<<nkpts-1<<"\n"; exit(0); }
+                   value is = "<<nkpts-1<<"\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
 
   start = beg[kpt]; status = 1; int knbnd = 0;
@@ -394,13 +395,11 @@ CMATRIX QE_read_acsii_wfc(std::string filename, int kpt, vector<int>& act_space,
   for(int i=0; i<sz; i++){
     if(act_space[i]<0){ 
       cout<<"Error: Orbital index can not be less than 0, given = "<<act_space[i]<<endl; 
-      cout<<"Exiting...\n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
     if(act_space[i]>nbands-1){ 
       cout<<"Error: Orbital index can not be larger than "<<nbands-1<<", given = "<<act_space[i]<<endl; 
-      cout<<"Exiting...\n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }// for i
   nbands = sz; // if all is fine - we'll just read what we need, as dictated by the act_space

@@ -18,6 +18,7 @@
 */
 
 #include "fgr.h"
+#include <stdexcept>
 
 
 /// liblibra namespace
@@ -148,8 +149,7 @@ double reorganization_energy(vector<double>& omega_nm, vector<double>& req_nm){
     cout<<"ERROR in reorganization_energy: the dimensions of the input arguments do not match\n";
     cout<<"len(omega_nm) = "<<omega_nm.size()<<endl;
     cout<<"len(req_nm) = "<<req_nm.size()<<endl;
-    cout<<"Exiting...\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   double Er = 0.0;
@@ -237,7 +237,7 @@ void error_msg(std::string name1, int sz1, std::string name2, int sz2){
     if(sz1!=sz2){
       cout<<"ERROR: The size of the "<<name1<<" ("<<sz1
           <<") is not consistent with the size of "<<name2<<" ("<<sz2<<")\n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
 }

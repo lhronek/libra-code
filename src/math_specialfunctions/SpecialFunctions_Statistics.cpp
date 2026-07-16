@@ -10,6 +10,7 @@
 *********************************************************************************/
 
 #include "SpecialFunctions.h"
+#include <stdexcept>
 #include "../math_meigen/mEigen.h"
 #include "../math_random/librandom.h"
 
@@ -253,8 +254,7 @@ MATRIX covariance(MATRIX& X, MATRIX& Y){
     cout<<"Error in covariance(MATRIX&, MATRIX&): the sizes of the matrices are incompatible\n";
     cout<<"X is a "<<nx<<" x "<<sz<<" matrix\n";
     cout<<"Y is a "<<ny<<" x "<<Y.n_cols<<" matrix\n";
-    cout<<"Exiting...\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   MATRIX res(nx, ny);
@@ -330,8 +330,7 @@ CMATRIX covariance(CMATRIX& X, CMATRIX& Y){
     cout<<"Error in covariance(CMATRIX&, CMATRIX&): the sizes of the matrices are incompatible\n";
     cout<<"X is a "<<nx<<" x "<<sz<<" matrix\n";
     cout<<"Y is a "<<ny<<" x "<<Y.n_cols<<" matrix\n";
-    cout<<"Exiting...\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   CMATRIX res(nx, ny);

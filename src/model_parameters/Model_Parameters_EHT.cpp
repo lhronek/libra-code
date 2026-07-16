@@ -10,6 +10,7 @@
  *********************************************************************************/
 
 #include "Model_Parameters.h"
+#include <stdexcept>
 
 /// liblibra namespace
 namespace liblibra {
@@ -80,7 +81,7 @@ void set_parameters_eht(Control_Parameters &prms, Model_Parameters &modprms) {
   } else {
     cout << "Error: eht_params_format = " << prms.eht_params_format
          << " is not known\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   //--------- Some sanity check --------
@@ -89,7 +90,7 @@ void set_parameters_eht(Control_Parameters &prms, Model_Parameters &modprms) {
             "1) slope for positive charges, 2) slope for negative charges\n";
     cout << "Change eht_params_format to \"eht+2\" or more and ensure that the "
             "parameters file has required number of fields in a line\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   //------------------------------------
 
@@ -179,7 +180,7 @@ void set_parameters_eht(Control_Parameters &prms, Model_Parameters &modprms) {
                      << prms.eht_params_format << endl;
                 cout << "Missing " << (8 + n_extra_params) - file[i1 + j].size()
                      << " more parameter(s)\n";
-                exit(0);
+                throw std::runtime_error("libra C++ error - see the message printed above");
               }
 
               if (n_extra_params > 0) {
@@ -208,7 +209,7 @@ void set_parameters_eht(Control_Parameters &prms, Model_Parameters &modprms) {
                 cout << "Missing "
                      << (10 + n_extra_params) - file[i1 + j].size()
                      << " more parameter(s)\n";
-                exit(0);
+                throw std::runtime_error("libra C++ error - see the message printed above");
               }
 
               if (n_extra_params > 0) {

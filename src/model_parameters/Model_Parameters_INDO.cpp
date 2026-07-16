@@ -10,6 +10,7 @@
 *********************************************************************************/
 
 #include "Model_Parameters.h"
+#include <stdexcept>
 
 
 /// liblibra namespace
@@ -75,7 +76,7 @@ void set_parameters_indo(Control_Parameters& prms, Model_Parameters& modprms){
   else if(prms.eht_params_format=="eht+4"){ n_extra_params = 4; }
   else{
     cout<<"Error: eht_params_format = "<<prms.eht_params_format<<" is not known\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
 
@@ -166,7 +167,7 @@ void set_parameters_indo(Control_Parameters& prms, Model_Parameters& modprms){
                        <<"\n is not complient with expected format which is = "
                        <<prms.eht_params_format<<endl;
                    cout<<"Missing "<<(8+n_extra_params)-file[i1+j].size()<<" more parameter(s)\n";
-              exit(0);
+              throw std::runtime_error("libra C++ error - see the message printed above");
             }
 
   
@@ -187,7 +188,7 @@ void set_parameters_indo(Control_Parameters& prms, Model_Parameters& modprms){
                        <<"\n is not complient with expected format which is = "
                        <<prms.eht_params_format<<endl;
                    cout<<"Missing "<<(10+n_extra_params)-file[i1+j].size()<<" more parameter(s)\n";
-              exit(0);
+              throw std::runtime_error("libra C++ error - see the message printed above");
             }
     
             modprms.PT[elt].beta0[sh] = atof(file[i1+j][10].c_str()) * eV; 

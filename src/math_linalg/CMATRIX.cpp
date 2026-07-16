@@ -18,6 +18,7 @@
 
 #if defined(USING_PCH)
 #include "../pch.h"
+#include <stdexcept>
 #else
 #include <cstdio>
 #include <memory>
@@ -46,10 +47,10 @@ CMATRIX::CMATRIX(vector<vector<double> >& re_part,vector<vector<double> >& im_pa
 */
 
   if(re_part.size()!=im_part.size()){ 
-    cout<<"Error in CMATRIX constructor: y-dimensions(num of rows) of the real and imaginary arrays are not equal\n"; exit(0); 
+    cout<<"Error in CMATRIX constructor: y-dimensions(num of rows) of the real and imaginary arrays are not equal\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
   if(re_part[0].size()!=im_part[0].size()){
-    cout<<"Error in CMATRIX constructor: x-dimensions(num of cols) of the real and imaginary arrays are not equal\n"; exit(0);
+    cout<<"Error in CMATRIX constructor: x-dimensions(num of cols) of the real and imaginary arrays are not equal\n"; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   n_rows = re_part.size();
   n_cols = re_part[0].size();
@@ -138,10 +139,10 @@ CMATRIX::CMATRIX(const MATRIX& re_part){
 CMATRIX::CMATRIX(MATRIX& re_part,MATRIX& im_part){
 
   if(re_part.n_rows!=im_part.n_rows){ 
-    cout<<"Error in CMATRIX constructor: num_of_rows of the real and imaginary matrices are not equal\n"; exit(0); 
+    cout<<"Error in CMATRIX constructor: num_of_rows of the real and imaginary matrices are not equal\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
   if(re_part.n_cols!=im_part.n_cols){
-    cout<<"Error in CMATRIX constructor: num_of_cols of the real and imaginary arrays are not equal\n"; exit(0);
+    cout<<"Error in CMATRIX constructor: num_of_cols of the real and imaginary arrays are not equal\n"; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   n_rows = re_part.n_rows;
   n_cols = re_part.n_cols;
@@ -202,22 +203,22 @@ void CMATRIX::get_components(MATRIX& re_part,MATRIX& im_part){
   if(re_part.n_cols != n_cols){
     std::cout<<"Error in CMATRIX::get_components : The number of columns of the target real component matrix ("
              <<re_part.n_cols<<") is not equal to the number of columns of the source complex matrix ("<<n_cols<<")\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if(im_part.n_cols != n_cols){
     std::cout<<"Error in CMATRIX::get_components : The number of columns of the target imaginary component matrix ("
              <<im_part.n_cols<<") is not equal to the number of columns of the source complex matrix ("<<n_cols<<")\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if(re_part.n_rows != n_rows){
     std::cout<<"Error in CMATRIX::get_components : The number of rows of the target real component matrix ("
              <<re_part.n_rows<<") is not equal to the number of rows of the source complex matrix ("<<n_rows<<")\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if(im_part.n_rows != n_rows){
     std::cout<<"Error in CMATRIX::get_components : The number of rows of the target imaginary component matrix ("
              <<im_part.n_rows<<") is not equal to the number of rows of the source complex matrix ("<<n_rows<<")\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   for(int i=0;i<n_elts;i++){ re_part.M[i] = M[i].real();  im_part.M[i] = M[i].imag(); }
@@ -522,7 +523,7 @@ CMATRIX& CMATRIX_chain_scratch(int slot, int nr, int nc){
   thread_local std::unique_ptr<CMATRIX> pool[8];
   if(slot < 0 || slot >= MAXSLOTS){
     std::cout << "Error in the chained product: too many adjoint operands\n";
-    exit(0);
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
   std::unique_ptr<CMATRIX>& p = pool[slot];
   if(!p || p->n_rows != nr || p->n_cols != nc){ p.reset(new CMATRIX(nr, nc)); }

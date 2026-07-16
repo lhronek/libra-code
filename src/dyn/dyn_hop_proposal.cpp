@@ -14,6 +14,7 @@
 */
 
 #include "Surface_Hopping.h"
+#include <stdexcept>
 #include "Energy_and_Forces.h"
 #include "electronic/libelectronic.h"
 ///#include "Dynamics.h"
@@ -1198,8 +1199,7 @@ vector<MATRIX> hop_proposal_probabilities(dyn_control_params& prms,
 
     else{
       cout<<"Error in tsh1: tsh_method can be -1, 0, 1, 2, or 3. Other values are not defined\n";
-      cout<<"Exiting...\n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
   }// for traj
@@ -1378,8 +1378,7 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
 
     else{
       cout<<"Error in tsh1: tsh_method can be -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9. Other values are not defined\n";
-      cout<<"Exiting...\n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
   }// for traj
@@ -1426,8 +1425,8 @@ int hop(vector<double>& prob, double ksi){
                              // so stay on the original state
                                   
     if(finstate==-1){
-      std::cout<<"Something is wrong in the hop(...) function\nExiting now...\n";
-      exit(0);
+      std::cout<<"Something is wrong in the hop(...) function\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } // else  ksi < 1.0
 
@@ -1473,8 +1472,8 @@ int hop(int initstate, MATRIX& g, double ksi){
                                     // so stay on the original state
                                   
     if(finstate==-1){
-      std::cout<<"Something is wrong in the hop(...) function\nExiting now...\n";
-      exit(0);
+      std::cout<<"Something is wrong in the hop(...) function\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } // else  ksi < 1.0
 
@@ -1519,8 +1518,8 @@ int hop(int initstate, vector<double>& g, double ksi){
                                     // so stay on the original state
                                   
     if(finstate==-1){
-      std::cout<<"Something is wrong in the hop(...) function\nExiting now...\n";
-      exit(0);
+      std::cout<<"Something is wrong in the hop(...) function\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } // else  ksi < 1.0
 

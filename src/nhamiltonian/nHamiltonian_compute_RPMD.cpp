@@ -17,6 +17,7 @@
 
 #if defined(USING_PCH)
 #include "../pch.h"
+#include <stdexcept>
 #else
 #include <stdlib.h>
 #endif 
@@ -54,7 +55,7 @@ double RPMD_internal_potential(const MATRIX& q, const MATRIX& invM, double beta)
   if(ntraj==1){
     en = 0.0;
   }
-  else{ cout<<"Error in RPMD_internal_potential(), not implemented for quantum nuclei\n"; exit(0); }
+  else{ cout<<"Error in RPMD_internal_potential(), not implemented for quantum nuclei\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
   return en;
 }
@@ -85,7 +86,7 @@ MATRIX RPMD_internal_force(const MATRIX& q, const MATRIX& invM, double beta){
       f.set(dof, 0, 0.0);
     }// for dof
   }
-  else{ cout<<"Error in RPMD_internal_force(), not implemented for quantum nuclei\n"; exit(0); }
+  else{ cout<<"Error in RPMD_internal_force(), not implemented for quantum nuclei\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
   return f;
 }

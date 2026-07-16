@@ -10,6 +10,7 @@
 *********************************************************************************/
 
 #include <Eigen/LU>
+#include <stdexcept>
 #include <Eigen/Dense>
 #include <Eigen/Eigenvalues>
 #include <Eigen/Core>
@@ -81,20 +82,20 @@ bool linsys_solver(const MATRIX& A, MATRIX& X, const MATRIX& B, const double Nor
   // if that fails, tries again using singular value decomposition (SVD)
 */
 
-    std::cout<<"Not implemented. Exiting...\n";
-    exit(0);
+    std::cout<<"Not implemented. ";
+    throw std::runtime_error("libra C++ error - see the message printed above");
 
     if(A.n_rows!=A.n_cols){
-        std::cout<<"Error: The matrix A in equation A * x = b must be square\n"; exit(1);  // N
+        std::cout<<"Error: The matrix A in equation A * x = b must be square\n"; throw std::runtime_error("libra C++ error - see the message printed above");  // N
     }
     if(A.n_cols!=X.n_rows){
-        std::cout<<"Error: The number of cols of matrix A and the number of rows in matrix x in equation A * x = b must be equal\n"; exit(1);  // N
+        std::cout<<"Error: The number of cols of matrix A and the number of rows in matrix x in equation A * x = b must be equal\n"; throw std::runtime_error("libra C++ error - see the message printed above");  // N
     }
     if( (X.n_cols!=B.n_cols) || (X.n_rows!=B.n_rows)){
-        std::cout<<"Error: The dimensions of matrices x and b in equation A * x = b must be equal\n"; exit(1); 
+        std::cout<<"Error: The dimensions of matrices x and b in equation A * x = b must be equal\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
     }
     if(X.n_cols!=1){
-        std::cout<<"Error: The matrices x and b in equation A * x = b should be column-vectors (num_of_cols ==1) \n"; exit(1); 
+        std::cout<<"Error: The matrices x and b in equation A * x = b should be column-vectors (num_of_cols ==1) \n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
     }
 
 /*
@@ -182,11 +183,11 @@ void solve_linsys(MATRIX& C,MATRIX& D, MATRIX& X,double eps,int maxiter){
     int iter;    // number of iterations
 
     if(C.n_rows!=D.n_rows)
-        {std::cout<<"Error: The number of rows of matrices C and D in equation CX = D must be equal\n"; exit(35); } // n
+        {std::cout<<"Error: The number of rows of matrices C and D in equation CX = D must be equal\n"; throw std::runtime_error("libra C++ error - see the message printed above"); } // n
     if(C.n_cols!=X.n_rows)
-        {std::cout<<"Error: The number of cols of matrix C and num of rows in matrix D in equation CX = D must be equal\n"; exit(35); } // m
+        {std::cout<<"Error: The number of cols of matrix C and num of rows in matrix D in equation CX = D must be equal\n"; throw std::runtime_error("libra C++ error - see the message printed above"); } // m
     if(X.n_cols!=D.n_cols)
-        {std::cout<<"Error: The number of cols of matrices X and D in equation CX = D must be equal\n"; exit(35); } // p
+        {std::cout<<"Error: The number of cols of matrices X and D in equation CX = D must be equal\n"; throw std::runtime_error("libra C++ error - see the message printed above"); } // p
 
     // Set dimentions
     n = C.n_rows;
@@ -240,7 +241,7 @@ void solve_linsys(MATRIX& C,MATRIX& D, MATRIX& X,double eps,int maxiter){
 
     if(error>eps){
       cout<<"Error in solve_linsys: convergence to eps= "<<eps<<" is not achieved for "<<iter<<" iterations\n";
-      exit(0);
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
 }

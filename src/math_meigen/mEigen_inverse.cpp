@@ -10,6 +10,7 @@
 *********************************************************************************/
 
 #include <Eigen/LU>
+#include <stdexcept>
 #include <Eigen/Dense>
 #include <Eigen/Eigenvalues>
 #include <Eigen/Core>
@@ -182,13 +183,13 @@ void inv_matrix(MATRIX& S, MATRIX& S_inv, double thresh, int do_phase_correction
 */
 
   if(S.n_cols != S.n_rows){
-    cout<<"Error in libmeigen::inv_matrix : the input matrix is not square\n"; exit(0); 
+    cout<<"Error in libmeigen::inv_matrix : the input matrix is not square\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
   if(S_inv.n_cols != S_inv.n_rows){
-    cout<<"Error in libmeigen::inv_matrix : the output S^{-1} matrix is not square\n"; exit(0); 
+    cout<<"Error in libmeigen::inv_matrix : the output S^{-1} matrix is not square\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
   if(S.n_cols != S_inv.n_cols){
-    cout<<"Error in libmeigen::inv_matrix : size of matrix S is not the same as that of matrix S^{-1}\n"; exit(0); 
+    cout<<"Error in libmeigen::inv_matrix : size of matrix S is not the same as that of matrix S^{-1}\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
 
 
@@ -214,8 +215,8 @@ void inv_matrix(MATRIX& S, MATRIX& S_inv, double thresh, int do_phase_correction
       std::cout<<"\n Error in inv_matrix: One of the eigenvalues of the matrix S is "<< val
                <<"\n this is below the used threshold of "<<thresh
                <<"\n So... the matrix is likely singular or your threshold is too large"
-               <<"\n Exiting now...\n";
-      exit(0);
+               <<"\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
     else{    tmp->M[i*sz+i] = 1.0/val; }
   }
@@ -263,13 +264,13 @@ void inv_matrix(CMATRIX& S, CMATRIX& S_inv, double thresh, int do_phase_correcti
 */
 
   if(S.n_cols != S.n_rows){
-    cout<<"Error in libmeigen::inv_matrix : the input matrix is not square\n"; exit(0); 
+    cout<<"Error in libmeigen::inv_matrix : the input matrix is not square\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
   if(S_inv.n_cols != S_inv.n_rows){
-    cout<<"Error in libmeigen::inv_matrix : the output S^{-1} matrix is not square\n"; exit(0); 
+    cout<<"Error in libmeigen::inv_matrix : the output S^{-1} matrix is not square\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
   if(S.n_cols != S_inv.n_cols){
-    cout<<"Error in libmeigen::inv_matrix : size of matrix S is not the same as that of matrix S^{-1}\n"; exit(0); 
+    cout<<"Error in libmeigen::inv_matrix : size of matrix S is not the same as that of matrix S^{-1}\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
 
 
@@ -297,8 +298,8 @@ void inv_matrix(CMATRIX& S, CMATRIX& S_inv, double thresh, int do_phase_correcti
       std::cout<<"\n Error in inv_matrix: One of the eigenvalues of the matrix S is "<< val
                <<"\n this is below the used threshold of "<<thresh
                <<"\n So... the matrix is likely singular or your threshold is too large"
-               <<"\n Exiting now...\n";
-      exit(0);
+               <<"\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
     else{    S_inv.M[i*sz+i] = 1.0/val; }
   }

@@ -15,6 +15,7 @@
 */
 
 #include "Basis.h"
+#include <stdexcept>
 
 /// liblibra namespace
 namespace liblibra{
@@ -669,7 +670,7 @@ int num_valence_elec(int Z){
   else if(Z>=71 && Z<=86){  dn = Z - 70 + 2; }  //  Lu, Hf, ... Rn  - skip f-electrons
 
   else{
-     cout<<"Calculation of # of electrons for Z>86 is not implemented\n"; exit(0);
+     cout<<"Calculation of # of electrons for Z>86 is not implemented\n"; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return dn;

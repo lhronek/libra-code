@@ -17,6 +17,7 @@
 
 #if defined(USING_PCH)
 #include "../pch.h"
+#include <stdexcept>
 #else
 #include <omp.h>
 #include <stdlib.h>
@@ -124,7 +125,7 @@ eigenvectors.
         cout<<"ERROR in void nHamiltonian::update_phases(vector<double>& phases,
 int lvl): \
         the number of elements in the <phases> input should be equal to the
-number of columns of \ the basis transformation matrix\nExiting...\n"; exit(0);
+number of columns of \ the basis transformation matrix\n"; throw std::runtime_error("libra C++ error - see the message printed above");
       }
 
       for(i=0; i<basis_transform->n_cols; i++){
@@ -141,7 +142,7 @@ number of columns of \ the basis transformation matrix\nExiting...\n"; exit(0);
         cout<<"ERROR in void nHamiltonian::update_phases(vector<double>& phases,
 int lvl): \
         the number of elements in the <phases> input should be equal to the
-number of columns of \ the nac_adi matrix\nExiting...\n"; exit(0);
+number of columns of \ the nac_adi matrix\n"; throw std::runtime_error("libra C++ error - see the message printed above");
       }
 
       for(i=0; i<nac_adi->n_cols; i++){
@@ -158,7 +159,7 @@ number of columns of \ the nac_adi matrix\nExiting...\n"; exit(0);
         cout<<"ERROR in void nHamiltonian::update_phases(vector<double>& phases,
 int lvl): \
         the number of elements in the <phases> input should be equal to the
-number of columns of \ the hvib_adi matrix\nExiting...\n"; exit(0);
+number of columns of \ the hvib_adi matrix\n"; throw std::runtime_error("libra C++ error - see the message printed above");
       }
 
       for(i=0; i<hvib_adi->n_cols; i++){
@@ -318,26 +319,26 @@ void nHamiltonian::compute_adiabatic(int der_lvl, int lvl) {
         cout
             << "Error in compute_adiabatic(): the diabatic Hamiltonian matrix is not allocated \
     but it is needed for the calculations\n";
-        exit(0);
+        throw std::runtime_error("libra C++ error - see the message printed above");
       }
       if (ovlp_dia_mem_status == 0) {
         cout
             << "Error in compute_adiabatic(): the overlap matrix of the diabatic states is not allocated \
     but it is needed for the calculations\n";
-        exit(0);
+        throw std::runtime_error("libra C++ error - see the message printed above");
       }
 
       if (ham_adi_mem_status == 0) {
         cout
             << "Error in compute_adiabatic(): the adiabatic Hamiltonian matrix is not allocated \
     but it is used to collect the results of the calculations\n";
-        exit(0);
+        throw std::runtime_error("libra C++ error - see the message printed above");
       }
       if (basis_transform_mem_status == 0) {
         cout
             << "Error in compute_adiabatic(): the basis_transform (eigenvector) matrix is\
     not allocated but it is used to collect the results of the calculations\n";
-        exit(0);
+        throw std::runtime_error("libra C++ error - see the message printed above");
       }
 
       eigen_algo = 0; /// Should be this option, otherwise the static
@@ -371,7 +372,7 @@ void nHamiltonian::compute_adiabatic(int der_lvl, int lvl) {
                 << "Error in compute_adiabatic(): the derivatives of the diabatic Hamiltonian \
         matrix w.r.t. the nuclear DOF "
                 << n << " is not allocated but is needed for calculations \n";
-            exit(0);
+            throw std::runtime_error("libra C++ error - see the message printed above");
           }
 
           if (d1ham_adi_mem_status[n] == 0) {
@@ -380,7 +381,7 @@ void nHamiltonian::compute_adiabatic(int der_lvl, int lvl) {
         matrix w.r.t. the nuclear DOF "
                 << n
                 << " is not allocated but is needed for collecting results \n";
-            exit(0);
+            throw std::runtime_error("libra C++ error - see the message printed above");
           }
 
           if (dc1_dia_mem_status[n] == 0) {
@@ -389,7 +390,7 @@ void nHamiltonian::compute_adiabatic(int der_lvl, int lvl) {
         basis w.r.t. the nuclear DOF "
                 << n
                 << " is not allocated but is needed for collecting results \n";
-            exit(0);
+            throw std::runtime_error("libra C++ error - see the message printed above");
           }
 
           if (dc1_adi_mem_status[n] == 0) {
@@ -398,7 +399,7 @@ void nHamiltonian::compute_adiabatic(int der_lvl, int lvl) {
         basis w.r.t. the nuclear DOF "
                 << n
                 << " is not allocated but is needed for collecting results \n";
-            exit(0);
+            throw std::runtime_error("libra C++ error - see the message printed above");
           }
 
           // E.g. see the derivations here:
