@@ -305,47 +305,35 @@ def build_SD_basis(data_dim, cbm_alpha_index, alpha_include, cbm_beta_index, bet
     alpha_electrons = []
     beta_electrons = []
 
-    # Check for potential errors
+    # Validate the requested basis against the available orbitals: out-of-range
+    # indices would silently build duplicate/garbage determinants (a negative
+    # beta index even flips sign into the ALPHA block), and a silently clamped
+    # basis changes the downstream state count - raise with guidance instead
     if data_dim % 2 > 0:
-        print("The dimensions of your vibronic Hamiltonian matrix (or whatever data you wish to pass to the function build_SD) must be even")
-        print("Exiting now ..")
-        sys.exit(0)
+        raise ValueError("data_dim must be even (equal numbers of alpha and beta spin-orbitals)")
 
-    if cbm_alpha_index > num_same_spin_orbitals:
-        print(
-            "You must have the same number of alpha and beta spin-orbitals in your basis. The index of the CBM for the alpha spin-orbitals\
- cannot be greater than 1/2 the total number of spin orbitals ")
-        print("Exiting now")
-        sys.exit(0)
+    if not 1 <= cbm_alpha_index <= num_same_spin_orbitals:
+        raise ValueError(F"cbm_alpha_index={cbm_alpha_index} must lie in the alpha block "
+                         F"[1, {num_same_spin_orbitals}]")
+    if not num_same_spin_orbitals + 1 <= cbm_beta_index <= 2 * num_same_spin_orbitals:
+        raise ValueError(F"cbm_beta_index={cbm_beta_index} must lie in the beta block "
+                         F"[{num_same_spin_orbitals + 1}, {2 * num_same_spin_orbitals}]")
 
-    elif cbm_alpha_index <= 0:
-        print("The index of the CBM for the alpha spin-orbitals must be > 0")
-        print("Exiting now")
-        sys.exit(0)
-
-    elif cbm_beta_index <= num_same_spin_orbitals:
-        print(
-            "You must have the same number of alpha and beta spin-orbitals in your basis. The index of the CBM for the beta spin-orbitals\
- cannot be less than 1/2 the total number of spin orbitals ")
-        print("Exiting now")
-        sys.exit(0)
-
-    elif cbm_beta_index > 2 * num_same_spin_orbitals:
-        print("The index of the CBM for the beta spin-orbitals must be < total number of spin-orbitals")
-        print("Exiting now")
-        sys.exit(0)
-
-    if cbm_alpha_index + alpha_include + 2 > num_same_spin_orbitals:
-        print("Cannot include more alpha spin-orbitals than there are")
-        print("Including the maximum amount")
-        alpha_include = num_same_spin_orbitals - cbm_alpha_index - 1
-        print("New value for alpha_include = ", alpha_include)
-
-    if cbm_beta_index + beta_include + 2 > 2 * num_same_spin_orbitals:
-        print("Cannot include more beta spin-orbitals than there are")
-        print("Including the maximum amount")
-        beta_include = 2 * num_same_spin_orbitals - cbm_beta_index - 1
-        print("New value for beta_include = ", beta_include)
+    if not 0 <= alpha_include <= cbm_alpha_index - 1:
+        raise ValueError(F"alpha_include={alpha_include} but only {cbm_alpha_index - 1} "
+                         F"occupied alpha orbitals lie below the alpha CBM")
+    if cbm_alpha_index + 1 + alpha_include > num_same_spin_orbitals:
+        raise ValueError(F"alpha_include={alpha_include} requests {alpha_include + 1} alpha "
+                         F"virtuals but only {num_same_spin_orbitals - cbm_alpha_index} exist "
+                         F"above the alpha CBM")
+    if not 0 <= beta_include <= cbm_beta_index - num_same_spin_orbitals - 1:
+        raise ValueError(F"beta_include={beta_include} but only "
+                         F"{cbm_beta_index - num_same_spin_orbitals - 1} occupied beta "
+                         F"orbitals lie below the beta CBM")
+    if cbm_beta_index + 1 + beta_include > 2 * num_same_spin_orbitals:
+        raise ValueError(F"beta_include={beta_include} requests {beta_include + 1} beta "
+                         F"virtuals but only {2 * num_same_spin_orbitals - cbm_beta_index} "
+                         F"exist above the beta CBM")
 
     # Make ground state SD
     for i in range(cbm_alpha_index - alpha_include, cbm_alpha_index + 1):
