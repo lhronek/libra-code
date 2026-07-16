@@ -584,8 +584,10 @@ void check_input(boost::python::dict params, boost::python::dict default_params,
       if(!params.has_key(key)){
 
         if(verbose){
-          std::cout<<"WARNING: Parameter "<< key<< " is not defined! in the input parameters"
-                   <<"Use the default value \n"; //<< default_params.values()[i]<<"\n";
+          std::cout<<"WARNING: Parameter "<< key <<" is not defined in the input parameters! "
+                   <<"Using the default value = "
+                   << boost::python::extract<std::string>(boost::python::str(default_params.values()[i]))()
+                   <<"\n";
         }
 
         params.setdefault(key, default_params.values()[i]);
