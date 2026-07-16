@@ -3502,7 +3502,7 @@ def make_sd_basis(homo_w, num_occ_states, num_unocc_states, norb_w):
 
 
 def sd_overlaps(sd_states, St_mo, S_mo_prev, S_mo_curr, orthonormalize=True,
-                sd_states_prev=None):
+                sd_states_prev=None, kernel="auto", cache=None):
     """
     SD overlap matrices from windowed one-spin MO overlaps.
 
@@ -3510,15 +3510,46 @@ def sd_overlaps(sd_states, St_mo, S_mo_prev, S_mo_curr, orthonormalize=True,
         sd_states: signed-spin-orbital SD list (GS first), window-relative;
             this is the CURRENT (ket) basis
         St_mo, S_mo_prev, S_mo_curr: (norb_w x norb_w) MO matrices
-        orthonormalize: apply Lowdin S^-1/2 sandwiches (step3 style)
+        orthonormalize: normalization of the SD overlaps:
+            - "lowdin" or True: Lowdin S^-1/2 sandwiches, both factors
+              recomputed from this step's same-time overlaps (the step3
+              convention, apply_orthonormalization_scipy) [default]
+            - "lowdin_cached": the same Lowdin sandwich, but the bra factor
+              S_prev^-1/2 is reused from the previous call via `cache` (the
+              cp2k_compute_adi_nbra convention). The cache is guarded by a
+              digest of the source overlaps, SD list and kernel (the step3
+              guard) and recomputes on any mismatch, so results are
+              bit-identical to "lowdin"; a hit is one fractional matrix
+              power cheaper - a saving that matters in file-based
+              post-processing, not next to a CP2K call
+            - "none" or False: raw determinant overlaps (the
+              dftb_compute_adi convention)
         sd_states_prev: previous-step (bra) SD list if it differs from the
             current one (e.g. per-step energy-sorted bases) [default: sd_states]
+        kernel: SD determinant kernel; same names as step3's
+            sd_overlap_kernel: "auto" [default] | "batched" | "lemma" | "per_pair"
+        cache: mutable dict for the "lowdin_cached" mode; reads and updates
+            cache["s_ihalf"] / cache["digest"] (S^-1/2 of this step's ket
+            basis and its content key)
 
     Returns:
         st_sd (nSD x nSD), s_sd_curr (nSD x nSD)
     """
     from libra_py.workflows.nbra import mapping
     from libra_py.workflows.nbra.step3 import apply_orthonormalization_scipy
+    mode = orthonormalize
+    if mode is True:
+        mode = "lowdin"
+    elif mode is False or mode is None:
+        mode = "none"
+    if mode not in ("none", "lowdin", "lowdin_cached"):
+        raise ValueError(f"unknown orthonormalize mode: {orthonormalize}")
+    if mode == "lowdin_cached" and cache is None:
+        raise ValueError("orthonormalize='lowdin_cached' requires a cache dict")
+    ovlp = {"per_pair": mapping.ovlp_mat_arb,
+            "batched": mapping.ovlp_mat_arb_batched,
+            "lemma": mapping.ovlp_mat_arb_lemma,
+            "auto": mapping.ovlp_mat_arb_auto}[kernel]
     if sd_states_prev is None:
         sd_states_prev = sd_states
     n_half = St_mo.shape[0]
@@ -3527,15 +3558,27 @@ def sd_overlaps(sd_states, St_mo, S_mo_prev, S_mo_curr, orthonormalize=True,
     # so that the SD2CI amplitudes (built without parities) stay consistent
     sp = mapping._sort_parities(mapping._sd_indices(sd_states_prev, n_half))
     sc = mapping._sort_parities(mapping._sd_indices(sd_states, n_half))
-    st = sp[:, None] * mapping.ovlp_mat_arb_auto(sd_states_prev, sd_states,
-                                                 _two_spinor(St_mo)) * sc[None, :]
-    s1 = sp[:, None] * mapping.ovlp_mat_arb_auto(sd_states_prev, sd_states_prev,
-                                                 _two_spinor(S_mo_prev)) * sp[None, :]
-    s2 = sc[:, None] * mapping.ovlp_mat_arb_auto(sd_states, sd_states,
-                                                 _two_spinor(S_mo_curr)) * sc[None, :]
-    if orthonormalize:
+    st = sp[:, None] * ovlp(sd_states_prev, sd_states,
+                            _two_spinor(St_mo)) * sc[None, :]
+    s1 = sp[:, None] * ovlp(sd_states_prev, sd_states_prev,
+                            _two_spinor(S_mo_prev)) * sp[None, :]
+    s2 = sc[:, None] * ovlp(sd_states, sd_states,
+                            _two_spinor(S_mo_curr)) * sc[None, :]
+    if mode == "lowdin":
         st, _ = apply_orthonormalization_scipy(s1, s2, st)
         s2, _ = apply_orthonormalization_scipy(s2, s2, s2)
+    elif mode == "lowdin_cached":
+        from libra_py.workflows.nbra.step3 import lowdin_digest, get_Lowdin_scipy
+        i1 = None
+        if cache.get("digest") == lowdin_digest(S_mo_prev, repr(sd_states_prev) + kernel):
+            i1 = cache.get("s_ihalf")
+        if i1 is None:
+            i1 = get_Lowdin_scipy(s1)
+        i2 = get_Lowdin_scipy(s2)
+        st = np.linalg.multi_dot([i1.transpose(), st, i2])
+        s2 = np.linalg.multi_dot([i2.transpose(), s2, i2])
+        cache.update(s_ihalf=i2,
+                     digest=lowdin_digest(S_mo_curr, repr(sd_states) + kernel))
     return st, s2
 
 
@@ -4114,6 +4157,27 @@ def cp2k_compute_adi_impl(q, params, full_id):
                 num_occ_states, num_unocc_states (int): SD basis window around HOMO
                                                 (backend A; must cover the CI configs)
             Optional:
+                apply_orthonormalization: normalization of the SD-level
+                    overlaps (same name/meaning as in step3's
+                    run_step3_sd_nacs_libint): "lowdin"/True [default],
+                    "lowdin_cached" (bra factor carried between steps, the
+                    cp2k_compute_adi_nbra convention - numerically identical
+                    here, one fractional matrix power cheaper), "none"/False
+                    (raw determinants, the dftb_compute_adi convention)
+                sd_overlap_kernel (str): SD determinant kernel, same values
+                    as step3: "auto" [default] | "batched" | "lemma" | "per_pair"
+                align_mo_phases (bool): cumulative MO-phase alignment of the
+                    orbitals between steps [default: True]. Disabling is
+                    incompatible with ci_source="namd_print" (raises) - the
+                    NAMD_PRINT amplitudes are re-signed against aligned MOs.
+                    NOTE the step3/on-the-fly vocabulary correspondence:
+                    step3's apply_phase_correction (state signs of the St
+                    sequence) corresponds to the DYNAMICS-level
+                    dyn_params["do_phase_correction"], NOT to this flag;
+                    step3's do_state_reordering corresponds to the dynamics
+                    dyn_params["state_tracking_algo"]; step3's tolerance
+                    corresponds to ci_threshold here (driver-family name,
+                    shared with dftb_compute_adi and cp2k_compute_adi_nbra)
                 time_dependent (bool): True (default) = TDDFPT CI states with
                     per-state forces. False = ground-state-only mode: states are
                     the fixed KS-SD basis, energies E_gs + orbital gaps, GS
@@ -4276,9 +4340,32 @@ def cp2k_compute_adi_impl(q, params, full_id):
 
     # cumulative MO phase alignment: flip current MOs (in place, so the cache
     # carries aligned orbitals forward) and remember the phases for the CI data
-    phases = align_mo_phases(mo_prev["C"], mo_curr, St_mo)
-    mo_curr["C"][LO - 1:HI, :] *= phases[:, np.newaxis]
-    S_curr = phases[:, np.newaxis] * S_curr * phases[np.newaxis, :]
+    if params.get("align_mo_phases", True):
+        phases = align_mo_phases(mo_prev["C"], mo_curr, St_mo)
+        mo_curr["C"][LO - 1:HI, :] *= phases[:, np.newaxis]
+        S_curr = phases[:, np.newaxis] * S_curr * phases[np.newaxis, :]
+    else:
+        # raw MO gauge: only safe when nothing downstream assumes aligned MOs
+        if params.get("ci_source", "namd_print") == "namd_print":
+            raise ValueError("align_mo_phases=False is incompatible with "
+                             "ci_source='namd_print': the NAMD_PRINT amplitudes "
+                             "are re-signed against the aligned MOs")
+        phases = np.ones(HI - LO + 1)
+
+    # SD-overlap options; apply_orthonormalization and sd_overlap_kernel use
+    # the step3 vocabulary (run_step3_sd_nacs_libint) with the same meanings
+    sd_orthon = params.get("apply_orthonormalization", "lowdin")
+    sd_kernel = params.get("sd_overlap_kernel", "auto")
+    sd_cache = None
+    if str(sd_orthon) == "lowdin_cached":
+        if is_first_time:
+            print("WARNING: apply_orthonormalization='lowdin_cached' is not recommended in the "
+                  "on-the-fly driver: it only saves one small matrix power per step, negligible "
+                  "next to the CP2K call, and ties each step to the previous one's cache. "
+                  "Consider 'lowdin' (the default). Results are identical - the cache is "
+                  "digest-guarded and recomputes on any mismatch.")
+            params.setdefault("s_ihalf_prev", {})[itraj] = {}
+        sd_cache = params.setdefault("s_ihalf_prev", {}).setdefault(itraj, {})
 
     time_dependent = params.get("time_dependent", True)
     if "sd_basis" not in params:
@@ -4332,7 +4419,9 @@ def cp2k_compute_adi_impl(q, params, full_id):
 
         # ---------------- CI time-overlap: backend A or B ----------------
         if backend == "sd":
-            st_sd, _ = sd_overlaps(sd_states, St_mo, S_prev, S_curr, orthonormalize=True)
+            st_sd, _ = sd_overlaps(sd_states, St_mo, S_prev, S_curr,
+                                   orthonormalize=sd_orthon, kernel=sd_kernel,
+                                   cache=sd_cache)
             T_prev = sd2ci_matrix(ci_prev, sd_unique, LO)
             T_curr = sd2ci_matrix(ci_curr, sd_unique, LO)
             st_ci = T_prev.T @ st_sd @ T_curr
@@ -4360,8 +4449,9 @@ def cp2k_compute_adi_impl(q, params, full_id):
         E_adi_curr = E_states[order]
         sd_sorted = [sd_states[k] for k in order]
         sd_prev_sorted = params["sd_prev"].get(itraj, sd_sorted) if not is_first_time else sd_sorted
-        st_ci, _ = sd_overlaps(sd_sorted, St_mo, S_prev, S_curr, orthonormalize=True,
-                               sd_states_prev=sd_prev_sorted)
+        st_ci, _ = sd_overlaps(sd_sorted, St_mo, S_prev, S_curr,
+                               orthonormalize=sd_orthon, kernel=sd_kernel,
+                               cache=sd_cache, sd_states_prev=sd_prev_sorted)
         params["sd_prev"][itraj] = sd_sorted
 
     # ---------------- mid-point energies ----------------
