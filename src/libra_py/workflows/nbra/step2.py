@@ -729,6 +729,14 @@ def run_cp2k_libint_step2(params):
                 # append it to the eigenvectors list
                 eigenvectors_1.append(eigenvector_1)
             eigenvectors_1 = np.array(eigenvectors_1)
+            # the window slices below would silently truncate (HI > nmo) or wrap
+            # (LO < 1) - validate against the MOs actually read from the molden
+            nmo_spin = int(eigenvectors_1.shape[0] / 2) if isUKS else eigenvectors_1.shape[0]
+            if not 1 <= lowest_orbital <= highest_orbital <= nmo_spin:
+                raise ValueError(F"orbital window [{lowest_orbital}, {highest_orbital}] does "
+                                 F"not fit the {nmo_spin} MOs per spin read from the molden "
+                                 F"file (1-based) - increase ADDED_MOS in the template or "
+                                 F"adjust lowest_orbital/highest_orbital")
             if isUKS:
                 # Alpha spin channel
                 # alpha_eigenvectors_1 = eigenvectors_1[0::2]
@@ -895,6 +903,12 @@ def run_cp2k_libint_step2(params):
                 # append it to the eigenvectors list
                 eigenvectors_2.append(eigenvector_2)
             eigenvectors_2 = np.array(eigenvectors_2)
+            nmo_spin = int(eigenvectors_2.shape[0] / 2) if isUKS else eigenvectors_2.shape[0]
+            if not 1 <= lowest_orbital <= highest_orbital <= nmo_spin:
+                raise ValueError(F"orbital window [{lowest_orbital}, {highest_orbital}] does "
+                                 F"not fit the {nmo_spin} MOs per spin read from the molden "
+                                 F"file (1-based) - increase ADDED_MOS in the template or "
+                                 F"adjust lowest_orbital/highest_orbital")
 
             if isUKS:
                 # Alpha spin channel
