@@ -172,9 +172,8 @@ def cube_file_names_cp2k(params):
                 cube_file_names.append(cube_file_name_of_band_j)
 
             elif software == "dftb+":
-                print("\nReading cubefiles from spin-polarized calculations not currently available")
-                print("Exiting now")
-                sys.exit(0)
+                raise ValueError("reading cubefiles from spin-polarized dftb+ "
+                                 "calculations is not currently available")
 
         else:
 

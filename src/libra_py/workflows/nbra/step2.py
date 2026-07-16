@@ -142,8 +142,7 @@ def run(params):
         if verbosity > 0:
             print("same as 2 + 1, followed by the projections  \n")
     else:
-        print("Error: nac_method must be one of the values in [0,1,2,3]  \n")
-        sys.exit(0)
+        raise ValueError("nac_method must be one of the values in [0, 1, 2, 3]")
 
     # Initialize variables
     curr_index = start_indx - 1
@@ -216,9 +215,8 @@ def run(params):
                         print("Computing various properies of the spin-diabatic (non-relativistic) KS orbitals using multiple K-points")
                         print("Warning: This capabilitiy is under development and not fully tested")
 
-                    print("This capability is temporarily disabled. Please use only a single K-point for now")
-                    print("Exiting now")
-                    sys.exit(0)
+                    raise ValueError("multiple K-points are temporarily disabled - "
+                                     "use a single K-point")
                     # compute_properties.compute_properties_general(params, es_curr, es_next, curr_index)
 
                 if compute_Hprime:
@@ -248,8 +246,7 @@ def run(params):
                     # compute_properties.compute_properties_adi_gamma(params, es_curr, es_next, curr_index)
 
                 else:
-                    print("Multiple k-points scheme with SOC is not yet implemented")
-                    sys.exit(0)
+                    raise ValueError("multiple k-points with SOC are not yet implemented")
 
             # Checking if spin-adiabtic and spin-diabatic cases were using the same sized P\plane wave basis
             if nac_method == 3:
@@ -266,8 +263,8 @@ def run(params):
                 info_wfc1 = QE_methods.read_qe_wfc_info("%s/curr1/x1.export/wfc.1" % wd, 0)
 
                 if info_wfc0["ngw"] != info_wfc1["ngw"]:
-                    print("Error: The number of plane waves of diabatic and adiabatic functions should be equal")
-                    sys.exit(0)
+                    raise ValueError("the numbers of plane waves of the diabatic and "
+                                     "adiabatic functions must be equal")
                 else:
                     print("Pass: The number of plane waves of diabatic and adiabatic functions are equal")
 

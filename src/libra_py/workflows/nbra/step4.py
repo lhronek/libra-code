@@ -602,9 +602,9 @@ def run(H_vib, params):
 
     elif params["decoherence_constants"] == 1 or params["decoherence_constants"] == 21:
         if params["decoherence_times"].num_of_cols != nstates:
-            print("Error: dimensions of the input decoherence times matrix are not consistent with \
-                   the dimensions of the Hamiltonian matrices (the number of states). Exiting...\n")
-            sys.exit(0)
+            raise ValueError("dimensions of the input decoherence times matrix are not "
+                             "consistent with the dimensions of the Hamiltonian matrices "
+                             "(the number of states)")
         else:
             tau = MATRIX(params["decoherence_times"])
             dephasing_rates = dectim.decoherence_times2rates(tau)

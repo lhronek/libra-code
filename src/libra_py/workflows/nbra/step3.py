@@ -447,13 +447,11 @@ def get_Lowdin(S):
 
     is_inv = FullPivLU_rank_invertible(S_aa)
     if is_inv[1] != 1:
-        print("Error, S_aa is not invertible, Exiting Program")
-        sys.exit(0)
+        raise ValueError("S_aa is not invertible")
 
     is_inv = FullPivLU_rank_invertible(S_bb)
     if is_inv[1] != 1:
-        print("Error, S_bb is not invertible, Exiting Program")
-        sys.exit(0)
+        raise ValueError("S_bb is not invertible")
 
     S_aa_half = CMATRIX(nstates, nstates)
     S_aa_i_half = CMATRIX(nstates, nstates)
@@ -553,9 +551,8 @@ def get_Lowdin_general(S):
     nstates = int(S.num_of_cols)  # division by 2 because it is a super-matrix
     is_inv = FullPivLU_rank_invertible(S)
     if is_inv[1] != 1:
-        print(F"Error, S is not invertible, true rank = { is_inv[0] }. Exiting program...\n")
         S.show_matrix()
-        sys.exit(0)
+        raise ValueError(F"S is not invertible, true rank = { is_inv[0] }")
     S_half = CMATRIX(nstates, nstates)
     S_i_half = CMATRIX(nstates, nstates)
     sqrt_matrix(S, S_half, S_i_half)
@@ -1214,8 +1211,7 @@ def sac_matrices(coeff, basis, S_ks):
         if norm.get(i, i) > 0.0:
             P2C.scale(-1, i, 1.0 / math.sqrt(norm.get(i, i)))
         else:
-            print("Error in CHI normalizaiton: some combination gives zero norm\n")
-            sys.exit(0)
+            raise ValueError("CHI normalization: some combination gives zero norm")
 
     return P2C
 
@@ -1480,11 +1476,9 @@ def run(S_dia_ks, St_dia_ks, E_dia_ks, params):
     # ====== Generic sanity checks ===============
     if do_output:
         if (ndata) != len(params["output_set_paths"]):
-            print("Error: The number of output sets paths should be the same as the number of data sets\n")
-            print("ndata = ", ndata)
-            print("len(params[\"output_set_paths\"]) = ", len(params["output_set_paths"]))
-            print("Exiting...\n")
-            sys.exit(0)
+            raise ValueError(F"the number of output set paths "
+                             F"({len(params['output_set_paths'])}) must equal the "
+                             F"number of data sets ({ndata})")
 
     # ====== Calculations  ===============
     H_vib = []
@@ -1607,11 +1601,9 @@ def pyxaid2libra(Hvib_pyxaid, params):
     # ====== Generic sanity checks ===============
     if do_output:
         if (ndata) != len(params["output_set_paths"]):
-            print("Error: The number of output sets paths should be the same as the number of data sets\n")
-            print("ndata = ", ndata)
-            print("len(params[\"output_set_paths\"]) = ", len(params["output_set_paths"]))
-            print("Exiting...\n")
-            sys.exit(0)
+            raise ValueError(F"the number of output set paths "
+                             F"({len(params['output_set_paths'])}) must equal the "
+                             F"number of data sets ({ndata})")
 
     # ====== Calculations  ===============
     H_vib = []

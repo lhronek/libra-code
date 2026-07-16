@@ -152,9 +152,8 @@ def ovlp_arb(_SD1, _SD2, S, active_space=None, verbose=False):
 
     res = 0.0 + 0j
     if len(SD1) != len(SD2):
-        print("Trying to compute an overlap of the SDs with different number of electrons")
-        print("Exiting...")
-        sys.exit(0)
+        raise ValueError("trying to compute an overlap of SDs with different "
+                         "numbers of electrons")
 
         
     # Apply the determinant formula
