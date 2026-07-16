@@ -34,6 +34,7 @@ import math
 import os
 import time
 import glob
+import hashlib
 import numpy as np
 from libra_py.workflows.nbra.mp_context import MP_CTX as _MP_CTX
 from scipy.linalg import fractional_matrix_power
@@ -657,6 +658,45 @@ def apply_orthonormalization_scipy(S_1, S_2, St):
     S_1_orthonormalized = np.linalg.multi_dot([U1.transpose(), S_1, U1])
 
     return St_orthonormalized, S_1_orthonormalized
+
+
+_LOWDIN_CACHE = {"step": None, "digest": None, "U": None}
+
+
+def _orthonormalization_mode(value):
+    """Resolves the tri-state `apply_orthonormalization` value (same
+    vocabulary as cp2k_compute_adi): True -> "lowdin", False/None -> "none",
+    and the strings "lowdin", "lowdin_cached" and "none" pass through.
+    """
+    if value is True:
+        return "lowdin"
+    if value is False or value is None:
+        return "none"
+    if value in ("lowdin", "lowdin_cached", "none"):
+        return value
+    raise ValueError(
+        F"apply_orthonormalization must be True/'lowdin', 'lowdin_cached' or False/'none', got {value!r}")
+
+
+def lowdin_digest(S, tag=""):
+    """Content key for the Lowdin factor caches (step3's per-process
+    slot, the driver's per-trajectory dicts)."""
+    return hashlib.blake2b(np.ascontiguousarray(S).tobytes() + tag.encode(), digest_size=16).digest()
+
+
+def _lowdin_cache_take(step, digest):
+    """The previous step's ket factor, when it provably is this step's bra
+    factor (the expected step index AND the content digest both match);
+    None otherwise. Hits occur on every step after the first in a serial
+    loop and within each contiguous Pool.starmap chunk; a miss just means
+    the factor is recomputed."""
+    if _LOWDIN_CACHE["step"] == step and _LOWDIN_CACHE["digest"] == digest:
+        return _LOWDIN_CACHE["U"]
+    return None
+
+
+def _lowdin_cache_put(step, digest, U):
+    _LOWDIN_CACHE.update(step=step, digest=digest, U=U)
 
 
 def make_active_space(num_occ,
@@ -1991,7 +2031,17 @@ def run_step3_ks_nacs_libint(params):
             * **params['sorting_type']** (string): it performs sorting the elements of the overlap matrices
                 either by their 'energy' or 'identity'.
             * **params['apply_phase_correction']** (bool): a True or False flag for performing the phase-correction
-            * **params['apply_orthonormalization']** (bool): a True or False flag for performing orthonormalization
+            * **params['apply_orthonormalization']**: orthonormalization of the KS overlaps
+                (same vocabulary as cp2k_compute_adi):
+                    - "lowdin" or True: Lowdin-orthonormalize every step (two fractional
+                      matrix powers per step)
+                    - "lowdin_cached" [default]: bit-identical result, cheaper - the ket factor
+                      S_2^{-1/2} is carried to the next step in a per-process cache (one
+                      fractional matrix power per step serially; also hits inside
+                      contiguous Pool chunks). This stage historically always
+                      orthonormalized, whatever the flag said - that output is preserved
+                      exactly.
+                    - "none" or False: skip - raw St/S pass through
             * **params['do_state_reordering']** (integer): the value for performing the state reordering
                 the vlaues it takes are:
                     - 0: no state reordering - same as in Pyxaid
@@ -2010,11 +2060,12 @@ def run_step3_ks_nacs_libint(params):
     default_params = {'nprocs': 2, 'path_to_npz_files': os.getcwd() + '/res',
                       'path_to_save_ks_Hvibs': os.getcwd() + '/res-ks',
                       'time_step': 1.0, 'start_time': 0, 'finish_time': 1,
-                      'apply_phase_correction': False, 'apply_orthonormalization': False,
+                      'apply_phase_correction': False, 'apply_orthonormalization': 'lowdin_cached',
                       'do_state_reordering': 0, 'state_reordering_alpha': 0, 'es_software': 'cp2k',
                       'nac_algo': 0, 'blas_num_threads': None
                       }
     comn.check_input(params, default_params, critical_params)
+    params['apply_orthonormalization'] = _orthonormalization_mode(params['apply_orthonormalization'])
     if params['es_software'].lower() == 'cp2k':
         sample_logfile = glob.glob(params['logfile_directory'] + '/*.log')[0]
         params['homo_index'] = CP2K_methods.read_homo_index(sample_logfile)
@@ -2193,8 +2244,24 @@ def _orthonormalize_ks_overlaps(step, params):
     E_2 = sp.load_npz(F'{params["path_to_npz_files"]}/E_ks_{step+1}.npz')[active_space, :][:, active_space]
     # The mid-point energies
     E_step = 0.5 * (E_1 + E_2)
-    # Applying orthonormaliztion
-    St_step, S_step = apply_orthonormalization_scipy(S_1.todense(), S_2.todense(), St_step.todense())
+    # Applying orthonormalization: "lowdin"/True (the historical behavior of this
+    # stage), "lowdin_cached" (default; identical result - the ket factor is carried
+    # to the next step, one fractional matrix power per step instead of two), or
+    # "none"/False (raw pass-through)
+    mode = _orthonormalization_mode(params.get('apply_orthonormalization', 'lowdin_cached'))
+    if mode == "none":
+        St_step, S_step = St_step.todense(), S_1.todense()
+    elif mode == "lowdin_cached":
+        S_1d, S_2d = S_1.todense(), S_2.todense()
+        U1 = _lowdin_cache_take(step, lowdin_digest(S_1d))
+        if U1 is None:
+            U1 = get_Lowdin_scipy(S_1d)
+        U2 = get_Lowdin_scipy(S_2d)
+        _lowdin_cache_put(step + 1, lowdin_digest(S_2d), U2)
+        St_step = np.linalg.multi_dot([U1.transpose(), St_step.todense(), U2])
+        S_step = np.linalg.multi_dot([U1.transpose(), S_1d, U1])
+    else:
+        St_step, S_step = apply_orthonormalization_scipy(S_1.todense(), S_2.todense(), St_step.todense())
 
     St_step_sparse = sp.csc_matrix(St_step)
     S_step_sparse = sp.csc_matrix(S_step)
@@ -2231,7 +2298,11 @@ def run_step3_sd_nacs_libint(params):
             * **params['sorting_type']** (string): it performs sorting the elements of the overlap matrices
                                                    either by their 'energy' or 'identity'.
             * **params['apply_phase_correction']** (bool): a True or False flag for performing the phase-correction
-            * **params['apply_orthonormalization']** (bool): a True or False flag for performing orthonormalization
+            * **params['apply_orthonormalization']**: orthonormalization of the SD-level
+                overlaps (same vocabulary as cp2k_compute_adi): "lowdin"/True,
+                "lowdin_cached" [default] (identical to "lowdin"; the ket factor is carried to
+                the next step in a per-process cache - one fractional matrix power per
+                step serially, hits inside contiguous Pool chunks too), "none"/False
             * **params['npz_file_ks_homo_index']** (integer): the KS HOMO index of the raw npz files.
             * **params['is_many_body']** (bool): a True or False flag for computing the overlaps and energies
                                                  for many-body states
@@ -2278,7 +2349,7 @@ def run_step3_sd_nacs_libint(params):
                       'path_to_save_ks_Hvibs': os.getcwd() + '/res-ks',
                       'time_step': 1.0, 'start_time': 0, 'finish_time': 1,
                       'sorting_type': 'energy', 'apply_phase_correction': False, 'spin_adapted': False,
-                      'apply_orthonormalization': False, 'do_state_reordering': 0,
+                      'apply_orthonormalization': 'lowdin_cached', 'do_state_reordering': 0,
                       'state_reordering_alpha': 0, 'is_many_body': False, 'num_occ_states': 1,
                       'num_occ_alpha': 1, 'num_unocc_alpha': 1,
                       'num_occ_beta': 1, 'num_unocc_beta': 1, 'active_space_num_occ_orbitals': 0,
@@ -2292,6 +2363,7 @@ def run_step3_sd_nacs_libint(params):
 
     # Check input, set output dirs
     comn.check_input(params, default_params, critical_params)
+    params['apply_orthonormalization'] = _orthonormalization_mode(params['apply_orthonormalization'])
     res_dir_1 = params['path_to_npz_files']
     res_dir_2 = params['path_to_save_sd_Hvibs']
 
@@ -2804,7 +2876,26 @@ def _compute_sd_overlaps(step, params):
     # Computing the overlaps for SDs
     t2 = time.time()
     
-    if params['apply_orthonormalization']:
+    mode = _orthonormalization_mode(params.get('apply_orthonormalization', 'lowdin_cached'))
+    if mode == "lowdin_cached":
+        # bra factor: reuse the previous step's ket factor when it provably
+        # matches (expected step index + digest of the source matrix/SD list)
+        U1 = _lowdin_cache_take(step, lowdin_digest(s_ks_1, repr(sd_states_reindexed_sorted[step])))
+        if U1 is None:
+            s_sd_1 = ovlp(
+                sd_states_reindexed_sorted[step],
+                sd_states_reindexed_sorted[step],
+                s_ks_1,
+                None)
+            U1 = get_Lowdin_scipy(s_sd_1.real)
+        s_sd_2 = ovlp(
+            sd_states_reindexed_sorted[step + 1],
+            sd_states_reindexed_sorted[step + 1],
+            s_ks_2,
+            None)
+        U2 = get_Lowdin_scipy(s_sd_2.real)
+        _lowdin_cache_put(step + 1, lowdin_digest(s_ks_2, repr(sd_states_reindexed_sorted[step + 1])), U2)
+    elif mode == "lowdin":
         s_sd_1 = ovlp(
             sd_states_reindexed_sorted[step],
             sd_states_reindexed_sorted[step],
@@ -2821,7 +2912,10 @@ def _compute_sd_overlaps(step, params):
                  st_ks,
                  None)
 
-    if params['apply_orthonormalization']:
+    if mode == "lowdin_cached":
+        print('Applying orthonormalization for SDs for step', step)
+        st_sd = np.linalg.multi_dot([U1.transpose(), st_sd.real, U2])
+    elif mode == "lowdin":
         print('Applying orthonormalization for SDs for step', step)
         st_sd, s_sd = apply_orthonormalization_scipy(s_sd_1.real, s_sd_2.real, st_sd.real)
     if params['spin_adapted']:
