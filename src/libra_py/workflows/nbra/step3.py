@@ -2793,7 +2793,7 @@ def _compute_sd_overlaps(step, params):
                      [active_space, :][:, active_space]).real
     s_ks_1 = np.array(sp.load_npz(F'{res_dir_1}/S_ks_{step+start_time}.npz').todense()
                       [active_space, :][:, active_space]).real
-    s_ks_2 = np.array(sp.load_npz(F'{res_dir_1}/S_ks_{step+start_time}.npz').todense()
+    s_ks_2 = np.array(sp.load_npz(F'{res_dir_1}/S_ks_{step+start_time+1}.npz').todense()
                       [active_space, :][:, active_space]).real
     # This is not needed anymore as we use the numpy approach
     # that works with numpy array of the matrices below
