@@ -556,10 +556,9 @@ void check_input(boost::python::dict params, boost::python::dict default_params,
         >>> check_input(params, default_params, critical_params)
         >>> my_function(data, params)
 
-        will crash:
+        will raise:
 
-        >>> ERROR: The critical parameter Name must be defined!
-        >>> Exiting now...
+        >>> RuntimeError: The critical parameter Name must be defined!
 
 
 ******************************************************************/
@@ -572,8 +571,9 @@ void check_input(boost::python::dict params, boost::python::dict default_params,
       key = boost::python::extract<std::string>(critical_params[i]);
 
       if(!params.has_key(key)){
-          std::cout<<"ERROR: The critical parameter "<< key <<" must be defined!\nExiting now...\n";
-          exit(0);
+          // exit(0) reported SUCCESS to the shell and killed Pool workers and
+          // notebooks; a thrown exception reaches Python as a RuntimeError
+          throw std::runtime_error("The critical parameter " + key + " must be defined!");
       }
   }
 
