@@ -409,7 +409,31 @@ def reindex_cp2k_sd_states(
                 [ [68,69], "alp" ] --> [1, -1, 3, -2]
                 [ [68,69], "bet" ] --> [1, -1, 2, -3]
 
+    Raises ValueError when the HOMO or any SD configuration lies outside
+    ks_orbital_indicies - the silent alternatives were treating the first
+    window orbital as the HOMO (the .index search fell back to 0) and
+    building duplicate/garbage determinants from unmapped orbitals.
     """
+
+    orbs = set(ks_orbital_indicies)
+    if ks_orbital_homo_index not in orbs:
+        raise ValueError(F"HOMO index {ks_orbital_homo_index} is not inside "
+                         F"ks_orbital_indicies [{ks_orbital_indicies[0]}.."
+                         F"{ks_orbital_indicies[-1]}] - the orbital window must "
+                         F"bracket the HOMO")
+    if sd_format == 1 and ks_beta_homo_index not in orbs:
+        raise ValueError(F"beta HOMO index {ks_beta_homo_index} is not inside "
+                         F"ks_orbital_indicies [{ks_orbital_indicies[0]}.."
+                         F"{ks_orbital_indicies[-1]}] - the orbital window must "
+                         F"bracket the beta HOMO")
+    for sd in sd_basis_states:
+        for o in sd[0]:
+            if o not in orbs:
+                raise ValueError(F"SD configuration {sd[0]} references orbital {o} "
+                                 F"outside ks_orbital_indicies "
+                                 F"[{ks_orbital_indicies[0]}..{ks_orbital_indicies[-1]}] "
+                                 F"- widen the orbital window "
+                                 F"(lowest_orbital/highest_orbital)")
 
     # print("\nEntered reindex_cp2k_sd_states function")
     # print("ks_orbital_homo_index", ks_orbital_homo_index)
