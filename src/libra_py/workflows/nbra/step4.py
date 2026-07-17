@@ -41,7 +41,6 @@
 """
 
 import libra_py.fit as fit
-import libra_py.dynamics.tsh.recipes as recipes
 import libra_py.dynamics.tsh.compute as tsh_dynamics
 import libra_py.units as units
 import libra_py.tsh_stat as tsh_stat
@@ -764,6 +763,64 @@ def run_tsh(common_params, compute_model, model_params):
     print(F"Calculation time = {end - start} seconds")
 
 
+def _set_method(params, ham_rep=0, is_nbra=0, method=0):
+    """
+    Translates the (ham_rep, is_nbra, method) selectors into the corresponding
+    dyn_params keys. This restores what recipes.set_method did before the
+    recipes module became a package of standalone recipe modules (which has no
+    set_method), leaving make_var_pool unable to run.
+
+    Args:
+        params ( dict ): the parameters dictionary which will be modified
+
+        ham_rep ( int ): 0 - the adiabatic Hamiltonian is computed via the
+            diabatic one [ default ]; 1 - the adiabatic properties are
+            available directly
+
+        is_nbra ( int ): -1 - custom (leave the keys alone); 0 - non-NBRA;
+            1 - file-based NBRA; 2 - on-the-fly NBRA
+
+        method ( int ): -1 - custom; 0 - FSSH; 1 - IDA; 2 - mSDM; 3 - DISH;
+            21 - mSDM, dephasing-informed; 31 - DISH, dephasing-informed
+    """
+
+    params.update({"rep_ham": ham_rep})
+
+    if is_nbra == -1:    # custom
+        pass
+    elif is_nbra == 0:   # non-NBRA
+        params.update({"force_method": 1, "rep_force": 1})    # state-specific forces, in the adiabatic rep
+        params.update({"nac_update_method": 1})               # NACs from derivative couplings and momenta
+        params.update({"time_overlap_method": 0})             # on-the-fly time-overlaps
+        params.update({"hop_acceptance_algo": 20, "momenta_rescaling_algo": 200})  # Tully-style rescaling
+    elif is_nbra == 1:   # file-based NBRA
+        params.update({"force_method": 0})                    # don't compute forces
+        params.update({"nac_update_method": 0})               # NACs defined directly
+        params.update({"time_overlap_method": 1})             # time-overlaps from external sources
+        params.update({"hop_acceptance_algo": 31, "momenta_rescaling_algo": 0})  # Boltzmann acceptance, no rescaling
+    elif is_nbra == 2:   # on-the-fly NBRA
+        params.update({"force_method": 1, "rep_force": 1})    # state-specific forces
+        params.update({"enforce_state_following": 0})
+        params.update({"nac_update_method": 1})
+        params.update({"time_overlap_method": 0})
+        params.update({"hop_acceptance_algo": 31, "momenta_rescaling_algo": 0})
+
+    if method == -1:     # custom
+        pass
+    elif method == 0:    # FSSH
+        params.update({"tsh_method": 0, "decoherence_algo": -1, "dephasing_informed": 0})
+    elif method == 1:    # IDA
+        params.update({"tsh_method": 0, "decoherence_algo": 1, "dephasing_informed": 0})
+    elif method == 2:    # mSDM
+        params.update({"tsh_method": 0, "decoherence_algo": 0, "dephasing_informed": 0})
+    elif method == 3:    # DISH
+        params.update({"tsh_method": 3, "decoherence_algo": -1, "dephasing_informed": 0})
+    elif method == 21:   # mSDM, dephasing-informed
+        params.update({"tsh_method": 0, "decoherence_algo": 0, "dephasing_informed": 1})
+    elif method == 31:   # DISH, dephasing-informed
+        params.update({"tsh_method": 3, "decoherence_algo": -1, "dephasing_informed": 1})
+
+
 def make_var_pool(dyn_params, compute_model, model_params, _rnd,
                   method_names_map={0: "FSSH", 1: "IDA", 2: "mSDM", 3: "DISH", 21: "mSDM2", 31: "DISH2"},
                   init_states=[1], tsh_methods=[0], batches=list(range(10)), ham_rep=1, is_nbra=1):
@@ -833,7 +890,7 @@ def make_var_pool(dyn_params, compute_model, model_params, _rnd,
                 prms["istate"] = [1, istate]  # adiabatic state `istate`; Recall index from 0
 
                 # This instruction is made backward-compatible with the commented block
-                recipes.set_method(prms, ham_rep, is_nbra, method)
+                _set_method(prms, ham_rep, is_nbra, method)
 
                 var_pool.append((prms, compute_model, mdl_prms))
 
