@@ -1009,6 +1009,17 @@ def limit_active_space(params):
     os.system(f'mkdir {params["path_to_save_npz_files"]}')
     # currently working only for restricted KS
     homo_index = CP2K_methods.read_homo_index(sample_logfile, isUKS=False)
+    if not l1 <= homo_index < h1:
+        raise ValueError(F"the stored orbital window [{l1}, {h1}] does not bracket the "
+                         F"HOMO ({homo_index}) - lowest_orbital/highest_orbital must be "
+                         F"the step2 window")
+    if not 1 <= nocc <= homo_index - l1 + 1:
+        raise ValueError(F"num_occ_orbitals={nocc} but the stored window holds only "
+                         F"{homo_index - l1 + 1} occupied orbitals - a negative slice "
+                         F"start would silently wrap to the end of the matrices")
+    if not 1 <= nunocc <= h1 - homo_index:
+        raise ValueError(F"num_unocc_orbitals={nunocc} but the stored window holds only "
+                         F"{h1 - homo_index} virtuals above the HOMO")
     l2 = homo_index - nocc + 1
     h2 = homo_index + nunocc
     l2_index = l2 - l1
