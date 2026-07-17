@@ -18,7 +18,28 @@
 
 """
 
+import hashlib
+import pickle
+
 import numpy as np
+
+
+def carried_state_digest(state):
+    """
+    Content key for quantities carried between calls of a per-trajectory driver
+    (e.g. the Lowdin factor of the previous step, stored together with a digest
+    of the step data it was derived from). Compare the stored digest against the
+    digest of this call's previous-step data before reusing the carried quantity:
+    a mismatch means the params state went out of sync between calls.
+
+    Args:
+        state: any picklable object (arrays, nested lists/dicts of step data)
+
+    Returns:
+        bytes: a 16-byte content digest of the state
+    """
+    return hashlib.blake2b(pickle.dumps(state, protocol=4), digest_size=16).digest()
+
 
 def lowdin_inverse_sqrt(S, thresh=1e-10):
     """

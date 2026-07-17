@@ -635,7 +635,9 @@ def mopac_compute_adi(q, params, full_id):
 
         s_ci_inv_prev : dict
             Trajectory-indexed storage of inverse square roots of CI
-            overlap matrices used for Löwdin orthogonalization.
+            overlap matrices used for Löwdin orthogonalization, stored
+            together with a content digest tying each factor to the step
+            data it was derived from.
 
         is_first_time : dict
             Trajectory-indexed flags indicating whether the current call
@@ -856,7 +858,12 @@ def mopac_compute_adi(q, params, full_id):
         if is_first_time:
             s_ci_inv_prev = copy.deepcopy(s_ci_inv_curr)
         else:
-            s_ci_inv_prev = params["s_ci_inv_prev"][itraj]
+            stored = params["s_ci_inv_prev"][itraj]
+            if stored["digest"] != ortho.carried_state_digest((MO_prev, data_prev)):
+                raise RuntimeError(F"in mopac_compute_adi - the stored Lowdin factor for trajectory {itraj} was "
+                                   F"not built alongside this call's previous-step MOs and data: the carried "
+                                   F"params state is out of sync between calls")
+            s_ci_inv_prev = stored["s_ci_inv"]
 
         s_ci = s_ci_inv_curr @ s_ci @ s_ci_inv_curr
         st_ci = s_ci_inv_prev @ st_ci @ s_ci_inv_curr
@@ -890,7 +897,8 @@ def mopac_compute_adi(q, params, full_id):
     # ================= Store state =================
     params["MO_prev"][itraj] = MO_curr.copy()
     params["data_prev"][itraj] = copy.deepcopy(data_curr)
-    params["s_ci_inv_prev"][itraj] = copy.deepcopy(s_ci_inv_curr)
+    params["s_ci_inv_prev"][itraj] = {"digest": ortho.carried_state_digest((MO_curr, data_curr)),
+                                      "s_ci_inv": copy.deepcopy(s_ci_inv_curr)}
     params["is_first_time"][itraj] = False
 
     return obj
