@@ -34,10 +34,8 @@ import math
 import os
 import time
 import glob
-import hashlib
 import numpy as np
 from libra_py.workflows.nbra.mp_context import MP_CTX as _MP_CTX
-from scipy.linalg import fractional_matrix_power
 import scipy.sparse as sp
 if sys.platform == "cygwin":
     from cyglibra_core import *
@@ -51,6 +49,9 @@ import libra_py.units as units
 import libra_py.data_read as data_read
 import libra_py.data_conv as data_conv
 import libra_py.hungarian as hungarian
+from libra_py.orthogonalizations import (get_Lowdin_scipy,
+                                         apply_orthonormalization_scipy,
+                                         lowdin_digest)
 
 
 def get_step2_data(_params):
@@ -599,52 +600,6 @@ def apply_orthonormalization_general(S, St):
         push_submatrix(S[i], S_normalized, list(range(0, nstates)), list(range(0, nstates)))
 
 
-def get_Lowdin_scipy(S):
-    """
-    This function computes the inverse square root of a matrix S^{-1/2}.
-
-    Args:
-
-        S (numpy array): Overlap matrix in form of a numpy array.
-
-    Returns:
-
-        S_inverse_square_root (numpy array): The inverse square root of S.
-    """
-    # Return the fractional matrix with the power of -1/2
-    S_inverse_square_root = fractional_matrix_power(S, -1 / 2)
-
-    return S_inverse_square_root
-
-
-def apply_orthonormalization_scipy(S_1, S_2, St):
-    """
-    This function applies orthonormalization for the overlap matrices.
-
-    Args:
-
-        S_1 (numpy array): The overlap matrix of time n.
-
-        S_2 (numpy array): The overlap matrix of time n+1.
-
-        St (numpy array): The time-overlap matrix.
-
-    Returns:
-
-        St_orthonormalized (numpy array): The orthonormalized St.
-
-        S_1_orthonormalized (numpy array): The orthonormalized S_1.
-
-    """
-    U1 = get_Lowdin_scipy(S_1)
-    U2 = get_Lowdin_scipy(S_2)
-
-    St_orthonormalized = np.linalg.multi_dot([U1.transpose(), St, U2])
-    S_1_orthonormalized = np.linalg.multi_dot([U1.transpose(), S_1, U1])
-
-    return St_orthonormalized, S_1_orthonormalized
-
-
 _LOWDIN_CACHE = {"step": None, "digest": None, "U": None}
 
 
@@ -661,12 +616,6 @@ def _orthonormalization_mode(value):
         return value
     raise ValueError(
         F"apply_orthonormalization must be True/'lowdin', 'lowdin_cached' or False/'none', got {value!r}")
-
-
-def lowdin_digest(S, tag=""):
-    """Content key for the Lowdin factor caches (step3's per-process
-    slot, the driver's per-trajectory dicts)."""
-    return hashlib.blake2b(np.ascontiguousarray(S).tobytes() + tag.encode(), digest_size=16).digest()
 
 
 def _lowdin_cache_take(step, digest):

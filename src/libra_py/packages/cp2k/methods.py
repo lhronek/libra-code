@@ -21,7 +21,7 @@ import os, sys, math, re, copy, time, glob, subprocess
 import numpy as np
 import scipy.sparse as sp
 import scipy.linalg
-from libra_py.workflows.nbra import step2_many_body
+from libra_py.workflows.nbra import mapping, step2_many_body
 import scipy.io as io
 import libra_py.citools.ci as ci
 
@@ -3534,8 +3534,6 @@ def sd_overlaps(sd_states, St_mo, S_mo_prev, S_mo_curr, orthonormalize=True,
     Returns:
         st_sd (nSD x nSD), s_sd_curr (nSD x nSD)
     """
-    from libra_py.workflows.nbra import mapping
-    from libra_py.workflows.nbra.step3 import apply_orthonormalization_scipy
     mode = orthonormalize
     if mode is True:
         mode = "lowdin"
@@ -3564,20 +3562,19 @@ def sd_overlaps(sd_states, St_mo, S_mo_prev, S_mo_curr, orthonormalize=True,
     s2 = sc[:, None] * ovlp(sd_states, sd_states,
                             _two_spinor(S_mo_curr)) * sc[None, :]
     if mode == "lowdin":
-        st, _ = apply_orthonormalization_scipy(s1, s2, st)
-        s2, _ = apply_orthonormalization_scipy(s2, s2, s2)
+        st, _ = ortho.apply_orthonormalization_scipy(s1, s2, st)
+        s2, _ = ortho.apply_orthonormalization_scipy(s2, s2, s2)
     elif mode == "lowdin_cached":
-        from libra_py.workflows.nbra.step3 import lowdin_digest, get_Lowdin_scipy
         i1 = None
-        if cache.get("digest") == lowdin_digest(S_mo_prev, repr(sd_states_prev) + kernel):
+        if cache.get("digest") == ortho.lowdin_digest(S_mo_prev, repr(sd_states_prev) + kernel):
             i1 = cache.get("s_ihalf")
         if i1 is None:
-            i1 = get_Lowdin_scipy(s1)
-        i2 = get_Lowdin_scipy(s2)
+            i1 = ortho.get_Lowdin_scipy(s1)
+        i2 = ortho.get_Lowdin_scipy(s2)
         st = np.linalg.multi_dot([i1.transpose(), st, i2])
         s2 = np.linalg.multi_dot([i2.transpose(), s2, i2])
         cache.update(s_ihalf=i2,
-                     digest=lowdin_digest(S_mo_curr, repr(sd_states) + kernel))
+                     digest=ortho.lowdin_digest(S_mo_curr, repr(sd_states) + kernel))
     return st, s2
 
 
