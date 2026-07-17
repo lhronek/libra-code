@@ -782,7 +782,9 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd):
 
 
             * **dyn_params["progress_frequency"]** ( double ):  at what intervals print out some "progress" messages. For
-                instance, if you have `nsteps = 100` and `progress_frequency = 0.1`, the code will notify you every 10 steps. [ default : 0.1 ]
+                instance, if you have `nsteps = 100` and `progress_frequency = 0.1`, the code will notify you every 10 steps.
+                Set it to 0 (or None) to disable the progress printout - e.g. for all but one of the parallel batches,
+                which otherwise all repeat the same " step= " counts. [ default : 0.1 ]
 
                 Note: this doesn't affect the frequency of the data saving to the file - at this point, we save the information for every
                 timestep

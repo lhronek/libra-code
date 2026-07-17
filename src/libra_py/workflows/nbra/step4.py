@@ -818,6 +818,11 @@ def make_var_pool(dyn_params, compute_model, model_params, _rnd,
 
                 prms = dict(dyn_params)
 
+                # only the first work item reports progress - every pooled
+                # dynamics otherwise repeats the same " step= " counts
+                if len(var_pool) > 0:
+                    prms["progress_frequency"] = 0
+
                 # independent, reproducible random stream per batch (drawn from
                 # the master generator) - replaces the wait_time stagger
                 prms["seed"] = int(_rnd.uniform(1.0, 2147483647.0))
