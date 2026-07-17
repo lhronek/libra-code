@@ -67,8 +67,8 @@ def create_odin_inp(params):
         if elt in max_l.keys():
             res = F"{res} {max_l[elt]} "
         else:
-            print(F"Element: {elt} is not present in the input `max_l` parameter\n max_l = {max_l}")
-            sys.exit(0)
+            raise RuntimeError(F"Element: {elt} is not present in the input `max_l` parameter. "
+                               F"max_l = {max_l}")
 
     return res
 
@@ -213,12 +213,10 @@ def do_step(snap, params):
         if os.path.isfile('EXC.DAT'):
             print("Found EXC.DAT")
         else:
-            print("\nCannot find the file EXC.DAT")
-            print(F"Hint: Current working directory is: {os.getcwd()}")
-            print("Is this where you expect the file EXC.DAT to be found?")
-            print("Check your dftb_in.hsd file to see if excited states calculation is enabled")
-            print("Exiting program...\n")
-            sys.exit(0)
+            raise RuntimeError(F"Cannot find the file EXC.DAT. Hint: Current working directory "
+                               F"is: {os.getcwd()}. Is this where you expect the file EXC.DAT "
+                               F"to be found? Check your dftb_in.hsd file to see if excited "
+                               F"states calculation is enabled")
 
         configuration_energies = []
         dominant_sd_transitions = []

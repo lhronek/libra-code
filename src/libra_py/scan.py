@@ -127,8 +127,7 @@ def make_path_xyz(R0, R1, E, s0=0.0, s1=1.0, npts=2, S0=0.0, S1=1.0):
 
     # Sanity check:
     if s1 <= s0:
-        print("Error: s0 (%5.3f) should be larger than s1(%5.3f)! Exiting...\n" % (s0, s1))
-        sys.exit(0)
+        raise RuntimeError("s0 (%5.3f) should be larger than s1(%5.3f)!" % (s0, s1))
 
     # Determine the number of points in the the actual path:
     ndof = R0.num_of_rows

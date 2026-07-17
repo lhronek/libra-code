@@ -585,16 +585,13 @@ def make_animation_1D(prefix, snaps, states, outname, plt_params,
     import imageio
 
     if data_type1 not in ["wfcr", "wfck"]:
-        print(F"data_type1 should be one of the following: \"wfcr\", \"wfck\" ")
-        sys.exit(0)
+        raise RuntimeError(F"data_type1 should be one of the following: \"wfcr\", \"wfck\"")
 
     if data_type2 not in ["real", "imag", "dens"]:
-        print(F"data_type2 should be one of the following: \"real\", \"imag\" \"dens\" ")
-        sys.exit(0)
+        raise RuntimeError(F"data_type2 should be one of the following: \"real\", \"imag\" \"dens\"")
 
     if data_type3 not in ["rep_0", "rep_1"]:
-        print(F"data_type3 should be one of the following: \"rep_0\", \"rep_1\" ")
-        sys.exit(0)
+        raise RuntimeError(F"data_type3 should be one of the following: \"rep_0\", \"rep_1\"")
 
     filenames = []
 
@@ -766,16 +763,13 @@ def make_animation_2D(prefix, snaps, state, outname, plt_params,
     import imageio
 
     if data_type1 not in ["wfcr", "wfck"]:
-        print(F"data_type1 should be one of the following: \"wfcr\", \"wfck\" ")
-        sys.exit(0)
+        raise RuntimeError(F"data_type1 should be one of the following: \"wfcr\", \"wfck\"")
 
     if data_type2 not in ["real", "imag", "dens"]:
-        print(F"data_type2 should be one of the following: \"real\", \"imag\" \"dens\" ")
-        sys.exit(0)
+        raise RuntimeError(F"data_type2 should be one of the following: \"real\", \"imag\" \"dens\"")
 
     if data_type3 not in ["rep_0", "rep_1"]:
-        print(F"data_type3 should be one of the following: \"rep_0\", \"rep_1\" ")
-        sys.exit(0)
+        raise RuntimeError(F"data_type3 should be one of the following: \"rep_0\", \"rep_1\"")
 
     filenames = []
 

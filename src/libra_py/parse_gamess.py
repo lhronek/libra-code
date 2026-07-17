@@ -61,9 +61,8 @@ def name2no(name):
         res = all_names.index(lname)
 
     else:
-        print("Error in name2no function: The element ", name, " is not defined")
-        print("Possible values are: ", all_names)
-        sys.exit(0)
+        raise RuntimeError(F"in name2no function: The element {name} is not defined. "
+                           F"Possible values are: {all_names}")
 
     return res
 

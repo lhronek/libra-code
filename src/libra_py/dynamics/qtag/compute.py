@@ -416,16 +416,14 @@ def propagate_basis(_q, _p, _alp, _s, _states, coeff, dyn_params, surf_pops):
             elif q_update_method == 1:
                 q_new_on_surf = q_on_surf + invM * mom * dt
             else:
-                print(F"q_update_method = {q_update_method} is not implemented. Exiting...\n")
-                sys.exit(0)
+                raise RuntimeError(F"q_update_method = {q_update_method} is not implemented.")
 
             if p_update_method == 0:
                 p_new_on_surf = MATRIX(p_on_surf)
             elif p_update_method == 1:
                 p_new_on_surf = MATRIX(mom)
             else:
-                print(F"p_update_method = {p_update_method} is not implemented. Exiting...\n")
-                sys.exit(0)
+                raise RuntimeError(F"p_update_method = {p_update_method} is not implemented.")
 
             if a_update_method == 0:
                 a_new_on_surf = MATRIX(a_on_surf)
@@ -434,8 +432,7 @@ def propagate_basis(_q, _p, _alp, _s, _states, coeff, dyn_params, surf_pops):
                 a_tmp.dot_product(a_on_surf, gmom)
                 a_new_on_surf = a_on_surf - 2.0 * dt * invM * a_tmp
             else:
-                print(F"a_update_method = {a_update_method} is not implemented. Exiting...\n")
-                sys.exit(0)
+                raise RuntimeError(F"a_update_method = {a_update_method} is not implemented.")
 
             s_new_on_surf = MATRIX(s_on_surf)
 
@@ -470,8 +467,7 @@ def propagate_basis(_q, _p, _alp, _s, _states, coeff, dyn_params, surf_pops):
 
     tmp = FullPivLU_rank_invertible(GG)
     if tmp[1] == 0:
-        print("GBF overlap matrix is not invertible.\n Exiting...\n")
-        sys.exit(0)
+        raise RuntimeError("GBF overlap matrix is not invertible.")
 
     invGG = CMATRIX(ntraj, ntraj)
     FullPivLU_inverse(GG, invGG)

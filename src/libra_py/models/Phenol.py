@@ -68,11 +68,9 @@ def Pollien_Arribas_Agostini(q, _params, full_id=None):
     nstates = params["nstates"]
 
     if ndof != 2:
-        print(F"The number of DOFs should be 2 but {ndof} is given\n")
-        sys.exit(0)
+        raise RuntimeError(F"The number of DOFs should be 2 but {ndof} is given")
     if nstates != 3:
-        print(F"The number of states should be 3, but {nstates} is given\n")
-        sys.exit(0)
+        raise RuntimeError(F"The number of states should be 3, but {nstates} is given")
 
     # Constants and parameters in atomic units
     D1e = 4.26302 * units.ev2Ha

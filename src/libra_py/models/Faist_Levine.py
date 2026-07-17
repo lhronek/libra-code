@@ -180,9 +180,8 @@ def Faist_Levine(q, params, full_id=None):
     ndof = q.num_of_rows  # the number of nuclear DOFs
 
     if ndof != 1:
-        print("Error: The Faist-Levine Hamiltonian takes 1 nuclear DOFs only. Given = ", ndof)
-        print("Exiting...")
-        sys.exit(0)
+        raise RuntimeError(F"The Faist-Levine Hamiltonian takes 1 nuclear DOFs only. "
+                           F"Given = {ndof}")
 
     A_cov = params["A_cov"]
     A_ion = params["A_ion"]

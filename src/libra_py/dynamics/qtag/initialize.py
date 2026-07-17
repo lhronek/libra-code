@@ -69,8 +69,7 @@ def gbfs(_params):
         ntraj, Q, P, A, S, states = gaussian(params)
 
     else:
-        print("Unrecognized option in basis initialization! Available options: 0 = grid, 1 = gaussian.\n Exiting...\n")
-        sys.exit(0)
+        raise RuntimeError("Unrecognized option in basis initialization! Available options: 0 = grid, 1 = gaussian.")
 
     return ntraj, Q, P, A, S, states
 
@@ -404,8 +403,7 @@ def coeffs(aQ, aP, aA, aS, astate, bQ, bP, bA, bS, bstate):
 
     tmp = FullPivLU_rank_invertible(GG)
     if tmp[1] == 0:
-        print("GBF overlap matrix is not invertible.\n Exiting...\n")
-        sys.exit(0)
+        raise RuntimeError("GBF overlap matrix is not invertible.")
 
     invGG = CMATRIX(ntraj, ntraj)
     FullPivLU_inverse(GG, invGG)

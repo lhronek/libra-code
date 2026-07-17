@@ -91,17 +91,14 @@ def autoconnect(R, MaxCoord, params):
     N = len(R)
 
     if len(MaxCoord) != N:
-        print("Error: The length of the MaxCoord list should be the same as the lenght of the R list!")
-        print("Exiting now...")
-        sys.exit(0)
+        raise RuntimeError("The length of the MaxCoord list should be the same as the lenght of the R list!")
 
     unsorted_pairs = []
     mapping = []
     periodicity = []
 
     if pbc_opt not in ["a", "b", "c", "ab", "ac", "bc", "abc", "none"]:
-        print("Error: pbc_opt ", pbc_opt, " is not recognized")
-        sys.exit(0)
+        raise RuntimeError(F"pbc_opt {pbc_opt} is not recognized")
 
     transl_a = [0]
     transl_b = [0]

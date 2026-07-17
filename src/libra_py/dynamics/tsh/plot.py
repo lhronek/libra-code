@@ -159,9 +159,8 @@ def add_energies(plt, hdf_file, plot_params_, property_type):
 
     possible_options = ["energies", "energy_fluctuations"]
     if property_type not in possible_options:
-        print(F"Error in add_energies - the property_type argument {property_type} is invalid\n")
-        print(F"Must be one of the following options: {possible_options}\nExiting")
-        sys.exit(0)
+        raise RuntimeError(F"in add_energies - the property_type argument {property_type} is "
+                           F"invalid. Must be one of the following options: {possible_options}")
 
     plot_params = common_defaults(plot_params_)
 
@@ -251,10 +250,9 @@ def add_trajectory_resolved_ham_property(plt, hdf_file, plot_params_, ham_proper
 
     possible_options = ["hvib_adi", "hvib_dia"]
     if ham_property_type not in possible_options:
-        print(F"Error in add_trajectory_resolved_ham_property - the ham_property_type argument\
-              {ham_property_type} is invalid\n")
-        print(F"Must be one of the following options: {possible_options}\nExiting")
-        sys.exit(0)
+        raise RuntimeError(F"in add_trajectory_resolved_ham_property - the ham_property_type "
+                           F"argument {ham_property_type} is invalid. Must be one of the "
+                           F"following options: {possible_options}")
 
     plot_params = common_defaults(plot_params_)
 
@@ -616,9 +614,8 @@ def add_populations(plt, hdf_file, plot_params_, pop_type):
     possible_options = ["D_dia_raw", "D_adi_raw", "SH_pop_raw", "D_dia", "D_adi", "SH_pop", "se_pop_adi", "se_pop_dia",
                         "sh_pop_adi", "sh_pop_dia", "sh_pop_adi_TR", "sh_pop_dia_TR", "mash_pop_adi", "mash_pop_dia"]
     if pop_type not in possible_options:
-        print(F"Error in add_populations - the pop_type argument {pop_type} is invalid\n")
-        print(F"Must be one of the following options: {possible_options}\nExiting")
-        sys.exit(0)
+        raise RuntimeError(F"in add_populations - the pop_type argument {pop_type} is invalid. "
+                           F"Must be one of the following options: {possible_options}")
 
     plot_params = common_defaults(plot_params_)
 
@@ -770,9 +767,8 @@ def add_coherence_indicators(plt, hdf_file, plot_params_, coh_type):
 
     possible_options = ["coherence_adi", "coherence_dia"]
     if coh_type not in possible_options:
-        print(F"Error in add_coherence_indicators - the coh_type argument {coh_type} is invalid\n")
-        print(F"Must be one of the following options: {possible_options}\nExiting")
-        sys.exit(0)
+        raise RuntimeError(F"in add_coherence_indicators - the coh_type argument {coh_type} is "
+                           F"invalid. Must be one of the following options: {possible_options}")
 
     plot_params = common_defaults(plot_params_)
 
@@ -849,9 +845,9 @@ def add_time_overlaps_projectors(plt, hdf_file, plot_params_, prop_type):
 
     possible_options = ["St", "projector"]
     if prop_type not in possible_options:
-        print(F"Error in add_time_overlaps_projectors - the prop_type argument {prop_type} is invalid\n")
-        print(F"Must be one of the following options: {possible_options}\nExiting")
-        sys.exit(0)
+        raise RuntimeError(F"in add_time_overlaps_projectors - the prop_type argument "
+                           F"{prop_type} is invalid. Must be one of the following options: "
+                           F"{possible_options}")
 
     plot_params = common_defaults(plot_params_)
 

@@ -107,8 +107,7 @@ def gen_bath_params(_params):
         mass = [1.0 for k in range(num_osc)]  # masses
 
     else:
-        print("Only spectral_density = 0, 1, or 2 are allowed for now. Exiting now...")
-        sys.exit(0)
+        raise RuntimeError("Only spectral_density = 0, 1, or 2 are allowed for now.")
 
     return omega, coupl, mass
 
@@ -192,8 +191,7 @@ def GLVC(q, _params, full_id=None):
     if (ndof == num_osc):
         pass
     else:
-        print(F"The coordinates input should have {ndof} = {num_osc} rows\nExiting now...\n")
-        sys.exit(0)
+        raise RuntimeError(F"The coordinates input should have {ndof} = {num_osc} rows")
 
     obj = tmp()
     obj.ham_dia = CMATRIX(nstates, nstates)

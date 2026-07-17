@@ -501,8 +501,7 @@ def convert_mtx(X, nx, ny):
     n_sq = len(X)
     n = int(math.sqrt(n_sq))
     if n * n != n_sq:
-        print("All the parameters should be input as lists on nstates x nstates objects. Exiting...\n")
-        sys.exit(0)
+        raise RuntimeError("All the parameters should be input as lists on nstates x nstates objects.")
 
     x = []
     for i in range(n):

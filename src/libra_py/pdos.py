@@ -129,12 +129,9 @@ def QE_pdos(prefix, emin, emax, de, projections, Ef, outfile_prefix, do_convolve
     """
 
     if nspin not in [1, 2, 4]:
-        print("Error: The value of nspin must be either 1, 2, or 4")
-        print("nspin = 1: Spin-unpolarized")
-        print("nspin = 2: Spin-polarized")
-        print("nspin = 4: Spin-non-colinear")
-        print("Exiting Now ...")
-        sys.exit(0)
+        raise RuntimeError("The value of nspin must be either 1, 2, or 4. nspin = 1: "
+                           "Spin-unpolarized; nspin = 2: Spin-polarized; nspin = 4: "
+                           "Spin-non-colinear")
 
     # ============= Dimensions  =================
 
@@ -452,10 +449,7 @@ def cp2k_pdos(_params):
     nspin = params["nspin"]
 
     if nspin not in [1]:
-        print("Error: The value of nspin must be 1")
-        print("nspin = 1: Spin-unpolarized")
-        print("Exiting Now ...")
-        sys.exit(0)
+        raise RuntimeError("The value of nspin must be 1. nspin = 1: Spin-unpolarized")
 
     # ============= Dimensions  =================
 

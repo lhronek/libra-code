@@ -47,10 +47,9 @@ def get_reordering(time_overlap):
 
     """
 
-    print("ERROR in libra_py.unavoided.get_reordering(...)")
-    print("The implementation contained a bug. It is now re-implemented in C++\
-          with the bug fixed. Please use the C++ version. Exiting...")
-    sys.exit(0)
+    raise RuntimeError("in libra_py.unavoided.get_reordering(...): the implementation "
+                       "contained a bug. It is now re-implemented in C++ with the bug "
+                       "fixed. Please use the C++ version.")
 
     # extract the indices where <phi_i(t)|phi_i(t+dt)> is not close to 1.
     S = CMATRIX(time_overlap)   # just a temporary working object

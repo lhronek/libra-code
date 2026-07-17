@@ -366,11 +366,9 @@ def read_mopac_orbital_info(params_):
     if os.path.isfile(out_file):
         pass
     else:
-        print(F"Cannot find the file {out_file}")
-        print(F"Hint: Current working directory is: {os.getcwd()}")
-        print("Is this where you expect the file detailed.out to be found?")
-        print("Exiting program...\n")
-        sys.exit(0)
+        raise RuntimeError(F"Cannot find the file {out_file}. Hint: Current working directory "
+                           F"is: {os.getcwd()}. Is this where you expect the file {out_file} "
+                           F"to be found?")
 
     f = open(out_file)
     output = f.readlines()
@@ -478,8 +476,7 @@ def read_mopac_orbital_info(params_):
 
     nci = len(ci_beg)
     if nci < params["nstates"]:
-        print("Not enough CI states requested in the INDO input line\nExiting...\n")
-        sys.exit(0)
+        raise RuntimeError("Not enough CI states requested in the INDO input line")
     else:
         nci = params["nstates"]
 

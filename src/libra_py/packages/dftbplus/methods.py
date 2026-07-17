@@ -189,18 +189,20 @@ def get_dftb_matrices(filename, act_sp1=None, act_sp2=None, correction=0, tol=0.
                 if tmp[j] == "NaN" or tmp[j] == "NAN":
                     z = 1000.0
                     # z = float(tmp[int(j%norbs2)]) #-1000.0
-                    sys.exit(0)
+                    raise RuntimeError(F"NaN encountered in {filename} at row {i}, col {j}")
                 else:
                     try:
                         z = float(tmp[j])
                         x.set(i,j, z)
                     except ValueError:
-                        sys.exit(0)
+                        raise RuntimeError(F"cannot convert '{tmp[j]}' to float in {filename} "
+                                           F"at row {i}, col {j}")
                         #z = 1000.0
                         # z = float(tmp[int(j%norbs2)]) #-1000.0
                         #pass
                     except TypeError:
-                        sys.exit(0)
+                        raise RuntimeError(F"cannot convert '{tmp[j]}' to float in {filename} "
+                                           F"at row {i}, col {j}")
                         #z = 1000.0
                         # z = float(tmp[int(j%norbs2)]) #-1000.0
                         #pass
@@ -462,11 +464,9 @@ def read_dftb_output(natoms, istate):
         # print("Found detailed.out")
         os.system(F"cp detailed.out detailed_{istate}.out")
     else:
-        print("\nCannot find the file detailed.out")
-        print(F"Hint: Current working directory is: {os.getcwd()}")
-        print("Is this where you expect the file detailed.out to be found?")
-        print("Exiting program...\n")
-        sys.exit(0)
+        raise RuntimeError(F"Cannot find the file detailed.out. Hint: Current working directory "
+                           F"is: {os.getcwd()}. Is this where you expect the file detailed.out "
+                           F"to be found?")
 
     ndof = 3 * natoms
     grad = MATRIX(ndof, 1)

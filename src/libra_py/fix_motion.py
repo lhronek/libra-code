@@ -571,17 +571,14 @@ def remove_rotation(S0, S1, verbose=0):
                 """
 
                 if math.fabs(U.Determinant()) < 1e-10:
-                    print("WARNING: 1) Problems with inversion: ", U.Determinant())
-                    sys.exit(0)
+                    raise RuntimeError(F"1) Problems with inversion: {U.Determinant()}")
 
                 dU = (U * U.T() - I)
                 if (dU * dU.T()).tr() > 1e-10:
-                    print("WARNING: 2) Problems with inversion: ", (dU * dU.T()).tr())
                     print("%8.5f  %8.5f  %8.5f " % (dU.xx, dU.xy, dU.xz))
                     print("%8.5f  %8.5f  %8.5f " % (dU.yx, dU.yy, dU.yz))
                     print("%8.5f  %8.5f  %8.5f " % (dU.zx, dU.zy, dU.zz))
-
-                    sys.exit(0)
+                    raise RuntimeError(F"2) Problems with inversion: {(dU * dU.T()).tr()}")
 
                 s = System(S1)
                 s.ROTATE_FRAGMENT(U, 1)

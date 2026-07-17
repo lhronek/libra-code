@@ -400,7 +400,7 @@ def trajectories(_plt_params):
     elif isinstance(which_states, list):
         which_states = sorted(which_states)
     else:
-        sys.exit('Error in which_states parameter in plt_params dict! Type should be list or "all"')
+        raise ValueError('which_states parameter in plt_params dict must be a list or "all"')
     if which_states == 'all':
         which_states = list(range(nstates))
 
@@ -435,7 +435,7 @@ def trajectories(_plt_params):
     elif isinstance(which_traj, list):
         which_traj = sorted(which_traj)
     else:
-        sys.exit('Error in which_traj parameter in plt_params dict! Type should be list or "all"')
+        raise ValueError('which_traj parameter in plt_params dict must be a list or "all"')
     if which_traj == 'all':
         which_traj = list(range(ntraj))
 

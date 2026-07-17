@@ -88,8 +88,7 @@ def Boltz_cl_prob(E, T):
 
     D = (2.0 / (math.sqrt(math.pi) * units.kB * T)) * x * math.exp(-x)
     if D > 1.0 or D < 0.0:
-        print("D = ", D)
-        sys.exit(0)
+        raise RuntimeError(F"D = {D} is outside the [0, 1] range")
     res = D
 
     return res
@@ -121,8 +120,7 @@ def Boltz_cl_prob_up(E, T):
 
     D = ERF(x) - math.sqrt(4.0 / math.pi) * x * math.exp(-x * x)
     if D > 1.0 or D < 0.0:
-        print("D = ", D)
-        sys.exit(0)
+        raise RuntimeError(F"D = {D} is outside the [0, 1] range")
     res = 1.0 - D
 
     return res

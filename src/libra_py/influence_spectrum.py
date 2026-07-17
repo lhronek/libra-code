@@ -111,8 +111,7 @@ def recipe1(data, params):
     elif data_type == 1:
         T, norm_acf, raw_acf = acf.acf_vec(data_new, dt, acf_type)
     else:
-        print("Error: data_type = ", data_type, " is not known\n")
-        sys.exit(0)
+        raise RuntimeError(F"data_type = {data_type} is not known")
 
     sz = len(T)
     for it in range(0, sz):

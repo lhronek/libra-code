@@ -72,9 +72,7 @@ def SSY(q, params, full_id):
 
     ndof = q.num_of_rows  # the number of nuclear DOFs
     if ndof != 2:
-        print("Error: The SSY Hamiltonian takes 2 nuclear DOFs only. Given = ", ndof)
-        print("Exiting...")
-        sys.exit(0)
+        raise RuntimeError(F"The SSY Hamiltonian takes 2 nuclear DOFs only. Given = {ndof}")
 
     obj = tmp()
     obj.ham_dia = CMATRIX(2, 2)

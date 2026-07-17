@@ -263,13 +263,12 @@ def file2matrix(filename, nrows, ncols):
         sz = len(tmp)
 
         if ncols * nrows != sz - 1:
-            print("ERROR in file2matrix: the dimentions of the matrix to be read do not agree with your expectations\n")
-            print("The number of columns per line should be %5i, but we've got %5i" % (ncols * nrows + 1, sz))
-            print("ncols = ", ncols)
-            print("nrows = ", nrows)
             print(item)
             print(tmp)
-            sys.exit(0)
+            raise RuntimeError("in file2matrix: the dimentions of the matrix to be read do not "
+                               "agree with your expectations. The number of columns per line "
+                               "should be %5i, but we've got %5i (ncols = %i, nrows = %i)"
+                               % (ncols * nrows + 1, sz, ncols, nrows))
 
         res_i = MATRIX(nrows, ncols)
         cnt = 1
@@ -313,14 +312,12 @@ def file2cmatrix(filename, nrows, ncols):
         sz = len(tmp)
 
         if 2 * ncols * nrows != sz - 1:
-            print("ERROR in file2cmatrix: the dimentions of the matrix to be read do not agree with your expectations\n")
-            print("The number of columns per line should be %5i, but we've got %5i" % (2 * ncols * nrows + 1, sz))
-            print("ncols = ", ncols)
-            print("nrows = ", nrows)
             print(item)
             print(tmp)
-
-            sys.exit(0)
+            raise RuntimeError("in file2cmatrix: the dimentions of the matrix to be read do not "
+                               "agree with your expectations. The number of columns per line "
+                               "should be %5i, but we've got %5i (ncols = %i, nrows = %i)"
+                               % (2 * ncols * nrows + 1, sz, ncols, nrows))
 
         res_i = CMATRIX(nrows, ncols)
         cnt = 1
