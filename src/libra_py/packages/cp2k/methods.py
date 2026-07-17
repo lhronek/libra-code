@@ -3651,6 +3651,116 @@ def ci_overlap_citools(St_mo, ci_prev, ci_curr, homo, lowest_orbital, highest_or
     return np.array(st_ci).real
 
 
+def make_overlap_deltat_input(template_file, csr_write=True):
+    """
+    Derives the OVERLAP_DELTAT companion input from a regular CP2K template,
+    so ao_overlap_method="cp2k" does not require a hand-written
+    es_overlap_deltat_* file.
+
+    Transformation rules (everything else - basis sets, XC, SCF, CELL, KINDs -
+    is kept verbatim so the overlap run matches the parent electronic
+    structure):
+        - GLOBAL RUN_TYPE -> ENERGY
+        - the &PROPERTIES (TDDFPT), &VDW_POTENTIAL and &MOTION sections are
+          dropped (dispersion diverges on the doubled geometry)
+        - the &EXCITED_STATES section is replaced by the OVERLAP_DELTAT switch
+          (added when the parent has none)
+        - the &S_CSR_WRITE print is added when `csr_write` (the section comes
+          from the Libra CP2K patch; set csr_write=False for stock CP2K, which
+          then prints the dense AO overlap into the log - slower but supported
+          by the same reader)
+        - CONNECTIVITY OFF is enforced in every &TOPOLOGY section (the doubled
+          xyz would otherwise trip the topology generation)
+
+    Args:
+        template_file ( string ): path to the parent CP2K input template
+        csr_write ( Boolean ): include the &S_CSR_WRITE print [ default: True ]
+
+    Returns:
+        string: the text of the derived OVERLAP_DELTAT input
+    """
+    with open(template_file) as f:
+        lines = f.read().splitlines()
+
+    DROP = ("PROPERTIES", "VDW_POTENTIAL", "MOTION")
+    have_csr = any("S_CSR_WRITE" in ln.upper() for ln in lines)
+    out = []
+    stack = []
+    skip_until = None      # stack depth at which a dropped section ends
+    did_excited = False
+
+    def emit_excited(indent):
+        out.append(F"{indent}&EXCITED_STATES T")
+        out.append(F"{indent}  OVERLAP_DELTAT T")
+        out.append(F"{indent}&END EXCITED_STATES")
+
+    def emit_csr(indent):
+        out.append(F"{indent}&S_CSR_WRITE ON")
+        out.append(F"{indent}  THRESHOLD 1.0E-12")
+        out.append(F"{indent}&END S_CSR_WRITE")
+
+    for ln in lines:
+        word = ln.strip()
+        up = word.upper()
+        indent = ln[:len(ln) - len(ln.lstrip())]
+        if up.startswith("&END"):
+            if skip_until is not None:
+                if len(stack) == skip_until:
+                    skip_until = None
+                stack.pop()
+                continue
+            if stack and stack[-1] == "DFT":
+                if not did_excited:
+                    emit_excited(indent + "  ")
+                    did_excited = True
+                if csr_write and not have_csr:
+                    out.append(F"{indent}  &PRINT")
+                    emit_csr(indent + "    ")
+                    out.append(F"{indent}  &END PRINT")
+                    have_csr = True
+            stack.pop()
+            out.append(ln)
+            continue
+        if up.startswith("&"):
+            name = up[1:].split()[0] if len(up) > 1 else ""
+            if skip_until is not None:
+                stack.append(name)
+                continue
+            if name in DROP or (name == "EXCITED_STATES" and "DFT" in stack):
+                stack.append(name)
+                skip_until = len(stack)
+                if name == "EXCITED_STATES" and not did_excited:
+                    emit_excited(indent)
+                    did_excited = True
+                continue
+            stack.append(name)
+            out.append(ln)
+            if name == "PRINT" and stack[-2:-1] == ["DFT"] and csr_write and not have_csr:
+                emit_csr(indent + "  ")
+                have_csr = True
+            if name == "TOPOLOGY":
+                pass    # CONNECTIVITY handled below via lookahead flag
+            continue
+        if skip_until is not None:
+            continue
+        if up.startswith("RUN_TYPE") and stack and stack[-1] == "GLOBAL":
+            out.append(F"{indent}RUN_TYPE ENERGY")
+            continue
+        out.append(ln)
+
+    # enforce CONNECTIVITY OFF in every &TOPOLOGY section
+    fixed = []
+    depth_topo = 0
+    topo_has_conn = "CONNECTIVITY" in "\n".join(out).upper()
+    for ln in out:
+        fixed.append(ln)
+        up = ln.strip().upper()
+        if up.startswith("&TOPOLOGY") and not topo_has_conn:
+            indent = ln[:len(ln) - len(ln.lstrip())]
+            fixed.append(F"{indent}  CONNECTIVITY OFF")
+    return "\n".join(fixed) + "\n"
+
+
 def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
                          lowest_orbital, highest_orbital, params):
     """
@@ -4194,11 +4304,13 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     EXCITED_STATES; nstates must be 1 + num_occ_states*num_unocc_states;
                     sd_state_ordering: "energy" (default) or "identity")
                 ao_overlap_method (str): "cp2k" (default) = OVERLAP_DELTAT
-                    doubled-geometry run per step (requires overlap_template;
-                    exact AO overlaps, periodic-capable; the CSR fast path
-                    needs the cp2k patch, stock CP2K falls back to the dense
-                    log print); "libint" = molden+libint in-process (no extra
-                    CP2K run, nonperiodic)
+                    doubled-geometry run per step (uses overlap_template; when
+                    absent, one is auto-generated from input_template via
+                    make_overlap_deltat_input - set overlap_csr_write=False for
+                    stock CP2K; exact AO overlaps, periodic-capable; the CSR
+                    fast path needs the cp2k patch, stock CP2K falls back to
+                    the dense log print); "libint" = molden+libint in-process
+                    (no extra CP2K run, nonperiodic)
                 force_source (str): what forces CP2K supplies (the engine-side
                     dyn_params["force_method"] decides how they are used):
                     "active_state" [default] - one Z-vector run at the hopping
@@ -4330,10 +4442,14 @@ def cp2k_compute_adi_impl(q, params, full_id):
     if params.get("ao_overlap_method", "cp2k") == "cp2k":
         # CP2K-native AO overlaps (OVERLAP_DELTAT doubled-geometry run)
         if "overlap_template" not in params:
-            raise ValueError('ao_overlap_method="cp2k" (the default) needs '
-                             'params["overlap_template"] (an es_overlap_deltat_* '
-                             'input); set ao_overlap_method="libint" for in-process '
-                             'libint overlaps instead')
+            auto = os.path.join(wd, "overlap_deltat_auto.inp")
+            if not os.path.exists(auto):
+                with open(auto, "w") as f:
+                    f.write(make_overlap_deltat_input(params["input_template"],
+                                                      params.get("overlap_csr_write", True)))
+                print(F"overlap_template not provided - auto-generated from "
+                      F"{params['input_template']} -> {auto}")
+            params["overlap_template"] = auto
         coords_prev = (params["coordinates_prev"].get(itraj, coordinates)
                        if not is_first_time else coordinates)
         odt = {k: params[k] for k in ("atom_labels", "cp2k_exe", "cp2k_data_dir",

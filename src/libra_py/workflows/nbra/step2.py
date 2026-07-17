@@ -413,10 +413,14 @@ def run_cp2k_libint_step2(params):
                                                  ASCII molden print (needs the &MO_MOLDEN print, precision capped
                                                  by the printed digits).
 
-                             overlap_template (string): CP2K input template for the OVERLAP_DELTAT runs (required for
-                                                        ao_overlap_method="cp2k"): &EXCITED_STATES OVERLAP_DELTAT T,
-                                                        &S_CSR_WRITE (or &AO_MATRICES OVERLAP), CONNECTIVITY OFF and
-                                                        no &VDW_POTENTIAL.
+                             overlap_template (string): CP2K input template for the OVERLAP_DELTAT runs
+                                                        (used by ao_overlap_method="cp2k"): &EXCITED_STATES
+                                                        OVERLAP_DELTAT T, &S_CSR_WRITE (or &AO_MATRICES OVERLAP),
+                                                        CONNECTIVITY OFF and no &VDW_POTENTIAL. When empty, it is
+                                                        auto-generated from cp2k_diag_input_template via
+                                                        CP2K_methods.make_overlap_deltat_input (set
+                                                        overlap_csr_write=False there for stock CP2K without the
+                                                        S_CSR_WRITE patch).
 
                              cp2k_ot_input_template (string): The CP2K OT input template file name (just for the xTB).
 
@@ -542,13 +546,13 @@ def run_cp2k_libint_step2(params):
         if isUKS or params['use_emultipole']:
             raise ValueError('ao_overlap_method="cp2k" is implemented for restricted, non-emultipole runs')
         if not params['overlap_template']:
-            raise ValueError('ao_overlap_method="cp2k" (the default) needs params["overlap_template"] '
-                             '(an es_overlap_deltat_* input); set ao_overlap_method="libint" for '
-                             'in-process libint overlaps from the molden files')
-        if not params['overlap_template']:
-            raise ValueError('ao_overlap_method="cp2k" requires overlap_template - a CP2K input with '
-                             '&EXCITED_STATES OVERLAP_DELTAT T (plus &S_CSR_WRITE or &AO_MATRICES OVERLAP), '
-                             'CONNECTIVITY OFF and no &VDW_POTENTIAL')
+            auto = "overlap_deltat_auto.inp"
+            with open(auto, "w") as f:
+                f.write(CP2K_methods.make_overlap_deltat_input(params['cp2k_diag_input_template'],
+                                                               params.get('overlap_csr_write', True)))
+            print(F"overlap_template not provided - auto-generated from "
+                  F"{params['cp2k_diag_input_template']} -> {auto}")
+            params['overlap_template'] = auto
 
     # Cube visualization
     cube_visualization = params['cube_visualization']
