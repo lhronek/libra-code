@@ -762,6 +762,14 @@ def mopac_compute_adi(q, params, full_id):
     # Trajectory-specific
     is_first_time = params["is_first_time"].get(itraj, True)
     act_state = params["act_state"].get(itraj, 0)
+
+    if not is_first_time:
+        keys = ("MO_prev", "data_prev") + (("s_ci_inv_prev",) if do_Lowdin else ())
+        missing = [key for key in keys if itraj not in params[key]]
+        if missing:
+            raise RuntimeError(F"in mopac_compute_adi - trajectory {itraj} is past its first step but the "
+                               F"carried state {missing} is gone: the same params dict must persist across all "
+                               F"calls of a trajectory")
     
     wd = f"{wd_prefix}_itraj{itraj}"
     
@@ -810,8 +818,8 @@ def mopac_compute_adi(q, params, full_id):
         coordinates_prev = copy.deepcopy(coords)
     else:
         # Otherwise, retrieve the previously-stored data
-        MO_prev = params["MO_prev"].get(itraj, MO_curr).copy()
-        data_prev = params["data_prev"].get(itraj, data_curr)
+        MO_prev = params["MO_prev"][itraj].copy()
+        data_prev = params["data_prev"][itraj]
         
     # Do the calculations - time-overlaps, energies, and Hvib
     obj = tmp()
@@ -848,7 +856,7 @@ def mopac_compute_adi(q, params, full_id):
         if is_first_time:
             s_ci_inv_prev = copy.deepcopy(s_ci_inv_curr)
         else:
-            s_ci_inv_prev = params["s_ci_inv_prev"].get(itraj, s_ci_inv_curr)
+            s_ci_inv_prev = params["s_ci_inv_prev"][itraj]
 
         s_ci = s_ci_inv_curr @ s_ci @ s_ci_inv_curr
         st_ci = s_ci_inv_prev @ st_ci @ s_ci_inv_curr

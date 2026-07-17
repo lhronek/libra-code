@@ -2827,6 +2827,14 @@ def dftb_compute_adi(q, params, full_id):
     is_first_time = params["is_first_time"].get(itraj, True)
     act_state = params["act_state"].get(itraj, 0)
 
+    if not is_first_time:
+        missing = [key for key in ("MO_prev", "data_prev", "coordinates_prev", "s_ci_inv_prev")
+                   if itraj not in params[key]]
+        if missing:
+            raise RuntimeError(F"in dftb_compute_adi - trajectory {itraj} is past its first step but the "
+                               F"carried state {missing} is gone: the same params dict must persist across all "
+                               F"calls of a trajectory")
+
     # ================= Read parameters =================
     dt = float(params.get("dt", 41.0))
     dftb_run_params = params.get("dftb_run_params", {})
@@ -2854,7 +2862,7 @@ def dftb_compute_adi(q, params, full_id):
     if is_first_time:
         coordinates_prev = coordinates.copy()
     else:
-        coordinates_prev = params["coordinates_prev"].get(itraj, coordinates).copy()
+        coordinates_prev = params["coordinates_prev"][itraj].copy()
 
     # ================= ODIN =================
     double_labels = atom_labels * 2
@@ -2905,8 +2913,8 @@ def dftb_compute_adi(q, params, full_id):
         MO_prev = MO_curr.copy()
         data_prev = copy.deepcopy(data_curr)
     else:
-        MO_prev = params["MO_prev"].get(itraj, MO_curr).copy()
-        data_prev = params["data_prev"].get(itraj, data_curr)
+        MO_prev = params["MO_prev"][itraj].copy()
+        data_prev = params["data_prev"][itraj]
 
     # ================= Build object =================
     obj = tmp()
@@ -2942,7 +2950,7 @@ def dftb_compute_adi(q, params, full_id):
     if is_first_time:
         s_ci_inv_prev = copy.deepcopy(s_ci_inv_curr)
     else:
-        s_ci_inv_prev = params["s_ci_inv_prev"].get(itraj, s_ci_inv_curr)
+        s_ci_inv_prev = params["s_ci_inv_prev"][itraj]
 
     s_ci = s_ci_inv_curr @ s_ci @ s_ci_inv_curr
     st_ci = s_ci_inv_prev @ st_ci @ s_ci_inv_curr

@@ -3971,6 +3971,13 @@ def cp2k_compute_adi_nbra(q, params, full_id):
     is_first_time = params["is_first_time"].get(itraj, True)
     act_state = params["act_state"].get(itraj, 0)
 
+    if not is_first_time:
+        missing = [key for key in ("data_prev", "coordinates_prev", "s_ci_inv_prev") if itraj not in params[key]]
+        if missing:
+            raise RuntimeError(F"in cp2k_compute_adi_nbra - trajectory {itraj} is past its first step but the "
+                               F"carried state {missing} is gone: the same params dict must persist across all "
+                               F"calls of a trajectory")
+
     nelec_act_space = params.get("nelec_act_space", None)
     lowest_orbital = params["lowest_orbital"]
 
@@ -3988,7 +3995,7 @@ def cp2k_compute_adi_nbra(q, params, full_id):
     if is_first_time:
         coordinates_prev = coordinates.copy()
     else:
-        coordinates_prev = params["coordinates_prev"].get(itraj, coordinates).copy()
+        coordinates_prev = params["coordinates_prev"][itraj].copy()
 
     # ================= Read electronic structure =================
     nstates = params["nstates"]
@@ -4007,7 +4014,7 @@ def cp2k_compute_adi_nbra(q, params, full_id):
     if is_first_time:
         data_prev = copy.deepcopy(data_curr)
     else:
-        data_prev = params["data_prev"].get(itraj, data_curr)
+        data_prev = params["data_prev"][itraj]
 
     # ================= Build object =================
     obj = tmp()
@@ -4073,7 +4080,7 @@ def cp2k_compute_adi_nbra(q, params, full_id):
     if is_first_time:
         s_ci_inv_prev = copy.deepcopy(s_ci_inv_curr)
     else:
-        s_ci_inv_prev = params["s_ci_inv_prev"].get(itraj, s_ci_inv_curr)
+        s_ci_inv_prev = params["s_ci_inv_prev"][itraj]
     
     s_ci = s_ci_inv_curr @ s_ci @ s_ci_inv_curr
     st_ci = s_ci_inv_prev @ st_ci @ s_ci_inv_curr
