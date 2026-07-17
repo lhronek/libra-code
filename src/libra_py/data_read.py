@@ -73,16 +73,14 @@ def get_matrix(nrows, ncols, filename_re, filename_im, act_sp, get_real=1, get_i
         if os.path.exists(filename_re):
             X_re.Load_Matrix_From_File(filename_re)
         else:
-            print(F"File {filename_re} does not exist. Exiting...")
-            sys.exit(0)
+            raise FileNotFoundError(F"File {filename_re} does not exist")
 
     X_im = MATRIX(nrows, ncols)
     if get_imag == 1:
-        if os.path.exists(filename_re):
+        if os.path.exists(filename_im):
             X_im.Load_Matrix_From_File(filename_im)
         else:
-            print(F"File {filename_im} does not exist. Exiting...")
-            sys.exit(0)
+            raise FileNotFoundError(F"File {filename_im} does not exist")
 
     nstates = len(act_sp)
     x_re = MATRIX(nstates, nstates)

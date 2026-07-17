@@ -150,9 +150,7 @@ def Belyaev_Lebedev(Hvib, params):
                         t_min = 0.5 * (dE[n - 1].get(i, j) - dE[n + 1].get(i, j)) * dt / denom
 
                         if t_min < -dt or t_min > dt:
-                            print("Error determining t_min in the interpolation!\n")
-                            print("Exiting...\n")
-                            sys.exit(0)
+                            raise ValueError("error determining t_min in the interpolation")
 
                         gap_min = 0.5 * (t_min * (t_min - dt) * dE[n - 1].get(i, j)
                                          - 2.0 * (t_min + dt) * (t_min - dt) * dE[n].get(i, j) +
@@ -165,9 +163,7 @@ def Belyaev_Lebedev(Hvib, params):
                                 gap_min = dE[n].get(i, j)
 
                         if gap_min > dE[n - 1].get(i, j) or gap_min > dE[n + 1].get(i, j):
-                            print("Error: the extrapolated gap is larger than the bounding values!\n")
-                            print("Exiting...\n")
-                            sys.exit(0)
+                            raise ValueError("the extrapolated gap is larger than the bounding values")
 
                         second_deriv = denom / (dt * dt)
 
@@ -190,8 +186,7 @@ def Belyaev_Lebedev(Hvib, params):
                                 bf = boltz_factor(gap_min, 0.0, T, boltz_opt)
 
                             if bf > 1.0:
-                                print("Error: Boltzmann scaling factor can not be larger 1.0 = ", bf)
-                                sys.exit(0)
+                                raise ValueError(F"Boltzmann scaling factor can not be larger 1.0 = {bf}")
 
                             P[n].set(i, j, p * bf)      # Probability to go j->i
                             normalization = normalization + p * bf
