@@ -107,11 +107,9 @@ def sanity_check(params):
 
         if "therm" in params.keys():
             if params["therm"] is None:
-                print "NVT simulations require some valid thermostat. None is given. Exiting..."
-                sys.exit(0)
+                raise ValueError("in sanity_check - NVT simulations require some valid thermostat, None is given")
         else:
-            print "NVT simulations require thermostat! Use \"therm\" keyword. Exiting..."
-            sys.exit(0)
+            raise ValueError('in sanity_check - NVT simulations require thermostat, use the "therm" keyword')
 
 
 def main(params):
@@ -454,12 +452,10 @@ def main(params):
                     if os.path.exists(params["ent_file"]):
                         LoadMolecule.Load_Molecule(params["U"], x, params["ent_file"], "pdb")
                     else:
-                        print "is_MM is set to 1, which means you need to provide the \
-                        a file containing the connectivity information for your MM system. \
-                        As of now, such file is called = ", params["ent_file"], " but it cannot \
-                        be found on your system. Please check if it exists or set is_MM to 0. \
-                        Exiting..."
-                        sys.exit(0)
+                        raise IOError("in main - is_MM is set to 1, which means you need to provide "
+                                      "a file containing the connectivity information for your MM system; "
+                                      "such file is called = %s but it cannot be found on your system - "
+                                      "please check if it exists or set is_MM to 0" % params["ent_file"])
 
                 syst.append(x)
 

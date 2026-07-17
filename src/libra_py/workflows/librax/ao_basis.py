@@ -47,8 +47,7 @@ def input_AO_name(l_atoms, atom_spec, basis_type, flag):
             if la == atom_spec[j]:
                 i = j
         if i == -1:
-            print "Error in input_AO_name: atom ", la, " is not known\n"
-            sys.exit(0)
+            raise ValueError("in input_AO_name - atom %s is not known" % la)
 
         aoa_tmp = []
         orb_name1 = []

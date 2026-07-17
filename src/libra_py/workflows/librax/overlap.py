@@ -69,8 +69,7 @@ def MO_overlap(S, ao_i, ao_j, Ci, Cj, basis_option):
     elif basis_option == 2:  # semi empirical calculation
         P = Ci.T() * Cj
     else:
-        print "basis_sets has an illegal value, so stop"
-        sys.exit()
+        raise ValueError("in MO_overlap - basis_option has an illegal value: %s" % basis_option)
 
     return P
 
@@ -116,12 +115,12 @@ def overlap_sd(MO1, MO2):
     #
 
     if MO1.num_of_rows != MO2.num_of_rows:
-        print "The vertical dimensions of the two matrices do not match"
-        sys.exit(0)
+        raise ValueError("in overlap_sd - the vertical dimensions of the two matrices do not match: "
+                         "%s vs %s" % (MO1.num_of_rows, MO2.num_of_rows))
 
     if MO1.num_of_cols != MO2.num_of_cols:
-        print "The horizontal dimensions of the two matrices do not match"
-        sys.exit(0)
+        raise ValueError("in overlap_sd - the horizontal dimensions of the two matrices do not match: "
+                         "%s vs %s" % (MO1.num_of_cols, MO2.num_of_cols))
 
     Norb = MO1.num_of_cols  # the number of 1-el orbitals in each determinant
 

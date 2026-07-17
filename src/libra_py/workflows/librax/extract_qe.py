@@ -80,8 +80,7 @@ def excited_populations(e, nel, nspin, kT, el_st):
         el_scheme = [-1, 1, 2]  # n_i^(N-1) + n_i^(N+2) - n_i^(N+1)
 
     else:
-        print "Error: check out el_st, shouldn't be larger than 2 at this point.\n Exiting...\n"
-        sys.exit(0)
+        raise ValueError("in excited_populations - el_st shouldn't be larger than 2 at this point, got %s" % el_st)
 
     a = MATRIX(norbs, norbs)
     occ_tot = []
@@ -121,8 +120,7 @@ def excited_populations(e, nel, nspin, kT, el_st):
             occ_new[ic] = occ_tot[0][ic] + occ_tot[2][ic] - occ_tot[1][ic]
 
         else:
-            print "Warning: Higher schemes are not implemented yet, exiting"
-            sys.exit(0)
+            raise NotImplementedError("in excited_populations - higher schemes are not implemented yet")
 
     return occ_new
 

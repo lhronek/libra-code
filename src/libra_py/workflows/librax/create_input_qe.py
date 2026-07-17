@@ -124,8 +124,7 @@ def excitation_to_qe_occ(norb, nel, state):
         ex_alp = gs_alp
         ex_bet = excite(a, b, gs_bet)
     else:
-        print "Error in qe_occ: excitations with spin flip are not allowed yet\nExiting...\n"
-        sys.exit(0)
+        raise NotImplementedError("in excitation_to_qe_occ - excitations with spin flip are not allowed yet")
 
     occ = [0.0] * norb
     occ_alp = [0.0] * norb

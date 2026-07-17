@@ -42,20 +42,15 @@ def reduce_matrix(M, min_shift, max_shift, HOMO_indx):
     # M_red - returned MATRIX, reduced in [min_shift:max_shift+1].
 
     if (HOMO_indx + min_shift < 0):
-        print "Error in reduce_matrix: The min_shift/HOMO_index combination result in the out-of-range error for the reduced matrix"
-        print "min_shift = ", min_shift
-        print "HOMO_index = ", HOMO_index
-        print "Exiting...\n"
-        sys.exit(0)
+        raise ValueError("in reduce_matrix - the min_shift/HOMO_index combination results in the "
+                         "out-of-range error for the reduced matrix (min_shift = %s, HOMO_index = %s)"
+                         % (min_shift, HOMO_indx))
 
     sz = max_shift - min_shift + 1
 
     if (sz > M.num_of_cols):
-        print "Error in reduce_matrix: The size of the cropped matrix is larger than the size of the original matrix"
-        print "size of the corpped matrix = ", sz
-        print "size of the original matrix = ", M.num_of_cols
-        print "Exiting...\n"
-        sys.exit(0)
+        raise ValueError("in reduce_matrix - the size of the cropped matrix (%s) is larger than "
+                         "the size of the original matrix (%s)" % (sz, M.num_of_cols))
 
     M_red = MATRIX(sz, sz)
     pop_submatrix(M, M_red, range(HOMO_indx + min_shift, HOMO_indx + max_shift + 1))

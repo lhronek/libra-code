@@ -133,10 +133,7 @@ def run_MD(syst, el, ao, E, sd_basis, params, label, Q, active_space):
     dt_nucl = params["dt_nucl"]
     el_mts = params["el_mts"]  # multiple time stepping algorithm for electronic DOF propagation
     if el_mts < 1:
-        print "Error in run_MD: el_mts must be positive integer"
-        print "Value given = ", el_mts
-        print "Exiting..."
-        sys.exit(0)
+        raise ValueError("in run_MD - el_mts must be a positive integer, value given = %s" % el_mts)
     dt_elec = dt_nucl / float(el_mts)
 
     nconfig = params["nconfig"]

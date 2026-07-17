@@ -99,10 +99,7 @@ def create_states(Nmin, HOMO, Nmax, spin, flip):
     elif spin == 1:
         sp_st = [1, -1]
     else:
-        print "Error in create_states: spin must be 0 or 1"
-        print "Value given = ", spin
-        print "Exiting..."
-        sys.exit(0)
+        raise ValueError("in create_states - spin must be 0 or 1, value given = %s" % spin)
 
     # note "excitation" object.
     # "excitation" has 4 index : (from orbital, from spin, to orbital, to spin)
@@ -139,11 +136,8 @@ def create_states(Nmin, HOMO, Nmax, spin, flip):
                         excitations.append(excitation(om - HOMO, sp1, uom - HOMO, sp2))
 
     else:
-        print "Error in create_states: flip must be 0 or 1 and spin 0 or 1"
-        print "And,when spin = 0, flip should not be 1"
-        print "Value flip and spin given = ", flip, spin
-        print "Exiting..."
-        sys.exit(0)
+        raise ValueError("in create_states - flip must be 0 or 1 and spin 0 or 1, and when spin = 0, "
+                         "flip should not be 1; values flip and spin given = %s %s" % (flip, spin))
 
     print "excitations length is ", len(excitations)
     # print excitations

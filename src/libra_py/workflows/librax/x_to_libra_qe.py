@@ -276,8 +276,8 @@ def qe_to_libra(params, E, sd_basis, label, mol, suff, active_space):
                 if coount == 1:
                     restart_flag = 10
                 if coount > mx_itr:  # Maximum 30 iteration, else exit
-                    print "Warning! Maximum iteration for the Fermi scheme reached, please check electronic_smearing parameter - exiting"
-                    sys.exit(0)
+                    raise RuntimeError("in qe_to_libra - maximum iteration for the Fermi scheme "
+                                       "reached, please check the electronic_smearing parameter")
                 else:
                     restart_flag = 11
                 if params["nspin"] == 2:

@@ -59,8 +59,7 @@ def index_spin(ex, active_space, homo):
     #  0  -- I I --     -- I I --      -- I I --
 
     if ex.size > 1:
-        print "Only single excitations are currently allowed. Exiting...\n"
-        sys.exit(0)
+        raise NotImplementedError("in index_spin - only single excitations are currently allowed")
 
     # Ground state "excitation"
     if ex.from_orbit[0] == ex.to_orbit[0]:
@@ -168,8 +167,7 @@ def index_spin_gen(ex, active_space, nel, nel_SD):
     #  0  -- I I --     -- I I --      -- I I --
 
     if ex.size > 1:
-        print "Only single excitations are currently allowed. Exiting...\n"
-        sys.exit(0)
+        raise NotImplementedError("in index_spin_gen - only single excitations are currently allowed")
 
     if open_shell == 0:
         # Closed shell system
@@ -212,8 +210,8 @@ def index_spin_gen(ex, active_space, nel, nel_SD):
         if ex.from_orbit[0] != ex.to_orbit[0]:
 
             if ex.to_orbit[0] == 0 and ex.to_spin[0] == 1:
-                print "Currently, the GS is snglet (spin up), no two electron in same spin in an orbital ... exiting"
-                sys.exit(0)
+                raise RuntimeError("in index_spin_gen - currently the GS is singlet (spin up), "
+                                   "no two electrons of the same spin in an orbital")
 
             # spin flip excitations
             elif ex.from_spin[0] != ex.to_spin[0]:

@@ -50,8 +50,7 @@ def set_defaults(params, interface, recipe=""):
         params["interface"] = interface
         print "Setting default parameters for Libra-", interface, " calculations"
     else:
-        print "Error in set_defaults: The interface ", interface, " is not known"
-        sys.exit(0)
+        raise ValueError("in set_defaults - the interface %s is not known" % interface)
 
     # Set up general parameters for both QE and GAMESS runs
 

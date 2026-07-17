@@ -120,8 +120,8 @@ def merge_orbitals(Ca, Cb):
     N_mo_b = Cb.num_of_cols
 
     if npw_a != npw_b:
-        print("Error: The number of rows of the two matrices should be equal")
-        sys.exit(0)
+        raise ValueError(F"in merge_orbitals - the number of rows of the two matrices should "
+                         F"be equal, got {npw_a} and {npw_b}")
 
     C = CMATRIX(npw_a, N_mo_a + N_mo_b)
 
@@ -298,8 +298,7 @@ def orthogonalize_orbitals(C):
     print("Det = ", FullPivLU_det(S))
     is_inv = FullPivLU_rank_invertible(S)
     if is_inv[1] != 1:
-        print("Error, S is not invertible, Exiting Program")
-        sys.exit(0)
+        raise RuntimeError("in orthogonalize_orbitals - S is not invertible - see the ranks printed above")
 
     S_half = CMATRIX(S.num_of_rows, S.num_of_cols)
     S_i_half = CMATRIX(S.num_of_rows, S.num_of_cols)

@@ -165,8 +165,8 @@ def read_qe_schema(filename, verbose=0):
             forces.append(float(a))
 
     if len(forces) % 3 != 0:
-        print("In read_qe_schema: Something is wrong with reading forces\n")
-        sys.exit(0)
+        raise RuntimeError(F"in read_qe_schema - something is wrong with reading forces: "
+                           F"got {len(forces)} components, which is not a multiple of 3")
 
     nat = int(len(forces) / 3)
     F = MATRIX(3 * nat, 1)  # forces
@@ -294,11 +294,11 @@ def read_qe_index(filename, orb_list, verbose=0):
         norbs = len(orb_list)
         for o in orb_list:
             if o > nbnd:
-                print("Orbital ", o, " is outside the range of allowed orbital indices. The maximal value is ", nbnd)
-                sys.exit(0)
+                raise ValueError(F"in read_qe_index - orbital {o} is outside the range of allowed "
+                                 F"orbital indices; the maximal value is {nbnd}")
             elif o < 1:
-                print("Orbital ", o, " is outside the range of allowed orbital indices. The minimal value is ", 1)
-                sys.exit(0)
+                raise ValueError(F"in read_qe_index - orbital {o} is outside the range of allowed "
+                                 F"orbital indices; the minimal value is 1")
 
         e = CMATRIX(norbs, norbs)
 
@@ -484,11 +484,11 @@ def read_qe_wfc(filename, orb_list, verbose=0):
 
     if nspin == 4:
         if orb_list[0] % 2 == 0:
-            print("In SOC, the very first orbital index must be odd!\nExiting now...")
-            sys.exit(0)
+            raise ValueError(F"in read_qe_wfc - in SOC, the very first orbital index must be odd, "
+                             F"got {orb_list[0]}")
         if len(orb_list) % 2 == 1:
-            print("In SOC, an even number of orbitals must be utilized!\nExiting now...")
-            sys.exit(0)
+            raise ValueError(F"in read_qe_wfc - in SOC, an even number of orbitals must be utilized, "
+                             F"got {len(orb_list)}")
 
     wfc_preprocess = "normalize"
     if gamma_only == "T":
@@ -497,11 +497,11 @@ def read_qe_wfc(filename, orb_list, verbose=0):
     norbs = len(orb_list)
     for o in orb_list:
         if o > nbnd:
-            print("Orbital ", o, " is outside the range of allowed orbital indices. The maximal value is ", nbnd)
-            sys.exit(0)
+            raise ValueError(F"in read_qe_wfc - orbital {o} is outside the range of allowed "
+                             F"orbital indices; the maximal value is {nbnd}")
         elif o < 1:
-            print("Orbital ", o, " is outside the range of allowed orbital indices. The minimal value is ", 1)
-            sys.exit(0)
+            raise ValueError(F"in read_qe_wfc - orbital {o} is outside the range of allowed "
+                             F"orbital indices; the minimal value is 1")
 
     coeff = CMATRIX(ngw, norbs)
 
@@ -1813,9 +1813,9 @@ def read_info(params):
         info0, all_e_dum0 = read_qe_index("%s/curr0/x0.export/index.xml" % wd0, [], 0)
 
         if info0["nspin"] != 1:
-            print("Error, you are not running the non-relativistic, non-spin-polarized calculation \
-                   check your setting with nspin")
-            sys.exit(0)
+            raise ValueError(F"in read_info - you are not running the non-relativistic, "
+                             F"non-spin-polarized calculation; check your setting with nspin "
+                             F"(got {info0['nspin']})")
         print("The total # of k-points (non-spin-polarized calculation) is: ", info0["nk"])
 
     # for non-relativistic, spin-polarized calculations
@@ -1823,9 +1823,8 @@ def read_info(params):
         info0, all_e_dum0 = read_qe_index("%s/curr0/x0.export/index.xml" % wd0, [], 0)
 
         if info0["nspin"] != 2:
-            print("Error, you are not running spin-polarized calculations,\
-                   check you settings with nspin")
-            sys.exit(0)
+            raise ValueError(F"in read_info - you are not running spin-polarized calculations; "
+                             F"check your settings with nspin (got {info0['nspin']})")
         print("The total # of k-points (spin-polarized) including up and down components is: ", info0["nk"])
 
     # for fully-relativistic non-collinear calculations
@@ -1833,9 +1832,9 @@ def read_info(params):
         info1, all_e_dum1 = read_qe_index("%s/curr1/x1.export/index.xml" % wd0, [], 0)
 
         if info1["nspin"] != 4:
-            print("Error,you are not running SOC calculations \
-                   check you setting with nspin. Also, veriy that you use fully-relativistic pseudopotentials")
-            sys.exit(0)
+            raise ValueError(F"in read_info - you are not running SOC calculations; check your "
+                             F"setting with nspin (got {info1['nspin']}) and verify that you "
+                             F"use fully-relativistic pseudopotentials")
         print("The total # of k-points (soc) is: ", info1["nk"])
 
     print("The time to get the basic parameters about your QE calculations = ", tim.stop())
@@ -1914,11 +1913,10 @@ def read_all(params):
     maxband = params["maxband"]
 
     if (minband <= 0):
-        print("Error: minband should be >0, current value of minband = ", minband)
-        sys.exit(0)
+        raise ValueError(F"in read_all - minband should be > 0, current value of minband = {minband}")
     if (minband > maxband):
-        print("Error: minband must be smaller or equal to maxband. Current values: minband = ", minband, " maxband = ", maxband)
-        sys.exit(0)
+        raise ValueError(F"in read_all - minband must be smaller or equal to maxband; "
+                         F"current values: minband = {minband}, maxband = {maxband}")
 
     print("printing prefix:  ", prefix)
 
@@ -2061,9 +2059,10 @@ def read_wfc_grid(params):
 
             id1 = CMATRIX(coeff_curr[0].num_of_cols, coeff_curr[0].num_of_cols)
             id1.identity()
-            if abs((coeff_curr[0].H() * coeff_curr[0] - id1).max_elt()) > 1e-5:
-                print("Error\n")
-                sys.exit(0)
+            dev = abs((coeff_curr[0].H() * coeff_curr[0] - id1).max_elt())
+            if dev > 1e-5:
+                raise RuntimeError(F"in read_wfc_grid - the orthogonalized orbitals failed the "
+                                   F"identity check: max |C^H C - I| = {dev:.3e} exceeds 1e-5")
 
         C_dia_curr, E_dia_curr = QE_utils.post_process(coeff_curr, e_curr, 0)
         res_curr["Coeff_dia"] = C_dia_curr
@@ -2096,9 +2095,10 @@ def read_wfc_grid(params):
 
             id1 = CMATRIX(coeff_curr[0].num_of_cols, coeff_curr[0].num_of_cols)
             id1.identity()
-            if abs((coeff_curr[0].H() * coeff_curr[0] - id1).max_elt()) > 1e-5:
-                print("Error\n")
-                sys.exit(0)
+            dev = abs((coeff_curr[0].H() * coeff_curr[0] - id1).max_elt())
+            if dev > 1e-5:
+                raise RuntimeError(F"in read_wfc_grid - the orthogonalized orbitals failed the "
+                                   F"identity check: max |C^H C - I| = {dev:.3e} exceeds 1e-5")
 
         C_adi_curr, E_adi_curr = QE_utils.post_process(coeff_curr, e_curr, 1)
         res_curr["Coeff_adi"] = C_adi_curr

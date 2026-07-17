@@ -211,8 +211,7 @@ def gms_extract_mo(inp_str, Ngbf, active_space, flag):
     # ***********Here, reduce E_full and C_full ***************
     sz = len(active_space)
     if sz == 0:
-        print "active space is not defined correctly, exit....."
-        sys.exit(0)
+        raise ValueError("in gms_extract_mo - the active space is not defined correctly (empty)")
 
     # E = MATRIX(sz,sz)
     # for i in xrange(sz):
