@@ -90,7 +90,7 @@ class ldr_solver:
         self.C_save = []
 
     def chi_overlap(self):
-        """
+        r"""
         Compute nuclear overlap matrix s_nucl[i, j] for the mesh qmesh 
         from the Gaussian basis, g(x; q) = \exp(-\alpha * (x-q)**2).
         """
@@ -99,7 +99,7 @@ class ldr_solver:
         self.s_nucl = torch.exp(exponent)
 
     def chi_kinetic(self):
-        """
+        r"""
         Compute nuclear kinetic energy matrix t_nucl[i,j] = <g(x; qgrid[i]) | T | g(x; qgrid[j])>,
         with T = \sum_{\nu} -0.5* m_ν^{-1} \partial^{2}/\partial x_{\nu}^2.
         """
@@ -355,7 +355,7 @@ class ldr_solver:
         return numer / denom
 
     def compute_average_pos(self):
-        """
+        r"""
         Compute average position as <q_i> = \sum_i C^+ Q C / C^+ S C for a single step.
         """
         N, s, ndim = self.ngrids, self.nstates, self.ndim

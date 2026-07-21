@@ -2672,7 +2672,7 @@ def atom_components_cp2k(filename):
 
 
 def compute_mo_overlap(params):
-    """
+    r"""
     This function computes the molecular orbital overlap calculations between
     two geometries: $\langle\Phi_{i,R}\|\Phi_{j,R'}\rangle$. It takes a dictionary as parameters.
     Args:

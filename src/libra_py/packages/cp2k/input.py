@@ -543,7 +543,7 @@ def generate(_params):
         fit_basis = ikind["fit_basis_set"]
         pot = ikind["potential"]
         dft_plus_u_input = ""
-        if "dft_plus_u" in ikind.keys() and method is not "xTB":
+        if "dft_plus_u" in ikind.keys() and method != "xTB":
             l_val = ikind["dft_plus_u"][0]
             u_val = ikind["dft_plus_u"][1]
             dft_plus_u_input = F"""

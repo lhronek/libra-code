@@ -300,7 +300,7 @@ def conf2csf_matrix(
     S: int = 0,
     Ms: int = 0
 ) -> coo_matrix:
-    """
+    r"""
     Build the configuration-to-CSF (Configuration State Function) transformation matrix.
 
     This matrix `T` transforms the determinant (Slater determinant) basis

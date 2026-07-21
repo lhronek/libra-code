@@ -33,7 +33,7 @@ HARTREE2EV = 27.2116  # constant stays as a constant
 
 @dataclass
 class DVRData:
-    """
+    r"""
     Description of data: 
     * d_X = [\nabla X] and X_deri = \nabla [X], see reference paper
 
