@@ -431,7 +431,12 @@ def run_cp2k_libint_step2(params):
 
                              cp2k_exe (string): The full path to CP2K executable.
 
-                             mpi_executable (string): The mpi run executable for CP2K. It can be mpiexe, mpirun, or srun.
+                             mpi_executable (string): The mpi run executable for CP2K. Used only for
+                                                      nprocs > 1 (a single rank skips the launcher); for hybrid
+                                                      MPI+OpenMP runs add binding flags here (e.g. "mpirun
+                                                      --map-by slot:PE=4" or "--bind-to none") - Open MPI's
+                                                      default bind-to-core pins each rank's OMP threads onto
+                                                      a single core. It can be mpiexe, mpirun, or srun.
 
                              cube_visualization (bool): Flag for plotting the molecular orbitals using VMD.
 
@@ -589,7 +594,10 @@ def run_cp2k_libint_step2(params):
                 step)
             if params["restart_file"]:
                 os.system(f'cp {params["restart_file"]} ./Diag_libra-{step}-RESTART.wfn')
-            os.system(F'OMP_NUM_THREADS={params["omp_num_threads"]} {mpi_executable} -n {nprocs} '
+            # a single rank gains nothing from mpirun, and OpenMPI's default
+            # bind-to-core would pin all OMP threads of the rank onto ONE core
+            launcher = F'{mpi_executable} -n {nprocs} ' if int(nprocs) > 1 else ''
+            os.system(F'OMP_NUM_THREADS={params["omp_num_threads"]} {launcher}'
                       F'{cp2k_exe} -i Diag_libra-{step}.inp -o step_{step}.log')
             molden_filename = F'Diag_libra-{step}-1_0.molden'
         print('Done with step', step, 'Elapsed time:', time.time() - t1)

@@ -1828,6 +1828,10 @@ def run_cp2k_xtb(params):
 
           * **nprocs** (integer): Number of processors (MPI ranks).
           * **omp_num_threads** (integer): OMP threads per rank [default: 1].
+            nprocs=1 skips the MPI launcher; for hybrid runs (nprocs > 1 with
+            omp_num_threads > 1) add binding flags to mpi_executable
+            ("--map-by slot:PE=N" or "--bind-to none") - Open MPI's default
+            bind-to-core pins each rank's OMP threads onto a single core.
 
     """
 
@@ -1842,21 +1846,24 @@ def run_cp2k_xtb(params):
     # threads per MPI rank - without an explicit value many psmp builds default
     # to ALL cores per rank, oversubscribing the node for nprocs > 1
     omp = int(params.get('omp_num_threads', 1))
+    # a single rank gains nothing from mpirun, and OpenMPI's default
+    # bind-to-core would pin all OMP threads of the rank onto ONE core
+    launcher = '%s -n %d ' % (mpi_executable, nprocs) if int(nprocs) > 1 else ''
 
     # Run OT
     print('Step', step, 'Computing the OT method wfn file...')
     cp2k_xtb_ot_inp(ot_input_template, trajectory_xyz_filename, step)
     t1 = time.time()
-    os.system('OMP_NUM_THREADS=%d %s -n %d %s -i xtb_ot_step_%d.inp -o OUT-ot_%d.log' %
-              (omp, mpi_executable, nprocs, cp2k_exe, step, step))
+    os.system('OMP_NUM_THREADS=%d %s%s -i xtb_ot_step_%d.inp -o OUT-ot_%d.log' %
+              (omp, launcher, cp2k_exe, step, step))
     print('Done with OT wfn. Elapsed time:', time.time() - t1)
 
     # Run diagonalization
     t1 = time.time()
     print('Computing the wfn file using diagonalization method...')
     cp2k_xtb_diag_inp(diag_input_template, step)
-    os.system('OMP_NUM_THREADS=%d %s -n %d %s -i xtb_diag_step_%d.inp -o OUT-diag_%d.log' %
-              (omp, mpi_executable, nprocs, cp2k_exe, step, step))
+    os.system('OMP_NUM_THREADS=%d %s%s -i xtb_diag_step_%d.inp -o OUT-diag_%d.log' %
+              (omp, launcher, cp2k_exe, step, step))
     print('Done with diagonalization. Elapsed time:', time.time() - t1)
 
 
@@ -3080,6 +3087,11 @@ def run_cp2k(coords_bohr, params):
             cp2k_exe (str): CP2K executable                            [default "cp2k.psmp"]
             mpi_executable (str or None): e.g. "mpirun"; None = serial [default None]
             nprocs (int): MPI ranks (used with mpi_executable)         [default 1]
+                nprocs=1 skips the launcher entirely; for hybrid runs
+                (nprocs > 1 with omp_num_threads > 1) add binding flags to
+                mpi_executable (e.g. "mpirun --map-by slot:PE=4" or
+                "--bind-to none") - Open MPI's default bind-to-core pins
+                each rank's OMP threads onto a single core
             omp_num_threads (int): OMP threads for the run             [default 1]
             cp2k_data_dir (str or None): sets CP2K_DATA_DIR            [default None]
             working_directory (str): run directory                     [default "wd"]
@@ -3116,7 +3128,9 @@ def run_cp2k(coords_bohr, params):
         if os.path.exists(logfile):
             os.remove(logfile)  # CP2K's -o APPENDS; keep one run per log
         cmd = [exe, "-i", input_name, "-o", logname]
-        if mpi is not None:
+        # a single rank gains nothing from mpirun, and OpenMPI's default
+        # bind-to-core would pin all OMP threads of the rank onto ONE core
+        if mpi is not None and int(nprocs) > 1:
             cmd = [mpi, "-n", str(nprocs)] + cmd
         res = subprocess.run(cmd, cwd=wd, env=env,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
