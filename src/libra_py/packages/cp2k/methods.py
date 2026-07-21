@@ -3371,19 +3371,50 @@ def _two_spinor(S):
     return data_conv.form_block_matrix(S, z, z, S)
 
 
-def load_molden_data(molden_file, is_spherical=True):
+def molden_spin_counts(molden_file):
+    """
+    Per-spin MO counts from a CP2K molden file. The channels are UNEQUAL in
+    general: CP2K stores nelec_spin + ADDED_MOS orbitals per spin, so e.g. a
+    triplet has two more alpha MOs than beta - a half-split of the stacked
+    [MO] section misassigns the channels.
+
+    Returns:
+        (n_alpha, n_beta) - n_beta is 0 for restricted files
+    """
+    with open(molden_file) as f:
+        txt = f.read()
+    return txt.count("Spin= Alpha"), txt.count("Spin= Beta")
+
+
+def load_molden_data(molden_file, is_spherical=True, isUKS=False):
     """
     Read a CP2K molden file into libint shells + AO-resorted MO coefficients.
 
+    UKS molden files carry the alpha and beta MOs stacked (alpha first); with
+    isUKS=True the stack is split and the beta channel returned alongside as
+    C_b / E_b (same AO resorting - the AO order is a basis property).
+
     Returns:
         dict: shell (libint shells), C (nmo x nao, resorted to libint AO order),
-              E (nmo, orbital energies in Hartree)
+              E (nmo, orbital energies in Hartree), resort_idx, nspin
+              (+ C_b / E_b for isUKS=True)
     """
+    na, nb = molden_spin_counts(molden_file)
+    if (nb > 0) != bool(isUKS):
+        raise ValueError(F"{molden_file} carries nspin={2 if nb else 1} but isUKS={isUKS} - "
+                         F"the CP2K template's UKS/MULTIPLICITY must match the isUKS parameter")
     shell, l_vals = molden_methods.molden_file_to_libint_shell(molden_file, is_spherical)
     C, E = molden_methods.eigenvectors_molden(molden_file, nbasis(shell), l_vals)
     idx = resort_molog_eigenvectors(l_vals)
     C = np.array([c[idx] for c in C])
-    return {"shell": shell, "C": C, "E": np.array(E), "resort_idx": np.array(idx)}
+    E = np.array(E)
+    out = {"shell": shell, "resort_idx": np.array(idx), "nspin": 2 if isUKS else 1}
+    if isUKS:
+        out.update({"C": C[:na], "E": E[:na],
+                    "C_b": C[na:na + nb], "E_b": E[na:na + nb]})
+    else:
+        out.update({"C": C, "E": E})
+    return out
 
 
 def mo_overlap(data1, data2, lowest_orbital, highest_orbital, nprocs=1):
@@ -3685,6 +3716,11 @@ def make_overlap_deltat_input(template_file, csr_write=True):
           by the same reader)
         - CONNECTIVITY OFF is enforced in every &TOPOLOGY section (the doubled
           xyz would otherwise trip the topology generation)
+        - the electronic state is re-posed for the doubled system: UKS / LSD /
+          SPIN_POLARIZED and MULTIPLICITY are dropped (doubling makes the
+          electron count even, so an open-shell parent multiplicity becomes
+          inconsistent - the AO overlap is basis-only and spin-independent
+          anyway) and any CHARGE is doubled to keep the parity correct
 
     Args:
         template_file ( string ): path to the parent CP2K input template
@@ -3760,6 +3796,13 @@ def make_overlap_deltat_input(template_file, csr_write=True):
         if up.startswith("RUN_TYPE") and stack and stack[-1] == "GLOBAL":
             out.append(F"{indent}RUN_TYPE ENERGY")
             continue
+        if stack and stack[-1] == "DFT":
+            key = up.split()[0] if up else ""
+            if key in ("UKS", "LSD", "SPIN_POLARIZED", "MULTIPLICITY"):
+                continue    # doubled system: re-posed as closed shell (S is spin-independent)
+            if key == "CHARGE":
+                out.append(F"{indent}CHARGE {2 * int(word.split()[1])}")
+                continue
         out.append(ln)
 
     # enforce CONNECTIVITY OFF in every &TOPOLOGY section
@@ -3795,17 +3838,25 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
             cp2k_exe / cp2k_data_dir / omp_num_threads / mpi_executable / nprocs
 
     Returns:
-        St_mo, S_mo_prev, S_mo_curr  (each (norb_w, norb_w))
+        St_mo, S_mo_prev, S_mo_curr  (each (norb_w, norb_w)). When the mo
+        dicts carry a beta channel (C_b, from the UKS loaders), each of the
+        three is instead a [alpha, beta] list - the AO overlap is
+        spin-independent, so the single doubled-geometry run serves both
+        channels at no extra CP2K cost.
 
     Raises ValueError when the window does not fit the stored MOs (python
     slicing would silently truncate or wrap).
     """
     for d in (mo_prev, mo_curr):
-        nmo = d["C"].shape[0]
-        if not 1 <= lowest_orbital <= highest_orbital <= nmo:
-            raise ValueError(F"orbital window [{lowest_orbital}, {highest_orbital}] does "
-                             F"not fit the {nmo} stored MOs (1-based) - increase ADDED_MOS "
-                             F"in the template or adjust lowest_orbital/highest_orbital")
+        for suff in ("", "_b"):
+            if F"C{suff}" not in d:
+                continue
+            nmo = d[F"C{suff}"].shape[0]
+            if not 1 <= lowest_orbital <= highest_orbital <= nmo:
+                raise ValueError(F"orbital window [{lowest_orbital}, {highest_orbital}] does "
+                                 F"not fit the {nmo} stored MOs (1-based, "
+                                 F"{'beta' if suff else 'alpha'} channel) - increase ADDED_MOS "
+                                 F"in the template or adjust lowest_orbital/highest_orbital")
     atom_labels = params["atom_labels"]
     run_params = dict(params)
     run_params.update({"atom_labels": list(atom_labels) + list(atom_labels),
@@ -3833,11 +3884,18 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
     S11, S12, S22 = S[:n, :n][ix], S[:n, n:][ix], S[n:, n:][ix]
     lo, hi = lowest_orbital - 1, highest_orbital
     # window BEFORE contracting: O(win * nao^2) instead of O(nao^3) -
-    # 20-100x cheaper already at a few thousand AOs
-    Cp, Cc = mo_prev["C"][lo:hi], mo_curr["C"][lo:hi]
-    St     = np.ascontiguousarray((Cp @ S12 @ Cc.T).real)
-    S_prev = np.ascontiguousarray((Cp @ S11 @ Cp.T).real)
-    S_curr = np.ascontiguousarray((Cc @ S22 @ Cc.T).real)
+    # 20-100x cheaper already at a few thousand AOs. The AO overlap is
+    # spin-independent, so the same S blocks serve every spin channel.
+    St, S_prev, S_curr = [], [], []
+    for suff in ("", "_b"):
+        if F"C{suff}" not in mo_prev or F"C{suff}" not in mo_curr:
+            continue
+        Cp, Cc = mo_prev[F"C{suff}"][lo:hi], mo_curr[F"C{suff}"][lo:hi]
+        St.append(np.ascontiguousarray((Cp @ S12 @ Cc.T).real))
+        S_prev.append(np.ascontiguousarray((Cp @ S11 @ Cp.T).real))
+        S_curr.append(np.ascontiguousarray((Cc @ S22 @ Cc.T).real))
+    if len(St) == 1:
+        return St[0], S_prev[0], S_curr[0]
     return St, S_prev, S_curr
 
 
@@ -3874,14 +3932,21 @@ def load_wfn_mo_data(filename):
 
     Returns:
         dict: C (nmo, nao), E (Hartree, exact), occ (occupation numbers),
-              homo (1-based index from the file itself), resort_idx = None
+              homo (1-based index from the file itself), resort_idx = None,
+              nspin. UKS files (nspin=2) return the beta channel alongside as
+              C_b / E_b / occ_b / homo_b (alpha and beta HOMOs differ in
+              general - the file stores both).
     """
     basis, spin, evocc, moc = read_wfn_file(filename)
-    nmo, homo = int(spin[0][0]), int(spin[0][1])
-    vals = np.asarray(evocc[0], dtype=np.float64)
-    E, occ = vals[:nmo].copy(), vals[nmo:2 * nmo].copy()
-    C = np.array(moc[0], dtype=float)                  # (nmo, nao), CP2K order
-    return {"C": C, "E": E, "occ": occ, "homo": homo, "resort_idx": None}
+    out = {"resort_idx": None, "nspin": len(spin)}
+    for i, suff in enumerate(("", "_b")[:len(spin)]):
+        nmo = int(spin[i][0])
+        vals = np.asarray(evocc[i], dtype=np.float64)
+        out[F"C{suff}"] = np.array(moc[i], dtype=float)   # (nmo, nao), CP2K order
+        out[F"E{suff}"] = vals[:nmo].copy()
+        out[F"occ{suff}"] = vals[nmo:2 * nmo].copy()
+        out[F"homo{suff}"] = int(spin[i][1])
+    return out
 
 
 def ci_data_from_newtonx(newtonx, omegas_Ha, ci_threshold=0.001,
@@ -4447,6 +4512,10 @@ def cp2k_compute_adi_impl(q, params, full_id):
     else:
         molden_file = f"{wd}/{project}-1_0.molden"
         mo_curr = load_molden_data(molden_file)
+
+    if mo_curr.get("nspin", 1) != 1:
+        raise ValueError("cp2k_compute_adi is restricted-only, but the CP2K output "
+                         "carries two spin channels - the driver template must not be UKS")
 
     if itraj not in params["homo"]:
         params["homo"][itraj] = read_homo_index(res["logfile"])

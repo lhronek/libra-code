@@ -390,7 +390,11 @@ def run_cp2k_libint_step2(params):
 
                              isxTB (bool): Flag for xTB calculations.
 
-                             isUKS (bool): Flag for unrestricted spin calculations.
+                             isUKS (bool): Flag for unrestricted spin calculations. Note for xTB:
+                                           GFN1-xTB's SCC depends on the total charges only, so
+                                           xTB-UKS orbitals are spin-DEGENERATE (identical alpha and
+                                           beta channels) - only the occupations and per-spin HOMOs
+                                           differ.
 
                              remove_molden (bool): Flag for removing the molden files after computing the MO overlaps.
 
@@ -548,8 +552,10 @@ def run_cp2k_libint_step2(params):
     if mo_source == 'wfn' and ao_overlap_method != 'cp2k':
         raise ValueError('mo_source="wfn" requires ao_overlap_method="cp2k" (no libint shells from a wfn)')
     if ao_overlap_method == 'cp2k':
-        if isUKS or params['use_emultipole']:
-            raise ValueError('ao_overlap_method="cp2k" is implemented for restricted, non-emultipole runs')
+        if params['use_emultipole']:
+            raise ValueError('use_emultipole requires the libint machinery (the multipole '
+                             'integrals have no CP2K OVERLAP_DELTAT analog) - set '
+                             'ao_overlap_method="libint"')
         if not params['overlap_template']:
             auto = "overlap_deltat_auto.inp"
             with open(auto, "w") as f:
@@ -636,8 +642,12 @@ def run_cp2k_libint_step2(params):
                 # molden-free: MOs, exact eigenvalues and HOMO from the binary restart file
                 wfn_file = F'Diag_{step}-RESTART.wfn' if isxTB else F'Diag_libra-{step}-RESTART.wfn'
                 mo_curr = CP2K_methods.load_wfn_mo_data(wfn_file)
+                if isUKS != (mo_curr['nspin'] == 2):
+                    raise ValueError(F'isUKS={isUKS} but {wfn_file} carries nspin='
+                                     F'{mo_curr["nspin"]} - the diag template UKS/MULTIPLICITY '
+                                     F'must match the isUKS parameter')
             else:
-                mo_curr = CP2K_methods.load_molden_data(molden_filename, is_spherical)
+                mo_curr = CP2K_methods.load_molden_data(molden_filename, is_spherical, isUKS)
             odt_params = {'atom_labels': labels_step,
                           'overlap_template': params['overlap_template'],
                           'working_directory': 'odt_wd',
@@ -652,14 +662,19 @@ def run_cp2k_libint_step2(params):
             St, S_prev, S = CP2K_methods.mo_overlaps_via_cp2k(mo_prev, mo_curr, R_prev, R_curr,
                                                               lowest_orbital, highest_orbital,
                                                               odt_params)
-            zero_mat = np.zeros_like(S)
-            S_step_sparse = scipy.sparse.csc_matrix(data_conv.form_block_matrix(S, zero_mat, zero_mat, S))
+            # 2-block npz convention (alpha | beta on the diagonal): restricted runs
+            # duplicate the single channel, UKS carries genuinely distinct blocks
+            S_a, S_b = S if isUKS else (S, S)
+            E_a = np.diag(mo_curr['E'][lowest_orbital - 1:highest_orbital])
+            E_b = np.diag((mo_curr['E_b'] if isUKS else mo_curr['E'])[lowest_orbital - 1:highest_orbital])
+            zero_mat = np.zeros_like(S_a)
+            S_step_sparse = scipy.sparse.csc_matrix(data_conv.form_block_matrix(S_a, zero_mat, zero_mat, S_b))
             scipy.sparse.save_npz(params['res_dir'] + F'/S_ks_{step}.npz', S_step_sparse)
-            E_w = np.diag(mo_curr['E'][lowest_orbital - 1:highest_orbital])
-            E_step_sparse = scipy.sparse.csc_matrix(data_conv.form_block_matrix(E_w, zero_mat, zero_mat, E_w))
+            E_step_sparse = scipy.sparse.csc_matrix(data_conv.form_block_matrix(E_a, zero_mat, zero_mat, E_b))
             scipy.sparse.save_npz(params['res_dir'] + F'/E_ks_{step}.npz', E_step_sparse)
             if counter > 0:
-                St_step_sparse = scipy.sparse.csc_matrix(data_conv.form_block_matrix(St, zero_mat, zero_mat, St))
+                St_a, St_b = St if isUKS else (St, St)
+                St_step_sparse = scipy.sparse.csc_matrix(data_conv.form_block_matrix(St_a, zero_mat, zero_mat, St_b))
                 scipy.sparse.save_npz(params['res_dir'] + F'/St_ks_{step-1}.npz', St_step_sparse)
             mo_prev, R_prev = mo_curr, R_curr
             print('Done with computing molecular orbital overlaps. Elapsed time:', time.time() - t1)
