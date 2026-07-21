@@ -2036,10 +2036,18 @@ def run_step3_ks_nacs_libint(params):
                       }
     comn.check_input(params, default_params, critical_params)
     params['apply_orthonormalization'] = _orthonormalization_mode(params['apply_orthonormalization'])
+    isUKS = params.get('isUKS', 0)
     if params['es_software'].lower() == 'cp2k':
         sample_logfile = glob.glob(params['logfile_directory'] + '/*.log')[0]
-        params['homo_index'] = CP2K_methods.read_homo_index(sample_logfile)
-    params['npz_file_ks_homo_index'] = params['homo_index'] - params['lowest_orbital'] + 1
+        if isUKS:
+            params['homo_alpha_index'], params['homo_beta_index'] = CP2K_methods.read_homo_index(
+                sample_logfile, isUKS=True)
+            params['npz_file_ks_homo_alpha_index'] = params['homo_alpha_index'] - params['lowest_orbital'] + 1
+            params['npz_file_ks_homo_beta_index'] = params['homo_beta_index'] - params['lowest_orbital'] + 1
+        else:
+            params['homo_index'] = CP2K_methods.read_homo_index(sample_logfile)
+    if not isUKS:
+        params['npz_file_ks_homo_index'] = params['homo_index'] - params['lowest_orbital'] + 1
     sample_npz_file = glob.glob(params['path_to_npz_files'] + '/*.npz')[0]
     params['data_dim'] = int(sp.load_npz(sample_npz_file).shape[0])
     # Number of occupied states
@@ -2048,11 +2056,23 @@ def run_step3_ks_nacs_libint(params):
     num_unocc_states = params['num_unocc_states']
     # The dimension of the super-matrix
     data_dim = params['data_dim']
-    # The KS HOMO index in the sparse npz files - this value starts from 1
-    npz_file_ks_homo_index = params['npz_file_ks_homo_index']
-    # Create active space based on the number of occupied and unocciped states
-    ks_active_space, ks_homo_index = make_active_space(
-        num_occ_states, num_unocc_states, data_dim, npz_file_ks_homo_index)
+    # Create active space based on the number of occupied and unoccupied states.
+    # UKS: each channel's window is built around ITS OWN HOMO (they differ for
+    # any radical) - a single-homo active space would misalign the beta block
+    if isUKS:
+        ks_active_space, ks_homo_index, _ks_homo_index_beta = make_active_space(
+            num_occ_states, num_unocc_states, data_dim,
+            [params['npz_file_ks_homo_alpha_index'], params['npz_file_ks_homo_beta_index']],
+            isUKS=1,
+            num_occ_alpha=params.get('num_occ_alpha', num_occ_states),
+            num_occ_beta=params.get('num_occ_beta', num_occ_states),
+            num_unocc_alpha=params.get('num_unocc_alpha', num_unocc_states),
+            num_unocc_beta=params.get('num_unocc_beta', num_unocc_states))
+    else:
+        # The KS HOMO index in the sparse npz files - this value starts from 1
+        npz_file_ks_homo_index = params['npz_file_ks_homo_index']
+        ks_active_space, ks_homo_index = make_active_space(
+            num_occ_states, num_unocc_states, data_dim, npz_file_ks_homo_index)
     # Append the created active space into params
     params['active_space'] = ks_active_space
     # The new KS HOMO index in the new active space
