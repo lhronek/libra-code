@@ -758,7 +758,13 @@ def run_cp2k_libint_step2(params):
             eigenvectors_1 = np.array(eigenvectors_1)
             # the window slices below would silently truncate (HI > nmo) or wrap
             # (LO < 1) - validate against the MOs actually read from the molden
-            nmo_spin = int(eigenvectors_1.shape[0] / 2) if isUKS else eigenvectors_1.shape[0]
+            if isUKS:
+                # the channels are UNEQUAL in general (nelec_spin + ADDED_MOS
+                # per spin) - never split the stacked molden MOs in half
+                nmo_alpha, nmo_beta = CP2K_methods.molden_spin_counts(molden_filename)
+                nmo_spin = min(nmo_alpha, nmo_beta)
+            else:
+                nmo_spin = eigenvectors_1.shape[0]
             if not 1 <= lowest_orbital <= highest_orbital <= nmo_spin:
                 raise ValueError(F"orbital window [{lowest_orbital}, {highest_orbital}] does "
                                  F"not fit the {nmo_spin} MOs per spin read from the molden "
@@ -790,13 +796,12 @@ def run_cp2k_libint_step2(params):
                 # Beta spin channel
                 # beta_eigenvectors_1 = eigenvectors_1[1::2]
                 # beta_energies_1 = energies_1[1::2]
-                eig_vec_shape = int(eigenvectors_1.shape[0] / 2)
                 # Alpha spin channel
-                alpha_eigenvectors_1 = eigenvectors_1[0:eig_vec_shape]
-                alpha_energies_1 = energies_1[0:eig_vec_shape]
+                alpha_eigenvectors_1 = eigenvectors_1[0:nmo_alpha]
+                alpha_energies_1 = energies_1[0:nmo_alpha]
                 # Beta spin channel
-                beta_eigenvectors_1 = eigenvectors_1[eig_vec_shape:]
-                beta_energies_1 = energies_1[eig_vec_shape:]
+                beta_eigenvectors_1 = eigenvectors_1[nmo_alpha:nmo_alpha + nmo_beta]
+                beta_energies_1 = energies_1[nmo_alpha:nmo_alpha + nmo_beta]
 
             print('Done with resorting eigenvectors elements. Elapsed time:', time.time() - t1)
             ##
@@ -808,7 +813,8 @@ def run_cp2k_libint_step2(params):
                 # Will continue the implementation of emultipole for isUKS,,, It's just a
                 # lot at this point but very straightforward
                 if params['use_emultipole']:
-                    raise ('emultipole not implemented for isUKS... Sorry!!')
+                    raise ValueError('use_emultipole is not implemented for isUKS - '
+                                     'set use_emultipole=False for spin-polarized runs')
                 S_alpha = np.linalg.multi_dot([alpha_eigenvectors_1, AO_S, alpha_eigenvectors_1.T])[
                     lowest_orbital - 1:highest_orbital, lowest_orbital - 1:highest_orbital]
                 S_beta = np.linalg.multi_dot([beta_eigenvectors_1, AO_S, beta_eigenvectors_1.T])[
@@ -833,6 +839,7 @@ def run_cp2k_libint_step2(params):
                         lowest_orbital -
                         1:highest_orbital])
                 E_step_sparse = scipy.sparse.csc_matrix(E_step)
+                scipy.sparse.save_npz(params['res_dir'] + F'/S_ks_{step}.npz', S_step_sparse)
                 scipy.sparse.save_npz(params['res_dir'] + F'/E_ks_{step}.npz', E_step_sparse)
 
             else:
@@ -963,21 +970,20 @@ def run_cp2k_libint_step2(params):
                 # Beta spin channel
                 # beta_eigenvectors_2 = eigenvectors_2[1::2]
                 # beta_energies_2 = energies_2[1::2]
-                eig_vec_shape = int(eigenvectors_2.shape[0] / 2)
+                # unequal channels in general - split by the true per-spin counts
+                # Alpha spin channel
+                alpha_eigenvectors_1 = eigenvectors_1[0:nmo_alpha]
+                alpha_energies_1 = energies_1[0:nmo_alpha]
+                # Beta spin channel
+                beta_eigenvectors_1 = eigenvectors_1[nmo_alpha:nmo_alpha + nmo_beta]
+                beta_energies_1 = energies_1[nmo_alpha:nmo_alpha + nmo_beta]
 
                 # Alpha spin channel
-                alpha_eigenvectors_1 = eigenvectors_1[0:eig_vec_shape]
-                alpha_energies_1 = energies_1[0:eig_vec_shape]
+                alpha_eigenvectors_2 = eigenvectors_2[0:nmo_alpha]
+                alpha_energies_2 = energies_2[0:nmo_alpha]
                 # Beta spin channel
-                beta_eigenvectors_1 = eigenvectors_1[eig_vec_shape:]
-                beta_energies_1 = energies_1[eig_vec_shape:]
-
-                # Alpha spin channel
-                alpha_eigenvectors_2 = eigenvectors_2[0:eig_vec_shape]
-                alpha_energies_2 = energies_2[0:eig_vec_shape]
-                # Beta spin channel
-                beta_eigenvectors_2 = eigenvectors_2[eig_vec_shape:]
-                beta_energies_2 = energies_2[eig_vec_shape:]
+                beta_eigenvectors_2 = eigenvectors_2[nmo_alpha:nmo_alpha + nmo_beta]
+                beta_energies_2 = energies_2[nmo_alpha:nmo_alpha + nmo_beta]
 
             print('Done with resorting eigenvectors elements. Elapsed time:', time.time() - t1)
             ##
@@ -986,7 +992,8 @@ def run_cp2k_libint_step2(params):
 
             if isUKS:
                 if params['use_emultipole']:
-                    raise ('emultipole not implemented for isUKS... Sorry!!')
+                    raise ValueError('use_emultipole is not implemented for isUKS - '
+                                     'set use_emultipole=False for spin-polarized runs')
                 S_alpha = np.linalg.multi_dot([alpha_eigenvectors_2, AO_S, alpha_eigenvectors_2.T])[
                     lowest_orbital - 1:highest_orbital, lowest_orbital - 1:highest_orbital]
                 St_alpha = np.linalg.multi_dot([alpha_eigenvectors_1, AO_St, alpha_eigenvectors_2.T])[
@@ -1017,6 +1024,8 @@ def run_cp2k_libint_step2(params):
                         1:highest_orbital])
 
                 E_step_sparse = scipy.sparse.csc_matrix(E_step)
+                scipy.sparse.save_npz(params['res_dir'] + F'/S_ks_{step}.npz', S_step_sparse)
+                scipy.sparse.save_npz(params['res_dir'] + F'/St_ks_{step-1}.npz', St_step_sparse)
             else:
                 if params['use_emultipole']:
                     for counter1 in range(len(emultipole_labels)):
