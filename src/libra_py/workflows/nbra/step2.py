@@ -810,21 +810,34 @@ def run_cp2k_libint_step2(params):
             # Note that we choose the data from lowest_orbital to highest_orbital
             # the values for lowest_orbital and highest_orbital start from 1
             if isUKS:
-                # Will continue the implementation of emultipole for isUKS,,, It's just a
-                # lot at this point but very straightforward
                 if params['use_emultipole']:
-                    raise ValueError('use_emultipole is not implemented for isUKS - '
-                                     'set use_emultipole=False for spin-polarized runs')
-                S_alpha = np.linalg.multi_dot([alpha_eigenvectors_1, AO_S, alpha_eigenvectors_1.T])[
-                    lowest_orbital - 1:highest_orbital, lowest_orbital - 1:highest_orbital]
-                S_beta = np.linalg.multi_dot([beta_eigenvectors_1, AO_S, beta_eigenvectors_1.T])[
-                    lowest_orbital - 1:highest_orbital, lowest_orbital - 1:highest_orbital]
-                # creating zero matrix
-                mat_block_size = (len(S_alpha), len(S_beta))
-                zero_mat = np.zeros(mat_block_size)
-                S_step = data_conv.form_block_matrix(S_alpha, zero_mat, zero_mat.T, S_beta)
-                # Since a lot of the data are zeros we save them as sparse matrices
-                S_step_sparse = scipy.sparse.csc_matrix(S_step)
+                    # per spin channel over every requested component; the 'S'
+                    # component writes the standard S_ks file name, so the
+                    # emultipole route stays a superset of the plain one
+                    for counter1 in range(len(emultipole_labels)):
+                        A_alpha = np.linalg.multi_dot(
+                            [alpha_eigenvectors_1, AO_c_all_numpy[counter1], alpha_eigenvectors_1.T])[
+                            lowest_orbital - 1:highest_orbital, lowest_orbital - 1:highest_orbital]
+                        A_beta = np.linalg.multi_dot(
+                            [beta_eigenvectors_1, AO_c_all_numpy[counter1], beta_eigenvectors_1.T])[
+                            lowest_orbital - 1:highest_orbital, lowest_orbital - 1:highest_orbital]
+                        zero_mat = np.zeros((len(A_alpha), len(A_beta)))
+                        A_step = data_conv.form_block_matrix(A_alpha, zero_mat, zero_mat.T, A_beta)
+                        scipy.sparse.save_npz(params['res_dir'] +
+                                              F'/{emultipole_labels[counter1]}_ks_{step}.npz',
+                                              scipy.sparse.csc_matrix(A_step))
+                else:
+                    S_alpha = np.linalg.multi_dot([alpha_eigenvectors_1, AO_S, alpha_eigenvectors_1.T])[
+                        lowest_orbital - 1:highest_orbital, lowest_orbital - 1:highest_orbital]
+                    S_beta = np.linalg.multi_dot([beta_eigenvectors_1, AO_S, beta_eigenvectors_1.T])[
+                        lowest_orbital - 1:highest_orbital, lowest_orbital - 1:highest_orbital]
+                    # creating zero matrix
+                    mat_block_size = (len(S_alpha), len(S_beta))
+                    zero_mat = np.zeros(mat_block_size)
+                    S_step = data_conv.form_block_matrix(S_alpha, zero_mat, zero_mat.T, S_beta)
+                    # Since a lot of the data are zeros we save them as sparse matrices
+                    S_step_sparse = scipy.sparse.csc_matrix(S_step)
+                    scipy.sparse.save_npz(params['res_dir'] + F'/S_ks_{step}.npz', S_step_sparse)
                 E_step = data_conv.form_block_matrix(
                     np.diag(alpha_energies_1)[
                         lowest_orbital -
@@ -839,7 +852,6 @@ def run_cp2k_libint_step2(params):
                         lowest_orbital -
                         1:highest_orbital])
                 E_step_sparse = scipy.sparse.csc_matrix(E_step)
-                scipy.sparse.save_npz(params['res_dir'] + F'/S_ks_{step}.npz', S_step_sparse)
                 scipy.sparse.save_npz(params['res_dir'] + F'/E_ks_{step}.npz', E_step_sparse)
 
             else:
@@ -992,22 +1004,49 @@ def run_cp2k_libint_step2(params):
 
             if isUKS:
                 if params['use_emultipole']:
-                    raise ValueError('use_emultipole is not implemented for isUKS - '
-                                     'set use_emultipole=False for spin-polarized runs')
-                S_alpha = np.linalg.multi_dot([alpha_eigenvectors_2, AO_S, alpha_eigenvectors_2.T])[
-                    lowest_orbital - 1:highest_orbital, lowest_orbital - 1:highest_orbital]
-                St_alpha = np.linalg.multi_dot([alpha_eigenvectors_1, AO_St, alpha_eigenvectors_2.T])[
-                    lowest_orbital - 1:highest_orbital, lowest_orbital - 1:highest_orbital]
+                    # per spin channel over every requested component: same-time
+                    # matrices from the CURRENT MOs, time-cross matrices with the
+                    # previous step's channel as the bra; the 'S' component
+                    # writes the standard S_ks/St_ks file names
+                    for counter1 in range(len(emultipole_labels)):
+                        A_alpha = np.linalg.multi_dot(
+                            [alpha_eigenvectors_2, AO_c_all_numpy[counter1], alpha_eigenvectors_2.T])[
+                            lowest_orbital - 1:highest_orbital, lowest_orbital - 1:highest_orbital]
+                        A_beta = np.linalg.multi_dot(
+                            [beta_eigenvectors_2, AO_c_all_numpy[counter1], beta_eigenvectors_2.T])[
+                            lowest_orbital - 1:highest_orbital, lowest_orbital - 1:highest_orbital]
+                        At_alpha = np.linalg.multi_dot(
+                            [alpha_eigenvectors_1, AO_t_all_numpy[counter1], alpha_eigenvectors_2.T])[
+                            lowest_orbital - 1:highest_orbital, lowest_orbital - 1:highest_orbital]
+                        At_beta = np.linalg.multi_dot(
+                            [beta_eigenvectors_1, AO_t_all_numpy[counter1], beta_eigenvectors_2.T])[
+                            lowest_orbital - 1:highest_orbital, lowest_orbital - 1:highest_orbital]
+                        zero_mat = np.zeros((len(A_alpha), len(A_beta)))
+                        A_step = data_conv.form_block_matrix(A_alpha, zero_mat, zero_mat.T, A_beta)
+                        At_step = data_conv.form_block_matrix(At_alpha, zero_mat, zero_mat.T, At_beta)
+                        scipy.sparse.save_npz(params['res_dir'] +
+                                              F'/{emultipole_labels[counter1]}_ks_{step}.npz',
+                                              scipy.sparse.csc_matrix(A_step))
+                        scipy.sparse.save_npz(params['res_dir'] +
+                                              F'/{emultipole_labels[counter1]}t_ks_{step-1}.npz',
+                                              scipy.sparse.csc_matrix(At_step))
+                else:
+                    S_alpha = np.linalg.multi_dot([alpha_eigenvectors_2, AO_S, alpha_eigenvectors_2.T])[
+                        lowest_orbital - 1:highest_orbital, lowest_orbital - 1:highest_orbital]
+                    St_alpha = np.linalg.multi_dot([alpha_eigenvectors_1, AO_St, alpha_eigenvectors_2.T])[
+                        lowest_orbital - 1:highest_orbital, lowest_orbital - 1:highest_orbital]
 
-                S_beta = np.linalg.multi_dot([beta_eigenvectors_2, AO_S, beta_eigenvectors_2.T])[
-                    lowest_orbital - 1:highest_orbital, lowest_orbital - 1:highest_orbital]
-                St_beta = np.linalg.multi_dot([beta_eigenvectors_1, AO_St, beta_eigenvectors_2.T])[
-                    lowest_orbital - 1:highest_orbital, lowest_orbital - 1:highest_orbital]
+                    S_beta = np.linalg.multi_dot([beta_eigenvectors_2, AO_S, beta_eigenvectors_2.T])[
+                        lowest_orbital - 1:highest_orbital, lowest_orbital - 1:highest_orbital]
+                    St_beta = np.linalg.multi_dot([beta_eigenvectors_1, AO_St, beta_eigenvectors_2.T])[
+                        lowest_orbital - 1:highest_orbital, lowest_orbital - 1:highest_orbital]
 
-                S_step = data_conv.form_block_matrix(S_alpha, zero_mat, zero_mat.T, S_beta)
-                St_step = data_conv.form_block_matrix(St_alpha, zero_mat, zero_mat.T, St_beta)
-                S_step_sparse = scipy.sparse.csc_matrix(S_step)
-                St_step_sparse = scipy.sparse.csc_matrix(St_step)
+                    S_step = data_conv.form_block_matrix(S_alpha, zero_mat, zero_mat.T, S_beta)
+                    St_step = data_conv.form_block_matrix(St_alpha, zero_mat, zero_mat.T, St_beta)
+                    S_step_sparse = scipy.sparse.csc_matrix(S_step)
+                    St_step_sparse = scipy.sparse.csc_matrix(St_step)
+                    scipy.sparse.save_npz(params['res_dir'] + F'/S_ks_{step}.npz', S_step_sparse)
+                    scipy.sparse.save_npz(params['res_dir'] + F'/St_ks_{step-1}.npz', St_step_sparse)
 
                 E_step = data_conv.form_block_matrix(
                     np.diag(alpha_energies_2)[
@@ -1024,8 +1063,6 @@ def run_cp2k_libint_step2(params):
                         1:highest_orbital])
 
                 E_step_sparse = scipy.sparse.csc_matrix(E_step)
-                scipy.sparse.save_npz(params['res_dir'] + F'/S_ks_{step}.npz', S_step_sparse)
-                scipy.sparse.save_npz(params['res_dir'] + F'/St_ks_{step-1}.npz', St_step_sparse)
             else:
                 if params['use_emultipole']:
                     for counter1 in range(len(emultipole_labels)):
