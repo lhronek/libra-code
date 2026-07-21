@@ -299,7 +299,18 @@ vector<int> get_reordering(CMATRIX& time_overlap){
       }// while indx!=col
     }// for col
 
-    return perm_cum;
+    // perm_cum accumulates the column swaps applied to S, which is the INVERSE
+    // of the documented convention perm[i] = j ("old state i is now labeled j",
+    // the row-argmax of |S|). Every consumer (update_projectors here, step3's
+    // do_state_reordering) applies the result through the same code path as
+    // Munkres_Kuhn / hungarian_algorithm / the stochastic variants, which all
+    // return the documented convention - so return its inverse. The two only
+    // coincide for involutions (e.g. pairwise crossings), which is why the
+    // mismatch stayed hidden: a 3-state cyclic crossing got scrambled.
+    vector<int> res(sz, 0);
+    for(i = 0; i < sz; i++){ res[ perm_cum[i] ] = i; }
+
+    return res;
 }
 
 

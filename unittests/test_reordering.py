@@ -10,6 +10,20 @@
 # *********************************************************************************/
 """
  This is an extended test suite for validating the reordering algorithm implemented in C++
+
+ Conventions (the reason this suite was once misleading): the physical input is
+ the time-overlap X = <psi(t)|psi(t+dt)> = U.H() * Ut, and every reordering
+ function returns perm[i] = j meaning "old state i is now labeled j" - the
+ row-argmax of |X| for permutation-structured inputs. The consumers (step3's
+ do_state_reordering, the engine's update_projectors) apply every algorithm's
+ output through the same permute_cols/permutation2cmatrix path, whose defining
+ property is that X.permute_cols(res) restores a dominant diagonal. For an
+ input built as X = U.H() * permute(U, q), that operational answer is
+ inverse(q) - NOT q; the two coincide only for involutions. The pre-2024 form
+ of this suite asserted q (making the correct Munkres_Kuhn look broken on
+ every non-involution) and handed get_reordering the TRANSPOSED input
+ (permute(U, q).H() * U), which no consumer produces - masking that
+ get_reordering returned the inverse convention until it was fixed.
 """
 
 import os
@@ -195,18 +209,23 @@ set1 = init_set()
 def test_Munkres_Kunh(mtx, perm):
     en = CMATRIX(mtx)
     en *= 0.0
-    x = Cpp2Py(Munkres_Kuhn(mtx, en, 0.0, 0))
+    x = Cpp2Py(Munkres_Kuhn(mtx, en, 0.0, 0, 0))
     assert perm == x
 
 
-@pytest.mark.parametrize(('mtx', 'perm'), set1)
+# get_reordering is a GREEDY column chase, exact for permutation-structured
+# inputs (trivial crossings - its design case: a, b, c incl. the 3-cycles);
+# on the strongly mixed matrices (e..h1) it may legitimately differ from the
+# optimal-assignment answer that Munkres_Kuhn/hungarian_algorithm return -
+# use those for mixed states.
+@pytest.mark.parametrize(('mtx', 'perm'), set1[0:3])
 def test_get_reordering(mtx, perm):
     x = Cpp2Py(get_reordering(mtx))
     assert perm == x
 
 
 @pytest.mark.parametrize(('mtx', 'perm'), set1)
-def test_hungarian(mtx, perm):
+def test_hungarian_1(mtx, perm):
     en = CMATRIX(mtx)
     en *= 0.0
     x = Cpp2Py(hungarian_algorithm(mtx, en, 0.0, 0))
@@ -236,16 +255,33 @@ set2 = [[0, 1], [1, 0],
         ]
 
 
+def inverse_perm(perm):
+    res = [0] * len(perm)
+    for i, j in enumerate(perm):
+        res[j] = i
+    return res
+
+
+def check_consumer_property(X, res):
+    """The contract every consumer relies on: applying the returned permutation
+    the way step3/update_projectors do restores the dominant diagonal."""
+    Y = CMATRIX(X)
+    Y.permute_cols(Py2Cpp_int(res))
+    for i in range(Y.num_of_rows):
+        assert abs(Y.get(i, i)) > 0.999
+
+
 @pytest.mark.parametrize(('perm'), set2)
 def test_Munkres_Kunh_2(perm):
     N = len(perm)
     U = get_U(N)
     Ut = permute(U, perm)
-    X = U.H() * Ut
+    X = U.H() * Ut                        # the physical bra/ket order
     en = CMATRIX(X)
     en *= 0.0
-    res = Cpp2Py(Munkres_Kuhn(X, en, 0.0, 0))
-    assert res == perm
+    res = Cpp2Py(Munkres_Kuhn(X, en, 0.0, 0, 0))
+    assert res == inverse_perm(perm)
+    check_consumer_property(X, res)
 
 
 @pytest.mark.parametrize(('perm'), set2)
@@ -253,18 +289,20 @@ def test_get_reordering_2(perm):
     N = len(perm)
     U = get_U(N)
     Ut = permute(U, perm)
-    X = Ut.H() * U
+    X = U.H() * Ut                        # the physical bra/ket order
     res = Cpp2Py(get_reordering(X))
-    assert res == perm
+    assert res == inverse_perm(perm)
+    check_consumer_property(X, res)
 
 
 @pytest.mark.parametrize(('perm'), set2)
-def test_hungarian(perm):
+def test_hungarian_2(perm):
     N = len(perm)
     U = get_U(N)
     Ut = permute(U, perm)
-    X = Ut.H() * U
+    X = U.H() * Ut                        # the physical bra/ket order
     en = CMATRIX(X)
     en *= 0.0
-    res = Cpp2Py(hungarian_algorithm(X, en, 0.0))
-    assert res == perm
+    res = Cpp2Py(hungarian_algorithm(X, en, 0.0, 0))
+    assert res == inverse_perm(perm)
+    check_consumer_property(X, res)
