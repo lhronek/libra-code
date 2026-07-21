@@ -1030,7 +1030,11 @@ def run_cp2k_libint_step2(params):
                 if params['use_emultipole']:
                     for counter1 in range(len(emultipole_labels)):
                         # I'll keep the same naming for matrices as it is more convenient
-                        S = np.linalg.multi_dot([eigenvectors_1, AO_c_all_numpy[counter1], eigenvectors_1.T])[
+                        # same-time matrices belong to the CURRENT step: AO_c_all is
+                        # computed over shell_2, so the contraction must use the current
+                        # MOs (eigenvectors_1 still holds the previous step's here -
+                        # it rotates only at the end of the loop)
+                        S = np.linalg.multi_dot([eigenvectors_2, AO_c_all_numpy[counter1], eigenvectors_2.T])[
                             lowest_orbital - 1:highest_orbital, lowest_orbital - 1:highest_orbital]
                         mat_block_size = len(S)
                         zero_mat = np.zeros((mat_block_size, mat_block_size))
