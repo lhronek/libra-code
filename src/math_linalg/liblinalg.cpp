@@ -1088,21 +1088,16 @@ void export_linalg_objects(){
 
 
 
-  class_< intMap >("intMap")
-      .def(vector_indexing_suite< intMap >())
-  ;
-
-  class_< floatMap >("floatMap")
-      .def(vector_indexing_suite< floatMap >())
-  ;
-
-  class_< doubleMap >("doubleMap")
-      .def(vector_indexing_suite< doubleMap >())
-  ;
-
-  class_< complexMap >("complexMap")
-      .def(vector_indexing_suite< complexMap >())
-  ;
+  // intMap/floatMap/doubleMap/complexMap are typedef ALIASES of the *List2
+  // types registered above - a second class_<> for the same C++ type would
+  // install a duplicate to-Python converter, which Boost.Python ignores with
+  // an import-time RuntimeWarning (eight of them: converter +
+  // container_element for each of the four element types). Expose the Map
+  // names as Python-level aliases of the already-registered classes instead.
+  scope().attr("intMap") = scope().attr("intList2");
+  scope().attr("floatMap") = scope().attr("floatList2");
+  scope().attr("doubleMap") = scope().attr("doubleList2");
+  scope().attr("complexMap") = scope().attr("complexList2");
 
 
   export_IMATRIX();
