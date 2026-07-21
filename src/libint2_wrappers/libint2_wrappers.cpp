@@ -508,10 +508,12 @@ std::vector<MATRIX> compute_1body_ints_parallel_emultipole3(
           // The results block
           Eigen::Map<const Matrix> buf_mat(buf[index], n1, n2);
           results[index].block(bf1, bf2, n1, n2) = buf_mat;
-
-          if (s1 != s2) // if s1 >= s2, copy {s1,s2} to the corresponding
-                        // {s2,s1} block, note the transpose!
-            results[index].block(bf2, bf1, n2, n1) = buf_mat.transpose();
+          // NO transpose-mirror into the {s2,s1} block here: the loop runs over
+          // ALL shell pairs (both triangles are computed directly), and the
+          // mirror is only valid when shells_1 == shells_2 - for two different
+          // shell sets (time-overlap pairs) it overwrote the upper triangle
+          // with wrong values (and raced between threads). Same convention as
+          // the overlap kernel above, where the mirror is disabled too.
         }
       }
     }
