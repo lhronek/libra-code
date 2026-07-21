@@ -3669,8 +3669,9 @@ def sd_overlaps(sd_states, St_mo, S_mo_prev, S_mo_curr, orthonormalize=True,
               bit-identical to "lowdin"; a hit is one fractional matrix
               power cheaper - a saving that matters in file-based
               post-processing, not next to a CP2K call
-            - "none" or False: raw determinant overlaps (the
-              dftb_compute_adi convention)
+            - "none" or False: raw determinant overlaps (the historical
+              dftb_compute_adi behavior; upstream moved that driver to
+              Lowdin in 2026-04)
         sd_states_prev: previous-step (bra) SD list if it differs from the
             current one (e.g. per-step energy-sorted bases) [default: sd_states]
         kernel: SD determinant kernel; same names as step3's
@@ -4501,7 +4502,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     "lowdin_cached" (bra factor carried between steps, the
                     cp2k_compute_adi_nbra convention - numerically identical
                     here, one fractional matrix power cheaper), "none"/False
-                    (raw determinants, the dftb_compute_adi convention)
+                    (raw determinants - the historical dftb_compute_adi
+                    behavior; upstream moved that driver to Lowdin in 2026-04)
                 sd_overlap_kernel (str): SD determinant kernel, same values
                     as step3: "auto" [default] | "batched" | "lemma" | "per_pair"
                 align_mo_phases (bool): cumulative MO-phase alignment of the
