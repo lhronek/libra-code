@@ -3951,8 +3951,24 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
         channels at no extra CP2K cost.
 
     Raises ValueError when the window does not fit the stored MOs (python
-    slicing would silently truncate or wrap).
+    slicing would silently truncate or wrap), and for tabulated/ZDO
+    electronic structures (DFTB, NDDO semi-empirics), whose parameterization
+    cannot produce the doubled-geometry CROSS overlaps.
     """
+    with open(params["overlap_template"]) as f:
+        tmpl_methods = set(re.findall(r"^\s*METHOD\s+(\S+)", f.read().upper(), re.M))
+    bad = tmpl_methods & {"DFTB", "SE", "AM1", "MNDO", "MNDOD", "PDG", "PDDG",
+                          "PM3", "PM6", "PM6-FM", "PNNL", "RM1"}
+    if bad:
+        raise ValueError(
+            F"the OVERLAP_DELTAT route cannot serve tabulated/ZDO electronic "
+            F"structures (overlap template METHOD {'/'.join(sorted(bad))}): the "
+            F"doubled-geometry run needs the CROSS overlaps <phi(R1)|phi(R2)> at "
+            F"near-zero interatomic distances, but Slater-Koster tables are "
+            F"zero-padded below their physical range (demonstrated on DFTB/CH2O: "
+            F"same-copy blocks exact at 1.3e-14, cross diagonals ~0.27 instead of "
+            F"~1) and NDDO never materializes basis functions at all - use xTB "
+            F"(analytic GTO-fit overlaps, validated end-to-end) or a GTO method")
     for d in (mo_prev, mo_curr):
         for suff in ("", "_b"):
             if F"C{suff}" not in d:
