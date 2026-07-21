@@ -4617,6 +4617,22 @@ def cp2k_compute_adi_impl(q, params, full_id):
     if force_source not in ("active_state", "all_states", "gs", "none"):
         raise ValueError(F"force_source must be 'active_state', 'all_states', 'gs' or 'none', "
                          F"got {force_source!r}")
+    # tblite runs (&XTB &TBLITE): CP2K's TDDFPT excited-state force assembly
+    # calls the native-xTB Coulomb Hessian (xtb_ehess), whose neighbor lists a
+    # tblite run never populates - hard segfault, verified
+    # (qs_tddfpt2_forces.F:1358 -> xtb_ehess.F:146; unfixed upstream). Refuse
+    # BEFORE any CP2K time is spent. (OE_CORR had the same class of defect in
+    # tddfpt_oecorr - fixed by the local CP2K patch dispatching to
+    # build_tblite_ks_matrix, so it is not guarded here.)
+    if params.get("time_dependent", True) and force_source in ("active_state", "all_states"):
+        with open(params["input_template"]) as f:
+            if "&TBLITE" in f.read().upper():
+                raise ValueError(
+                    "CP2K's TDDFPT excited-state forces call the native-xTB Coulomb "
+                    "Hessian (xtb_ehess), whose neighbor lists tblite runs never "
+                    "populate - segfault, verified (qs_tddfpt2_forces.F:1358 -> "
+                    "xtb_ehess.F:146). Use force_source='gs'/'none' (spectrum + GS "
+                    "forces work), time_dependent=False, or native xTB")
     wd = f"{params.get('working_directory_prefix', 'wd')}_itraj{itraj}"
 
     # ---------------- run CP2K (execution layer) ----------------
