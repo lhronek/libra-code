@@ -167,6 +167,10 @@ def apply_orthonormalization_scipy(S_1, S_2, St):
 
 def lowdin_digest(S, tag=""):
     """Content key for the Lowdin factor caches (step3's per-process
-    slot, the driver's per-trajectory dicts)."""
-    return hashlib.blake2b(np.ascontiguousarray(S).tobytes() + tag.encode(),
-                           digest_size=16).digest()
+    slot, the driver's per-trajectory dicts). S is a single array or a
+    tuple/list of per-spin blocks (UKS) - the blocks are hashed in order."""
+    h = hashlib.blake2b(digest_size=16)
+    for blk in (S if isinstance(S, (tuple, list)) else (S,)):
+        h.update(np.ascontiguousarray(blk).tobytes())
+    h.update(tag.encode())
+    return h.digest()

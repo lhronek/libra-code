@@ -2727,9 +2727,18 @@ def read_cp2k_newtonx_output(filename):
       - OCCUPIED/VIRTUAL MO COEFFICIENTS (nao x nmo, CP2K MOLog AO order)
         and MO EIGENVALUES
 
+    UKS layout (the writer, qs_tddfpt2_restart.F, is spin-generic): the ES
+    EIGENVECTORS blocks alternate alpha/beta WITHIN each state, the MO
+    coefficient blocks come once per spin, and the scalar blocks (eigenvalues,
+    phases) are concatenated alpha-then-beta. The spin channels are detected
+    from the MO blocks (their per-spin occupied counts differ from a naive
+    split), so UKS parsing requires PRINT_VIRTUALS T.
+
     Returns:
         dict: X (list of np.ndarray (nvirt, nocc) per state),
-              C_occ, C_virt (np.ndarray or None), E_occ, E_virt (np.ndarray or None)
+              C_occ, C_virt (np.ndarray or None), E_occ, E_virt (np.ndarray or None),
+              nspin (1 or 2); for UKS additionally the beta channel as
+              X_b, C_occ_b, C_virt_b, E_occ_b, E_virt_b, phases_occ_b, phases_virt_b
     """
     lines = open(filename).readlines()
 
@@ -2749,20 +2758,22 @@ def read_cp2k_newtonx_output(filename):
             M[r - 1, c - 1] = v
         return M, i
 
-    X, C_occ, C_virt = [], None, None
+    X_all, occ_blocks, virt_blocks = [], [], []
     extra = {}
     i = 0
     while i < len(lines):
         s = lines[i].strip()
         if s == "ES EIGENVECTORS":
             M, i = read_triplet_matrix(i + 1)
-            X.append(M)
+            X_all.append(M)
             continue
         if s == "OCCUPIED MO COEFFICIENTS":
-            C_occ, i = read_triplet_matrix(i + 1)
+            M, i = read_triplet_matrix(i + 1)
+            occ_blocks.append(M)
             continue
         if s == "VIRTUAL MO COEFFICIENTS":
-            C_virt, i = read_triplet_matrix(i + 1)
+            M, i = read_triplet_matrix(i + 1)
+            virt_blocks.append(M)
             continue
         if s in ("PHASES OCCUPIED ORBITALS", "PHASES VIRTUAL ORBITALS",
                  "OCCUPIED MO EIGENVALUES", "VIRTUAL MO EIGENVALUES"):
@@ -2783,17 +2794,56 @@ def read_cp2k_newtonx_output(filename):
             i = j
             continue
         i += 1
-    if not X:
+    if not X_all:
         raise ValueError(f"no ES EIGENVECTORS blocks in {filename}")
+    if len(occ_blocks) > 2 or len(occ_blocks) != len(virt_blocks):
+        raise ValueError(f"{filename}: {len(occ_blocks)} occupied / "
+                         f"{len(virt_blocks)} virtual MO blocks - expected "
+                         f"matching counts of 1 (restricted) or 2 (UKS)")
+
+    if len(occ_blocks) == 2:
+        # UKS: coefficient blocks per spin, ES blocks alternating alpha/beta
+        # per state, scalar blocks concatenated alpha-then-beta
+        C_occ, C_occ_b = occ_blocks
+        C_virt, C_virt_b = virt_blocks
+        na, nb = C_occ.shape[1], C_occ_b.shape[1]
+        nva = C_virt.shape[1]
+        if len(X_all) % 2:
+            raise ValueError(f"{filename}: odd number of ES EIGENVECTORS blocks "
+                             f"({len(X_all)}) with two spin channels")
+        X, X_b = X_all[0::2], X_all[1::2]
+        if any(M.shape[1] != na for M in X) or any(M.shape[1] != nb for M in X_b):
+            raise ValueError(f"{filename}: ES EIGENVECTORS column counts do not "
+                             f"alternate as the per-spin occupied counts "
+                             f"({na} alpha / {nb} beta)")
+        split = lambda a, n: (None, None) if a is None else (a[:n], a[n:])
+        E_occ, E_occ_b = split(extra.get("E_occ"), na)
+        E_virt, E_virt_b = split(extra.get("E_virt"), nva)
+        p_occ, p_occ_b = split(extra.get("phases_occ"), na)
+        p_virt, p_virt_b = split(extra.get("phases_virt"), nva)
+    else:
+        X = X_all
+        C_occ = occ_blocks[0] if occ_blocks else None
+        C_virt = virt_blocks[0] if virt_blocks else None
+        X_b = C_occ_b = C_virt_b = E_occ_b = E_virt_b = p_occ_b = p_virt_b = None
+        E_occ, E_virt = extra.get("E_occ"), extra.get("E_virt")
+        p_occ, p_virt = extra.get("phases_occ"), extra.get("phases_virt")
     # the writer UNCONDITIONALLY column-scales X by the occupied-MO phases
     # (qs_tddfpt2_restart.F); undo it so the amplitudes refer to the raw MOs
     # (the same convention as the molden coefficients). Requires PRINT_PHASES T.
-    if "phases_occ" in extra:
+    if p_occ is not None:
         for M in X:
-            M *= extra["phases_occ"][np.newaxis, :]     # phases are +-1
+            M *= p_occ[np.newaxis, :]                   # phases are +-1
+    if X_b is not None and p_occ_b is not None:
+        for M in X_b:
+            M *= p_occ_b[np.newaxis, :]
     return {"X": X, "C_occ": C_occ, "C_virt": C_virt,
-            "E_occ": extra.get("E_occ"), "E_virt": extra.get("E_virt"),
-            "phases_occ": extra.get("phases_occ"), "phases_virt": extra.get("phases_virt")}
+            "E_occ": E_occ, "E_virt": E_virt,
+            "phases_occ": p_occ, "phases_virt": p_virt,
+            "nspin": 2 if X_b is not None else 1,
+            "X_b": X_b, "C_occ_b": C_occ_b, "C_virt_b": C_virt_b,
+            "E_occ_b": E_occ_b, "E_virt_b": E_virt_b,
+            "phases_occ_b": p_occ_b, "phases_virt_b": p_virt_b}
 
 
 def read_cp2k_tdfrc(filename):
@@ -3366,9 +3416,12 @@ def fd_force_check(coords_bohr, params, atom, dim, h=0.01):
 
 
 def _two_spinor(S):
-    """alpha (+) beta block-diagonal duplication (= data_conv.form_block_matrix(S, 0, 0, S))."""
-    z = np.zeros_like(S)
-    return data_conv.form_block_matrix(S, z, z, S)
+    """alpha (+) beta block-diagonal spinor matrix. S is either a single array
+    (restricted: the block is duplicated, = data_conv.form_block_matrix(S, 0, 0, S))
+    or an (S_alpha, S_beta) pair (UKS)."""
+    Sa, Sb = S if isinstance(S, (tuple, list)) else (S, S)
+    return data_conv.form_block_matrix(Sa, np.zeros((Sa.shape[0], Sb.shape[1])),
+                                       np.zeros((Sb.shape[0], Sa.shape[1])), Sb)
 
 
 def molden_spin_counts(molden_file):
@@ -3468,7 +3521,8 @@ def align_mo_phases(C_prev_aligned, data_curr, St_mo):
 # ========================= TDDFPT CI data ==================================
 
 
-def read_ci_data(logfile, nstates, tolerance=0.01, lowest_orbital=1, highest_orbital=int(1e10)):
+def read_ci_data(logfile, nstates, tolerance=0.01, lowest_orbital=1, highest_orbital=int(1e10),
+                 isUKS=False):
     """
     Parse TDDFPT excitation energies + CI expansions from a CP2K log.
 
@@ -3476,20 +3530,28 @@ def read_ci_data(logfile, nstates, tolerance=0.01, lowest_orbital=1, highest_orb
 
     Returns:
         dict: E (np.ndarray nexc, Hartree), configs (list per state of [occ, vir]
-              ABSOLUTE 1-based orbital pairs), amps (list per state of np.ndarray,
-              NORMALIZED after tolerance truncation), spins (list per state)
+              ABSOLUTE 1-based orbital pairs, per spin channel), amps (list per
+              state of np.ndarray, NORMALIZED after tolerance truncation),
+              spins (list per state, 'alp'/'bet' - beta appears for isUKS logs,
+              whose excitation analysis labels every config with its spin)
+
+    UKS caveat: the CP2K analysis print (2026.1-dev) decodes the alpha-channel
+    flat indices with the beta-channel dimensions, so the alpha [occ, vir]
+    labels come out corrupted whenever the channels differ (beta labels and
+    all amplitudes/energies are fine) - prefer the NAMD_PRINT vectors for UKS.
     """
     out = read_cp2k_tddfpt_log_file(
         {"logfile_name": logfile, "number_of_states": nstates,
          "tolerance": tolerance, "ci_threshold": tolerance,   # master / devel keyword
-         "isUKS": False, "lowest_orbital": lowest_orbital, "highest_orbital": highest_orbital})
+         "isUKS": bool(isUKS), "lowest_orbital": lowest_orbital, "highest_orbital": highest_orbital})
     if len(out) == 2:
-        # devel branch: (info, [E_Ha, configs, amplitudes])
+        # devel branch: (info, [E_Ha, configs, amplitudes, spins])
         info, data = out
         E = np.asarray(data[0], dtype=float)[:nstates]
         basis = [np.asarray(c, dtype=int).tolist() for c in data[1][:nstates]]
         coeff = [np.asarray(a, dtype=float) for a in data[2][:nstates]]
-        spin = [["alp"] * len(b) for b in basis]
+        spin = (list(data[3][:nstates]) if len(data) > 3
+                else [["alp"] * len(b) for b in basis])
     else:
         # master branch: (E_eV, configs, amplitudes, spins)
         E_ev, basis, coeff, spin = out
@@ -3507,41 +3569,79 @@ def read_ci_data(logfile, nstates, tolerance=0.01, lowest_orbital=1, highest_orb
 # ===================== Backend A: Slater determinants ======================
 
 
-def make_sd_basis(homo_w, num_occ_states, num_unocc_states, norb_w):
+def make_sd_basis(homo_w, num_occ_states, num_unocc_states, norb_w,
+                  homo_beta_w=None, num_occ_beta=None, num_unocc_beta=None):
     """
-    Fixed single-particle SD basis for the orbital window (restricted case).
+    Fixed single-particle SD basis for the orbital window.
 
     Excitations occ -> vir with occ in [homo_w-num_occ_states+1, homo_w] and
     vir in [homo_w+1, homo_w+num_unocc_states], all indices 1-based WITHIN the window.
 
-    Returns:
-        sd_unique (list): [[occ, vir], 'alp'] pairs (no ground state)
-        sd_states (list): Libra signed-spin-orbital SDs, ground state FIRST
-                          (from step2_many_body.reindex_cp2k_sd_states)
+    Restricted by default; passing homo_beta_w switches to the UKS basis:
+    electron-only excitations per spin channel (alpha windowed around homo_w,
+    beta around homo_beta_w, both over the same norb_w orbital window), with
+    the beta excitation counts defaulting to the alpha ones. The determinants
+    list alpha spin-orbitals as +i and beta as -i (the step2_many_body signed
+    convention, same as reindex_cp2k_sd_states with both channels).
 
-    Raises ValueError when the window does not bracket the HOMO or when the
+    Returns:
+        sd_unique (list): [[occ, vir], 'alp'/'bet'] pairs (no ground state)
+        sd_states (list): Libra signed-spin-orbital SDs, ground state FIRST
+
+    Raises ValueError when a channel's window does not bracket its HOMO or the
     SD window exceeds the orbitals available in it - invalid indices would
     otherwise reindex into duplicate/garbage determinants (singular SD
     overlaps, NaN through everything downstream).
     """
-    if not 1 <= homo_w <= norb_w - 1:
-        raise ValueError(F"the orbital window does not bracket the HOMO "
-                         F"(window-relative HOMO={homo_w}, window size {norb_w}) - "
-                         F"choose lowest_orbital <= HOMO < highest_orbital")
-    if not 1 <= num_occ_states <= homo_w:
-        raise ValueError(F"num_occ_states={num_occ_states} but the orbital window holds only "
-                         F"{homo_w} occupied orbitals - reduce num_occ_states or lower "
-                         F"lowest_orbital")
-    if not 1 <= num_unocc_states <= norb_w - homo_w:
-        raise ValueError(F"num_unocc_states={num_unocc_states} but the orbital window holds only "
-                         F"{norb_w - homo_w} virtuals above the HOMO - reduce "
-                         F"num_unocc_states or raise highest_orbital")
-    sd_unique = []
+    def _check(homo_c, no_c, nu_c, ch):
+        occ_kw = "num_occ_states" if ch == "alp" else "num_occ_beta"
+        vir_kw = "num_unocc_states" if ch == "alp" else "num_unocc_beta"
+        lab = "" if ch == "alp" else "beta "
+        if not 1 <= homo_c <= norb_w - 1:
+            raise ValueError(F"the {lab}orbital window does not bracket the HOMO "
+                             F"(window-relative HOMO={homo_c}, window size {norb_w}) - "
+                             F"choose lowest_orbital <= HOMO < highest_orbital")
+        if not 1 <= no_c <= homo_c:
+            raise ValueError(F"{occ_kw}={no_c} but the {lab}orbital window holds only "
+                             F"{homo_c} occupied orbitals - reduce {occ_kw} or lower "
+                             F"lowest_orbital")
+        if not 1 <= nu_c <= norb_w - homo_c:
+            raise ValueError(F"{vir_kw}={nu_c} but the {lab}orbital window holds only "
+                             F"{norb_w - homo_c} virtuals above the HOMO - reduce "
+                             F"{vir_kw} or raise highest_orbital")
+
+    _check(homo_w, num_occ_states, num_unocc_states, "alp")
+    if homo_beta_w is None:
+        sd_unique = []
+        for o in range(homo_w - num_occ_states + 1, homo_w + 1):
+            for v in range(homo_w + 1, homo_w + num_unocc_states + 1):
+                sd_unique.append([[o, v], 'alp'])
+        sd_states = step2_many_body.reindex_cp2k_sd_states(
+            homo_w, list(range(1, norb_w + 1)), sd_unique, sd_format=2)
+        return sd_unique, sd_states
+
+    no_b = num_occ_states if num_occ_beta is None else num_occ_beta
+    nu_b = num_unocc_states if num_unocc_beta is None else num_unocc_beta
+    _check(homo_beta_w, no_b, nu_b, "bet")
+    gs = []
+    for i in range(1, max(homo_w, homo_beta_w) + 1):
+        if i <= homo_w:
+            gs.append(i)
+        if i <= homo_beta_w:
+            gs.append(-i)
+    sd_unique, sd_states = [], [list(gs)]
     for o in range(homo_w - num_occ_states + 1, homo_w + 1):
         for v in range(homo_w + 1, homo_w + num_unocc_states + 1):
             sd_unique.append([[o, v], 'alp'])
-    sd_states = step2_many_body.reindex_cp2k_sd_states(
-        homo_w, list(range(1, norb_w + 1)), sd_unique, sd_format=2)
+            st = list(gs)
+            st[st.index(o)] = v
+            sd_states.append(st)
+    for o in range(homo_beta_w - no_b + 1, homo_beta_w + 1):
+        for v in range(homo_beta_w + 1, homo_beta_w + nu_b + 1):
+            sd_unique.append([[o, v], 'bet'])
+            st = list(gs)
+            st[st.index(-o)] = -v
+            sd_states.append(st)
     return sd_unique, sd_states
 
 
@@ -3553,7 +3653,10 @@ def sd_overlaps(sd_states, St_mo, S_mo_prev, S_mo_curr, orthonormalize=True,
     Args:
         sd_states: signed-spin-orbital SD list (GS first), window-relative;
             this is the CURRENT (ket) basis
-        St_mo, S_mo_prev, S_mo_curr: (norb_w x norb_w) MO matrices
+        St_mo, S_mo_prev, S_mo_curr: (norb_w x norb_w) MO matrices; a single
+            array is used for both spin blocks (restricted), an
+            (alpha, beta) tuple/list gives each channel its own block (UKS -
+            both channels over the same orbital window)
         orthonormalize: normalization of the SD overlaps:
             - "lowdin" or True: Lowdin S^-1/2 sandwiches, both factors
               recomputed from this step's same-time overlaps (the step3
@@ -3594,7 +3697,7 @@ def sd_overlaps(sd_states, St_mo, S_mo_prev, S_mo_curr, orthonormalize=True,
             "auto": mapping.ovlp_mat_arb_auto}[kernel]
     if sd_states_prev is None:
         sd_states_prev = sd_states
-    n_half = St_mo.shape[0]
+    n_half = (St_mo[0] if isinstance(St_mo, (tuple, list)) else St_mo).shape[0]
     # mapping's fast kernels use the canonical (sorted) determinant convention;
     # convert back to the list-order convention with the per-SD sort parities
     # so that the SD2CI amplitudes (built without parities) stay consistent
@@ -3629,7 +3732,9 @@ def sd2ci_matrix(ci_data, sd_unique, lowest_orbital):
 
     Column 0 = ground state (pure reference determinant). Column i>0 holds the
     normalized amplitudes of excited state i distributed over the SD basis.
-    Configs in ci_data are absolute orbital indices; sd_unique is window-relative.
+    Configs in ci_data are absolute orbital indices (per spin channel, matched
+    through ci_data["spins"] against the 'alp'/'bet' tags of sd_unique);
+    sd_unique is window-relative.
 
     Components outside the SD basis cannot be represented there: they are
     dropped and the column is renormalized over the kept part (the same
@@ -3644,11 +3749,12 @@ def sd2ci_matrix(ci_data, sd_unique, lowest_orbital):
     T = np.zeros((nsd, nstates))
     T[0, 0] = 1.0
     for i, (confs, amps) in enumerate(zip(ci_data["configs"], ci_data["amps"])):
+        spins = ci_data["spins"][i] if "spins" in ci_data else ["alp"] * len(confs)
         dropped = 0.0
-        for c, a in zip(confs, amps):
+        for c, a, sp in zip(confs, amps, spins):
             cw = [c[0] - lowest_orbital + 1, c[1] - lowest_orbital + 1]
             try:
-                j = sd_unique.index([cw, 'alp'])
+                j = sd_unique.index([cw, sp])
             except ValueError:
                 dropped += a * a
                 continue
@@ -3906,16 +4012,24 @@ def load_newtonx_mo_data(filename):
 
     Returns the same dict layout as load_molden_data minus libint shells:
     C (nmo x nao, CP2K MOLog AO order - pairs directly with the OVERLAP_DELTAT
-    matrix, no reordering), E (Hartree), resort_idx = None (signals MOLog
+    matrix, no reordering), E (Hartree), homo (= the occupied count of the
+    print, exactly the SCF occupation), resort_idx = None (signals MOLog
     order to mo_overlaps_via_cp2k), and the parsed "newtonx" dict so the CI
-    amplitudes need not be re-parsed.
+    amplitudes need not be re-parsed. For UKS files the beta channel comes
+    back as C_b/E_b/homo_b with nspin = 2 (the load_wfn_mo_data convention).
     """
     nx = read_cp2k_newtonx_output(filename)
     if nx["C_occ"] is None or nx["C_virt"] is None:
         raise ValueError(f"{filename} has no MO blocks - set PRINT_VIRTUALS T")
     C = np.vstack([nx["C_occ"].T, nx["C_virt"].T])      # (nmo, nao), MOLog order
     E = np.concatenate([nx["E_occ"], nx["E_virt"]])
-    return {"C": C, "E": E, "resort_idx": None, "newtonx": nx}
+    out = {"C": C, "E": E, "homo": nx["C_occ"].shape[1],
+           "resort_idx": None, "newtonx": nx, "nspin": nx["nspin"]}
+    if nx["nspin"] == 2:
+        out["C_b"] = np.vstack([nx["C_occ_b"].T, nx["C_virt_b"].T])
+        out["E_b"] = np.concatenate([nx["E_occ_b"], nx["E_virt_b"]])
+        out["homo_b"] = nx["C_occ_b"].shape[1]
+    return out
 
 
 def load_wfn_mo_data(filename):
@@ -3954,7 +4068,11 @@ def ci_data_from_newtonx(newtonx, omegas_Ha, ci_threshold=0.001,
     """
     Convert NAMD_PRINT excitation matrices into the read_ci_data dict layout
     (configs with ABSOLUTE 1-based orbital indices, thresholded + renormalized
-    amplitudes) so it can feed the SD/citools machinery unchanged.
+    amplitudes) so it can feed the SD/citools machinery unchanged. For UKS
+    parses (newtonx["X_b"] present) each state merges its alpha and beta
+    configs ('alp'/'bet' spin tags, per-channel absolute orbital indices) and
+    is renormalized over the combined vector - the convention of the CP2K
+    excitation vectors themselves.
 
     Args:
         newtonx: read_cp2k_newtonx_output result
@@ -3966,19 +4084,25 @@ def ci_data_from_newtonx(newtonx, omegas_Ha, ci_threshold=0.001,
             overlap machinery anyway)
     """
     configs, amps, spins = [], [], []
-    for M in newtonx["X"]:
-        nvirt, nocc = M.shape
-        sel = np.argwhere(np.abs(M) > ci_threshold)
-        if occ_min is not None:
-            sel = sel[sel[:, 1] + 1 >= occ_min]
-        if vir_max is not None:
-            sel = sel[nocc + sel[:, 0] + 1 <= vir_max]
-        conf = [[int(c) + 1, int(nocc + r) + 1] for r, c in sel]     # [occ, vir] absolute
-        a = np.array([M[r, c] for r, c in sel], dtype=float)
+    X_b = newtonx.get("X_b")
+    for ist, M in enumerate(newtonx["X"]):
+        channels = [(M, "alp")] + ([(X_b[ist], "bet")] if X_b is not None else [])
+        conf, a, sp = [], [], []
+        for Mc, tag in channels:
+            nvirt, nocc = Mc.shape
+            sel = np.argwhere(np.abs(Mc) > ci_threshold)
+            if occ_min is not None:
+                sel = sel[sel[:, 1] + 1 >= occ_min]
+            if vir_max is not None:
+                sel = sel[nocc + sel[:, 0] + 1 <= vir_max]
+            conf += [[int(c) + 1, int(nocc + r) + 1] for r, c in sel]  # [occ, vir] absolute
+            a += [Mc[r, c] for r, c in sel]
+            sp += [tag] * len(sel)
+        a = np.array(a, dtype=float)
         a /= np.linalg.norm(a)
         configs.append(conf)
         amps.append(a)
-        spins.append(["alp"] * len(conf))
+        spins.append(sp)
     return {"E": np.asarray(omegas_Ha)[:len(configs)],
             "configs": configs, "amps": amps, "spins": spins}
 
@@ -4419,7 +4543,17 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     template must carry that print with PRINT_VIRTUALS T);
                     "log" = excitation-analysis block (~5 digits, works with
                     any TDDFPT template)
+                UKS (open shell): detected from the CP2K output itself (two
+                    spin channels) - no flag. The SD basis becomes per-channel
+                    electron-only excitations around each spin's own HOMO,
+                    sized by num_occ_alpha/num_unocc_alpha (default
+                    num_occ_states/num_unocc_states) and num_occ_beta/
+                    num_unocc_beta (default = alpha) - the step3 SD
+                    vocabulary; in GS-SD mode nstates = 1 + the summed
+                    per-channel excitation counts. Requires
+                    ao_overlap_method="cp2k" and overlap_backend="sd"
                 overlap_backend (str): "sd" (default) or "citools"
+                    (spin-adapted singlet CSFs, restricted-only)
                 ci_threshold (float): amplitude truncation       [default 0.001]
                 act_state (dict itraj->int): synced by run_dynamics each step
                 working_directory_prefix (str)                   [default "wd"]
@@ -4498,7 +4632,6 @@ def cp2k_compute_adi_impl(q, params, full_id):
         if params.get("ao_overlap_method", "cp2k") != "cp2k":
             raise ValueError('mo_source="wfn" requires ao_overlap_method="cp2k"')
         mo_curr = load_wfn_mo_data(f"{wd}/{project}-RESTART.wfn")
-        params["homo"].setdefault(itraj, mo_curr["homo"])
     elif mo_source == "namd_print":
         # fully CP2K-native pipeline: MOs from the &NAMD_PRINT file (MOLog AO
         # order) - requires the cp2k AO backend (no libint shells available)
@@ -4511,15 +4644,18 @@ def cp2k_compute_adi_impl(q, params, full_id):
         mo_curr = load_newtonx_mo_data(f"{wd}/{project}-CP2K_NEWTONX-1_0.inp")
     else:
         molden_file = f"{wd}/{project}-1_0.molden"
-        mo_curr = load_molden_data(molden_file)
+        mo_curr = load_molden_data(molden_file,
+                                   isUKS=molden_spin_counts(molden_file)[1] > 0)
 
-    if mo_curr.get("nspin", 1) != 1:
-        raise ValueError("cp2k_compute_adi is restricted-only, but the CP2K output "
-                         "carries two spin channels - the driver template must not be UKS")
-
+    isUKS = mo_curr.get("nspin", 1) == 2
     if itraj not in params["homo"]:
-        params["homo"][itraj] = read_homo_index(res["logfile"])
-    homo = params["homo"][itraj]
+        if "homo" in mo_curr:
+            params["homo"][itraj] = ((mo_curr["homo"], mo_curr["homo_b"]) if isUKS
+                                     else mo_curr["homo"])
+        else:
+            params["homo"][itraj] = read_homo_index(res["logfile"], isUKS=isUKS)
+    homo = params["homo"][itraj]        # int, or (homo_alpha, homo_beta) for UKS
+    homos = list(homo) if isUKS else [homo]
 
     mo_prev = params["mo_prev"].get(itraj, mo_curr) if not is_first_time else mo_curr
     if params.get("ao_overlap_method", "cp2k") == "cp2k":
@@ -4542,23 +4678,41 @@ def cp2k_compute_adi_impl(q, params, full_id):
         St_mo, S_prev, S_curr = mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev,
                                                      coordinates, LO, HI, odt)
     else:
+        if isUKS:
+            raise ValueError('ao_overlap_method="libint" is restricted-only in '
+                             'the driver - UKS runs need ao_overlap_method="cp2k"')
         S_curr = mo_overlap(mo_curr, mo_curr, LO, HI)
         S_prev = params["S_prev"].get(itraj, S_curr) if not is_first_time else S_curr
         St_mo = mo_overlap(mo_prev, mo_curr, LO, HI)
 
+    # per-channel views (the overlap builders return [alpha, beta] lists for
+    # UKS); the restricted path is the one-channel special case
+    St_ch = list(St_mo) if isUKS else [St_mo]
+    Sp_ch = list(S_prev) if isUKS else [S_prev]
+    Sc_ch = list(S_curr) if isUKS else [S_curr]
+    C_keys = ("C", "C_b")[:len(St_ch)]
+
     # cumulative MO phase alignment: flip current MOs (in place, so the cache
     # carries aligned orbitals forward) and remember the phases for the CI data
     if params.get("align_mo_phases", True):
-        phases = align_mo_phases(mo_prev["C"], mo_curr, St_mo)
-        mo_curr["C"][LO - 1:HI, :] *= phases[:, np.newaxis]
-        S_curr = phases[:, np.newaxis] * S_curr * phases[np.newaxis, :]
+        phases_ch = []
+        for k, ck in enumerate(C_keys):
+            ph = align_mo_phases(mo_prev[ck], mo_curr, St_ch[k])
+            mo_curr[ck][LO - 1:HI, :] *= ph[:, np.newaxis]
+            Sc_ch[k] = ph[:, np.newaxis] * Sc_ch[k] * ph[np.newaxis, :]
+            phases_ch.append(ph)
     else:
         # raw MO gauge: only safe when nothing downstream assumes aligned MOs
         if params.get("ci_source", "namd_print") == "namd_print":
             raise ValueError("align_mo_phases=False is incompatible with "
                              "ci_source='namd_print': the NAMD_PRINT amplitudes "
                              "are re-signed against the aligned MOs")
-        phases = np.ones(HI - LO + 1)
+        phases_ch = [np.ones(HI - LO + 1) for _ in C_keys]
+
+    # spinor-ready SD-machinery inputs ((alpha, beta) pairs for UKS)
+    St_in = tuple(St_ch) if isUKS else St_ch[0]
+    Sp_in = tuple(Sp_ch) if isUKS else Sp_ch[0]
+    Sc_in = tuple(Sc_ch) if isUKS else Sc_ch[0]
 
     # SD-overlap options; apply_orthonormalization and sd_overlap_kernel use
     # the step3 vocabulary (run_step3_sd_nacs_libint) with the same meanings
@@ -4577,10 +4731,19 @@ def cp2k_compute_adi_impl(q, params, full_id):
 
     time_dependent = params.get("time_dependent", True)
     if "sd_basis" not in params:
-        params["sd_basis"] = make_sd_basis(homo - LO + 1,
-                                           int(params["num_occ_states"]),
-                                           int(params["num_unocc_states"]),
-                                           HI - LO + 1)
+        # per-spin excitation counts follow the step3 SD vocabulary: the alpha
+        # window defaults to num_occ_states/num_unocc_states, beta to alpha
+        noa = int(params.get("num_occ_alpha", params["num_occ_states"]))
+        nua = int(params.get("num_unocc_alpha", params["num_unocc_states"]))
+        if isUKS:
+            params["sd_basis"] = make_sd_basis(
+                homos[0] - LO + 1, noa, nua, HI - LO + 1,
+                homo_beta_w=homos[1] - LO + 1,
+                num_occ_beta=int(params.get("num_occ_beta", noa)),
+                num_unocc_beta=int(params.get("num_unocc_beta", nua)))
+        else:
+            params["sd_basis"] = make_sd_basis(homos[0] - LO + 1, noa, nua,
+                                               HI - LO + 1)
     sd_unique, sd_states = params["sd_basis"]
 
     if time_dependent:
@@ -4595,6 +4758,10 @@ def cp2k_compute_adi_impl(q, params, full_id):
                                  'T) in the input template; set ci_source="log" to '
                                  'parse the excitation-analysis block instead')
             nx = mo_curr.get("newtonx") or read_cp2k_newtonx_output(nx_file)
+            if isUKS and nx.get("nspin", 1) != 2:
+                raise ValueError("the run is UKS but the NAMD_PRINT file has no "
+                                 "per-spin MO blocks - set PRINT_VIRTUALS T (the "
+                                 "spin channels cannot be told apart without them)")
             amps_prealigned = False
             if params.get("mo_source", "wfn") == "wfn":
                 # X follows the NAMD-print MO sign convention; the wfn MOs
@@ -4605,35 +4772,54 @@ def cp2k_compute_adi_impl(q, params, full_id):
                 # the wfn may hold fewer MOs than the NAMD print (nmo =
                 # nocc + ADDED_MOS under diagonalization) - re-sign over the
                 # shared MOs and truncate X to the wfn virtual range (the
-                # dropped rows reference MOs the wfn route cannot overlap)
-                nocc = nx["C_occ"].shape[1]
-                nmo = mo_curr["C"].shape[0]
-                C_namd = np.vstack([nx["C_occ"].T, nx["C_virt"].T])[:nmo]
-                s = np.sign(np.sum(mo_curr["C"] * C_namd, axis=1))
+                # dropped rows reference MOs the wfn route cannot overlap);
+                # per spin channel for UKS (independent MO sets and counts)
                 nx = dict(nx)
-                nx["X"] = [M[:nmo - nocc] * s[np.newaxis, :nocc] * s[nocc:, np.newaxis]
-                           for M in nx["X"]]
+                for ck, xk, ok, vk in (("C", "X", "C_occ", "C_virt"),
+                                       ("C_b", "X_b", "C_occ_b", "C_virt_b"))[:len(C_keys)]:
+                    nocc = nx[ok].shape[1]
+                    nmo = mo_curr[ck].shape[0]
+                    C_namd = np.vstack([nx[ok].T, nx[vk].T])[:nmo]
+                    s = np.sign(np.sum(mo_curr[ck] * C_namd, axis=1))
+                    nx[xk] = [M[:nmo - nocc] * s[np.newaxis, :nocc] * s[nocc:, np.newaxis]
+                              for M in nx[xk]]
                 amps_prealigned = True
             ci_curr = ci_data_from_newtonx(nx, res["omegas"][:nexc], ci_threshold,
                                            occ_min=LO, vir_max=HI)
         else:
             amps_prealigned = False
-            ci_curr = read_ci_data(res["logfile"], nexc, ci_threshold, LO, HI)
+            if isUKS:
+                raise ValueError(
+                    'ci_source="log" is unreliable for UKS: the CP2K excitation-'
+                    'analysis print decodes the alpha-channel configurations with '
+                    'the beta-channel dimensions (verified on CP2K 2026.1-dev: a '
+                    '9a->10a amplitude printed as "8 (alp) -> 15 (alp)" = the '
+                    'alpha flat index re-decoded with nocc/nvirt of beta), so the '
+                    'alpha labels are corrupted whenever the channels differ - '
+                    'use ci_source="namd_print" (exact, unaffected)')
+            ci_curr = read_ci_data(res["logfile"], nexc, ci_threshold, LO, HI,
+                                   isUKS=isUKS)
         if not amps_prealigned:
-            for confs, amps in zip(ci_curr["configs"], ci_curr["amps"]):
-                for k, c in enumerate(confs):
-                    amps[k] *= phases[c[0] - LO] * phases[c[1] - LO]
+            for confs, amps, csp in zip(ci_curr["configs"], ci_curr["amps"],
+                                        ci_curr["spins"]):
+                for k, (c, sp) in enumerate(zip(confs, csp)):
+                    ph = phases_ch[0] if sp == "alp" else phases_ch[1]
+                    amps[k] *= ph[c[0] - LO] * ph[c[1] - LO]
         ci_prev = params["ci_prev"].get(itraj, ci_curr) if not is_first_time else ci_curr
 
         # ---------------- CI time-overlap: backend A or B ----------------
         if backend == "sd":
-            st_sd, _ = sd_overlaps(sd_states, St_mo, S_prev, S_curr,
+            st_sd, _ = sd_overlaps(sd_states, St_in, Sp_in, Sc_in,
                                    orthonormalize=sd_orthon, kernel=sd_kernel,
                                    cache=sd_cache)
             T_prev = sd2ci_matrix(ci_prev, sd_unique, LO)
             T_curr = sd2ci_matrix(ci_curr, sd_unique, LO)
             st_ci = T_prev.T @ st_sd @ T_curr
         elif backend == "citools":
+            if isUKS:
+                raise ValueError('overlap_backend="citools" builds spin-adapted '
+                                 'singlet CSFs - restricted-only; use '
+                                 'overlap_backend="sd" for UKS')
             st_ci = ci_overlap_citools(St_mo, ci_prev, ci_curr, homo, LO, HI, nstates)
         else:
             raise ValueError(f"unknown overlap_backend '{backend}'")
@@ -4646,10 +4832,11 @@ def cp2k_compute_adi_impl(q, params, full_id):
             raise ValueError(f"time_dependent=False requires nstates = "
                              f"1 + num_occ_states*num_unocc_states = {1 + len(sd_unique)}, "
                              f"got {nstates}")
-        eps = mo_curr["E"]
+        eps_ch = [mo_curr["E"]] + ([mo_curr["E_b"]] if isUKS else [])
         E_gs = res["E_gs"]
         E_states = np.array([E_gs] + [E_gs + eps[v + LO - 2] - eps[o + LO - 2]
-                                      for (o, v), _spin in sd_unique])
+                                      for (o, v), spin in sd_unique
+                                      for eps in [eps_ch[0 if spin == "alp" else 1]]])
         if params.get("sd_state_ordering", "energy") == "energy":
             order = np.argsort(E_states)
         else:
@@ -4657,7 +4844,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
         E_adi_curr = E_states[order]
         sd_sorted = [sd_states[k] for k in order]
         sd_prev_sorted = params["sd_prev"].get(itraj, sd_sorted) if not is_first_time else sd_sorted
-        st_ci, _ = sd_overlaps(sd_sorted, St_mo, S_prev, S_curr,
+        st_ci, _ = sd_overlaps(sd_sorted, St_in, Sp_in, Sc_in,
                                orthonormalize=sd_orthon, kernel=sd_kernel,
                                cache=sd_cache, sd_states_prev=sd_prev_sorted)
         params["sd_prev"][itraj] = sd_sorted
@@ -4708,7 +4895,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
     if time_dependent:
         params["ci_prev"][itraj] = ci_curr
     params["E_adi_prev"][itraj] = E_adi_curr.copy()
-    params["S_prev"][itraj] = S_curr
+    params["S_prev"][itraj] = Sc_ch if isUKS else Sc_ch[0]
     params["coordinates_prev"][itraj] = coordinates.copy()
     params["is_first_time"][itraj] = False
 
