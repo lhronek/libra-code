@@ -205,7 +205,9 @@ void nHamiltonian::ampl_dia2adi(CMATRIX &ampl_dia, CMATRIX &ampl_adi, int lvl,
       CMATRIX adi_tmp(ampl_adi.n_rows, 1);
 
       vector<int> stenc_dia1(ampl_dia.n_rows, 0);
-      vector<int> stenc_adi1(ampl_dia.n_rows, 0);
+      // the adiabatic stencil must follow the ADIABATIC dimension - sizing it
+      // by ndia only worked while every model had ndia == nadi
+      vector<int> stenc_adi1(ampl_adi.n_rows, 0);
       vector<int> stenc_col(1, 0);
 
       for (auto i = 0; i < ampl_dia.n_rows; i++) {
@@ -313,7 +315,9 @@ void nHamiltonian::ampl_dia2adi(CMATRIX *ampl_dia, CMATRIX *ampl_adi, int lvl,
       CMATRIX adi_tmp(ampl_adi->n_rows, 1);
 
       vector<int> stenc_dia1(ampl_dia->n_rows, 0);
-      vector<int> stenc_adi1(ampl_dia->n_rows, 0);
+      // adiabatic stencil follows the ADIABATIC dimension (see the reference
+      // overloads above) - ndia-sized only worked while ndia == nadi
+      vector<int> stenc_adi1(ampl_adi->n_rows, 0);
       vector<int> stenc_col(1, 0);
 
       for (i = 0; i < ampl_dia->n_rows; i++) {
@@ -513,7 +517,9 @@ void nHamiltonian::ampl_adi2dia(CMATRIX &ampl_dia, CMATRIX &ampl_adi, int lvl,
       CMATRIX adi_tmp(ampl_adi.n_rows, 1);
 
       vector<int> stenc_dia1(ampl_dia.n_rows, 0);
-      vector<int> stenc_adi1(ampl_dia.n_rows, 0);
+      // the adiabatic stencil must follow the ADIABATIC dimension - sizing it
+      // by ndia only worked while every model had ndia == nadi
+      vector<int> stenc_adi1(ampl_adi.n_rows, 0);
       vector<int> stenc_col(1, 0);
 
       for (i = 0; i < ampl_dia.n_rows; i++) {
@@ -621,7 +627,9 @@ void nHamiltonian::ampl_adi2dia(CMATRIX *ampl_dia, CMATRIX *ampl_adi, int lvl,
       CMATRIX adi_tmp(ampl_adi->n_rows, 1);
 
       vector<int> stenc_dia1(ampl_dia->n_rows, 0);
-      vector<int> stenc_adi1(ampl_dia->n_rows, 0);
+      // adiabatic stencil follows the ADIABATIC dimension (see the reference
+      // overloads above) - ndia-sized only worked while ndia == nadi
+      vector<int> stenc_adi1(ampl_adi->n_rows, 0);
       vector<int> stenc_col(1, 0);
 
       for (i = 0; i < ampl_dia->n_rows; i++) {
