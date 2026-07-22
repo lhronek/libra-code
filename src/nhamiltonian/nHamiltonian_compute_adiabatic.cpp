@@ -594,13 +594,34 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
     has_attr = (int)hasattr(obj, "basis_transform");
     if (has_attr) {
 
-      check_cmatrix(obj, "basis_transform", nadi, nadi);
+      // the transformation matrix is (ndia x nadi) by allocation - rectangular
+      // whenever the model declares more diabats than adiabatic states (e.g.
+      // an SD basis as the diabatic basis with the CI matrix as the transform)
+      check_cmatrix(obj, "basis_transform", ndia, nadi);
       //*basis_transform = extract<CMATRIX>(obj.attr("basis_transform"));
       try {
         *basis_transform = extract<CMATRIX>(obj.attr("basis_transform"));
       }
       catch (bp::error_already_set const &) {
         std::cout << "Error extracting basis_transform\n";
+        PyErr_Print();
+        throw;
+      }
+    }
+
+    has_attr = 0;
+    has_attr = (int)hasattr(obj, "ovlp_dia");
+    if (has_attr) {
+
+      // adiabatic-native models never run compute_diabatic, so this is their
+      // only way to declare the diabatic metric (identity for orthonormal
+      // diabats) - without it ampl_dia2adi multiplies by an all-zero S_dia
+      check_cmatrix(obj, "ovlp_dia", ndia, ndia);
+      try {
+        *ovlp_dia = extract<CMATRIX>(obj.attr("ovlp_dia"));
+      }
+      catch (bp::error_already_set const &) {
+        std::cout << "Error extracting ovlp_dia\n";
         PyErr_Print();
         throw;
       }

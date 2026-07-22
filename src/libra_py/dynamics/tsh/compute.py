@@ -1250,9 +1250,17 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
 
     #sys.exit(0)
     if (dyn_params["ham_update_method"] == 2):
-        pass
-        # update_Hamiltonian_variables( dyn_params1, dyn_var, ham, ham, compute_model, model_params1, 0)
-        # update_Hamiltonian_variables( dyn_params1, dyn_var, ham, ham, compute_model, model_params1, 1)
+        # Adiabatic-native models (on-the-fly drivers, file-fed NBRA) are not
+        # called at init by default, so basis_transform keeps its all-zero
+        # allocation. Harmless for adiabatic initialization (rep = 1), but for
+        # rep = 0 both the amplitude conversion and the active-state sampling
+        # need the model's transformation matrix at t = 0 - run the model once
+        # (one extra model call at the initial geometry). The model must
+        # supply obj.basis_transform and obj.ovlp_dia (identity for
+        # orthonormal diabats) for the diabatic side to be meaningful.
+        if init_elec.get("rep", 1) == 0:
+            update_Hamiltonian_variables(dyn_params1, dyn_var, ham, ham, compute_model, model_params1, 0)
+            update_Hamiltonian_variables(dyn_params1, dyn_var, ham, ham, compute_model, model_params1, 1)
     else:
         dyn_params1.update({"ham_update_method": 1, "ham_transform_method": 1})
         # update_Hamiltonian_q( dyn_params1, dyn_var, ham, compute_model, model_params1)

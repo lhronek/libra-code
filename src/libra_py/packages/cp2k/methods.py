@@ -4572,6 +4572,20 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     ao_overlap_method="cp2k" and overlap_backend="sd"
                 overlap_backend (str): "sd" (default) or "citools"
                     (spin-adapted singlet CSFs, restricted-only)
+                dia_basis (str): "none" (default) or "sd" - declare the SD
+                    basis as the DIABATIC basis of the dynamics: the driver
+                    then returns basis_transform = the sd2ci matrix (TDDFPT;
+                    the energy-sort permutation in GS-SD mode) and
+                    ovlp_dia = identity instead of the identity transform.
+                    Enables engine-side diabatic initialization
+                    (elec_params rep:0 with istate = an SD index: 0 = the
+                    reference determinant, k = sd_unique[k-1]; set
+                    elec_params ndia = 1 + num_occ*num_unocc SDs, nadi =
+                    nstates) and per-step SD populations (Cdia, se_pop_dia).
+                    The initial adiabatic surface is sampled from
+                    |T[istate, :]|^2 (auto-renormalized); the neglected
+                    weight equals the SD's CI-space leakage. Requires
+                    overlap_backend="sd"
                 ci_threshold (float): amplitude truncation       [default 0.001]
                 act_state (dict itraj->int): synced by run_dynamics each step
                 working_directory_prefix (str)                   [default "wd"]
@@ -4617,6 +4631,12 @@ def cp2k_compute_adi_impl(q, params, full_id):
     if force_source not in ("active_state", "all_states", "gs", "none"):
         raise ValueError(F"force_source must be 'active_state', 'all_states', 'gs' or 'none', "
                          F"got {force_source!r}")
+    dia_basis = params.get("dia_basis", "none")
+    if dia_basis not in ("none", "sd"):
+        raise ValueError(F"dia_basis must be 'none' or 'sd', got {dia_basis!r}")
+    if dia_basis == "sd" and params.get("overlap_backend", "sd") != "sd":
+        raise ValueError('dia_basis="sd" declares the SD basis as the diabatic basis '
+                         'via the sd2ci matrix - it requires overlap_backend="sd"')
     # tblite runs (&XTB &TBLITE): CP2K's TDDFPT excited-state force assembly
     # calls the native-xTB Coulomb Hessian (xtb_ehess), whose neighbor lists a
     # tblite run never populates - hard segfault, verified
@@ -4849,6 +4869,10 @@ def cp2k_compute_adi_impl(q, params, full_id):
             T_prev = sd2ci_matrix(ci_prev, sd_unique, LO)
             T_curr = sd2ci_matrix(ci_curr, sd_unique, LO)
             st_ci = T_prev.T @ st_sd @ T_curr
+            # the CI data may carry more excitations than the propagated
+            # nstates (the template's NSTATES); the diabatic transform must be
+            # exactly (1+nSD, nstates) - columns = the propagated states
+            T_dia = T_curr[:, :nstates]
         elif backend == "citools":
             if isUKS:
                 raise ValueError('overlap_backend="citools" builds spin-adapted '
@@ -4877,6 +4901,11 @@ def cp2k_compute_adi_impl(q, params, full_id):
             order = np.arange(nstates)
         E_adi_curr = E_states[order]
         sd_sorted = [sd_states[k] for k in order]
+        # GS-SD "adiabatic" states ARE the energy-sorted SDs, so the dia->adi
+        # transform is the sort permutation over the fixed sd_states order
+        T_dia = np.zeros((nstates, nstates))
+        for j in range(nstates):
+            T_dia[order[j], j] = 1.0
         sd_prev_sorted = params["sd_prev"].get(itraj, sd_sorted) if not is_first_time else sd_sorted
         st_ci, _ = sd_overlaps(sd_sorted, St_in, Sp_in, Sc_in,
                                orthonormalize=sd_orthon, kernel=sd_kernel,
@@ -4892,14 +4921,31 @@ def cp2k_compute_adi_impl(q, params, full_id):
     obj.ham_adi = CMATRIX(nstates, nstates)
     obj.hvib_adi = CMATRIX(nstates, nstates)
     obj.nac_adi = CMATRIX(nstates, nstates)
-    obj.basis_transform = CMATRIX(nstates, nstates)
     obj.time_overlap_adi = CMATRIX(nstates, nstates)
     obj.overlap_adi = CMATRIX(nstates, nstates)
+
+    if dia_basis == "sd":
+        # the SD basis is declared as the DIABATIC basis: U[dia, adi] =
+        # <SD_i|state_j> - the sd2ci matrix (TDDFPT states) or the energy-sort
+        # permutation (GS-SD mode). Row indices follow the fixed sd_states
+        # order: 0 = the reference determinant, k = sd_unique[k-1]. Together
+        # with the identity diabatic metric this enables rep = 0 (diabatic)
+        # initialization in the engine and per-step SD populations
+        # (Cdia = U Cadi); the engine's elec_params must carry
+        # ndia = 1 + len(sd_unique) and nadi = nstates
+        obj.basis_transform = data_conv.nparray2CMATRIX(np.asarray(T_dia, dtype=complex))
+        ndia_sd = T_dia.shape[0]
+        obj.ovlp_dia = CMATRIX(ndia_sd, ndia_sd)
+        for i in range(ndia_sd):
+            obj.ovlp_dia.set(i, i, 1.0 + 0.0j)
+    else:
+        obj.basis_transform = CMATRIX(nstates, nstates)
+        for i in range(nstates):
+            obj.basis_transform.set(i, i, 1.0 + 0.0j)
 
     for i in range(nstates):
         obj.ham_adi.set(i, i, float(E_mid[i]) * (1.0 + 0.0j))
         obj.hvib_adi.set(i, i, float(E_mid[i]) * (1.0 + 0.0j))
-        obj.basis_transform.set(i, i, 1.0 + 0.0j)
         obj.overlap_adi.set(i, i, 1.0 + 0.0j)
         for j in range(nstates):
             obj.time_overlap_adi.set(i, j, float(st_ci[i, j]) * (1.0 + 0.0j))
