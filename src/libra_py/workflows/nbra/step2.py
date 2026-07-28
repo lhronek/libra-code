@@ -427,6 +427,10 @@ def run_cp2k_libint_step2(params):
                                                         S_CSR_WRITE patch).
 
                              cp2k_ot_input_template (string): The CP2K OT input template file name (just for the xTB).
+                                                              None/absent skips the OT stage: the diagonalization runs then
+                                                              chain their own wfn restarts (see CP2K_methods.run_cp2k_xtb) -
+                                                              the diag template must carry full standalone SCF settings.
+                                                              DFT runs never use it. [default: None]
 
                              cp2k_diag_input_template (string): The CP2K diagonalization input template file name. For
                                                                 DFT calculations, this is the only parameter that we need.
@@ -463,8 +467,9 @@ def run_cp2k_libint_step2(params):
     """
 
     # Now try to get parameters from the input
-    critical_params = ["cp2k_ot_input_template", "cp2k_diag_input_template", "trajectory_xyz_filename"]
+    critical_params = ["cp2k_diag_input_template", "trajectory_xyz_filename"]
     default_params = {
+        "cp2k_ot_input_template": None,
         "res_dir": os.getcwd() +
         "/res",
         "all_logfiles": os.getcwd() +
@@ -690,7 +695,8 @@ def run_cp2k_libint_step2(params):
             if counter > 0:
                 if isxTB:
                     print('Removing unnecessary wfn files...')
-                    os.system(F'rm OT_{step-1}-RESTART*')
+                    if params['cp2k_ot_input_template'] is not None:
+                        os.system(F'rm OT_{step-1}-RESTART*')
                     os.system(F'rm Diag_{step-1}-RESTART*')
                 else:
                     os.system(F'rm Diag_libra-{step-1}-RESTART*')
@@ -1133,7 +1139,8 @@ def run_cp2k_libint_step2(params):
 
             if isxTB:
                 print('Removing unnecessary wfn files...')
-                os.system(F'rm OT_{step-1}-RESTART*')
+                if params['cp2k_ot_input_template'] is not None:
+                    os.system(F'rm OT_{step-1}-RESTART*')
                 os.system(F'rm Diag_{step-1}-RESTART*')
             else:
                 os.system(F'rm Diag_libra-{step-1}-RESTART*')
