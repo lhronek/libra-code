@@ -1839,6 +1839,15 @@ def run_cp2k_xtb(params):
         params (dictionary): A dictionary containing the following parameters
 
           * **cp2k_ot_input_template** (string): The CP2K OT input template file name.
+            None (or absent) skips the OT stage entirely: the diagonalization run
+            then restarts from the previous step's 'Diag_{step-1}-RESTART.wfn'
+            (falling back to the atomic guess while that file does not exist yet,
+            i.e. at the first step) and extracts the coordinates itself. The
+            two-stage OT+diag flow is a density warm start the minimal-basis xTB
+            SCF does not need - dropping it halves the CP2K launches per step.
+            The diag template must then carry full standalone SCF settings
+            (EPS_SCF, MAX_SCF, mixing if needed) rather than assume a converged
+            restart.
 
           * **cp2k_diag_input_template** (string): The CP2K diagonalization input template file name.
 
@@ -1858,7 +1867,7 @@ def run_cp2k_xtb(params):
     """
 
     print('**************** Running CP2K ****************')
-    ot_input_template = params['cp2k_ot_input_template']
+    ot_input_template = params.get('cp2k_ot_input_template', None)
     diag_input_template = params['cp2k_diag_input_template']
     trajectory_xyz_filename = params['trajectory_xyz_filename']
     step = params['step']
@@ -1872,18 +1881,28 @@ def run_cp2k_xtb(params):
     # bind-to-core would pin all OMP threads of the rank onto ONE core
     launcher = '%s -n %d ' % (mpi_executable, nprocs) if int(nprocs) > 1 else ''
 
-    # Run OT
-    print('Step', step, 'Computing the OT method wfn file...')
-    cp2k_xtb_ot_inp(ot_input_template, trajectory_xyz_filename, step)
-    t1 = time.time()
-    os.system('OMP_NUM_THREADS=%d %s%s -i xtb_ot_step_%d.inp -o OUT-ot_%d.log' %
-              (omp, launcher, cp2k_exe, step, step))
-    print('Done with OT wfn. Elapsed time:', time.time() - t1)
+    if ot_input_template is not None:
+        # Run OT; the diag run restarts from the same-step OT wfn (the
+        # generator's default) and cp2k_xtb_ot_inp extracts coord-{step}.xyz
+        print('Step', step, 'Computing the OT method wfn file...')
+        cp2k_xtb_ot_inp(ot_input_template, trajectory_xyz_filename, step)
+        t1 = time.time()
+        os.system('OMP_NUM_THREADS=%d %s%s -i xtb_ot_step_%d.inp -o OUT-ot_%d.log' %
+                  (omp, launcher, cp2k_exe, step, step))
+        print('Done with OT wfn. Elapsed time:', time.time() - t1)
+        diag_wfn_restart, diag_traj = None, None
+    else:
+        # OT-free: chain the diagonalization runs directly; SCF_GUESS RESTART
+        # falls back to the atomic guess while the file does not exist yet
+        # (the first step) - the same way the OT chain itself boots
+        print('Step', step, 'No OT template - chaining diagonalization restarts')
+        diag_wfn_restart = 'Diag_%d-RESTART.wfn' % (step - 1)
+        diag_traj = trajectory_xyz_filename
 
     # Run diagonalization
     t1 = time.time()
     print('Computing the wfn file using diagonalization method...')
-    cp2k_xtb_diag_inp(diag_input_template, step)
+    cp2k_xtb_diag_inp(diag_input_template, step, diag_wfn_restart, diag_traj)
     os.system('OMP_NUM_THREADS=%d %s%s -i xtb_diag_step_%d.inp -o OUT-diag_%d.log' %
               (omp, launcher, cp2k_exe, step, step))
     print('Done with diagonalization. Elapsed time:', time.time() - t1)
