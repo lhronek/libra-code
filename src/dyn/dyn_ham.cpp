@@ -62,6 +62,9 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
        - 3: adiabatic->diabatic according to internally stored basis
     transformation matrix
        - 4: adiabatic->diabatic according to local diabatization method
+    The dia->adi options are skipped when ham_update_method == 2: an
+    adiabatic-native model never populates ham_dia, so there is nothing
+    to transform from.
 
 
     nac_update_method:
@@ -107,7 +110,12 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
       ;
       ;
     } else if (prms.ham_transform_method == 1) {
-      ham.compute_adiabatic(1, 1); // do internal diagonalization
+      // an adiabatic-native model (ham_update_method == 2) never populates
+      // ham_dia - diagonalizing that zero matrix would overwrite the ingested
+      // energies and basis_transform, so there is nothing to transform from
+      if (prms.ham_update_method != 2) {
+        ham.compute_adiabatic(1, 1); // do internal diagonalization
+      }
     } else if (prms.ham_transform_method == 2) {
       // TO DO: Add dia->adi transformation according to the basis_transform
       // matrix
