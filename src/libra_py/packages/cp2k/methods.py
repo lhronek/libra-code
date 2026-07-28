@@ -1768,17 +1768,34 @@ def cp2k_xtb_ot_inp(ot_inp_temp: str, traj_xyz_filename: str, step: int):
     file.close()
 
 
-def cp2k_xtb_diag_inp(diag_inp_temp: str, step: int):
+def cp2k_xtb_diag_inp(diag_inp_temp: str, step: int, wfn_restart_file=None, traj_xyz_filename=None):
     """
     This function gets the xTB diagonalization input template
-    and makes a new input based on the time step. This input will use the
-    wfn RESTART file name obtained from the OT calclulations.
+    and makes a new input based on the time step. By default this input will
+    use the wfn RESTART file name obtained from the OT calclulations.
 
     Args:
 
         diag_inp_temp (string): The name of the diagonalization input template.
 
         step (integer): The time step.
+
+        wfn_restart_file (string): The wfn file the diagonalization restarts
+                                   from. None keeps the OT-chain default,
+                                   'OT_{step}-RESTART.wfn' (the same-step OT
+                                   run's output); OT-free workflows pass e.g.
+                                   'Diag_{step-1}-RESTART.wfn' to chain the
+                                   diagonalization runs directly (SCF_GUESS
+                                   RESTART falls back to the atomic guess
+                                   while the file does not exist yet - that
+                                   is how the first step boots).
+
+        traj_xyz_filename (string): When given, extract coord-{step}.xyz from
+                                    this trajectory here. The two-stage flow
+                                    leaves this None because cp2k_xtb_ot_inp
+                                    already wrote the coord file; without the
+                                    OT stage the diag generator must extract
+                                    it itself.
 
     Returns:
 
@@ -1789,6 +1806,11 @@ def cp2k_xtb_diag_inp(diag_inp_temp: str, step: int):
     lines = file.readlines()
     file.close()
 
+    if wfn_restart_file is None:
+        wfn_restart_file = 'OT_%d-RESTART.wfn' % step
+    if traj_xyz_filename is not None:
+        read_trajectory_xyz_file(traj_xyz_filename, step)
+
     file = open('xtb_diag_step_%d.inp' % step, 'w')
 
     for i in range(len(lines)):
@@ -1797,7 +1819,7 @@ def cp2k_xtb_diag_inp(diag_inp_temp: str, step: int):
         elif 'COORD_FILE_NAME'.lower() in lines[i].lower():
             file.write('COORD_FILE_NAME coord-%d.xyz\n' % step)
         elif 'WFN_RESTART_FILE_NAME'.lower() in lines[i].lower():
-            file.write('WFN_RESTART_FILE_NAME OT_%d-RESTART.wfn\n' % step)
+            file.write('WFN_RESTART_FILE_NAME %s\n' % wfn_restart_file)
         elif 'SCF_GUESS'.lower() in lines[i].lower():
             file.write('SCF_GUESS RESTART\n')
         elif 'FILENAME'.lower() in lines[i].lower():
