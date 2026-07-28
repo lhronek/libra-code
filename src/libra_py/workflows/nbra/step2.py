@@ -479,8 +479,9 @@ def run_cp2k_libint_step2(params):
         "lowest_orbital": 1,
         "highest_orbital": 2,
         "is_spherical": True,
-        "isXTB": False,
+        "isxTB": False,
         "isUKS": False,
+        "is_periodic": False,
         "remove_molden": True,
         "nprocs": 2,
         "cp2k_exe": "cp2k.psmp",
@@ -507,6 +508,12 @@ def run_cp2k_libint_step2(params):
             'x',
             'y',
             'z']}
+    # every read of the xTB flag uses 'isxTB' (and the defaults dict used to
+    # misspell it 'isXTB', so the default never applied) - a params dict
+    # carrying the capital form can only be a typo, and it would otherwise
+    # silently fall back to the DFT branch now that the lowercase default exists
+    if 'isXTB' in params:
+        raise ValueError("params['isXTB'] is not read by this workflow - use 'isxTB'")
     comn.check_input(params, default_params, critical_params)
 
     # Making the required directories for gatherig all the information needed
