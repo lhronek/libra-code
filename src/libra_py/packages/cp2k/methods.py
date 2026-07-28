@@ -3744,10 +3744,16 @@ def sd2ci_matrix(ci_data, sd_unique, lowest_orbital):
     dropped). The lost weight is printed per state when it exceeds 1e-6 -
     widen num_occ_states/num_unocc_states and/or the MO window to capture more.
     A state lying entirely outside the basis raises.
+
+    Returns:
+        T (np.ndarray nSD+1 x nstates+1), drops (np.ndarray nstates+1):
+        drops[i] = the CI weight of state i lost outside the SD basis
+        (0.0 for the ground-state column)
     """
     nsd = len(sd_unique) + 1
     nstates = len(ci_data["configs"]) + 1
     T = np.zeros((nsd, nstates))
+    drops = np.zeros(nstates)
     T[0, 0] = 1.0
     for i, (confs, amps) in enumerate(zip(ci_data["configs"], ci_data["amps"])):
         spins = ci_data["spins"][i] if "spins" in ci_data else ["alp"] * len(confs)
@@ -3770,7 +3776,8 @@ def sd2ci_matrix(ci_data, sd_unique, lowest_orbital):
                 print(F"sd2ci_matrix: state {i+1}: dropped CI weight {dropped:.2e} "
                       F"outside the SD basis (column renormalized) - widen "
                       F"num_occ_states/num_unocc_states or the MO window to capture it")
-    return T
+        drops[i + 1] = dropped
+    return T, drops
 
 
 # ======================= Backend B: citools CSFs ===========================
@@ -4586,6 +4593,12 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     |T[istate, :]|^2 (auto-renormalized); the neglected
                     weight equals the SD's CI-space leakage. Requires
                     overlap_backend="sd"
+                dia_basis_max_drop (float): with dia_basis="sd", the largest
+                    CI weight a PROPAGATED state may carry outside the SD
+                    basis (the sd2ci dropped weight, checked at every step) -
+                    beyond it the renormalized T column is noise and the
+                    driver raises; widen num_occ_states/num_unocc_states or
+                    reduce nstates to satisfy the contract    [default 0.5]
                 ci_threshold (float): amplitude truncation       [default 0.001]
                 act_state (dict itraj->int): synced by run_dynamics each step
                 working_directory_prefix (str)                   [default "wd"]
@@ -4637,6 +4650,9 @@ def cp2k_compute_adi_impl(q, params, full_id):
     if dia_basis == "sd" and params.get("overlap_backend", "sd") != "sd":
         raise ValueError('dia_basis="sd" declares the SD basis as the diabatic basis '
                          'via the sd2ci matrix - it requires overlap_backend="sd"')
+    dia_max_drop = float(params.get("dia_basis_max_drop", 0.5))
+    if not 0.0 <= dia_max_drop <= 1.0:
+        raise ValueError(F"dia_basis_max_drop must be in [0, 1], got {dia_max_drop}")
     # tblite runs (&XTB &TBLITE): CP2K's TDDFPT excited-state force assembly
     # calls the native-xTB Coulomb Hessian (xtb_ehess), whose neighbor lists a
     # tblite run never populates - hard segfault, verified
@@ -4866,13 +4882,30 @@ def cp2k_compute_adi_impl(q, params, full_id):
             st_sd, _ = sd_overlaps(sd_states, St_in, Sp_in, Sc_in,
                                    orthonormalize=sd_orthon, kernel=sd_kernel,
                                    cache=sd_cache)
-            T_prev = sd2ci_matrix(ci_prev, sd_unique, LO)
-            T_curr = sd2ci_matrix(ci_curr, sd_unique, LO)
+            T_prev, _ = sd2ci_matrix(ci_prev, sd_unique, LO)
+            T_curr, ci_drops = sd2ci_matrix(ci_curr, sd_unique, LO)
             st_ci = T_prev.T @ st_sd @ T_curr
             # the CI data may carry more excitations than the propagated
             # nstates (the template's NSTATES); the diabatic transform must be
             # exactly (1+nSD, nstates) - columns = the propagated states
             T_dia = T_curr[:, :nstates]
+            if dia_basis == "sd":
+                # a renormalized column that lost most of its CI weight to the
+                # SD-window truncation is noise, and every propagated state
+                # feeds the diabatic transform - enforce the capture contract
+                # (at every step: the CI coefficients evolve along the
+                # trajectory, so a window adequate at t = 0 can degrade)
+                bad = [(j, d) for j, d in enumerate(ci_drops[:nstates])
+                       if d > dia_max_drop]
+                if bad:
+                    detail = ", ".join(F"state {j}: {d:.1%}" for j, d in bad)
+                    raise ValueError(
+                        F'dia_basis="sd": the SD basis captures too little of '
+                        F"propagated states ({detail}; limit dia_basis_max_drop "
+                        F"= {dia_max_drop:.1%}) - the renormalized T columns "
+                        F"would be meaningless. Widen num_occ_states/"
+                        F"num_unocc_states (and the MO window), reduce nstates, "
+                        F"or raise dia_basis_max_drop deliberately")
         elif backend == "citools":
             if isUKS:
                 raise ValueError('overlap_backend="citools" builds spin-adapted '
