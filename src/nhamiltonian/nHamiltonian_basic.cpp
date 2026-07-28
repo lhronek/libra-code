@@ -1481,6 +1481,12 @@ void nHamiltonian::init_basis_transform() {
 
   if (basis_transform_mem_status == 0) {
     basis_transform = new CMATRIX(ndia, nadi);
+    if (ndia == nadi) {
+      // default: diabats = adiabats (identity, like the ovlp_dia default) -
+      // a rectangular basis has no canonical default and stays zero until
+      // the model supplies the real transform
+      basis_transform->identity();
+    }
     basis_transform_mem_status = 1;
   } else {
     cout << "WARNING in init_basis_transform: memory is already allocated\n";

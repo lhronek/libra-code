@@ -1254,7 +1254,19 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
     dyn_params1 = dict(dyn_params)
 
     #sys.exit(0)
-    if (dyn_params["ham_update_method"] == 2):
+    if dyn_params.get("ham_update_method", 1) == 2:
+        # an adiabatic-native model never populates the diabatic matrices
+        # (ham_dia, hvib_dia, d1ham_dia, time_overlap_dia stay zero) - any
+        # diabatic-representation request would consume them silently: the
+        # local-diabatization integrator annihilates the amplitudes, hops see
+        # zero couplings, forces come out zero
+        for key, what in (("rep_tdse", "TDSE propagation"),
+                          ("rep_sh", "surface hopping"),
+                          ("rep_force", "force evaluation")):
+            if dyn_params.get(key, 1) == 0:
+                raise ValueError(F"{key} = 0 requests diabatic-representation {what}, "
+                                 F"but adiabatic-native models (ham_update_method = 2) "
+                                 F"never populate the diabatic matrices - use {key} = 1")
         # Adiabatic-native models (on-the-fly drivers, file-fed NBRA) are not
         # called at init by default, so basis_transform keeps its all-zero
         # allocation. Harmless for adiabatic initialization (rep = 1), but for
@@ -1266,6 +1278,26 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
         if init_elec.get("rep", 1) == 0:
             update_Hamiltonian_variables(dyn_params1, dyn_var, ham, ham, compute_model, model_params1, 0)
             update_Hamiltonian_variables(dyn_params1, dyn_var, ham, ham, compute_model, model_params1, 1)
+            # the model call above fills the CHILDREN Hamiltonians. A square
+            # basis_transform defaults to identity (diabats = adiabats), but a
+            # rectangular one (ndia != nadi) has no canonical default - it stays
+            # zero unless the model supplies obj.basis_transform, and the dia->adi
+            # conversion and the surface sampling below would then silently give
+            # all-zero amplitudes and a state-0 collapse
+            child = Py2Cpp_int([0, 0])
+            U = ham.get_basis_transform(child)
+            if all(abs(U.get(i, j)) == 0.0 for i in range(U.num_of_rows)
+                   for j in range(U.num_of_cols)):
+                raise ValueError("rep = 0 initialization: basis_transform is still all-zero "
+                                 "after the model call - declaring ndia != nadi promises a "
+                                 "model-supplied dia->adi transform (CP2K driver: "
+                                 "dia_basis='sd'); square bases default to identity")
+            S_dia = ham.get_ovlp_dia(child)
+            G = U.H() * S_dia * U
+            dev = max(abs(G.get(i, j) - (1.0 if i == j else 0.0))
+                      for i in range(G.num_of_rows) for j in range(G.num_of_cols))
+            print(F"generic_recipe: rep = 0 init through the model basis_transform "
+                  F"({U.num_of_rows}, {U.num_of_cols}); max|U^H S_dia U - 1| = {dev:.2e}")
     else:
         dyn_params1.update({"ham_update_method": 1, "ham_transform_method": 1})
         # update_Hamiltonian_q( dyn_params1, dyn_var, ham, compute_model, model_params1)
