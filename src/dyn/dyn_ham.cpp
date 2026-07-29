@@ -405,12 +405,17 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
         throw std::runtime_error("libra C++ error - see the message printed above");
       }
       T_new = orthogonalized_T(T_new);
-    } else if (prms.state_tracking_algo == 1 || prms.state_tracking_algo == 2 ||
+    } else if (prms.state_tracking_algo == 0 ||
+               prms.state_tracking_algo == 1 || prms.state_tracking_algo == 2 ||
                prms.state_tracking_algo == 21 ||
                prms.state_tracking_algo == 3 ||
                prms.state_tracking_algo == 32 ||
                prms.state_tracking_algo ==
                    33) { // This is based on reordering + phase correction
+      // algo 0 = no reordering: compute_projector keeps the identity
+      // permutation and still applies the phase corrections
+      // (do_phase_correction-gated) - without them the diabatic readout
+      // Cdia = U C_adi jumps at eigenvector sign flips
       CMATRIX Eadi(ham->get_ham_adi());
       T_new = P;
       T_new = compute_projector(prms, Eadi, T_new);
