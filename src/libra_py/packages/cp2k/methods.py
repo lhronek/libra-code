@@ -3821,6 +3821,49 @@ def sd2ci_matrix(ci_data, sd_unique, lowest_orbital):
     return T, drops
 
 
+def align_ci_state_signs(st_ci, ci_curr, T_curr=None):
+    """
+    Chain a smooth gauge for the CI states: eigenvector global signs are
+    arbitrary per step (fresh Davidson), and raw output flips them on ~70%%
+    of MD steps. The previous step's data is already aligned, so a negative
+    diagonal of the state time-overlap marks a flip of the CURRENT state -
+    flip its amplitudes IN PLACE (the driver caches ci_curr, carrying the
+    alignment forward), the st_ci column, and (when given) the T column.
+
+    |st_ci[j, j]| < 0.5 is genuine-crossing territory and is deliberately
+    left untouched - state ORDER is the engine's state-tracking job, only
+    the gauge is smoothed here. Column 0 (the ground state) never flips.
+    Everything gauge-invariant (|st|, populations, energies) is unchanged.
+
+    See also: the engine-side compute_phase_corrections/compute_projector
+    (dyn_projectors.cpp) correct the AMPLITUDES via proj_adi during the
+    dynamics; step3's apply_phase_correction family corrects NBRA St file
+    series. This helper aligns the emitted driver data itself, so every
+    consumer - the engine under any setting, archives, restarts - sees
+    one smooth gauge.
+
+    Args:
+        st_ci (np.ndarray): state time-overlap <prev_i|curr_j>, modified in place
+        ci_curr (dict): read_ci_data dict of the current step, amps flipped in place
+        T_curr (np.ndarray or None): sd2ci matrix of the current step, columns
+                                     flipped in place
+
+    Returns:
+        list: the flipped state indices (1-based, matching st_ci columns)
+    """
+    flips = []
+    for j in range(1, st_ci.shape[1]):
+        if st_ci[j, j] < -0.5:
+            amps = ci_curr["amps"][j - 1]
+            for k in range(len(amps)):
+                amps[k] = -amps[k]
+            st_ci[:, j] = -st_ci[:, j]
+            if T_curr is not None:
+                T_curr[:, j] = -T_curr[:, j]
+            flips.append(j)
+    return flips
+
+
 # ======================= Backend B: citools CSFs ===========================
 
 
@@ -4926,6 +4969,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
             T_prev, _ = sd2ci_matrix(ci_prev, sd_unique, LO)
             T_curr, ci_drops = sd2ci_matrix(ci_curr, sd_unique, LO)
             st_ci = T_prev.T @ st_sd @ T_curr
+            align_ci_state_signs(st_ci, ci_curr, T_curr)
             # the CI data may carry more excitations than the propagated
             # nstates (the template's NSTATES); the diabatic transform must be
             # exactly (1+nSD, nstates) - columns = the propagated states
@@ -4953,6 +4997,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
                                  'singlet CSFs - restricted-only; use '
                                  'overlap_backend="sd" for UKS')
             st_ci = ci_overlap_citools(St_mo, ci_prev, ci_curr, homo, LO, HI, nstates)
+            align_ci_state_signs(st_ci, ci_curr)
         else:
             raise ValueError(f"unknown overlap_backend '{backend}'")
     else:
