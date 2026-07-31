@@ -28,6 +28,9 @@ import util.libutil as comn
 
 from libra_py import units
 from libra_py import scan
+from libra_py import data_conv
+from libra_py.citools.sd_basis import (make_sd_basis, sd2ci_matrix,
+                                       align_ci_state_signs, check_sd_capture)
 from libra_py import regexlib as rgl
 import libra_py.citools.ci as ci
 from libra_py import data_conv
@@ -2190,8 +2193,7 @@ def make_dftb_input(params, ground_state=True, working_directory="."):
     # templates stay free of it
     soi_line = ""
     if "StateOfInterest" in params:
-        soi_line = F"       StateOfInterest = {params['StateOfInterest']}
-"
+        soi_line = F"       StateOfInterest = {params['StateOfInterest']}\n"
 
     WriteSPTransitions = params.get("WriteSPTransitions", "Yes")
     WriteXplusY = params.get("WriteXplusY", "Yes")
@@ -2772,6 +2774,23 @@ def dftb_compute_adi(q, params, full_id):
             Previous nuclear coordinates per trajectory (updated in-place).
         ci_threshold : float, default=0.01
             Threshold for CI truncation.
+        dia_basis : str, default="none"
+            "none" or "sd". With "sd" the fixed single-particle SD basis of
+            the FULL active orbital window (o-major enumeration; requires a
+            contiguous orbital_space) is declared as the DIABATIC basis:
+            basis_transform becomes the (1 + n_SD, nstates) transition-vector
+            matrix and ovlp_dia the identity, enabling engine-side diabatic
+            initialization (elec_params rep: 0 with istate = an SD index:
+            0 = the reference determinant, k = the k-th window transition)
+            and per-step SD populations (Cdia, se_pop_dia). Optional
+            num_occ_states / num_unocc_states (counted from the HOMO, the
+            CP2K-driver vocabulary) narrow the SD window - the engine
+            allocates dense diabatic arrays scaling as ndof x ndia^2, so
+            frontier windows keep rep:0 dynamics affordable.
+        dia_basis_max_drop : float, default=0.5
+            With dia_basis="sd", the largest CI weight a propagated state may
+            lose to the ci_threshold truncation before the driver raises
+            (checked at every step).
         odin_max_ang_mom : dict, optional
             Maximum angular momentum per element for ODIN.
 
@@ -2793,8 +2812,10 @@ def dftb_compute_adi(q, params, full_id):
         time_overlap_adi : CMATRIX (nstates, nstates)
             Time-overlap matrix S_ij(t, t+dt) = <Ψ_i(t)|Ψ_j(t+dt)>.
 
-        basis_transform : CMATRIX (nstates, nstates)
-            Basis transformation matrix (currently identity).
+        basis_transform : CMATRIX
+            Basis transformation matrix: identity (nstates, nstates) by
+            default; with dia_basis="sd" the (1 + n_SD, nstates) SD -> CI
+            transition matrix (plus obj.ovlp_dia = identity).
 
         d1ham_adi : CMATRIXList
             List of derivative Hamiltonians with respect to nuclear coordinates.
@@ -2864,6 +2885,13 @@ def dftb_compute_adi(q, params, full_id):
 
     wd_prefix = params.get("working_directory_prefix", "wd")
     wd = f"{wd_prefix}_itraj{itraj}"
+
+    dia_basis = params.get("dia_basis", "none")
+    if dia_basis not in ("none", "sd"):
+        raise ValueError(F"dia_basis must be 'none' or 'sd', got {dia_basis!r}")
+    dia_max_drop = float(params.get("dia_basis_max_drop", 0.5))
+    if not 0.0 <= dia_max_drop <= 1.0:
+        raise ValueError(F"dia_basis_max_drop must be in [0, 1], got {dia_max_drop}")
 
     # ================= Run DFTB+ =================
     dftb_params = copy.deepcopy(dftb_run_params)
@@ -2986,6 +3014,36 @@ def dftb_compute_adi(q, params, full_id):
     s_ci = s_ci_inv_curr @ s_ci @ s_ci_inv_curr
     st_ci = s_ci_inv_prev @ st_ci @ s_ci_inv_curr
 
+    # chain a smooth state gauge on the emitted data: raw Davidson signs are
+    # step-arbitrary, and the in-place amps flips propagate into the cached
+    # data_prev, carrying the alignment forward; with the diabatic transform
+    # requested, its columns follow through the T argument
+    ci_adapter = {"configs": [np.asarray(c).tolist() for c in data_curr[1]],
+                  "amps": data_curr[2]}
+    T_dia = None
+    if dia_basis == "sd":
+        # the fixed diabatic basis is the FULL active window in the canonical
+        # o-major enumeration - never the SPX (rpa) order, which is
+        # energy-sorted and reshuffles with geometry
+        space = info["actual_orbital_space"]
+        if list(space) != list(range(space[0], space[0] + len(space))):
+            raise ValueError('dia_basis="sd" needs a contiguous orbital_space '
+                             F"(the SD index arithmetic assumes it) - got {list(space)[:6]}...")
+        lowest = int(space[0])
+        homo_w = info["nocc"] - lowest + 1
+        # window defaults to the FULL active space; the optional narrowing
+        # matters for the ENGINE side - it allocates dense diabatic arrays
+        # scaling as ndof x ndia^2, so a frontier window keeps rep:0 dynamics
+        # affordable on larger molecules
+        num_occ = int(params.get("num_occ_states", homo_w))
+        num_unocc = int(params.get("num_unocc_states", len(space) - homo_w))
+        sd_unique, _ = make_sd_basis(homo_w, num_occ, num_unocc, len(space))
+        T_full, ci_drops = sd2ci_matrix(ci_adapter, sd_unique, lowest)
+        check_sd_capture(ci_drops, nstates, dia_max_drop)
+        T_dia = T_full[:, :nstates]
+        align_ci_state_signs(st_ci, ci_adapter, T_dia)
+    else:
+        align_ci_state_signs(st_ci, ci_adapter)
 
     # ================= Populate Hamiltonian =================
     for i in range(nstates):
@@ -3001,6 +3059,20 @@ def dftb_compute_adi(q, params, full_id):
         for j in range(nstates):
             obj.time_overlap_adi.set(i, j, float(st_ci[i, j]))
             obj.overlap_adi.set(i,  j, float(s_ci[i,j]) )
+
+    if dia_basis == "sd":
+        # the SD basis is the DIABATIC basis: U[dia, adi] = <SD_i|state_j>,
+        # rows in the fixed window enumeration (0 = the reference determinant,
+        # k = sd_unique[k-1], o-major); identity metric for the orthonormal
+        # determinants. The engine's elec_params must carry ndia = 1 + n_SD
+        # and nadi = nstates. Full-RPA X+Y columns are orthonormal only up to
+        # the Y-component (near-TDA for gapped systems) - the engine prints
+        # max|U^H S U - 1| at a rep:0 initialization
+        obj.basis_transform = data_conv.nparray2CMATRIX(np.asarray(T_dia, dtype=complex))
+        ndia_sd = T_dia.shape[0]
+        obj.ovlp_dia = CMATRIX(ndia_sd, ndia_sd)
+        for i in range(ndia_sd):
+            obj.ovlp_dia.set(i, i, 1.0 + 0.0j)
 
     # ================== Forces ===============================
     ## autotest.tag
