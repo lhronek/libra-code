@@ -11,5 +11,6 @@ __all__ = ["ci",
            "clebsch_gordan",
            "csf",
            "interfaces",
+           "sd_basis",
            "slatdet"
           ]
