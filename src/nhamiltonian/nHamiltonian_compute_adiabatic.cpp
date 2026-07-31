@@ -687,6 +687,10 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
 
       check_cmatrix_list(obj, "d2ham_adi", nadi, nadi, nnucl * nnucl);
 
+      // a model may supply second derivatives while the hierarchy was
+      // initialized to der_lvl < 2 - allocate on demand (the raw-pointer
+      // copy below would otherwise dereference NULL)
+      if (d2ham_adi_mem_status[0] == 0) { init_d2ham_adi(); }
       vector<CMATRIX> _d2ham_adi(nnucl * nnucl, CMATRIX(nadi, nadi));
       _d2ham_adi = extract<CMATRIXList>(obj.attr("d2ham_adi"));
 

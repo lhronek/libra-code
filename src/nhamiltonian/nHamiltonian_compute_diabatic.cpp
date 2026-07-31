@@ -209,6 +209,10 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
 
       check_cmatrix_list(obj, "d2ham_dia", ndia, ndia, nnucl*nnucl);
 
+      // a model may supply second derivatives while the hierarchy was
+      // initialized to der_lvl < 2 - allocate on demand (the raw-pointer
+      // copy below would otherwise dereference NULL)
+      if(d2ham_dia_mem_status[0]==0){ init_d2ham_dia(); }
       vector<CMATRIX> _d2ham_dia(nnucl*nnucl, CMATRIX(ndia,ndia));
       _d2ham_dia = extract<CMATRIXList>(obj.attr("d2ham_dia"));   
 
