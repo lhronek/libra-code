@@ -114,8 +114,10 @@ def sd2ci_matrix(ci_data, sd_unique, lowest_orbital):
 
     Returns:
         T (np.ndarray nSD+1 x nstates+1), drops (np.ndarray nstates+1):
-        drops[i] = the CI weight of state i lost outside the SD basis
-        (0.0 for the ground-state column)
+        drops[i] = the CI weight of unit-normalized state i NOT represented
+        in the basis - window-truncated components and any sub-normalization
+        of the input amplitudes (e.g. a read-time ci_threshold truncation,
+        the DFTB+ reader convention) both land here (0.0 for the GS column)
     """
     nsd = len(sd_unique) + 1
     nstates = len(ci_data["configs"]) + 1
@@ -124,25 +126,23 @@ def sd2ci_matrix(ci_data, sd_unique, lowest_orbital):
     T[0, 0] = 1.0
     for i, (confs, amps) in enumerate(zip(ci_data["configs"], ci_data["amps"])):
         spins = ci_data["spins"][i] if "spins" in ci_data else ["alp"] * len(confs)
-        dropped = 0.0
         for c, a, sp in zip(confs, amps, spins):
             cw = [c[0] - lowest_orbital + 1, c[1] - lowest_orbital + 1]
             try:
                 j = sd_unique.index([cw, sp])
             except ValueError:
-                dropped += a * a
                 continue
             T[j + 1, i + 1] = a
-        if dropped > 0.0:
-            nrm = np.linalg.norm(T[:, i + 1])
-            if nrm == 0.0:
-                raise ValueError(f"CI state {i+1} lies entirely outside the SD basis - "
-                                 f"increase num_occ_states/num_unocc_states (and the MO window)")
-            T[:, i + 1] /= nrm
-            if dropped > 1e-6:
-                print(F"sd2ci_matrix: state {i+1}: dropped CI weight {dropped:.2e} "
-                      F"outside the SD basis (column renormalized) - widen "
-                      F"num_occ_states/num_unocc_states or the MO window to capture it")
+        nrm2 = float(T[:, i + 1] @ T[:, i + 1])
+        if nrm2 == 0.0:
+            raise ValueError(f"CI state {i+1} lies entirely outside the SD basis - "
+                             f"increase num_occ_states/num_unocc_states (and the MO window)")
+        dropped = max(0.0, 1.0 - nrm2)
+        T[:, i + 1] /= np.sqrt(nrm2)
+        if dropped > 1e-6:
+            print(F"sd2ci_matrix: state {i+1}: dropped CI weight {dropped:.2e} "
+                  F"outside the SD basis (column renormalized) - widen "
+                  F"num_occ_states/num_unocc_states or the MO window to capture it")
         drops[i + 1] = dropped
     return T, drops
 
