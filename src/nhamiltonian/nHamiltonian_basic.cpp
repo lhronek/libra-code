@@ -150,6 +150,27 @@ nHamiltonian::nHamiltonian(const nHamiltonian &src) {
   copy_content(src);
 }
 
+nHamiltonian::nHamiltonian(const nHamiltonian &src, int aux_mode) {
+  /**
+    aux_mode 1: build a previous-step cache - same hierarchy, but only the
+    read-set allocated (init_aux); any other value falls back to the exact
+    mirror of the source
+  */
+  init_mem_status(src.ndia, src.nadi, src.nnucl);
+  int ntraj = src.children.size();
+  int lvl = 0;
+  if (ntraj > 0) {
+    lvl = 1;
+    this->add_new_children(src.ndia, src.nadi, src.nnucl, ntraj);
+  }
+  if (aux_mode == 1) {
+    init_aux(lvl);
+  } else {
+    init_mirror(src);
+  }
+  copy_content(src);
+}
+
 nHamiltonian::nHamiltonian(int ndia_, int nadi_, int nnucl_) {
 
   init_mem_status(ndia_, nadi_, nnucl_);
@@ -487,6 +508,34 @@ void nHamiltonian::copy_level_content(nHamiltonian *src) {
   gs_kinetic_energy = src->gs_kinetic_energy;
 
 } // copy_level_content
+
+void nHamiltonian::init_aux(int target_lvl) {
+  /**
+    Allocate only the read-set of the previous-step Hamiltonian cache
+    (ham_aux/Ham_prev): its consumers read ham/hvib in both
+    representations, ovlp_dia, nac_adi, basis_transform (the U_prev^H
+    factor of model-based time-overlaps) and - through all_forces_adi in
+    the F-cost state tracking - the adiabatic first derivatives. Anything
+    more would also be re-copied by every per-step copy_content.
+  */
+  if (level <= target_lvl) {
+    init_ovlp_dia();
+    init_ham_dia();
+    init_hvib_dia();
+    init_basis_transform();
+    init_ham_adi();
+    init_nac_adi();
+    init_hvib_adi();
+    init_dc1_adi();
+    init_d1ham_adi();
+  }
+  if (level < target_lvl) {
+    for (auto i = 0u; i < children.size(); ++i) {
+      children[i]->init_aux(target_lvl);
+    }
+  }
+}
+
 
 void nHamiltonian::init_mirror(const nHamiltonian &src) {
   /**

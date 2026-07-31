@@ -264,6 +264,7 @@ public:
 
   ///< Copy Constructor:
   nHamiltonian(const nHamiltonian&); 
+  nHamiltonian(const nHamiltonian& src, int aux_mode);
  
   ///< Destructor
   ~nHamiltonian();    
@@ -285,6 +286,7 @@ public:
   void init_all(int der_lvl, int lvl);
   void init_mirror(const nHamiltonian& src);
   void init_adi_derivatives(int lvl);
+  void init_aux(int lvl);
 
   void show_memory_status(vector<int>& id_);
 

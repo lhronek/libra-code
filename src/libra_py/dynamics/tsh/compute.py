@@ -1051,7 +1051,10 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd):
     if use_kcrpmd == 1:  # KC-RPMD
         dyn_var.allocate_kcrpmd()
 
-    ham_aux = nHamiltonian(ham)
+    # the previous-step cache: allocate only its read-set (aux_mode 1) -
+    # a full mirror would also re-copy every allocated array on each
+    # per-step copy_content (measured 1.1 s/step at a full-window shape)
+    ham_aux = nHamiltonian(ham, 1)
     ham_aux.copy_content(ham);
 
     prms = dyn_control_params();

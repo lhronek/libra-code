@@ -351,6 +351,7 @@ void export_nhamiltonian_objects(){
 
   class_<nHamiltonian>("nHamiltonian",init<int,int,int>())
       .def(init<const nHamiltonian&>())
+      .def(init<const nHamiltonian&, int>())
 //      .def("__copy__", &generic__copy__<Hamiltonian>)
 //      .def("__deepcopy__", &generic__deepcopy__<Hamiltonian>)
       .def_readwrite("id", &nHamiltonian::id)
@@ -373,6 +374,7 @@ void export_nhamiltonian_objects(){
       .def("init_all", expt_init_all_v1)
       .def("init_all", expt_init_all_v2)
       .def("init_adi_derivatives", &nHamiltonian::init_adi_derivatives)
+      .def("init_aux", &nHamiltonian::init_aux)
       .def("show_memory_status", expt_show_memory_status_v1)
 
       .def("init_ovlp_dia", &nHamiltonian::init_ovlp_dia)
