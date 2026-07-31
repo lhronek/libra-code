@@ -1242,7 +1242,10 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
         ham.add_new_children(ndia, nadi, ndof, 1)
     else:
         ham.add_new_children(ndia, nadi, ndof, ntraj)
-    ham.init_all(2, 1)
+    # der_lvl 1: the TSH machinery reads values and first derivatives only;
+    # second-derivative arrays (nnucl^2 matrices of ndia^2/nadi^2) are
+    # allocated on demand by the model ingestion when a model supplies them
+    ham.init_all(1, 1)
 
     # Compute internals of the Hamiltonian objects
     model_params1 = copy.deepcopy(model_params)

@@ -150,7 +150,6 @@ nHamiltonian::nHamiltonian(const nHamiltonian &src) {
     }
   }
 
-  cout << "In cctor: lvl = " << lvl << " der_lvl = " << der_lvl << "\n";
 
   // Allocate memory for all the levels
   this->init_all(der_lvl, lvl);

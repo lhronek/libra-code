@@ -193,13 +193,13 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
     # ======= Hierarchy of Hamiltonians =======
     tol = 0.01
     ham = nHamiltonian(ndia, nadi, ndof)
-    ham.init_all(2)
+    ham.init_all(1)
     ham.phase_corr_ovlp_tol = tol
 
     ham1 = []
     for tr in range(1):
         ham1.append(nHamiltonian(ndia, nadi, ndof))
-        ham1[tr].init_all(2)
+        ham1[tr].init_all(1)
         ham1[tr].phase_corr_ovlp_tol = tol
         ham.add_child(ham1[tr])
 
@@ -523,7 +523,7 @@ def plot_surfaces(_compute_model, _param_sets, states_of_interest, xmin, xmax, d
         nstates = n
 
         ham = nHamiltonian(nstates, nstates, _ndof)  # ndia, nadi, nnucl
-        ham.init_all(2)
+        ham.init_all(1)
 
         hdia, hadi, nac, nac_abs = [], [], [], []
         uij = []              # projecitions of the MOs onto elementary basis

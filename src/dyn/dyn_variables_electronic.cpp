@@ -117,7 +117,7 @@ void dyn_variables::update_amplitudes(dyn_control_params& dyn_params, bp::object
     //# Prepare the Hamiltonian's hierarchy
     nHamiltonian ham(ndia, nadi, ndof);
     ham.add_new_children(ndia, nadi, ndof, ntraj);
-    ham.init_all(2,1);
+    ham.init_all(1,1);
 
     //# Compute the Hamiltonian transformation
     //update_Hamiltonian_q(dyn_params, *q, ham, compute_model, model_params);
@@ -402,7 +402,7 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params, bp::ob
   //# Prepare the Hamiltonian's hierarchy
   nHamiltonian ham(ndia, nadi, ndof);
   ham.add_new_children(ndia, nadi, ndof, ntraj);
-  ham.init_all(2,1);
+  ham.init_all(1,1);
 
   //# Compute the Hamiltonian transformation
   update_Hamiltonian_variables(dyn_params, *this, ham, ham, compute_model, model_params, 0);
@@ -421,7 +421,7 @@ void dyn_variables::update_density_matrix(bp::dict dyn_params, bp::object comput
   //# Prepare the Hamiltonian's hierarchy
   nHamiltonian ham(ndia, nadi, ndof);
   ham.add_new_children(ndia, nadi, ndof, ntraj);
-  ham.init_all(2,1);
+  ham.init_all(1,1);
 
   //# Compute the Hamiltonian transformation
   //update_Hamiltonian_q(_prms, *q, ham, compute_model, model_params);
