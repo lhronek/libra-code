@@ -1242,10 +1242,18 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
         ham.add_new_children(ndia, nadi, ndof, 1)
     else:
         ham.add_new_children(ndia, nadi, ndof, ntraj)
-    # der_lvl 1: the TSH machinery reads values and first derivatives only;
-    # second-derivative arrays (nnucl^2 matrices of ndia^2/nadi^2) are
-    # allocated on demand by the model ingestion when a model supplies them
-    ham.init_all(1, 1)
+    if dyn_params.get("ham_update_method", 1) == 2:
+        # adiabatic-native models supply forces and couplings in the
+        # adiabatic representation only - the diabatic derivative tier
+        # (2 x nnucl x ndia^2 complex per level) would be dead weight;
+        # the value matrices stay fully allocated
+        ham.init_all(0, 1)
+        ham.init_adi_derivatives(1)
+    else:
+        # der_lvl 1: the TSH machinery reads values and first derivatives
+        # only; second-derivative arrays are allocated on demand by the
+        # model ingestion when a model supplies them
+        ham.init_all(1, 1)
 
     # Compute internals of the Hamiltonian objects
     model_params1 = copy.deepcopy(model_params)
@@ -1270,6 +1278,10 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
                 raise ValueError(F"{key} = 0 requests diabatic-representation {what}, "
                                  F"but adiabatic-native models (ham_update_method = 2) "
                                  F"never populate the diabatic matrices - use {key} = 1")
+        if dyn_params.get("tsh_method", -1) == 3 and dyn_params.get("rep_lz", 0) == 0:
+            raise ValueError("tsh_method = 3 with rep_lz = 0 computes the Belyaev-Lebedev "
+                             "probabilities from the diabatic Hamiltonian derivatives, "
+                             "which adiabatic-native models never populate - use rep_lz 1 or 2")
         # Adiabatic-native models (on-the-fly drivers, file-fed NBRA) are not
         # called at init by default, so basis_transform keeps its all-zero
         # allocation. Harmless for adiabatic initialization (rep = 1), but for
