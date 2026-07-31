@@ -138,21 +138,13 @@ nHamiltonian::nHamiltonian(const nHamiltonian &src) {
     this->add_new_children(src.ndia, src.nadi, src.nnucl, ntraj);
   }
 
-  int der_lvl = 0;
-  if (src.d1ham_dia_mem_status.size() > 0) {
-    if (src.d1ham_dia_mem_status[0] != 0) {
-      der_lvl = 1;
-    }
-  }
-  if (src.d2ham_dia_mem_status.size() > 0) {
-    if (src.d2ham_dia_mem_status[0] != 0) {
-      der_lvl = 2;
-    }
-  }
+  // allocate exactly the arrays the source has - a hierarchy may be
+  // selectively initialized (e.g. no diabatic derivative arrays for
+  // adiabatic-native models), and a single derived der_lvl would
+  // allocate too much or too little
 
 
-  // Allocate memory for all the levels
-  this->init_all(der_lvl, lvl);
+  init_mirror(src);
 
   // Copy content for all the levels
   copy_content(src);
@@ -495,6 +487,36 @@ void nHamiltonian::copy_level_content(nHamiltonian *src) {
   gs_kinetic_energy = src->gs_kinetic_energy;
 
 } // copy_level_content
+
+void nHamiltonian::init_mirror(const nHamiltonian &src) {
+  /**
+    Allocate exactly the arrays the source has allocated, at this level and
+    below - a selectively initialized hierarchy (e.g. no diabatic derivative
+    arrays for adiabatic-native models) cannot be described by a single
+    der_lvl
+  */
+  if (src.ovlp_dia_mem_status != 0) { init_ovlp_dia(); }
+  if (src.ham_dia_mem_status != 0) { init_ham_dia(); }
+  if (src.nac_dia_mem_status != 0) { init_nac_dia(); }
+  if (src.hvib_dia_mem_status != 0) { init_hvib_dia(); }
+  if (src.ham_adi_mem_status != 0) { init_ham_adi(); }
+  if (src.nac_adi_mem_status != 0) { init_nac_adi(); }
+  if (src.hvib_adi_mem_status != 0) { init_hvib_adi(); }
+  if (src.basis_transform_mem_status != 0) { init_basis_transform(); }
+  if (src.time_overlap_adi_mem_status != 0) { init_time_overlap_adi(); }
+  if (src.time_overlap_dia_mem_status != 0) { init_time_overlap_dia(); }
+  if (src.cum_phase_corr_mem_status != 0) { init_cum_phase_corr(); }
+  if (src.dc1_dia_mem_status.size() > 0 && src.dc1_dia_mem_status[0] != 0) { init_dc1_dia(); }
+  if (src.d1ham_dia_mem_status.size() > 0 && src.d1ham_dia_mem_status[0] != 0) { init_d1ham_dia(); }
+  if (src.dc1_adi_mem_status.size() > 0 && src.dc1_adi_mem_status[0] != 0) { init_dc1_adi(); }
+  if (src.d1ham_adi_mem_status.size() > 0 && src.d1ham_adi_mem_status[0] != 0) { init_d1ham_adi(); }
+  if (src.d2ham_dia_mem_status.size() > 0 && src.d2ham_dia_mem_status[0] != 0) { init_d2ham_dia(); }
+  if (src.d2ham_adi_mem_status.size() > 0 && src.d2ham_adi_mem_status[0] != 0) { init_d2ham_adi(); }
+  for (auto i = 0u; i < children.size(); ++i) {
+    children[i]->init_mirror(*src.children[i]);
+  }
+}
+
 
 void nHamiltonian::init_all(int der_lvl) { init_all(der_lvl, 0); }
 
