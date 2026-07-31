@@ -2097,8 +2097,9 @@ def make_dftb_input(params, ground_state=True, working_directory="."):
         If False, generate input for excited-state TD-DFTB (Casida).
 
         Note:
-        For excited-state runs, ``StateOfInterest`` is internally forced
-        to 1 to ensure compatibility with force calculations.
+        ``StateOfInterest`` is written only when supplied in the params;
+        DFTB+ requires it nonzero for excited-state forces (both 24.1
+        and 25.1), and the driver threads the active state into it.
 
         Default: True
 
@@ -2165,7 +2166,15 @@ def make_dftb_input(params, ground_state=True, working_directory="."):
 
     Symmetry = params.get("Symmetry", "Singlet")
     NrOfExcitations = params.get("NrOfExcitations", 5)
-    StateOfInterest = params.get("StateOfInterest", 1)
+    # StateOfInterest is optional in DFTB+ (default 0) and REQUIRED nonzero
+    # for excited-state forces ("Excited forces only available for
+    # StateOfInterest non zero" - both 24.1 and 25.1); the line is written
+    # only when the caller carries it in dftb_run_params, so forces-free
+    # templates stay free of it
+    soi_line = ""
+    if "StateOfInterest" in params:
+        soi_line = F"       StateOfInterest = {params['StateOfInterest']}
+"
 
     WriteSPTransitions = params.get("WriteSPTransitions", "Yes")
     WriteXplusY = params.get("WriteXplusY", "Yes")
@@ -2183,10 +2192,6 @@ def make_dftb_input(params, ground_state=True, working_directory="."):
                          Temperature [K] = 40    
                          }
                          """)
-
-    # -------- Fix for excited-state forces --------
-    if not ground_state:
-        StateOfInterest = 1
 
     # -------- Templates --------
     scf_template_excited = f"""Geometry = GenFormat {{  
@@ -2210,8 +2215,7 @@ ExcitedState {{
     Casida {{
        Symmetry = {Symmetry}
        NrOfExcitations = {NrOfExcitations}
-       #StateOfInterest = {StateOfInterest}
-       WriteSPTransitions = {WriteSPTransitions}
+{soi_line}       WriteSPTransitions = {WriteSPTransitions}
        WriteXplusY = {WriteXplusY}
        #WriteXplusYAscii = {WriteXplusYAscii}
        StateCouplings = {StateCouplings}
@@ -2846,7 +2850,12 @@ def dftb_compute_adi(q, params, full_id):
 
     # ================= Run DFTB+ =================
     dftb_params = copy.deepcopy(dftb_run_params)
-    #dftb_params["StateOfInterest"] = act_state
+    # excited-state forces must follow the trajectory's active state; the
+    # excited run needs a nonzero state (DFTB+ aborts on 0 - both 24.1 and
+    # 25.1), and the keyword is threaded only when the caller opted in by
+    # supplying it
+    if "StateOfInterest" in dftb_params:
+        dftb_params["StateOfInterest"] = max(int(act_state), 1)
 
     #make_dftb_input(dftb_params)
     prms1 = {
