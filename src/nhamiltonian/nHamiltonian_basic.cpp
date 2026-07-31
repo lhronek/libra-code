@@ -518,6 +518,25 @@ void nHamiltonian::init_mirror(const nHamiltonian &src) {
 }
 
 
+void nHamiltonian::init_adi_derivatives(int target_lvl) {
+  /**
+    Allocate only the adiabatic first-derivative arrays (dc1_adi, d1ham_adi)
+    down to the target level - adiabatic-native models supply forces and
+    couplings in the adiabatic representation only, and the diabatic
+    derivative tier (nnucl x ndia^2 per array) would be dead weight
+  */
+  if (level <= target_lvl) {
+    init_dc1_adi();
+    init_d1ham_adi();
+  }
+  if (level < target_lvl) {
+    for (auto i = 0u; i < children.size(); ++i) {
+      children[i]->init_adi_derivatives(target_lvl);
+    }
+  }
+}
+
+
 void nHamiltonian::init_all(int der_lvl) { init_all(der_lvl, 0); }
 
 void nHamiltonian::init_all(int der_lvl, int target_lvl) {

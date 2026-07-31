@@ -372,6 +372,7 @@ void export_nhamiltonian_objects(){
       .def("copy_content", expt_copy_content_v1)
       .def("init_all", expt_init_all_v1)
       .def("init_all", expt_init_all_v2)
+      .def("init_adi_derivatives", &nHamiltonian::init_adi_derivatives)
       .def("show_memory_status", expt_show_memory_status_v1)
 
       .def("init_ovlp_dia", &nHamiltonian::init_ovlp_dia)

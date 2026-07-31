@@ -284,6 +284,7 @@ public:
   void init_all(int der_lvl);
   void init_all(int der_lvl, int lvl);
   void init_mirror(const nHamiltonian& src);
+  void init_adi_derivatives(int lvl);
 
   void show_memory_status(vector<int>& id_);
 
