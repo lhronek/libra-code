@@ -1882,6 +1882,23 @@ def run_odin(params):
     # Ensure working directory exists
     os.makedirs(wd, exist_ok=True)
 
+    # odin-01 reads the SK prefix into a fixed-length buffer (~120 chars) and
+    # then fails opening the truncated .skf names - long prefixes are linked
+    # into the working directory and passed as a short relative path (ODIN
+    # runs with cwd = wd)
+    slakos = params.get("slakos_prefix", "./")
+    if len(slakos) > 80:
+        if slakos.endswith("/"):
+            target, tail = slakos, ""
+        else:
+            target, tail = os.path.dirname(slakos) + "/", os.path.basename(slakos)
+        link = os.path.join(wd, "skdir")
+        if os.path.islink(link):
+            os.remove(link)
+        os.symlink(os.path.abspath(target), link)
+        params = dict(params)
+        params["slakos_prefix"] = F"skdir/{tail}"
+
     # -------- Create input content --------
     inp = create_odin_inp(params)
 
