@@ -299,6 +299,30 @@ class dyn_variables{
   */
   MATRIX* reversal_events;
 
+  /**
+    Status of the BLLZ (tsh_method 3, rep_lz 4) variables
+
+    0 - not allocated (default)
+    1 - allocated
+  */
+  int bllz_vars_status;
+
+  /**
+    Adiabatic state energies one and two steps back - the history for
+    the Belyaev-Lebedev 3-point gap-minimum detection
+
+    MATRIX(nadi, ntraj)
+
+    For Method: LZ with rep_lz 4
+  */
+  MATRIX* bllz_E_prev;
+  MATRIX* bllz_E_prev2;
+
+  /**
+    How many history levels are filled so far (0, 1 or 2)
+  */
+  int bllz_hist_size;
+
   
   ///================= For DISH ===================
   /**
@@ -644,6 +668,7 @@ class dyn_variables{
   void allocate_nuclear_vars();
   void allocate_afssh();
   void allocate_bcsh();
+  void allocate_bllz();
   void allocate_dish();
   void allocate_fssh2();
   void allocate_shxf();

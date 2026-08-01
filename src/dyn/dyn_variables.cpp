@@ -99,6 +99,10 @@ dyn_variables::dyn_variables(int _ndia, int _nadi, int _ndof, int _ntraj){
   ///================= BCSH ====================
   bcsh_vars_status = 0;
 
+  ///================= BLLZ ====================
+  bllz_vars_status = 0;
+  bllz_hist_size = 0;
+
   ///================= DISH ====================
   dish_vars_status = 0;
 
@@ -161,6 +165,20 @@ void dyn_variables::allocate_bcsh(){
   }
 
 }// allocate_bcsh
+
+
+void dyn_variables::allocate_bllz(){
+
+  if(bllz_vars_status==0){
+
+    bllz_E_prev = new MATRIX(nadi, ntraj);
+    bllz_E_prev2 = new MATRIX(nadi, ntraj);
+    bllz_hist_size = 0;
+    bllz_vars_status = 1;
+
+  }
+
+}// allocate_bllz
 
 
 void dyn_variables::allocate_dish(){
@@ -410,6 +428,17 @@ dyn_variables::dyn_variables(const dyn_variables& x){
 
   }// if BCSH vars
 
+  // BLLZ vars - only if initialized
+  if(x.bllz_vars_status==1){
+    allocate_bllz();
+
+    // Copy content
+    *bllz_E_prev = *x.bllz_E_prev;
+    *bllz_E_prev2 = *x.bllz_E_prev2;
+    bllz_hist_size = x.bllz_hist_size;
+
+  }// if BLLZ vars
+
   // DISH vars - only if initialized
   if(x.dish_vars_status==1){
     allocate_dish();
@@ -587,6 +616,13 @@ dyn_variables::~dyn_variables(){
     delete reversal_events;
 
     bcsh_vars_status = 0;
+  }
+
+  if(bllz_vars_status==1){
+    delete bllz_E_prev;
+    delete bllz_E_prev2;
+
+    bllz_vars_status = 0;
   }
 
   if(dish_vars_status==1){
