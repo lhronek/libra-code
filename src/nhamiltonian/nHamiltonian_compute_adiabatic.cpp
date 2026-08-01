@@ -617,6 +617,26 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
     }
 
     has_attr = 0;
+    has_attr = (int)hasattr(obj, "ham_dia");
+    if (has_attr) {
+
+      // the diabatic-representation hop proposals (LZ with rep_lz 0/1, ZN)
+      // detect crossings and read couplings in ham_dia, which
+      // compute_diabatic never populates for adiabatic-native models - this
+      // is their way to supply it
+      check_cmatrix(obj, "ham_dia", ndia, ndia);
+      if (ham_dia_mem_status == 0) { init_ham_dia(); }
+      try {
+        *ham_dia = extract<CMATRIX>(obj.attr("ham_dia"));
+      }
+      catch (bp::error_already_set const &) {
+        std::cout << "Error extracting ham_dia\n";
+        PyErr_Print();
+        throw;
+      }
+    }
+
+    has_attr = 0;
     has_attr = (int)hasattr(obj, "ovlp_dia");
     if (has_attr) {
 
