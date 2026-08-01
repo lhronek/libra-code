@@ -689,7 +689,7 @@ void export_dyn_hop_proposal_objects(){
 
   vector<double> (*expt_hopping_probabilities_zn_v1)
   (nHamiltonian& ham, nHamiltonian& ham_prev, int act_state_indx, int rep,
-  MATRIX& p, const MATRIX& invM) = &hopping_probabilities_lz;
+  MATRIX& p, const MATRIX& invM) = &hopping_probabilities_zn;
   def("hopping_probabilities_zn", expt_hopping_probabilities_zn_v1);
 
 
