@@ -839,15 +839,24 @@ must supply obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
     MATRIX dHv(nstates,nstates); // |H'_ii - H'_jj| * v
 
     if(ham->d1ham_dia_mem_status[0] != 0){
+      // |d(H_ii - H_jj)/dt| by the chain rule: the DOF contributions sum
+      // WITH signs and one magnitude is taken of the result - per-DOF
+      // magnitudes would inflate the gap velocity whenever DOF motions
+      // oppose each other
       for(k=0;k<ndof;k++){
         dham = ham->get_d1ham_dia(k).real() * p.get(k,0) * invM.get(k,0);
 
         for(j=0;j<nstates;j++){
-          double dmod = fabs(dham.get(i,i) - dham.get(j,j));
+          double dmod = dham.get(i,i) - dham.get(j,j);
           dHv.add(i,j, dmod);
           dHv.add(j,i, dmod);
         }// for j
       }// for k
+      for(j=0;j<nstates;j++){
+        double dmod = fabs(dHv.get(i,j));
+        dHv.set(i,j, dmod);
+        dHv.set(j,i, dmod);
+      }// for j
     }
     else{
       // no diabatic derivatives (adiabatic-native models supplying ham_dia):
