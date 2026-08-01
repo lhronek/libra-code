@@ -849,10 +849,11 @@ void export_dyn_projectors_objects(){
 void export_LZ_hopping_probabilities_objects(){
 
 
-  MATRIX (*expt_compute_hopping_probabilities_lz_v1)
-  (nHamiltonian& ham, int rep, MATRIX& p, const MATRIX& invM, MATRIX& prev_ham_dia) = &compute_hopping_probabilities_lz;
+  vector<double> (*expt_hopping_probabilities_lz_v1)
+  (nHamiltonian& ham, nHamiltonian& ham_prev, int act_state_indx, int rep,
+  MATRIX& p, const MATRIX& invM, double dt) = &hopping_probabilities_lz;
 
-  def("compute_hopping_probabilities_lz",expt_compute_hopping_probabilities_lz_v1);
+  def("hopping_probabilities_lz", expt_hopping_probabilities_lz_v1);
 
 }
 */

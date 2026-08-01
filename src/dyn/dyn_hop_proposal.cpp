@@ -777,7 +777,7 @@ vector<double> hopping_probabilities_mssh(dyn_control_params& prms, CMATRIX& den
 }
 
 
-//MATRIX compute_hopping_probabilities_lz(nHamiltonian* ham, int rep, MATRIX& p, const MATRIX& invM, MATRIX& prev_ham_dia){
+//vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM, double dt){
 vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM, double dt){
 /**
   \brief This function computes the surface hopping probabilities according to Landau-Zener formula.
@@ -809,7 +809,7 @@ vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_pre
   if(rep==0){ nstates = ham->ndia;  }
   else if(rep==1 || rep==2){  nstates = ham->nadi;  }
 
-//  MATRIX g(nstates,nstates);
+//  vector<double> g(nstates, 0.0);
   vector<double> g(nstates, 0.0);
 
   i = act_state_indx;
@@ -887,8 +887,7 @@ must supply obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
           double g_ij = exp(-2.0*M_PI*h_ij*h_ij / dHv.get(i,j) );
 
           g[j] = g_ij;
-          //g.set(i,j,g_ij);
-          //g.set(j,i,g_ij);
+          //g[j] = g_ij;
 
         }// only if minimum is located 
         else{ g[j] = 0.0; }
@@ -967,7 +966,7 @@ obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
 }// lz
 
 
-//MATRIX compute_hopping_probabilities_lz(nHamiltonian& ham, int rep, MATRIX& p, const MATRIX& invM, MATRIX& prev_ham_dia){
+//vector<double> hopping_probabilities_lz(nHamiltonian& ham, nHamiltonian& ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM, double dt){
 vector<double> hopping_probabilities_lz(nHamiltonian& ham, nHamiltonian& ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM, double dt){
 /**
   \brief This function computes the surface hopping probabilities according to Landau-Zener formula.
@@ -1238,7 +1237,7 @@ vector<MATRIX> hop_proposal_probabilities(dyn_control_params& prms,
     else if(prms.tsh_method == 3){ // LZ
 
 //      pop_submatrix(p, p_traj, nucl_stenc_x, nucl_stenc_y);
-//      g[traj] = compute_hopping_probabilities_lz(ham.children[traj], prms.rep_lz, p_traj, invM, prev_ham_dia[traj]);
+//      g[traj] = hopping_probabilities_lz(ham.children[traj], ham_prev.children[traj], dyn_var.act_states[traj], prms.rep_lz, p_traj, *dyn_var.iM, prms.dt);
 
     }
 

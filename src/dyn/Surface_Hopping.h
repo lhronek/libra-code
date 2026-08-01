@@ -42,10 +42,10 @@ using namespace libnuclear;
 using namespace libelectronic;
 //using namespace libensemble;
 
-///================  In tsh_prob_lz.cpp  ===================================
+///================  In dyn_hop_proposal.cpp  ==============================
 
-//MATRIX compute_hopping_probabilities_lz(nHamiltonian* ham, int rep, MATRIX& p, const MATRIX& invM, MATRIX& prev_ham_dia);
-//MATRIX compute_hopping_probabilities_lz(nHamiltonian& ham, int rep, MATRIX& p, const MATRIX& invM, MATRIX& prev_ham_dia);
+//vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM, double dt);
+//vector<double> hopping_probabilities_lz(nHamiltonian& ham, nHamiltonian& ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM, double dt);
 
 
 
