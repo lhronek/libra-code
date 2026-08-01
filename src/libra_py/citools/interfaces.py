@@ -91,6 +91,21 @@ def find_matches(
     return matches
 
 
+def _composition_key(det):
+    """(sorted |orbitals|, 2*Ms) - the equality class find_matches tests."""
+    return (tuple(sorted(abs(x) for x in det)),
+            int(sum(1 if x > 0 else -1 for x in det)))
+
+
+def _composition_index(possible_configs):
+    """One-pass index of a (det, phase) pool by composition key - replaces
+    the per-config Counter scan of the whole pool in the basis builders."""
+    index = {}
+    for entry in possible_configs:
+        index.setdefault(_composition_key(entry[0]), []).append(entry)
+    return index
+
+
 def build_minimal_csf_basis(
     configs: List[Tuple[int, ...]],
     active_space: List[int],
@@ -148,10 +163,11 @@ def build_minimal_csf_basis(
     # Generate all possible determinants (with parity) for the given active space
     dets: List[Tuple[Any, ...]] = list(sd.generate_determinants_with_parity(active_space, nelec))
 
+    index = _composition_index(dets)
     min_basis: List[Tuple[Any, ...]] = []
     for config in configs:
-        matches = find_matches(config, dets, max_unpaired)
-        min_basis.extend(matches)
+        key = (tuple(sorted(abs(x) for x in config)), max_unpaired)
+        min_basis.extend(index.get(key, []))
 
     # Avoid error when basis is empty
     transposed_basis: List[Tuple[Any, ...]] = list(zip(*min_basis)) if min_basis else []
@@ -215,10 +231,11 @@ def build_minimal_csf_basis_singlet(
     # Generate all possible determinants (with parity) for the given active space
     dets: List[Tuple[Any, ...]] = list(sd.generate_single_excitations(active_space, nelec))
 
+    index = _composition_index(dets)
     min_basis: List[Tuple[Any, ...]] = []
     for config in configs:
-        matches = find_matches(config, dets, max_unpaired)
-        min_basis.extend(matches)
+        key = (tuple(sorted(abs(x) for x in config)), max_unpaired)
+        min_basis.extend(index.get(key, []))
 
     # Avoid error when basis is empty
     transposed_basis: List[Tuple[Any, ...]] = list(zip(*min_basis)) if min_basis else []
