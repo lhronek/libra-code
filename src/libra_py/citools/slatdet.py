@@ -282,6 +282,55 @@ def generate_single_excitations(active_orbitals: List[int], nelec: int):
 def slater_overlap_matrix(dets_A, dets_B, S_orb, complex_valued=False, phases_A=None, phases_B=None):
     """
     Compute the matrix of overlaps between two possibly distinct sets of
+    Slater determinants (alpha/beta spins orthogonal).
+
+    Same interface and semantics as `slater_overlap_matrix_loop` (see its
+    docstring). Routed through the workflows.nbra.mapping batched /
+    determinant-lemma kernels when S_orb is a real two-spinor block matrix
+    (equal spin blocks, zero cross blocks) and the determinant lists fit it -
+    the loop evaluates O(nA nB) small determinants in python, which dominates
+    the CI-overlap cost, while the kernels reduce singles pairs to scalars.
+    """
+    if not complex_valued and not hasattr(S_orb, "toarray"):
+        S = np.asarray(S_orb)
+        n = S.shape[0]
+        if (S.ndim == 2 and S.shape[1] == n and n % 2 == 0
+                and len(dets_A) and len(dets_B)
+                and (phases_A is None or len(phases_A) == len(dets_A))
+                and (phases_B is None or len(phases_B) == len(dets_B))):
+            n_half = n // 2
+            lens_A = {len(d) for d in dets_A}
+            lens_B = {len(d) for d in dets_B}
+            in_range = all(o != 0 and abs(o) <= n_half
+                           for dets in (dets_A, dets_B) for d in dets for o in d)
+            if (len(lens_A) == 1 and lens_A == lens_B and in_range
+                    and np.array_equal(S[:n_half, :n_half], S[n_half:, n_half:])
+                    and not S[:n_half, n_half:].any()
+                    and not S[n_half:, :n_half].any()):
+                from libra_py.workflows.nbra import mapping as _mapping
+                res = _mapping.ovlp_mat_arb_auto(list(dets_A), list(dets_B), S)
+                # the kernels return the canonical sorted-row convention; the
+                # loop evaluates rows in the LISTED order - convert with the
+                # per-determinant sort parities, then apply the caller phases
+                sA = _mapping._sort_parities(np.array(_listed_rows(dets_A, n_half)))
+                sB = _mapping._sort_parities(np.array(_listed_rows(dets_B, n_half)))
+                ph_A = np.ones(len(dets_A)) if phases_A is None else np.asarray(phases_A, dtype=float)
+                ph_B = np.ones(len(dets_B)) if phases_B is None else np.asarray(phases_B, dtype=float)
+                return res * np.outer(sA * ph_A, sB * ph_B)
+    return slater_overlap_matrix_loop(dets_A, dets_B, S_orb, complex_valued, phases_A, phases_B)
+
+
+def _listed_rows(dets, n_half):
+    """Two-spinor row indices in the determinants' LISTED per-spin order
+    (alphas as given, then betas as given) - the order the reference loop
+    evaluates its determinants in."""
+    return [[abs(o) - 1 for o in d if o > 0] +
+            [n_half + abs(o) - 1 for o in d if o < 0] for d in dets]
+
+
+def slater_overlap_matrix_loop(dets_A, dets_B, S_orb, complex_valued=False, phases_A=None, phases_B=None):
+    """
+    Compute the matrix of overlaps between two possibly distinct sets of
     Slater determinants (α/β spins orthogonal).
 
     Parameters
