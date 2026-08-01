@@ -223,7 +223,7 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
     has_attr = (int)hasattr(obj,"time_overlap_dia"); 
     if(has_attr){    
 
-      check_cmatrix(obj, "time_overlap_adi", ndia, ndia);
+      check_cmatrix(obj, "time_overlap_dia", ndia, ndia);
       *time_overlap_dia = extract<CMATRIX>(obj.attr("time_overlap_dia"));    
     }
 
