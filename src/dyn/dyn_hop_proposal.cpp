@@ -792,6 +792,8 @@ vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_pre
   \param[in] act_state_indx - index of the current adiabatic state
   \param[in] rep index selecting the type of representation to be used: 0 - diabatic, 1 - adiabatic based on the min of diabatic 
   gap, 2 - adiabatic, based on the switch of the NAC sign
+  3 - diabatic, generalized-linear LZ: Eq. (3) of Belyaev, Lasser, Trigila (JCP 140, 224108 (2014))
+  evaluated at the gap minimum of the linearized passage, detected inside the last step
   \param[in] p [ndof x 1] or [ndof x ntraj] matrix of nuclear momenta
   \param[in] invM [ndof x 1] matrix of inverse nuclear masses
   \param[in] dt the integration timestep (a.u.) - the finite-difference gap velocity
@@ -806,7 +808,7 @@ vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_pre
   int ndof = ham->nnucl;
 
   // Determine the dimensions
-  if(rep==0){ nstates = ham->ndia;  }
+  if(rep==0 || rep==3){ nstates = ham->ndia;  }
   else if(rep==1 || rep==2){  nstates = ham->nadi;  }
 
 //  vector<double> g(nstates, 0.0);
@@ -953,6 +955,83 @@ obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
       }// j!=i
     }// for j
   }// rep == 1 adiabatic
+
+
+  /** Generalized-linear diabatic LZ:
+
+   p_{i->j} = exp( - pi * (v1*v2' - v2*v1')^2 / (v1'^2 + v2'^2)^(3/2) ),  v = ( (H_ii - H_jj)/2, H_ij )
+
+   BLT Eq. (3) evaluated at the gap minimum of the linearized passage - exact for a linear
+   diabatic model, reduces to the rep 0 formula for a constant coupling
+
+  */
+
+  else if(rep==3){
+
+    // Diabatic Ham matrices
+    MATRIX ham_dia(nstates,nstates);
+    MATRIX ham_dia_prev(nstates, nstates);
+    ham_dia = ham->get_ham_dia().real();
+    ham_dia_prev = ham_prev->get_ham_dia().real();
+    if(ham_dia.max_elt()==0.0 && ham_dia_prev.max_elt()==0.0){
+      cout<<"Error in hopping_probabilities_lz(): the diabatic Hamiltonian is all-zero at two \
+consecutive steps - the diabatic crossing detection is inoperative. Adiabatic-native models \
+must supply obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+
+    // the pair-local trace-free vector is v = ( (H_ii - H_jj)/2, H_ij ); its
+    // time derivative comes from the diabatic derivatives when the model
+    // supplies them, from the two steps otherwise
+    vector<double> v1d(nstates, 0.0);
+    vector<double> v2d(nstates, 0.0);
+    if(ham->d1ham_dia_mem_status[0] != 0){
+      MATRIX d1(nstates,nstates);
+      for(k=0;k<ndof;k++){
+        d1 = ham->get_d1ham_dia(k).real();
+        double vk = p.get(k,0) * invM.get(k,0);
+        for(j=0;j<nstates;j++){
+          v1d[j] += 0.5*(d1.get(i,i) - d1.get(j,j)) * vk;
+          v2d[j] += d1.get(i,j) * vk;
+        }// for j
+      }// for k
+    }
+    else{
+      for(j=0;j<nstates;j++){
+        v1d[j] = 0.5*( (ham_dia.get(i,i) - ham_dia.get(j,j))
+                     - (ham_dia_prev.get(i,i) - ham_dia_prev.get(j,j)) )/dt;
+        v2d[j] = (ham_dia.get(i,j) - ham_dia_prev.get(i,j))/dt;
+      }// for j
+    }
+
+    for(j=0; j<nstates; j++){
+
+      if(j!=i){
+        double v1c = 0.5*(ham_dia.get(i,i) - ham_dia.get(j,j));
+        double v2c = ham_dia.get(i,j);
+        double dv1 = v1c - 0.5*(ham_dia_prev.get(i,i) - ham_dia_prev.get(j,j));
+        double dv2 = v2c - ham_dia_prev.get(i,j);
+
+        // the linearized passage attains its gap minimum inside this step
+        // iff the projection of v on the step direction changes sign
+        double s_prev = (v1c - dv1)*dv1 + (v2c - dv2)*dv2;
+        double s_curr = v1c*dv1 + v2c*dv2;
+
+        if(s_prev < 0.0 && s_curr >= 0.0){
+          double den = v1d[j]*v1d[j] + v2d[j]*v2d[j];
+          if(den > 0.0){
+            // the cross product is constant along a linear passage, so the
+            // probability does not depend on where in the step it is evaluated
+            double cross = v1c*v2d[j] - v2c*v1d[j];
+            g[j] = exp(-M_PI * cross*cross / (den*sqrt(den)) );
+          }
+          else{ g[j] = 0.0; }
+        }// gap minimum inside the step
+        else{ g[j] = 0.0; }
+
+      }// j!=i
+    }// for j
+  }// rep == 3 generalized-linear diabatic
 
   // Diagonal elements - common for both reps
   double sum = 0.0;

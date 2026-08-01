@@ -114,6 +114,10 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd):
                      by the sign change of the diabatic gap
                 - 2: adiabatic, Eq. 3 of the Belyaev-Lebedev paper, crossing point is determined
                      by the sign change of the NAC
+                - 3: diabatic, generalized-linear LZ - Eq. (3) of Belyaev, Lasser, Trigila
+                     (JCP 140, 224108 (2014)) at the gap minimum of the linearized passage;
+                     needs a populated ham_dia like option 0, but detects the minimum from
+                     the two-step segment (also catches coupling-sweep passages)
 
 
             * **dyn_params["rep_force"]** ( int ): In which representation to compute forces.
@@ -1024,7 +1028,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd):
     # state: they need a populated, SQUARE diabatic Hamiltonian - from
     # compute_diabatic, or supplied as obj.ham_dia by an adiabatic-native model
     _tshm = dyn_params.get("tsh_method", -1)
-    if (_tshm == 3 and dyn_params.get("rep_lz", 0) in (0, 1)) or _tshm == 4:
+    if (_tshm == 3 and dyn_params.get("rep_lz", 0) in (0, 1, 3)) or _tshm == 4:
         if ndia != nadi:
             raise ValueError(F"tsh_method = {_tshm} detects crossings in the diabatic "
                              F"Hamiltonian indexed by adiabatic state, which needs a square "
