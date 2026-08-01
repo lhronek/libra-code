@@ -54,6 +54,11 @@ CMATRIX nHamiltonian::forces_adi(vector<int>& act_states){
       int st = act_states[traj];
 
       for(int dof=0; dof<nnucl; dof++){
+        if(children[traj]->d1ham_adi_mem_status[dof]==0){
+          cout<<"Error in forces_adi(): the derivative of the Hamiltonian w.r.t. the nuclear \
+DOF "<<dof<<" is not allocated for trajectory "<<traj<<" but is needed for the calculations \n";
+          throw std::runtime_error("libra C++ error - see the message printed above");
+        }
         res.set(dof, traj, -children[traj]->d1ham_adi[dof]->get(st, st) );
       }// for dof 
     }// for traj
@@ -84,6 +89,11 @@ CMATRIX nHamiltonian::forces_dia(vector<int>& act_states){
       int st = act_states[traj];
 
       for(int dof=0; dof<nnucl; dof++){
+        if(children[traj]->d1ham_dia_mem_status[dof]==0){
+          cout<<"Error in forces_dia(): the derivative of the Hamiltonian w.r.t. the nuclear \
+DOF "<<dof<<" is not allocated for trajectory "<<traj<<" but is needed for the calculations \n";
+          throw std::runtime_error("libra C++ error - see the message printed above");
+        }
         res.set(dof, traj, -children[traj]->d1ham_dia[dof]->get(st, st) );
       }// for dof 
     }// for traj

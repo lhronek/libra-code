@@ -194,6 +194,13 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
                          .real());
 
         for (int k = 0; k < ndof; k++) {
+          if (ham.children[traj]->dc1_adi_mem_status[k] == 0) {
+            cout << "Error in update_Hamiltonian_variables(): the derivative "
+                    "coupling w.r.t. the nuclear DOF " << k << " is not "
+                    "allocated for trajectory " << traj << " but is needed "
+                    "for its sign correction\n";
+            throw std::runtime_error("libra C++ error - see the message printed above");
+          }
           for (int i = 0; i < nadi; i++) {
             for (int j = i + 1; j < nadi; j++) {
               // double sgn = T_new[k].get(i,j);

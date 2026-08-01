@@ -228,6 +228,11 @@ MATRIX nHamiltonian::kcrpmd_effective_force(vector<double>& y_aux_var, const MAT
     MATRIX Fg(ndof, ntraj);
     MATRIX Fe(ndof, ntraj);
     for(dof=0; dof<ndof; dof++){   
+      if(children[0]->d1ham_dia_mem_status[dof]==0){
+        cout<<"Error in kcrpmd_effective_force(): the derivative of the Hamiltonian in the diabatic basis w.r.t. \
+the nuclear DOF "<<dof<<" is not allocated but is needed for the calculations \n";
+        throw std::runtime_error("libra C++ error - see the message printed above");
+      }
       F0.set(dof, 0, -(children[0]->d1ham_dia[dof]->get(0,0)).real());
       F1.set(dof, 0, -(children[0]->d1ham_dia[dof]->get(1,1)).real());
       // Reminder to account for complex coupling

@@ -164,6 +164,11 @@ void nHamiltonian::add_ethd_dia(const MATRIX &q, const MATRIX &invM,
     CMATRIX ethd_en(ndia, ndia);
     ethd_en.identity();
     ethd_en *= en;
+    if (ham_dia_mem_status == 0) {
+      cout << "Error in add_ethd_dia(): the diabatic Hamiltonian matrix is "
+              "not allocated but is needed for the calculations\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
+    }
     *ham_dia = ethd_en;
 
     if (der_lvl >= 1) {
@@ -172,6 +177,12 @@ void nHamiltonian::add_ethd_dia(const MATRIX &q, const MATRIX &invM,
 
       for (auto traj = 0u; traj < children.size(); traj++) {
         for (auto dof = 0; dof < nnucl; dof++) {
+          if (children[traj]->d1ham_dia_mem_status[dof] == 0) {
+            cout << "Error in add_ethd_dia(): the derivative of the Hamiltonian "
+                    "w.r.t. the nuclear DOF " << dof << " is not allocated for "
+                    "trajectory " << traj << " but is needed for the calculations\n";
+            throw std::runtime_error("libra C++ error - see the message printed above");
+          }
           for (auto st = 0; st < ndia; st++) {
             children[traj]->d1ham_dia[dof]->add(
                 st, st, ethd_frcs.get(dof, traj) * minus_one);
@@ -201,6 +212,11 @@ void nHamiltonian::add_ethd_adi(const MATRIX &q, const MATRIX &invM,
     ethd_en.identity();
     ethd_en *= ETHD_energy(q, invM);
 
+    if (ham_adi_mem_status == 0) {
+      cout << "Error in add_ethd_adi(): the adiabatic Hamiltonian matrix is "
+              "not allocated but is needed for the calculations\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
+    }
     *ham_adi = ethd_en;
 
     //    cout<<"ham_adi = "<<ham_adi<<endl;
@@ -217,6 +233,12 @@ void nHamiltonian::add_ethd_adi(const MATRIX &q, const MATRIX &invM,
       //      exit(0);
       for (auto traj = 0u; traj < children.size(); traj++) {
         for (auto dof = 0; dof < nnucl; dof++) {
+          if (children[traj]->d1ham_adi_mem_status[dof] == 0) {
+            cout << "Error in add_ethd_adi(): the derivative of the Hamiltonian "
+                    "w.r.t. the nuclear DOF " << dof << " is not allocated for "
+                    "trajectory " << traj << " but is needed for the calculations\n";
+            throw std::runtime_error("libra C++ error - see the message printed above");
+          }
           for (auto st = 0; st < nadi; st++) {
             children[traj]->d1ham_adi[dof]->add(
                 st, st, ethd_frcs.get(dof, traj) * minus_one);
