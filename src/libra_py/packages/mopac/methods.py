@@ -797,8 +797,17 @@ def mopac_compute_adi(q, params, full_id):
     # that of the input
     read_params = {"nstates":nstates, 
                    "filename":F"{wd}/{mopac_input_prefix}{mopac_jobid}.out", 
-                   "orbital_space":None}
+                   "orbital_space":params.get("orbital_space", None)}
     info, MO_curr, data_curr = read_mopac_orbital_info(read_params)
+
+    # the reader windows the MOs to actual_orbital_space; the CI-overlap
+    # range parameters below must describe the SAME window - full-space
+    # counts fail the st_mo shape validation for a non-full window
+    ci_space = info["actual_orbital_space"]
+    if list(ci_space) != list(range(ci_space[0], ci_space[0] + len(ci_space))):
+        raise ValueError("the CI-overlap path needs a contiguous orbital_space "
+                         F"- got {list(ci_space)[:6]}...")
+    lo_w, hi_w = int(ci_space[0]), int(ci_space[-1])
 
     #================= Construct active space ==================
     active_space = None
@@ -809,7 +818,7 @@ def mopac_compute_adi(q, params, full_id):
         if min_indx > info["min_occ"]:
             min_elec = ((info["nocc"] - info["min_occ"]) + 1 )*2
             raise ValueError(f"The `nelec_act_space` should be at least { min_elec }")
-        active_space = list(range(min_indx, info["nmo"]+1))
+        active_space = list(range(min_indx, hi_w+1))
 
     # Get the properties at the previous time-steps
     MO_prev, data_prev = None, None
@@ -842,9 +851,9 @@ def mopac_compute_adi(q, params, full_id):
 
     #================= Compute CI time-overlaps ============= 
     ovlp_params = {"homo_indx":info["nocc"], 
-                   "nocc":info["nocc"] - 1, 
-                   "nvirt":info["nmo"] - info["nocc"], 
-                   "nelec":info["nelec"], "nstates":nstates,
+                   "nocc":info["nocc"] - lo_w, 
+                   "nvirt":hi_w - info["nocc"], 
+                   "nelec":(info["nocc"] - lo_w + 1) * 2, "nstates":nstates,
                    "active_space":active_space
                    }
     st_ci = ci.overlap(st_mo, data_prev, data_curr, ovlp_params)
