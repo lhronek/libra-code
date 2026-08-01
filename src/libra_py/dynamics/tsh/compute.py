@@ -118,6 +118,10 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd):
                      (JCP 140, 224108 (2014)) at the gap minimum of the linearized passage;
                      needs a populated ham_dia like option 0, but detects the minimum from
                      the two-step segment (also catches coupling-sweep passages)
+                - 4: adiabatic, true Belyaev-Lebedev - Eq. (4) of the same paper: 3-point
+                     local minimum of the adiabatic gap with parabolic extrapolation. Needs
+                     NO diabatic data and NO NACs; the first two steps (and the two after a
+                     restart) propose nothing while the energy history fills
 
 
             * **dyn_params["rep_force"]** ( int ): In which representation to compute forces.

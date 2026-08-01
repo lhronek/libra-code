@@ -810,6 +810,11 @@ vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_pre
   // Determine the dimensions
   if(rep==0 || rep==3){ nstates = ham->ndia;  }
   else if(rep==1 || rep==2){  nstates = ham->nadi;  }
+  else{
+    cout<<"Error in hopping_probabilities_lz(): rep can be 0, 1, 2 or 3; the Belyaev-Lebedev \
+gap-minimum probabilities (rep_lz = 4) come from hopping_probabilities_bllz \n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
 //  vector<double> g(nstates, 0.0);
   vector<double> g(nstates, 0.0);
@@ -1072,6 +1077,68 @@ vector<double> hopping_probabilities_lz(nHamiltonian& ham, nHamiltonian& ham_pre
   return hopping_probabilities_lz(&ham, &ham_prev, act_state_indx, rep, p, invM, dt);
 
 }
+
+
+vector<double> hopping_probabilities_bllz(MATRIX& E_prev2, MATRIX& E_prev, MATRIX& E_curr, int act_state_indx, double dt){
+/**
+  \brief Belyaev-Lebedev hopping probabilities - Eq. (4) of Belyaev, Lasser, Trigila,
+  JCP 140, 224108 (2014) - from a three-step adiabatic energy history of one trajectory
+
+  \param[in] E_prev2 [nstates x 1] adiabatic energies two steps back
+  \param[in] E_prev [nstates x 1] adiabatic energies at the previous step
+  \param[in] E_curr [nstates x 1] adiabatic energies at the current step
+  \param[in] act_state_indx - index of the current adiabatic state
+  \param[in] dt the integration timestep (a.u.)
+
+  A pair's gap history Z(t-2dt) > Z(t-dt) < Z(t) marks a local minimum; the Lagrange
+  parabola through the three gaps gives the extrapolated minimum and the second time
+  derivative, and P = exp( -(pi/2) sqrt(Z_min^3 / Z_dd) ). A negative extrapolated
+  minimum is clamped to zero - the trivial-crossing limit, P = 1. Detailed balance is
+  NOT applied here: the hop acceptance machinery owns it.
+
+  Returns:
+      A nstates-vector of hopping probabilities to all states from the current active state
+*/
+
+  int nstates = E_curr.n_rows;
+  vector<double> g(nstates, 0.0);
+  int i = act_state_indx;
+  int j;
+
+  double sum = 0.0;
+  for(j=0; j<nstates; j++){
+    if(j!=i){
+      double z0 = fabs(E_prev2.get(i,0) - E_prev2.get(j,0));
+      double z1 = fabs(E_prev.get(i,0) - E_prev.get(j,0));
+      double z2 = fabs(E_curr.get(i,0) - E_curr.get(j,0));
+
+      if(z0 > z1 && z1 < z2){
+        // the strict minimum makes denom > 0 and keeps |t_min| < dt/2
+        double denom = z0 - 2.0*z1 + z2;
+        double t_min = 0.5*(z0 - z2)*dt/denom;
+        double gap_min = 0.5*( t_min*(t_min - dt)*z0
+                       - 2.0*(t_min + dt)*(t_min - dt)*z1
+                       + t_min*(t_min + dt)*z2 )/(dt*dt);
+        if(gap_min < 0.0){ gap_min = 0.0; }
+
+        double Zdd = denom/(dt*dt);
+        g[j] = exp(-0.5*M_PI*sqrt(gap_min*gap_min*gap_min/Zdd));
+        sum += g[j];
+      }// local minimum
+    }// j!=i
+  }// for j
+
+  // proposals may sum above 1 when several pairs attain minima in the same
+  // step - rescale, as the NBRA post-processing does
+  if(sum < 1.0){  g[i] = 1.0 - sum; }
+  else{
+    g[i] = 0.0;
+    for(j=0; j<nstates; j++){  if(j!=i){ g[j] /= sum; }  }
+  }
+
+  return g;
+
+}// bllz
 
 vector<double> hopping_probabilities_zn(nHamiltonian* ham, nHamiltonian* ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM){
 /**
@@ -1426,9 +1493,33 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
     }
     else if(prms.tsh_method == 3){ // LZ
 
-      pop_submatrix(*dyn_var.p, p_traj, nucl_stenc_x, nucl_stenc_y);
-      g[traj] = hopping_probabilities_lz(ham.children[traj], ham_prev.children[traj], dyn_var.act_states[traj], 
-                prms.rep_lz, p_traj, *dyn_var.iM, prms.dt);
+      if(prms.rep_lz == 4){
+        // true Belyaev-Lebedev: adiabatic energies alone; the two-step history
+        // lives in dyn_var (allocated on first use) and the first two steps
+        // propose nothing while it fills
+        if(dyn_var.bllz_vars_status == 0){ dyn_var.allocate_bllz(); }
+        int nst_t = ham.children[traj]->nadi;
+        vector<double> gg(nst_t, 0.0);
+        gg[dyn_var.act_states[traj]] = 1.0;
+        if(dyn_var.bllz_hist_size >= 2){
+          MATRIX Ec(nst_t, 1);
+          MATRIX Ep(nst_t, 1);
+          MATRIX Ep2(nst_t, 1);
+          CMATRIX Ham_t(ham.children[traj]->get_ham_adi());
+          for(int st=0; st<nst_t; st++){
+            Ec.set(st, 0, Ham_t.get(st, st).real());
+            Ep.set(st, 0, dyn_var.bllz_E_prev->get(st, traj));
+            Ep2.set(st, 0, dyn_var.bllz_E_prev2->get(st, traj));
+          }// for st
+          gg = hopping_probabilities_bllz(Ep2, Ep, Ec, dyn_var.act_states[traj], prms.dt);
+        }
+        g[traj] = gg;
+      }
+      else{
+        pop_submatrix(*dyn_var.p, p_traj, nucl_stenc_x, nucl_stenc_y);
+        g[traj] = hopping_probabilities_lz(ham.children[traj], ham_prev.children[traj], dyn_var.act_states[traj], 
+                  prms.rep_lz, p_traj, *dyn_var.iM, prms.dt);
+      }
 
     }
     else if(prms.tsh_method == 4){ // ZN
@@ -1505,6 +1596,20 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
     }
 
   }// for traj
+
+  if(prms.tsh_method == 3 && prms.rep_lz == 4){
+    // push the current energies into the history AFTER all proposals
+    if(dyn_var.bllz_vars_status == 0){ dyn_var.allocate_bllz(); }
+    for(traj=0; traj<ntraj; traj++){
+      CMATRIX Ham_t(ham.children[traj]->get_ham_adi());
+      int nst_t = ham.children[traj]->nadi;
+      for(int st=0; st<nst_t; st++){
+        dyn_var.bllz_E_prev2->set(st, traj, dyn_var.bllz_E_prev->get(st, traj));
+        dyn_var.bllz_E_prev->set(st, traj, Ham_t.get(st, st).real());
+      }// for st
+    }// for traj
+    if(dyn_var.bllz_hist_size < 2){ dyn_var.bllz_hist_size += 1; }
+  }
 
   return g;
 

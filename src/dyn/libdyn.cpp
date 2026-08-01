@@ -690,6 +690,10 @@ void export_dyn_hop_proposal_objects(){
   MATRIX& p, const MATRIX& invM, double dt) = &hopping_probabilities_lz;
   def("hopping_probabilities_lz", expt_hopping_probabilities_lz_v1);
 
+  vector<double> (*expt_hopping_probabilities_bllz_v1)
+  (MATRIX& E_prev2, MATRIX& E_prev, MATRIX& E_curr, int act_state_indx, double dt) = &hopping_probabilities_bllz;
+  def("hopping_probabilities_bllz", expt_hopping_probabilities_bllz_v1);
+
   vector<double> (*expt_hopping_probabilities_zn_v1)
   (nHamiltonian& ham, nHamiltonian& ham_prev, int act_state_indx, int rep,
   MATRIX& p, const MATRIX& invM) = &hopping_probabilities_zn;
