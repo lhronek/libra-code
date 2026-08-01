@@ -1019,6 +1019,23 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd):
     update_Hamiltonian_variables(dyn_params, dyn_var, ham, ham, compute_model, model_params, 0)
     update_Hamiltonian_variables(dyn_params, dyn_var, ham, ham, compute_model, model_params, 1)
 
+    # the diabatic-representation hop proposals (tsh_method 3 with rep_lz 0/1,
+    # tsh_method 4) detect crossings in ham_dia and index it by adiabatic
+    # state: they need a populated, SQUARE diabatic Hamiltonian - from
+    # compute_diabatic, or supplied as obj.ham_dia by an adiabatic-native model
+    _tshm = dyn_params.get("tsh_method", -1)
+    if (_tshm == 3 and dyn_params.get("rep_lz", 0) in (0, 1)) or _tshm == 4:
+        if ndia != nadi:
+            raise ValueError(F"tsh_method = {_tshm} detects crossings in the diabatic "
+                             F"Hamiltonian indexed by adiabatic state, which needs a square "
+                             F"diabatic basis - here ndia = {ndia}, nadi = {nadi}")
+        _H0 = ham.get_ham_dia(Py2Cpp_int([0, 0]))
+        if max(abs(_H0.get(a, b)) for a in range(ndia) for b in range(ndia)) == 0.0:
+            raise ValueError(F"tsh_method = {_tshm} detects crossings in the diabatic "
+                             F"Hamiltonian, but ham_dia is all-zero after the initial model "
+                             F"call - supply obj.ham_dia from the model, or use rep_lz = 2 "
+                             F"(adiabatic-only detection, tsh_method 3)")
+
     therm = ThermostatList()
     if ensemble == 1:
         for traj in range(ntraj):
@@ -1281,10 +1298,6 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
                 raise ValueError(F"{key} = 0 requests diabatic-representation {what}, "
                                  F"but adiabatic-native models (ham_update_method = 2) "
                                  F"never populate the diabatic matrices - use {key} = 1")
-        if dyn_params.get("tsh_method", -1) == 3 and dyn_params.get("rep_lz", 0) == 0:
-            raise ValueError("tsh_method = 3 with rep_lz = 0 computes the Belyaev-Lebedev "
-                             "probabilities from the diabatic Hamiltonian derivatives, "
-                             "which adiabatic-native models never populate - use rep_lz 1 or 2")
         # Adiabatic-native models (on-the-fly drivers, file-fed NBRA) are not
         # called at init by default, so basis_transform keeps its all-zero
         # allocation. Harmless for adiabatic initialization (rep = 1), but for
