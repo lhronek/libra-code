@@ -2987,13 +2987,23 @@ def dftb_compute_adi(q, params, full_id):
     st_mo_orb = MO_prev.T @ st_ao @ MO_curr
     st_mo = np.kron(np.eye(2), st_mo_orb)
 
+    # the MO matrices above are windowed to actual_orbital_space, so the
+    # CI-overlap range parameters must describe the SAME window - full-space
+    # counts fail the st_mo shape validation for any non-full orbital_space;
+    # a window starting above orbital 1 freezes the core out of ci.overlap
+    ci_space = info["actual_orbital_space"]
+    if list(ci_space) != list(range(ci_space[0], ci_space[0] + len(ci_space))):
+        raise ValueError("the CI-overlap path needs a contiguous orbital_space "
+                         "(ci.overlap rebuilds a contiguous range internally) - "
+                         F"got {list(ci_space)[:6]}...")
+    lo_w, hi_w = int(ci_space[0]), int(ci_space[-1])
     ovlp_params = {
         "homo_indx": info["nocc"],
-        "nocc": info["nocc"] - 1,
-        "nvirt": info["nmo"] - info["nocc"],
-        "nelec": info["nelec"],
+        "nocc": info["nocc"] - lo_w,
+        "nvirt": hi_w - info["nocc"],
+        "nelec": (info["nocc"] - lo_w + 1) * 2,
         "nstates": nstates,
-        "active_space": info["actual_orbital_space"],
+        "active_space": ci_space,
     }
 
     st_ci = ci.overlap(st_mo, data_prev, data_curr, ovlp_params)
