@@ -547,6 +547,10 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
     if (has_attr) {
 
       check_cmatrix(obj, "ham_adi", nadi, nadi);
+      // a model may supply any family the hierarchy was not initialized
+      // for - allocate on demand (the raw-pointer writes would otherwise
+      // dereference NULL); same policy for every ingested family below
+      if (ham_adi_mem_status == 0) { init_ham_adi(); }
       //*ham_adi = extract<CMATRIX>(obj.attr("ham_adi"));
       try {
         *ham_adi = extract<CMATRIX>(obj.attr("ham_adi"));
@@ -563,6 +567,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
     if (has_attr) {
 
       check_cmatrix(obj, "nac_adi", nadi, nadi);
+      if (nac_adi_mem_status == 0) { init_nac_adi(); }
       //*nac_adi = extract<CMATRIX>(obj.attr("nac_adi"));
       try {
         *nac_adi = extract<CMATRIX>(obj.attr("nac_adi"));
@@ -579,6 +584,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
     if (has_attr) {
 
       check_cmatrix(obj, "hvib_adi", nadi, nadi);
+      if (hvib_adi_mem_status == 0) { init_hvib_adi(); }
       //*hvib_adi = extract<CMATRIX>(obj.attr("hvib_adi"));
       try {
         *hvib_adi = extract<CMATRIX>(obj.attr("hvib_adi"));
@@ -598,6 +604,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       // whenever the model declares more diabats than adiabatic states (e.g.
       // an SD basis as the diabatic basis with the CI matrix as the transform)
       check_cmatrix(obj, "basis_transform", ndia, nadi);
+      if (basis_transform_mem_status == 0) { init_basis_transform(); }
       //*basis_transform = extract<CMATRIX>(obj.attr("basis_transform"));
       try {
         *basis_transform = extract<CMATRIX>(obj.attr("basis_transform"));
@@ -617,6 +624,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       // only way to declare the diabatic metric (identity for orthonormal
       // diabats) - without it ampl_dia2adi multiplies by an all-zero S_dia
       check_cmatrix(obj, "ovlp_dia", ndia, ndia);
+      if (ovlp_dia_mem_status == 0) { init_ovlp_dia(); }
       try {
         *ovlp_dia = extract<CMATRIX>(obj.attr("ovlp_dia"));
       }
@@ -632,6 +640,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
     if (has_attr) {
 
       check_cmatrix(obj, "time_overlap_adi", nadi, nadi);
+      if (time_overlap_adi_mem_status == 0) { init_time_overlap_adi(); }
       //*time_overlap_adi = extract<CMATRIX>(obj.attr("time_overlap_adi"));
       try {
         *time_overlap_adi = extract<CMATRIX>(obj.attr("time_overlap_adi"));
@@ -648,6 +657,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
     if (has_attr) {
 
       check_cmatrix_list(obj, "dc1_adi", nadi, nadi, nnucl);
+      if (dc1_adi_mem_status[0] == 0) { init_dc1_adi(); }
 
       vector<CMATRIX> _dc1_adi(nnucl, CMATRIX(nadi, nadi));
       //_dc1_adi = extract<CMATRIXList>(obj.attr("dc1_adi"));
@@ -672,6 +682,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
     if (has_attr) {
 
       check_cmatrix_list(obj, "d1ham_adi", nadi, nadi, nnucl);
+      if (d1ham_adi_mem_status[0] == 0) { init_d1ham_adi(); }
 
       vector<CMATRIX> _d1ham_adi(nnucl, CMATRIX(nadi, nadi));
       _d1ham_adi = extract<CMATRIXList>(obj.attr("d1ham_adi"));

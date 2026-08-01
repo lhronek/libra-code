@@ -149,6 +149,10 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
     if(has_attr){  
 
       check_cmatrix(obj, "ham_dia", ndia, ndia);
+      // a model may supply any family the hierarchy was not initialized
+      // for - allocate on demand (the raw-pointer writes would otherwise
+      // dereference NULL); same policy for every ingested family below
+      if(ham_dia_mem_status==0){ init_ham_dia(); }
       *ham_dia = extract<CMATRIX>(obj.attr("ham_dia")); 
     }
   
@@ -157,6 +161,7 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
     if(has_attr){ 
 
       check_cmatrix(obj, "ovlp_dia", ndia, ndia);
+      if(ovlp_dia_mem_status==0){ init_ovlp_dia(); }
       *ovlp_dia = extract<CMATRIX>(obj.attr("ovlp_dia"));   
     }
 //exit(0);
@@ -166,6 +171,7 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
     if(has_attr){    
 
       check_cmatrix(obj, "nac_dia", ndia, ndia);
+      if(nac_dia_mem_status==0){ init_nac_dia(); }
       *nac_dia = extract<CMATRIX>(obj.attr("nac_dia"));    
     }
 
@@ -174,6 +180,7 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
     if(has_attr){    
 
       check_cmatrix(obj, "hvib_dia", ndia, ndia);
+      if(hvib_dia_mem_status==0){ init_hvib_dia(); }
       *hvib_dia = extract<CMATRIX>(obj.attr("hvib_dia"));    
     }
     
@@ -182,6 +189,7 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
     if(has_attr){  
 
       check_cmatrix_list(obj, "dc1_dia", ndia, ndia, nnucl);
+      if(dc1_dia_mem_status[0]==0){ init_dc1_dia(); }
 
       vector<CMATRIX> _dc1_dia(nnucl, CMATRIX(ndia,ndia));
       _dc1_dia = extract<CMATRIXList>(obj.attr("dc1_dia"));   
@@ -195,6 +203,7 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
     if(has_attr){  
 
       check_cmatrix_list(obj, "d1ham_dia", ndia, ndia, nnucl);
+      if(d1ham_dia_mem_status[0]==0){ init_d1ham_dia(); }
 
       vector<CMATRIX> _d1ham_dia(nnucl, CMATRIX(ndia,ndia));
       _d1ham_dia = extract<CMATRIXList>(obj.attr("d1ham_dia"));   
@@ -224,6 +233,7 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
     if(has_attr){    
 
       check_cmatrix(obj, "time_overlap_dia", ndia, ndia);
+      if(time_overlap_dia_mem_status==0){ init_time_overlap_dia(); }
       *time_overlap_dia = extract<CMATRIX>(obj.attr("time_overlap_dia"));    
     }
 
