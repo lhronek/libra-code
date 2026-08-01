@@ -827,6 +827,12 @@ vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_pre
     MATRIX ham_dia_prev(nstates, nstates);
     ham_dia = ham->get_ham_dia().real();
     ham_dia_prev = ham_prev->get_ham_dia().real();
+    if(ham_dia.max_elt()==0.0 && ham_dia_prev.max_elt()==0.0){
+      cout<<"Error in hopping_probabilities_lz(): the diabatic Hamiltonian is all-zero at two \
+consecutive steps - the diabatic crossing detection is inoperative. Adiabatic-native models \
+must supply obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
+    }
 
     // Get denominator
     MATRIX dham(nstates,nstates); // H'_ii * v
@@ -903,6 +909,12 @@ vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_pre
     ham_adi_prev = ham_prev->get_ham_adi().real();
     ham_dia_prev = ham_prev->get_ham_dia().real();
     nac_adi_prev = ham_prev->get_nac_adi().real();
+    if(rep==1 && ham_dia.max_elt()==0.0 && ham_dia_prev.max_elt()==0.0){
+      cout<<"Error in hopping_probabilities_lz(): rep_lz = 1 detects crossings in the diabatic \
+Hamiltonian, which is all-zero at two consecutive steps. Adiabatic-native models must supply \
+obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
+    }
 
     // Off-diagonal elements
     for(j=0;j<nstates;j++){
@@ -1014,6 +1026,12 @@ vector<double> hopping_probabilities_zn(nHamiltonian* ham, nHamiltonian* ham_pre
   MATRIX ham_dia_prev(nstates, nstates);
   ham_dia = ham->get_ham_dia().real();
   ham_dia_prev = ham_prev->get_ham_dia().real();
+  if(ham_dia.max_elt()==0.0 && ham_dia_prev.max_elt()==0.0){
+    cout<<"Error in hopping_probabilities_zn(): the diabatic Hamiltonian is all-zero at two \
+consecutive steps - the crossing detection and the diabatic coupling are inoperative. \
+Adiabatic-native models must supply obj.ham_dia \n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
   MATRIX F(ndof, nstates);
   MATRIX Fi(ndof, 1);
