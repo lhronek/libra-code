@@ -296,9 +296,13 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
           for (int j = i + 1; j < nadi; j++) {
             double x1 = ham.children[traj]->nac_adi->get(i, j).real();
             double x2 = ham_prev.children[traj]->nac_adi->get(i, j).real();
-            double sng = SIGN(x1) * SIGN(x2);
-            ham.children[traj]->nac_adi->scale(i, j, sng);
-            ham.children[traj]->nac_adi->scale(j, i, sng);
+            // flip only on definite sign disagreement: SIGN(0) = 0
+            // would scale a first-step or zero-crossing NAC to zero
+            // permanently (an HST NAC starts from St = I, so zero)
+            if (SIGN(x1) * SIGN(x2) < 0.0) {
+              ham.children[traj]->nac_adi->scale(i, j, -1.0);
+              ham.children[traj]->nac_adi->scale(j, i, -1.0);
+            }
           } // for j
         } // for i
       } // for traj
