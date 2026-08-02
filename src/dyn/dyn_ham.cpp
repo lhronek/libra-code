@@ -245,7 +245,12 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
         }
       }
 
-      ham.compute_nac_dia(p_quantum_dof, iM, 0, 1);
+      // an adiabatic-native model (ham_update_method == 2) never populates
+      // the diabatic derivative couplings - there is nothing to build the
+      // diabatic NACs from
+      if (prms.ham_update_method != 2) {
+        ham.compute_nac_dia(p_quantum_dof, iM, 0, 1);
+      }
       ham.compute_nac_adi(p_quantum_dof, iM, 0, 1);
     }
 
@@ -309,7 +314,11 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
 
     // Explicitly update Hvib
     else if (prms.hvib_update_method == 1) {
-      ham.compute_hvib_dia(1);
+      // the diabatic Hvib of an adiabatic-native model would be built from
+      // the never-populated ham_dia/nac_dia - all-zero dead output
+      if (prms.ham_update_method != 2) {
+        ham.compute_hvib_dia(1);
+      }
       ham.compute_hvib_adi(1);
     }
 
