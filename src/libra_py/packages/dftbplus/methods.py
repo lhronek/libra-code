@@ -3149,6 +3149,9 @@ def dftb_compute_adi(q, params, full_id):
     # requested, its columns follow through the T argument
     ci_adapter = {"configs": [np.asarray(c).tolist() for c in data_curr[1]],
                   "amps": data_curr[2]}
+    if info.get("isUKS", 0):
+        ci_adapter["spins"] = [["alp" if int(c[2]) == 0 else "bet" for c in confs]
+                               for confs in data_curr[1]]
     T_dia = None
     if dia_basis == "sd":
         # the fixed diabatic basis is the FULL active window in the canonical
@@ -3166,7 +3169,22 @@ def dftb_compute_adi(q, params, full_id):
         # affordable on larger molecules
         num_occ = int(params.get("num_occ_states", homo_w))
         num_unocc = int(params.get("num_unocc_states", len(space) - homo_w))
-        sd_unique, _ = make_sd_basis(homo_w, num_occ, num_unocc, len(space))
+        if info.get("isUKS", 0):
+            # per-channel windows around each HOMO (the UKS basis of
+            # make_sd_basis), taking the same per-channel keywords as the
+            # CP2K driver (num_occ_alpha/... default through the shared
+            # counts; unspecified betas span their full window)
+            homo_b_w = info["nocc_beta"] - lowest + 1
+            noa = int(params.get("num_occ_alpha", num_occ))
+            nua = int(params.get("num_unocc_alpha", num_unocc))
+            nob_def = int(params.get("num_occ_states", homo_b_w))
+            nub_def = int(params.get("num_unocc_states", len(space) - homo_b_w))
+            sd_unique, _ = make_sd_basis(
+                homo_w, noa, nua, len(space), homo_beta_w=homo_b_w,
+                num_occ_beta=int(params.get("num_occ_beta", nob_def)),
+                num_unocc_beta=int(params.get("num_unocc_beta", nub_def)))
+        else:
+            sd_unique, _ = make_sd_basis(homo_w, num_occ, num_unocc, len(space))
         T_full, ci_drops = sd2ci_matrix(ci_adapter, sd_unique, lowest)
         check_sd_capture(ci_drops, nstates, dia_max_drop)
         T_dia = T_full[:, :nstates]
