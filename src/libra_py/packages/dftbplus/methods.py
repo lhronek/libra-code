@@ -2184,7 +2184,10 @@ def make_dftb_input(params, ground_state=True, working_directory="."):
                      }
                      """)
 
+    # spin-polarized Casida REJECTS the Symmetry keyword (hard input error) -
+    # passing Symmetry = None omits the line
     Symmetry = params.get("Symmetry", "Singlet")
+    sym_line = "" if Symmetry is None else F"       Symmetry = {Symmetry}\n"
     NrOfExcitations = params.get("NrOfExcitations", 5)
     # StateOfInterest is optional in DFTB+ (default 0) and REQUIRED nonzero
     # for excited-state forces ("Excited forces only available for
@@ -2205,6 +2208,10 @@ def make_dftb_input(params, ground_state=True, working_directory="."):
     WriteEigenvectors = params.get("WriteEigenvectors", "Yes")
     EigenvectorsAsText = params.get("EigenvectorsAsText", "Yes")
     PrintForces = params.get("PrintForces", "Yes")
+
+    # verbatim extra lines for the Hamiltonian block (e.g. SpinPolarisation
+    # and SpinConstants for open-shell runs); must be newline-terminated
+    HamiltonianExtras = params.get("HamiltonianExtras", "")
 
     Filling = params.get("Filling",
                          """Fermi {
@@ -2228,12 +2235,11 @@ Hamiltonian = DFTB {{
         Suffix = ".skf"
     }}
     Filling = {Filling}
-}}
+{HamiltonianExtras}}}
 
 ExcitedState {{
     Casida {{
-       Symmetry = {Symmetry}
-       NrOfExcitations = {NrOfExcitations}
+{sym_line}       NrOfExcitations = {NrOfExcitations}
 {soi_line}       WriteSPTransitions = {WriteSPTransitions}
        WriteXplusY = {WriteXplusY}
        #WriteXplusYAscii = {WriteXplusYAscii}
@@ -2267,7 +2273,7 @@ Hamiltonian = DFTB {{
         Suffix = ".skf"
     }}
     Filling = {Filling}
-}}
+{HamiltonianExtras}}}
 
 Options {{
   WriteAutotestTag = {WriteAutotestTag}
@@ -2747,6 +2753,54 @@ class tmp:
     pass
 
 
+def _uks_sd_expansion(data, info, lo):
+    """Union SD basis (ground determinant first) and the state-amplitude
+    matrix for a spin-polarized Casida spectrum: each (occ, vir, spin)
+    transition is a single spin-orbital excitation of the UKS reference -
+    no spin adaptation is involved. Determinants are window-relative signed
+    spin-orbitals (+alpha / -beta), the mapping/slatdet convention."""
+    homo_u = info["nocc_alpha"] - lo + 1
+    homo_d = info["nocc_beta"] - lo + 1
+    gs = [i for i in range(1, homo_u + 1)] + [-i for i in range(1, homo_d + 1)]
+    sd_list = [tuple(gs)]
+    index = {tuple(gs): 0}
+    rows = []
+    for confs, amps in zip(data[1], data[2]):
+        row = []
+        for c, a in zip(confs, amps):
+            occ_w, vir_w, sp = int(c[0]) - lo + 1, int(c[1]) - lo + 1, int(c[2])
+            src = occ_w if sp == 0 else -occ_w
+            dst = vir_w if sp == 0 else -vir_w
+            det = list(gs)
+            try:
+                det[det.index(src)] = dst
+            except ValueError:
+                raise ValueError(F"UKS config ({int(c[0])} -> {int(c[1])}, spin {sp}) "
+                                 F"excites from outside the reference/orbital window")
+            key = tuple(det)
+            if key not in index:
+                index[key] = len(sd_list)
+                sd_list.append(key)
+            row.append((index[key], float(a)))
+        rows.append(row)
+    C = np.zeros((len(rows) + 1, len(sd_list)))
+    C[0, 0] = 1.0
+    for k, row in enumerate(rows):
+        for j, a in row:
+            C[k + 1, j] += a
+    return sd_list, C
+
+
+def _uks_ci_overlap(S2, data_bra, data_ket, info, lo):
+    """CI-state overlaps for the spin-polarized branch: states expanded over
+    their union SD bases, SD overlaps through the series kernels."""
+    from libra_py.workflows.nbra import mapping
+    sd_b, C_b = _uks_sd_expansion(data_bra, info, lo)
+    sd_k, C_k = _uks_sd_expansion(data_ket, info, lo)
+    S_sd = mapping.ovlp_mat_arb_auto(list(sd_b), list(sd_k), np.asarray(S2))
+    return C_b @ S_sd @ C_k.T
+
+
 def dftb_compute_adi(q, params, full_id):
     """
     Compute adiabatic electronic properties and derivative couplings for one trajectory
@@ -3012,10 +3066,10 @@ def dftb_compute_adi(q, params, full_id):
 
     # ================= Previous electronic data =================
     if is_first_time:
-        MO_prev = MO_curr.copy()
+        MO_prev = copy.deepcopy(MO_curr)
         data_prev = copy.deepcopy(data_curr)
     else:
-        MO_prev = params["MO_prev"][itraj].copy()
+        MO_prev = copy.deepcopy(params["MO_prev"][itraj])
         data_prev = params["data_prev"][itraj]
 
     # ================= Build object =================
@@ -3029,11 +3083,21 @@ def dftb_compute_adi(q, params, full_id):
     obj.overlap_adi = CMATRIX(nstates, nstates)
 
     # ================= Compute overlaps =================
-    s_mo_orb = MO_curr.T @ s_ao @ MO_curr
-    s_mo = np.kron(np.eye(2), s_mo_orb)
+    if info.get("isUKS", 0):
+        # per-spin blocks - the channels differ, kron duplication would be wrong
+        MOa_c, MOb_c = MO_curr
+        MOa_p, MOb_p = MO_prev
+        zero_w = np.zeros((MOa_c.shape[1], MOb_c.shape[1]))
+        s_mo = data_conv.form_block_matrix(MOa_c.T @ s_ao @ MOa_c, zero_w,
+                                           zero_w.T, MOb_c.T @ s_ao @ MOb_c)
+        st_mo = data_conv.form_block_matrix(MOa_p.T @ st_ao @ MOa_c, zero_w,
+                                            zero_w.T, MOb_p.T @ st_ao @ MOb_c)
+    else:
+        s_mo_orb = MO_curr.T @ s_ao @ MO_curr
+        s_mo = np.kron(np.eye(2), s_mo_orb)
 
-    st_mo_orb = MO_prev.T @ st_ao @ MO_curr
-    st_mo = np.kron(np.eye(2), st_mo_orb)
+        st_mo_orb = MO_prev.T @ st_ao @ MO_curr
+        st_mo = np.kron(np.eye(2), st_mo_orb)
 
     # the MO matrices above are windowed to actual_orbital_space, so the
     # CI-overlap range parameters must describe the SAME window - full-space
@@ -3045,17 +3109,24 @@ def dftb_compute_adi(q, params, full_id):
                          "(ci.overlap rebuilds a contiguous range internally) - "
                          F"got {list(ci_space)[:6]}...")
     lo_w, hi_w = int(ci_space[0]), int(ci_space[-1])
-    ovlp_params = {
-        "homo_indx": info["nocc"],
-        "nocc": info["nocc"] - lo_w,
-        "nvirt": hi_w - info["nocc"],
-        "nelec": (info["nocc"] - lo_w + 1) * 2,
-        "nstates": nstates,
-        "active_space": ci_space,
-    }
+    if info.get("isUKS", 0):
+        # spin-polarized CIS states are direct SD combinations - expand over
+        # the union SD bases and take the overlaps through the SD kernels
+        # (the closed-shell CSF machinery does not apply)
+        st_ci = _uks_ci_overlap(st_mo, data_prev, data_curr, info, lo_w)
+        s_ci = _uks_ci_overlap(s_mo, data_curr, data_curr, info, lo_w)
+    else:
+        ovlp_params = {
+            "homo_indx": info["nocc"],
+            "nocc": info["nocc"] - lo_w,
+            "nvirt": hi_w - info["nocc"],
+            "nelec": (info["nocc"] - lo_w + 1) * 2,
+            "nstates": nstates,
+            "active_space": ci_space,
+        }
 
-    st_ci = ci.overlap(st_mo, data_prev, data_curr, ovlp_params)
-    s_ci = ci.overlap(s_mo, data_curr, data_curr, ovlp_params)
+        st_ci = ci.overlap(st_mo, data_prev, data_curr, ovlp_params)
+        s_ci = ci.overlap(s_mo, data_curr, data_curr, ovlp_params)
     
     s_ci_inv_curr = ortho.lowdin_inverse_sqrt(s_ci)
     s_ci_inv_prev = None
@@ -3163,6 +3234,23 @@ def dftb_compute_adi(q, params, full_id):
                 obj.d1ham_adi[3 * iatom + 0].set(i, i, -forces[i, 0, iatom] * (1.0 + 0.0j))
                 obj.d1ham_adi[3 * iatom + 1].set(i, i, -forces[i, 1, iatom] * (1.0 + 0.0j))
                 obj.d1ham_adi[3 * iatom + 2].set(i, i, -forces[i, 2, iatom] * (1.0 + 0.0j))
+    else:
+        # no StateCouplings-driven FRC.DAT (e.g. spin-polarized runs - NACVs
+        # are closed-shell upstream): the tag files carry the ground-state
+        # forces and the SOI-state forces, so only those two diagonals are
+        # known; the tag arrays are Fortran-shaped (3, natoms)
+        f_gs = np.asarray(results_gs["forces"]) if "forces" in results_gs else None
+        # the excited run's 'forces' tag already carries the SOI-state TOTAL
+        # forces ('exc_forces' holds only the excitation contribution) -
+        # FD-verified on the allyl doublet
+        f_ex = np.asarray(results_ex["forces"]) if "forces" in results_ex else None
+        soi_row = max(int(act_state), 1)
+        for iatom in range(nat):
+            for k in range(3):
+                if f_gs is not None:
+                    obj.d1ham_adi[3 * iatom + k].set(0, 0, -f_gs[k, iatom] * (1.0 + 0.0j))
+                if f_ex is not None:
+                    obj.d1ham_adi[3 * iatom + k].set(soi_row, soi_row, -f_ex[k, iatom] * (1.0 + 0.0j))
 
     # ================= Derivative couplings ====================
     obj.dc1_adi = CMATRIXList()
@@ -3186,7 +3274,7 @@ def dftb_compute_adi(q, params, full_id):
             obj.hvib_adi.set(j, i, +1j * dij)            
             
     # ================= Store state =================
-    params["MO_prev"][itraj] = MO_curr.copy()
+    params["MO_prev"][itraj] = copy.deepcopy(MO_curr)
     params["data_prev"][itraj] = copy.deepcopy(data_curr)
     params["coordinates_prev"][itraj] = coordinates.copy()
     params["s_ci_inv_prev"][itraj] = {"digest": ortho.carried_state_digest((MO_curr, data_curr)),
