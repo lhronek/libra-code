@@ -73,7 +73,9 @@ CMATRIX Zhu_Liouvillian(double Etot, CMATRIX& Ham, CMATRIX& rho);
 int need_active_states_diff_rep(dyn_control_params& prms);
 
 void propagate_electronic(dyn_variables& dyn_var, nHamiltonian& ham, nHamiltonian& ham_prev, dyn_control_params& prms);
+void propagate_electronic(dyn_variables& dyn_var, nHamiltonian& ham, nHamiltonian& ham_prev, dyn_control_params& prms, int isub);
 void propagate_electronic(dyn_variables& dyn_var, nHamiltonian* ham, nHamiltonian* ham_prev, dyn_control_params& prms);
+void propagate_electronic(dyn_variables& dyn_var, nHamiltonian* ham, nHamiltonian* ham_prev, dyn_control_params& prms, int isub);
 void propagate_electronic_kcrpmd(dyn_variables& dyn_var, nHamiltonian& ham, dyn_control_params& prms, Random& rnd);
 
 /*

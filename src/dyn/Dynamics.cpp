@@ -414,7 +414,14 @@ void SSY_correction(CMATRIX &Ham, dyn_variables &dyn_var, nHamiltonian &ham,
 void propagate_electronic(dyn_variables &dyn_var, nHamiltonian &ham,
                           nHamiltonian &ham_prev, dyn_control_params &prms) {
 
-  propagate_electronic(dyn_var, &ham, &ham_prev, prms);
+  propagate_electronic(dyn_var, &ham, &ham_prev, prms, 0);
+}
+
+void propagate_electronic(dyn_variables &dyn_var, nHamiltonian &ham,
+                          nHamiltonian &ham_prev, dyn_control_params &prms,
+                          int isub) {
+
+  propagate_electronic(dyn_var, &ham, &ham_prev, prms, isub);
 }
 
 void apply_thermal_correction(dyn_variables &dyn_var, nHamiltonian &ham,
@@ -891,6 +898,13 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
 void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
                           nHamiltonian *Ham_prev, dyn_control_params &prms) {
 
+  propagate_electronic(dyn_var, Ham, Ham_prev, prms, 0);
+}
+
+void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
+                          nHamiltonian *Ham_prev, dyn_control_params &prms,
+                          int isub) {
+
   int itraj;
 
   int num_el = prms.num_electronic_substeps;
@@ -946,9 +960,16 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
   if (prms.isNBRA == 1 && is_ssy == 0 && rep == 1 && ntraj > 0 &&
       (method <= 8 || (method >= 100 && method <= 108))) {
     CMATRIX T_new(*dyn_var.proj_adi[0]);
+    // proj_adi is the per-nuclear-step reprojection: apply it on the
+    // last electronic substep only - reapplying it every substep
+    // multiplies the basis rotation num_el times (and a sign-flip
+    // relabel self-cancels at even substep counts), while an early
+    // placement splits the exp factors around T mid-step
+    int t_skip = (isub < num_el - 1);
+    if (t_skip) { T_new.identity(); }
     propagate_amplitudes_adi_exp(method, dt, Coeff, T_new, Ham->children[0],
                                  Ham_prev->children[0], 0, dyn_var, 0,
-                                 prms.assume_always_consistent);
+                                 prms.assume_always_consistent || t_skip);
   } else {
 
   // Deterministic per-trajectory propagation: every iteration works only on
@@ -996,7 +1017,10 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
 
     */
     CMATRIX T_new(*dyn_var.proj_adi[itraj]);
-    if (prms.assume_always_consistent) {
+    // per-nuclear-step reprojection: last substep only (see the
+    // NBRA fast path note)
+    int t_skip = (isub < num_el - 1);
+    if (prms.assume_always_consistent || t_skip) {
       T_new.identity();
     }
 
@@ -1077,7 +1101,8 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
       if (method <= 8 || (method >= 100 && method <= 108)) {
         propagate_amplitudes_adi_exp(method, dt, C, T_new, ham, ham_prev,
                                      is_ssy, dyn_var, itraj,
-                                     prms.assume_always_consistent);
+                                     prms.assume_always_consistent ||
+                                         t_skip);
       }
 
       //========================== Rotation-based ============================
@@ -1736,7 +1761,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       propagate_half_xf(dyn_var, ham, prms);
     }
 
-    propagate_electronic(dyn_var, ham, ham_aux, prms);
+    propagate_electronic(dyn_var, ham, ham_aux, prms, i);
 
     if (prms.decoherence_algo == 5 or prms.decoherence_algo == 6) {
       rotate_nab_phase(dyn_var, ham, prms);
