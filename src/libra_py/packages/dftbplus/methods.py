@@ -2586,6 +2586,11 @@ def read_dftb_orbital_info(params_):
         f"{wd}/SPX.DAT"
     )
 
+    if max_spin > 0:
+        raise ValueError("spin-polarized DFTB+ output detected (SPX.DAT carries "
+                         "U/D transitions), but this reader is closed-shell only - "
+                         "the spin channels would be collapsed silently")
+
     ndim = rpa_map.shape[1]
     nmo = ndim
     nao = nmo 
