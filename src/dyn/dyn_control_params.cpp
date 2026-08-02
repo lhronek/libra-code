@@ -317,6 +317,44 @@ void dyn_control_params::sanity_check(){
     throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
+  ///============== Integrator vs projector family pairing ==============
+  /// rep_tdse == 1: the bare-energy local-diabatization integrators carry
+  /// the whole electronic coupling through the rotation projector
+  /// (state_tracking_algo -1/5/6 build T from St), while the NAC-carrying
+  /// Hvib integrators need a relabel-only projector - crossing the
+  /// families silently double-counts the basis rotation or freezes the
+  /// electronic subsystem
+  if(rep_tdse==1){
+    int m = electronic_integrator % 100; // the 10x variants share the classification
+    int rot_proj = (state_tracking_algo==-1 || state_tracking_algo==5 ||
+                    state_tracking_algo==6);
+    int ld_int = (m==0 || m==1 || m==2 || m==10 || m==11 || m==12);
+    int hvib_int = (m==3 || m==4 || m==5 || m==7 || m==8 || m==13 ||
+                    m==14 || m==15);
+    if(ld_int && (!rot_proj || assume_always_consistent==1)){
+      std::cout<<"Error in dyn_control_params::sanity_check: the bare-energy"
+          <<" local-diabatization integrator (electronic_integrator = "
+          <<electronic_integrator<<") carries the whole electronic coupling"
+          <<" through the St-derived rotation projector - it requires"
+          <<" state_tracking_algo -1, 5 or 6 and assume_always_consistent = 0"
+          <<" (got state_tracking_algo = "<<state_tracking_algo
+          <<", assume_always_consistent = "<<assume_always_consistent
+          <<"); a relabel-only or identity projector freezes the electronic"
+          <<" subsystem\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if(hvib_int && rot_proj && assume_always_consistent==0){
+      std::cout<<"Error in dyn_control_params::sanity_check: the NAC-carrying"
+          <<" Hvib integrator (electronic_integrator = "<<electronic_integrator
+          <<") double-counts the basis rotation under the St-derived rotation"
+          <<" projector (state_tracking_algo = "<<state_tracking_algo
+          <<"); use a relabel projector (state_tracking_algo 0/1/2/21 with"
+          <<" do_phase_correction = 1), or assume_always_consistent = 1 with"
+          <<" do_nac_phase_correction = 1\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+  }
+
   /// Shall not use DISH with the decoherence correction
   if(tsh_method==3 && decoherence_algo!=-1){
     cout<<"Error in dyn_control_params::sanity_check: Shall not use DISH (tsh_method == 3) with the \
