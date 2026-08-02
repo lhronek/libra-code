@@ -461,8 +461,12 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
       CMATRIX svd_s(dyn_var.nadi, dyn_var.nadi);
       CMATRIX svd_v(dyn_var.nadi, dyn_var.nadi);
 
-      BDCSVD_decomposition(P, svd_u, svd_s, svd_v); 
-      T_new = svd_u * svd_v.H();
+      BDCSVD_decomposition(P, svd_u, svd_s, svd_v);
+      // the reprojection runs OPPOSITE to St (the -1 branch builds
+      // orth(St^-1)): the polar factor of St needs the adjoint,
+      // V U^H, not U V^H - self-inverse sign-flip scripts hide the
+      // difference, genuine rotations do not
+      T_new = svd_v * svd_u.H();
     }// 5 - SVD-based LD
 
     else if (prms.state_tracking_algo == 6) { // adaptive SVD-based LD
