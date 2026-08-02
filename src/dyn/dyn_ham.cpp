@@ -482,7 +482,11 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
       double eps = 1e-12;
       for(int i=0; i<dyn_var.nadi; i++){
         double sigma_i = svd_s.get(i,i).real();
-        f.set(i, i,  sigma_i/(sigma_i + eps) );
+        // an explicit complex value: a plain double binds to the
+        // flat-index set(int, double re, double im) overload (int ->
+        // double outranks double -> complex), writing complex(i,
+        // sigma) into element [i] and leaving the diagonal zero
+        f.set(i, i, complex<double>(sigma_i/(sigma_i + eps), 0.0));
       }// for i
 
       CMATRIX Proj(dyn_var.nadi, dyn_var.nadi);
