@@ -2457,6 +2457,26 @@ def run_dftb(coords, params):
             stderr=subprocess.PIPE,
         )
 
+def read_band_occupations(filename):
+    """Occupied-orbital count per spin section of a DFTB+ band.out
+    (occupation > 0.5 counts as occupied - integer-occupation fillings)."""
+    counts = []
+    with open(filename) as f:
+        for line in f:
+            t = line.split()
+            if not t:
+                continue
+            if t[0] == "KPT":
+                counts.append(0)
+            elif counts and len(t) >= 3:
+                try:
+                    if float(t[2]) > 0.5:
+                        counts[-1] += 1
+                except ValueError:
+                    pass
+    return counts
+
+
 def read_dftb_orbital_info(params_):
     """
     Read molecular orbital (MO) information, configurations, and CI amplitudes
@@ -2499,7 +2519,8 @@ def read_dftb_orbital_info(params_):
             Number of occupied orbitals.
 
         nelec : int
-            Number of electrons (assumes closed-shell: nelec = 2 * nocc).
+            Number of electrons (closed-shell: 2 nocc; spin-polarized:
+            nocc_alpha + nocc_beta).
 
         nao : int
             Number of atomic orbitals.
@@ -2566,7 +2587,8 @@ def read_dftb_orbital_info(params_):
 
     Assumptions
     ~~~~~~~~~~~
-    - Closed-shell system (nelec = 2 * nocc).
+    - Closed-shell OR colinear spin-polarized outputs (auto-detected
+      from the SPX spin markers).
     - Spin-restricted DFTB calculation.
     - Single excitations only (Casida formalism).
 
@@ -2586,10 +2608,10 @@ def read_dftb_orbital_info(params_):
         f"{wd}/SPX.DAT"
     )
 
-    if max_spin > 0:
-        raise ValueError("spin-polarized DFTB+ output detected (SPX.DAT carries "
-                         "U/D transitions), but this reader is closed-shell only - "
-                         "the spin channels would be collapsed silently")
+    # spin-polarized outputs (SPX carries U/D markers) switch the reader to
+    # the per-spin mode: MOs become an (up, down) pair over the same window
+    # and every config carries its spin channel
+    spin_polarized = int(max_spin > 0)
 
     ndim = rpa_map.shape[1]
     nmo = ndim
@@ -2608,15 +2630,20 @@ def read_dftb_orbital_info(params_):
     mo = read_mo_matrix(
         f"{wd}/eigenvec.bin",
         ndim,
-        spin_polarized=False
+        spin_polarized=bool(spin_polarized)
     )
     # mo shape: (spin, AO, MO)
 
     active_space_indx = [i - 1 for i in actual_orbital_space]
 
-    # Extract active-space MOs (closed shell → spin index 0)
-    MOs = np.take(mo[0], active_space_indx, axis=1) # to avoid axis reordering due to
-                                                    # advanced indexing
+    # Extract active-space MOs; np.take avoids axis reordering due to
+    # advanced indexing. Spin-polarized: an (up, down) pair over the SAME
+    # orbital window
+    if spin_polarized:
+        MOs = (np.take(mo[0], active_space_indx, axis=1),
+               np.take(mo[1], active_space_indx, axis=1))
+    else:
+        MOs = np.take(mo[0], active_space_indx, axis=1)
 
     # ================= Read CI amplitudes =======================
 
@@ -2628,7 +2655,11 @@ def read_dftb_orbital_info(params_):
     nci = min(nexc, nstates - 1)
 
     # Configuration list from SPX lookup (convert to 1-based indexing)
-    all_confs = [[v[0] + 1, v[1] + 1] for v in rpa_lookup]
+    if spin_polarized:
+        # keep the spin channel (0 = up, 1 = down; per-spin orbital indices)
+        all_confs = [[v[0] + 1, v[1] + 1, v[2]] for v in rpa_lookup]
+    else:
+        all_confs = [[v[0] + 1, v[1] + 1] for v in rpa_lookup]
     nconf = len(all_confs)
 
     # Orbital ranges
@@ -2680,8 +2711,17 @@ def read_dftb_orbital_info(params_):
 
     # ================= Build info dictionary ====================
 
-    nocc = max_occ
-    nelec = 2 * nocc
+    if spin_polarized:
+        # per-spin occupied counts from band.out - the CI configs cannot
+        # recover both channels robustly
+        occ_counts = read_band_occupations(f"{wd}/band.out")
+        nocc_up, nocc_dn = int(occ_counts[0]), int(occ_counts[1])
+        nocc = nocc_up
+        nelec = nocc_up + nocc_dn
+    else:
+        nocc = max_occ
+        nelec = 2 * nocc
+        nocc_up = nocc_dn = nocc
 
     info = {
         "nocc": nocc,
@@ -2695,6 +2735,9 @@ def read_dftb_orbital_info(params_):
         "max_occ": max_occ,
         "min_vir": min_vir,
         "max_vir": max_vir,
+        "isUKS": spin_polarized,
+        "nocc_alpha": nocc_up,
+        "nocc_beta": nocc_dn,
     }
 
     return info, MOs, data
