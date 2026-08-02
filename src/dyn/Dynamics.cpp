@@ -676,7 +676,7 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
                                           CMATRIX &T_new, nHamiltonian *ham,
                                           nHamiltonian *ham_prev, int is_ssy,
                                           dyn_variables &dyn_var, int itraj,
-                                          int t_identity) {
+                                          int t_identity, int t_ampl_skip) {
   /**
     One step of the adiabatic-amplitude propagation for the exp_-based
     integrators (electronic_integrator = -1..8 and 100..108), extracted
@@ -692,7 +692,9 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
   // per-thread reuse removes four nadi^2 allocations+zeroings per call.
   // Every branch assigns these before reading them. t_identity signals that
   // T_new was loaded as the identity (assume_always_consistent), so its
-  // factors drop out of the chains exactly.
+  // factors drop out of the chains exactly; t_ampl_skip suppresses only the
+  // amplitude-side T factors (early electronic substeps) while the Hvib
+  // dressings keep aligning data frames with the real T.
   thread_local std::unique_ptr<CMATRIX> wHvib, wHvib_old, wA, wB;
   if (!wHvib || wHvib->n_rows != ham->nadi) {
     wHvib.reset(new CMATRIX(ham->nadi, ham->nadi));
@@ -723,7 +725,7 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
         }
         exp_(B, Hvib, complex<double>(0.0, -0.5 * dt));
 
-        if (t_identity) { C.product(B, A, C); }
+        if (t_identity || t_ampl_skip) { C.product(B, A, C); }
         else { C.product(B, T_new, A, C); }
       } // method == 0 && 100
 
@@ -741,7 +743,7 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
         }
         exp_(A, Hvib, complex<double>(0.0, -0.5 * dt));
 
-        if (t_identity) { C.product(B, A, B, C); }
+        if (t_identity || t_ampl_skip) { C.product(B, A, B, C); }
         else { C.product(T_new, B, adjoint(T_new), A, T_new, B, C); }
       } // method == 1 && 101
 
@@ -760,7 +762,7 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
         Hvib += Hvib_old;
 
         exp_(A, Hvib, complex<double>(0.0, -0.5 * dt));
-        if (t_identity) { C.product(A, C); }
+        if (t_identity || t_ampl_skip) { C.product(A, C); }
         else { C.product(T_new, A, C); }
         //      C = A * C;
 
@@ -775,7 +777,7 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
         }
 
         exp_(A, Hvib, complex<double>(0.0, -dt));
-        if (t_identity) { C.product(A, C); }
+        if (t_identity || t_ampl_skip) { C.product(A, C); }
         else { C.product(T_new, A, C); }
       } // method == 3 && 103
 
@@ -794,7 +796,7 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
         Hvib += Hvib_old;
 
         exp_(A, Hvib, complex<double>(0.0, -0.5 * dt));
-        if (t_identity) { C.product(A, C); }
+        if (t_identity || t_ampl_skip) { C.product(A, C); }
         else { C.product(T_new, A, C); }
       } // method == 4 && 104
 
@@ -813,7 +815,7 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
 
         Hvib += Hvib_old;
         exp_(A, Hvib, complex<double>(0.0, -0.5 * dt));
-        if (t_identity) { C.product(A, C); }
+        if (t_identity || t_ampl_skip) { C.product(A, C); }
         else { C.product(T_new, A, C); }
       } // method == 5 && 105
 
@@ -960,16 +962,15 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
   if (prms.isNBRA == 1 && is_ssy == 0 && rep == 1 && ntraj > 0 &&
       (method <= 8 || (method >= 100 && method <= 108))) {
     CMATRIX T_new(*dyn_var.proj_adi[0]);
-    // proj_adi is the per-nuclear-step reprojection: apply it on the
-    // last electronic substep only - reapplying it every substep
-    // multiplies the basis rotation num_el times (and a sign-flip
-    // relabel self-cancels at even substep counts), while an early
-    // placement splits the exp factors around T mid-step
+    // proj_adi is the per-nuclear-step reprojection: the amplitude-side
+    // factors apply on the last electronic substep only - reapplying them
+    // every substep multiplies the basis rotation num_el times (and a
+    // sign-flip relabel self-cancels at even substep counts) - while the
+    // Hvib dressings align data frames with the real T on every substep
     int t_skip = (isub < num_el - 1);
-    if (t_skip) { T_new.identity(); }
     propagate_amplitudes_adi_exp(method, dt, Coeff, T_new, Ham->children[0],
                                  Ham_prev->children[0], 0, dyn_var, 0,
-                                 prms.assume_always_consistent || t_skip);
+                                 prms.assume_always_consistent, t_skip);
   } else {
 
   // Deterministic per-trajectory propagation: every iteration works only on
@@ -1017,11 +1018,17 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
 
     */
     CMATRIX T_new(*dyn_var.proj_adi[itraj]);
-    // per-nuclear-step reprojection: last substep only (see the
-    // NBRA fast path note)
-    int t_skip = (isub < num_el - 1);
-    if (prms.assume_always_consistent || t_skip) {
+    if (prms.assume_always_consistent) {
       T_new.identity();
+    }
+    // per-nuclear-step reprojection: the amplitude-side factors apply
+    // on the last substep only, while the Hvib dressings align data
+    // frames with the real T on every substep (see the NBRA fast path
+    // note)
+    int t_skip = (isub < num_el - 1);
+    CMATRIX T_ampl(T_new);
+    if (t_skip) {
+      T_ampl.identity();
     }
 
     //    if ampl_transformation_method
@@ -1101,8 +1108,8 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
       if (method <= 8 || (method >= 100 && method <= 108)) {
         propagate_amplitudes_adi_exp(method, dt, C, T_new, ham, ham_prev,
                                      is_ssy, dyn_var, itraj,
-                                     prms.assume_always_consistent ||
-                                         t_skip);
+                                     prms.assume_always_consistent,
+                                     t_skip);
       }
 
       //========================== Rotation-based ============================
@@ -1114,7 +1121,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
           SSY_correction(Hvib, dyn_var, ham_prev, itraj);
         }
         propagate_electronic_rot(0.5 * dt, C, Hvib);
-        C = T_new * C;
+        C = T_ampl * C;
 
         Hvib = ham->get_ham_adi();
         if (is_ssy) {
@@ -1136,11 +1143,11 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         }
 
         propagate_electronic_rot(0.25 * dt, C, Hvib_old);
-        C = T_new * C;
+        C = T_ampl * C;
         propagate_electronic_rot(0.5 * dt, C, Hvib);
-        C = T_new.H() * C;
+        C = T_ampl.H() * C;
         propagate_electronic_rot(0.25 * dt, C, Hvib_old);
-        C = T_new * C;
+        C = T_ampl * C;
 
       } // method == 11 && 111
 
@@ -1159,7 +1166,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         Hvib += Hvib_old;
 
         propagate_electronic_rot(0.5 * dt, C, Hvib);
-        C = T_new * C;
+        C = T_ampl * C;
 
       } // method == 12 && 112
 
@@ -1171,7 +1178,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         }
 
         propagate_electronic_rot(dt, C, Hvib);
-        C = T_new * C;
+        C = T_ampl * C;
       } // method == 13 && 113
 
       else if (method == 14 || method == 114) {
@@ -1189,7 +1196,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         Hvib += Hvib_old;
 
         propagate_electronic_rot(0.5 * dt, C, Hvib);
-        C = T_new * C;
+        C = T_ampl * C;
       } // method == 14 && 114
 
       else if (method == 15 || method == 115) {
@@ -1208,7 +1215,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         Hvib += Hvib_old;
 
         propagate_electronic_rot(0.5 * dt, C, Hvib);
-        C = T_new * C;
+        C = T_ampl * C;
 
       } // method == 15 && 115
 
@@ -1266,7 +1273,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         vRHO = exp_(L, complex<double>(0.0, -dt)) * vRHO;
 
         RHO = unvectorize_density_matrix(vRHO);
-        RHO = T_new * RHO * T_new.H(); // dyn-const to "raw"
+        RHO = T_ampl * RHO * T_ampl.H(); // dyn-const to "raw"
         *dyn_var.dm_adi[itraj] = RHO;
       } // method == 0 or 100
 
@@ -1289,7 +1296,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         vRHO = exp_(L, complex<double>(0.0, -dt)) * vRHO;
 
         RHO = unvectorize_density_matrix(vRHO);
-        RHO = T_new.H() * RHO * T_new;
+        RHO = T_ampl.H() * RHO * T_ampl;
         *dyn_var.dm_adi[itraj] = RHO;
 
       } // method == 1 or 101
@@ -1312,7 +1319,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         propagate_electronic_rot(dt, vRHO, L);
 
         RHO = unvectorize_density_matrix(vRHO);
-        RHO = T_new * RHO * T_new.H(); // dyn-const to "raw"
+        RHO = T_ampl * RHO * T_ampl.H(); // dyn-const to "raw"
         *dyn_var.dm_adi[itraj] = RHO;
       } // method == 10 or 110
 
