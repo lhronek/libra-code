@@ -852,9 +852,6 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
         exp_(A, Hvib_old, complex<double>(0.0, -0.5 * dt));
         C.product(A, C);
 
-        // Reproject the coefficients
-        if (!t_identity) { C.product(adjoint(T_new), C); }
-
         // Propagate the new coefficients using the transformed new Hamiltonian,
         // half-way
         Hvib = ham->get_hvib_adi_ref();
@@ -864,7 +861,12 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
         }
 
         exp_(A, Hvib, complex<double>(0.0, -0.5 * dt));
-        C.product(A, C);
+        // T applies once, after both half-steps: a mid-step adjoint(T)
+        // reprojection between the two half-exponentials puts them in
+        // opposite gauges at an eigenvector branch switch - their
+        // couplings cancel and the crossing step transfers nothing
+        if (t_identity || t_ampl_skip) { C.product(A, C); }
+        else { C.product(T_new, A, C); }
 
       } // method == 7 && 107
 
