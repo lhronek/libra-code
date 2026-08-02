@@ -881,9 +881,6 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
         exp_(A, Hvib_old, complex<double>(0.0, -0.5 * dt));
         C.product(A, C);
 
-        // Reorder:
-        // C = T_new.H() * C;
-
         // Propagate with the new Ham
         Hvib = ham->get_hvib_adi_ref();
         if (is_ssy) {
@@ -891,10 +888,11 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
         }
         if (!t_identity) { Hvib.product(adjoint(T_new), Hvib, T_new); }
         exp_(A, Hvib, complex<double>(0.0, -0.5 * dt));
-        C.product(A, C);
-
-        // Reorder back:
-        // C = T_new * C;
+        // the T-dressed propagation ends in the previous step's frame -
+        // without a final reprojection the amplitudes fall out of the
+        // basis bookkeeping at every eigenvector branch switch
+        if (t_identity || t_ampl_skip) { C.product(A, C); }
+        else { C.product(T_new, A, C); }
 
       } // method == 8 && 108
 }
