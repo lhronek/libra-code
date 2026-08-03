@@ -413,7 +413,7 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
     CMATRIX P(ham->nadi, ham->nadi);
     CMATRIX T_new(*dyn_var.proj_adi[itraj]);
 
-    P = ham->get_time_overlap_adi(); // (U_old.H() * U).H();
+    P = ham->get_time_overlap_adi(); // U_old.H() * U
 
     if (prms.state_tracking_algo == -1) { // This is LD
       // More consistent with the new derivations:
