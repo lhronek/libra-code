@@ -982,7 +982,11 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
       if (prms.omp_num_threads > 1 && rep <= 1)
   for (int itraj = 0; itraj < ntraj; itraj++) {
 
-    CMATRIX C(Coeff.col(itraj));
+    // rep >= 2 propagates the density matrices - Coeff is the 1x1
+    // dummy there, so the amplitude round-trip stays in the
+    // wavefunction representations
+    CMATRIX C(nst, 1);
+    if (rep <= 1) { C = Coeff.col(itraj); }
 
     int traj1 = itraj;
     if (method >= 100 && method < 200) {
@@ -1328,8 +1332,10 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
     //  *dyn_var.proj_adi[itraj] = T_new;
 
     // Insert the propagated result back
-    for (int st = 0; st < nst; st++) {
-      Coeff.set(st, itraj, C.get(st, 0));
+    if (rep <= 1) {
+      for (int st = 0; st < nst; st++) {
+        Coeff.set(st, itraj, C.get(st, 0));
+      }
     }
 
   } // for itraj - all trajectories
