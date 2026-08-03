@@ -355,6 +355,26 @@ void dyn_control_params::sanity_check(){
     }
   }
 
+  /// rep_tdse == 3 (adiabatic density matrix): methods 0/10 dress bare
+  /// energies with T and frame-transform RHO, and the Zhu Liouvillian (1)
+  /// generates nothing from a pure state without the rotation frame
+  /// creating coherences - all three freeze under a relabel projector
+  if(rep_tdse==3){
+    int m = electronic_integrator % 100;
+    int rot_proj = (state_tracking_algo==-1 || state_tracking_algo==5 ||
+                    state_tracking_algo==6);
+    if((m==0 || m==1 || m==10) && (!rot_proj || assume_always_consistent==1)){
+      std::cout<<"Error in dyn_control_params::sanity_check: the adiabatic"
+          <<" density-matrix integrator (electronic_integrator = "
+          <<electronic_integrator<<") carries the electronic coupling"
+          <<" through the St-derived rotation projector - it requires"
+          <<" state_tracking_algo -1, 5 or 6 and assume_always_consistent = 0"
+          <<" (got state_tracking_algo = "<<state_tracking_algo
+          <<", assume_always_consistent = "<<assume_always_consistent<<")\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+  }
+
   /// Shall not use DISH with the decoherence correction
   if(tsh_method==3 && decoherence_algo!=-1){
     cout<<"Error in dyn_control_params::sanity_check: Shall not use DISH (tsh_method == 3) with the \
