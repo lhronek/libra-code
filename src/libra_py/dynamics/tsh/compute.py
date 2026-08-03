@@ -1355,6 +1355,13 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
     dyn_var.update_basis_transform(ham)
     dyn_var.update_amplitudes({"rep_tdse": init_elec["rep"]}, ham)
     #sys.exit(0)
+    if int(dyn_params["rep_tdse"]) in (2, 3) and int(init_elec.get("init_dm_type", 0)) == 0:
+        # the density-matrix representations propagate the DM itself:
+        # init_density_matrix fills only the init-rep side, and the per-step
+        # conversion derives the OTHER side from the propagated one - seed the
+        # propagated side from the t0-synchronized amplitudes
+        dyn_var.init_density_matrix({"init_dm_type": 0,
+                                     "rep": 0 if int(dyn_params["rep_tdse"]) == 2 else 1})
     dyn_var.update_density_matrix(dyn_params, ham, 1)
     #sys.exit(0)
     if dyn_params["rep_sh"] == 1:
