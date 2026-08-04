@@ -2970,8 +2970,18 @@ def read_cp2k_ao_overlap_print(logfile):
     FLOAT = _re.compile(r"-?\d+\.\d+(E[+-]?\d+)?$", _re.I)
     with open(logfile) as f:
         lines = f.readlines()
-    start = next(i for i, l in enumerate(lines)
-                 if l.strip().endswith("OVERLAP MATRIX"))   # GPW: "OVERLAP MATRIX"; xTB: "XTB OVERLAP MATRIX"
+    # GPW: "OVERLAP MATRIX"; xTB: "XTB OVERLAP MATRIX"
+    start = next((i for i, l in enumerate(lines)
+                  if l.strip().endswith("OVERLAP MATRIX")), None)
+    if start is None:
+        raise RuntimeError(
+            F"no AO overlap print found in {logfile} - the OVERLAP_DELTAT run "
+            F"produced neither the S_CSR_WRITE file nor the dense log print. "
+            F"On stock CP2K (no Libra S_CSR_WRITE patch) set "
+            F"overlap_csr_write=False so the generated input carries the dense "
+            F"&AO_MATRICES OVERLAP print, or switch to mo_source='molden' + "
+            F"ao_overlap_method='libint'; if the print is still missing, the run "
+            F"itself failed - check the log tail")
     entries, cols = {}, []
     for l in lines[start + 1:]:
         t = l.split()
