@@ -3738,10 +3738,10 @@ def make_overlap_deltat_input(template_file, csr_write=True):
           dropped (dispersion diverges on the doubled geometry)
         - the &EXCITED_STATES section is replaced by the OVERLAP_DELTAT switch
           (added when the parent has none)
-        - the &S_CSR_WRITE print is added when `csr_write` (the section comes
-          from the Libra CP2K patch; set csr_write=False for stock CP2K, which
-          then prints the dense AO overlap into the log - slower but supported
-          by the same reader)
+        - csr_write=True adds the &S_CSR_WRITE print (the sparse fast path of
+          the Libra CP2K patch); csr_write=False adds a dense &AO_MATRICES
+          OVERLAP print instead - stock-CP2K-compatible, read from the log by
+          the same caller
         - CONNECTIVITY OFF is enforced in every &TOPOLOGY section (the doubled
           xyz would otherwise trip the topology generation)
         - the electronic state is re-posed for the doubled system: UKS / LSD /
@@ -3761,7 +3761,10 @@ def make_overlap_deltat_input(template_file, csr_write=True):
         lines = f.read().splitlines()
 
     DROP = ("PROPERTIES", "VDW_POTENTIAL", "MOTION")
-    have_csr = any("S_CSR_WRITE" in ln.upper() for ln in lines)
+    # the overlap must be printed somewhere: sparse &S_CSR_WRITE (the Libra
+    # CP2K patch) or the dense &AO_MATRICES log print (stock CP2K)
+    have_out = any(("S_CSR_WRITE" if csr_write else "AO_MATRICES") in ln.upper()
+                   for ln in lines)
     out = []
     stack = []
     skip_until = None      # stack depth at which a dropped section ends
@@ -3772,10 +3775,16 @@ def make_overlap_deltat_input(template_file, csr_write=True):
         out.append(F"{indent}  OVERLAP_DELTAT T")
         out.append(F"{indent}&END EXCITED_STATES")
 
-    def emit_csr(indent):
-        out.append(F"{indent}&S_CSR_WRITE ON")
-        out.append(F"{indent}  THRESHOLD 1.0E-12")
-        out.append(F"{indent}&END S_CSR_WRITE")
+    def emit_overlap_print(indent):
+        if csr_write:
+            out.append(F"{indent}&S_CSR_WRITE ON")
+            out.append(F"{indent}  THRESHOLD 1.0E-12")
+            out.append(F"{indent}&END S_CSR_WRITE")
+        else:
+            out.append(F"{indent}&AO_MATRICES")
+            out.append(F"{indent}  OVERLAP T")
+            out.append(F"{indent}  NDIGITS 12")
+            out.append(F"{indent}&END AO_MATRICES")
 
     for ln in lines:
         word = ln.strip()
@@ -3791,11 +3800,11 @@ def make_overlap_deltat_input(template_file, csr_write=True):
                 if not did_excited:
                     emit_excited(indent + "  ")
                     did_excited = True
-                if csr_write and not have_csr:
+                if not have_out:
                     out.append(F"{indent}  &PRINT")
-                    emit_csr(indent + "    ")
+                    emit_overlap_print(indent + "    ")
                     out.append(F"{indent}  &END PRINT")
-                    have_csr = True
+                    have_out = True
             stack.pop()
             out.append(ln)
             continue
@@ -3813,9 +3822,9 @@ def make_overlap_deltat_input(template_file, csr_write=True):
                 continue
             stack.append(name)
             out.append(ln)
-            if name == "PRINT" and stack[-2:-1] == ["DFT"] and csr_write and not have_csr:
-                emit_csr(indent + "  ")
-                have_csr = True
+            if name == "PRINT" and stack[-2:-1] == ["DFT"] and not have_out:
+                emit_overlap_print(indent + "  ")
+                have_out = True
             if name == "TOPOLOGY":
                 pass    # CONNECTIVITY handled below via lookahead flag
             continue
