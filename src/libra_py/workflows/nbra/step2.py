@@ -662,7 +662,7 @@ def run_cp2k_libint_step2(params):
                 mo_curr = CP2K_methods.load_molden_data(molden_filename, is_spherical, isUKS)
             odt_params = {'atom_labels': labels_step,
                           'overlap_template': params['overlap_template'],
-                          'working_directory': 'odt_wd',
+                          'working_directory': 'odt-wd',
                           'cp2k_exe': cp2k_exe,
                           'mpi_executable': mpi_executable,
                           'nprocs': nprocs,
