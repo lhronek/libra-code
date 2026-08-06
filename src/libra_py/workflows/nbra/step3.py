@@ -1991,6 +1991,40 @@ def _parent_blas_threads(params):
     return per_worker
 
 
+_IDENTITY_WARNED = set()
+
+
+def _check_input_overlap(S, tag, step, threshold=0.05):
+    """The stored step-2 MO self-overlaps must be near-identity - large
+    deviations signal a step-2 defect (AO mis-mapping, truncation), not
+    physics. The Lowdin stage re-orthonormalizes either way; warn once
+    per process per tag so a dirty dataset cannot pass silently."""
+    dev = float(np.abs(S - np.eye(S.shape[0])).max())
+    if dev > threshold and tag not in _IDENTITY_WARNED:
+        _IDENTITY_WARNED.add(tag)
+        print(F"WARNING: {tag} deviates from identity by {dev:.3f} at step "
+              F"{step} (threshold {threshold}) - the step-2 MO overlaps are "
+              F"not orthonormal, which signals a step-2 defect; the Lowdin "
+              F"stage re-orthonormalizes, but regenerating step 2 is "
+              F"recommended")
+    return dev
+
+
+def _check_contraction(St, step, basis, tol=1e-6):
+    """An overlap between two orthonormalized frames is U^H V with
+    orthonormal columns, so every singular value is <= 1. A violation
+    after the Lowdin stage means the two sides were orthonormalized
+    against inconsistent metrics (e.g. a wrong-time overlap) and the
+    couplings are inflated."""
+    smax = float(np.linalg.svd(St, compute_uv=False).max())
+    if smax > 1.0 + tol:
+        raise ValueError(
+            F"orthonormalized {basis} time-overlap at step {step} has "
+            F"sigma_max = {smax:.6f} > 1 - impossible for orthonormal "
+            F"frames; the orthonormalization metrics are inconsistent")
+    return smax
+
+
 def _with_parent_blas_cap(fn):
     """Cap the whole step-3 run to the parallelization budget: the
     serial parent stages (CI contractions, Hvib assembly, reordering)
@@ -2268,6 +2302,8 @@ def _orthonormalize_ks_overlaps(step, params):
     # to the next step, one fractional matrix power per step instead of two), or
     # "none"/False (raw pass-through)
     mode = _orthonormalization_mode(params.get('apply_orthonormalization', 'lowdin_cached'))
+    _check_input_overlap(np.asarray(S_1.todense()), 'S_ks(t)', step)
+    _check_input_overlap(np.asarray(S_2.todense()), 'S_ks(t+1)', step)
     if mode == "none":
         St_step, S_step = St_step.todense(), S_1.todense()
     elif mode == "lowdin_cached":
@@ -2281,6 +2317,9 @@ def _orthonormalize_ks_overlaps(step, params):
         S_step = np.linalg.multi_dot([U1.transpose(), S_1d, U1])
     else:
         St_step, S_step = apply_orthonormalization_scipy(S_1.todense(), S_2.todense(), St_step.todense())
+
+    if mode != "none":
+        _check_contraction(np.asarray(St_step).real, step, 'KS')
 
     St_step_sparse = sp.csc_matrix(St_step)
     S_step_sparse = sp.csc_matrix(S_step)
@@ -2887,6 +2926,8 @@ def _compute_sd_overlaps(step, params):
                       [active_space, :][:, active_space]).real
     s_ks_2 = np.array(sp.load_npz(F'{res_dir_1}/S_ks_{step+start_time+1}.npz').todense()
                       [active_space, :][:, active_space]).real
+    _check_input_overlap(s_ks_1, 'S_ks(t)', step + start_time)
+    _check_input_overlap(s_ks_2, 'S_ks(t+1)', step + start_time)
     # This is not needed anymore as we use the numpy approach
     # that works with numpy array of the matrices below
     x = sp.load_npz(F'{res_dir_1}/St_ks_{step+start_time}.npz').todense() 
@@ -2938,6 +2979,10 @@ def _compute_sd_overlaps(step, params):
     elif mode == "lowdin":
         print('Applying orthonormalization for SDs for step', step)
         st_sd, s_sd = apply_orthonormalization_scipy(s_sd_1.real, s_sd_2.real, st_sd.real)
+    # before the spin adaptation - the sqrt(2) GS scaling breaks the
+    # bound by design
+    if mode != "none":
+        _check_contraction(np.asarray(st_sd).real, step + start_time, 'SD')
     if params['spin_adapted']:
         st_sd[:, 0] *= np.sqrt(2)
         st_sd[0, :] *= np.sqrt(2)
