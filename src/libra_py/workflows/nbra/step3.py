@@ -2731,7 +2731,7 @@ def run_step3_sd_nacs_libint(params):
 
             sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/Hvib_sd_{step+start_time}_im.npz', sp.csc_matrix(Hvib_sd))
             sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/St_sd_{step+start_time}_re.npz', St_step_phase_corrected)
-        print('Done with applying phase-correction to St_sd matrices. Elpased time:', time.time() - t3)
+        print('Done with applying phase-correction to St_sd matrices. Elapsed time:', time.time() - t3)
 
         if params['is_many_body']:
             # Set up the counter
@@ -2767,7 +2767,7 @@ def run_step3_sd_nacs_libint(params):
                     F'{params["path_to_save_sd_Hvibs"]}/St_ci_{step+start_time}_re.npz',
                     sp.csc_matrix(St_ci_step_phase_corrected))
                 c += 1
-            print('Done with applying phase-correction to St_ci matrices. Elpased time:', time.time() - t3)
+            print('Done with applying phase-correction to St_ci matrices. Elapsed time:', time.time() - t3)
 
     else:
         for step in range(len(St_sds)):
