@@ -30,6 +30,7 @@
 
 import sys
 import cmath
+import functools
 import math
 import os
 import time
@@ -1975,6 +1976,34 @@ def _worker_blas_threads(params):
     return 1 if params.get('use_multiprocessing', False) else int(params.get('nprocs', 1))
 
 
+def _parent_blas_threads(params):
+    """Whole-run cap for the serial (parent) phases.
+
+    The parent is idle while a Pool runs, so its serial numpy/Eigen
+    stages may use the full nprocs x per-worker budget. An explicit
+    blas_num_threads = 0 disables all capping, as everywhere."""
+    n = params.get('blas_num_threads', None)
+    if n is not None and int(n) == 0:
+        return 0
+    per_worker = _worker_blas_threads(params)
+    if params.get('use_multiprocessing', False):
+        return int(params.get('nprocs', 1)) * per_worker
+    return per_worker
+
+
+def _with_parent_blas_cap(fn):
+    """Cap the whole step-3 run to the parallelization budget: the
+    serial parent stages (CI contractions, Hvib assembly, reordering)
+    run heavy numpy/Eigen too, and an uncapped BLAS/OpenMP pool there
+    oversubscribes past nprocs regardless of the worker caps."""
+    @functools.wraps(fn)
+    def wrapped(params):
+        with _blas_thread_limit(_parent_blas_threads(params)):
+            return fn(params)
+    return wrapped
+
+
+@_with_parent_blas_cap
 def run_step3_ks_nacs_libint(params):
     """
     This function runs the step3 for computing NACs for Kohn-Sham states.
@@ -2263,6 +2292,7 @@ def _orthonormalize_ks_overlaps(step, params):
     print('Done with step', step, '. Elapsed time:', time.time() - t2)
 
 
+@_with_parent_blas_cap
 def run_step3_sd_nacs_libint(params):
     """
     This function runs the step3 for computing NACs between SDs.
