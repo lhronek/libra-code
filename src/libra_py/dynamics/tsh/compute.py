@@ -33,6 +33,7 @@ __email__ = "alexvakimov@gmail.com"
 __url__ = "https://quantum-dynamics-hub.github.io/libra/index.html"
 
 
+import functools
 import os
 import sys
 import math
@@ -54,6 +55,25 @@ import libra_py.tsh_stat as tsh_stat
 from . import save
 
 
+def _with_blas_cap(param_pos):
+    """Cap the BLAS/OpenMP pools for the WHOLE dynamics entry: the init
+    phases (the initial Hamiltonian diagonalization per trajectory, the
+    density-matrix and basis-transform setup) run before the propagation
+    loop's own cap and otherwise engage the pools at full machine width.
+    param_pos locates the dyn_params dict in the wrapped signature;
+    blas_num_threads: default 1, explicit 0 = leave the pools alone."""
+    def deco(fn):
+        @functools.wraps(fn)
+        def wrapped(*args, **kwargs):
+            prms = args[param_pos]
+            nbt = prms.get("blas_num_threads", 1) if hasattr(prms, "get") else 1
+            with blas_thread_limit(1 if nbt is None else nbt):
+                return fn(*args, **kwargs)
+        return wrapped
+    return deco
+
+
+@_with_blas_cap(1)
 def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd):
     """
 
@@ -1142,6 +1162,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd):
 
 
 # def generic_recipe(q, p, iM, _dyn_params, compute_model, _model_params, _init_elec, rnd):
+@_with_blas_cap(0)
 def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_nucl, rnd):
     """
     This function initializes electronic variables and Hamiltonians for a given set of
