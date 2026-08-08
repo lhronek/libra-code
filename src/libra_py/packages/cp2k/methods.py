@@ -17,7 +17,7 @@
 """
 
 
-import os, sys, math, re, copy, time, glob, subprocess
+import os, sys, math, re, copy, time, glob, shlex, subprocess
 import numpy as np
 import scipy.sparse as sp
 import scipy.linalg
@@ -3232,9 +3232,11 @@ def run_cp2k(coords_bohr, params):
             os.remove(logfile)  # CP2K's -o APPENDS; keep one run per log
         cmd = [exe, "-i", input_name, "-o", logname]
         # a single rank gains nothing from mpirun, and OpenMPI's default
-        # bind-to-core would pin all OMP threads of the rank onto ONE core
+        # bind-to-core would pin all OMP threads of the rank onto ONE core.
+        # shlex: the launcher may carry flags ("mpirun --bind-to none") -
+        # as one argv element it would be looked up as the binary name
         if mpi is not None and int(nprocs) > 1:
-            cmd = [mpi, "-n", str(nprocs)] + cmd
+            cmd = shlex.split(str(mpi)) + ["-n", str(nprocs)] + cmd
         res = subprocess.run(cmd, cwd=wd, env=env,
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if res.returncode != 0:
