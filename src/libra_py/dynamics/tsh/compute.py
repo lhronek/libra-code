@@ -1042,7 +1042,10 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd):
     if _savers["txt2_saver"] is not None:
         _savers["txt2_saver"].save_data_txt(F"{prefix2}", properties_to_save, "w", 0)
 
-    model_params.update({"timestep": icond})
+    # at the init call no interval has been propagated yet; timestep_st = icond
+    # is the upcoming interval's start (consumed only by the nac_update_method 2
+    # init path, where it is the correct file)
+    model_params.update({"timestep": icond, "timestep_st": icond})
 
     update_Hamiltonian_variables(dyn_params, dyn_var, ham, ham, compute_model, model_params, 0)
     update_Hamiltonian_variables(dyn_params, dyn_var, ham, ham, compute_model, model_params, 1)
@@ -1139,9 +1142,15 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd):
 
             # ============ Propagate ===========
             index = i + icond + 1  ### AVA: added +1 on 3/18/2026 for the debug
+            # the model serves two channels from one clock: the Hamiltonian of the
+            # NEW endpoint (timestep = i + icond + 1) and the time-overlap of the
+            # interval being propagated, <t_i|t_i+1>, whose left-edge file index is
+            # the interval START - passed explicitly as timestep_st
+            index_st = i + icond
             if nfiles > 0:
                 index = index % nfiles
-            model_params.update({"timestep": index})
+                index_st = index_st % nfiles
+            model_params.update({"timestep": index, "timestep_st": index_st})
             model_params["act_state"] = { itraj : dyn_var.act_states[itraj] for itraj in range(ntraj)  } 
 
 
@@ -1306,7 +1315,7 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
 
     # Compute internals of the Hamiltonian objects
     model_params1 = copy.deepcopy(model_params)
-    model_params1.update({"model": model_params["model0"], "timestep": 0})
+    model_params1.update({"model": model_params["model0"], "timestep": 0, "timestep_st": 0})
 
     # We set up this temporary dict such that we we request diabatic Ham calculations
     # followed by the transformation to the adiabatic one - this is what we need to get
