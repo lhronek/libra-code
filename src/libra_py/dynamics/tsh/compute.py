@@ -1156,6 +1156,10 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd):
 
             compute_dynamics(dyn_var, dyn_params, ham, ham_aux, compute_model, model_params, rnd, therm)
 
+            # the time-overlap of the interval just crossed - saved post-step so
+            # frame i means [t_i, t_i+1] under both time_overlap_method values
+            save.save_time_overlaps(_savers, dyn_params, i, dyn_var, ham)
+
             # the text tables follow the same saving stride as the HDF5/mem savers:
             # the buffers hold ceil(nsteps/nprint) rows, so append only on the
             # steps that actually stored data, addressing the STRIDED row

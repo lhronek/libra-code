@@ -874,7 +874,7 @@ def save_hdf5_4D(
 
     # Trajectory-resolved time-overlaps of the adiabatic states
     # Format: saver.add_dataset("St", (_nsteps, _ntraj, _nadi, _nadi), "C")
-    if "St" in saver.keywords and "St" in saver.np_data.keys():
+    if St is not None and "St" in saver.keywords and "St" in saver.np_data.keys():
         saver.save_multi_matrix(t, tr, "St", St)
 
     # Trajectory-resolved diabatic-to-adiabatic transformation matrices
@@ -1016,6 +1016,33 @@ def save_tsh_data_123(_savers, params,
                      dm_adi_raw, dm_dia, dm_dia_raw, q, p, Cadi, Cdia, 1)
 
 
+def save_time_overlaps(_savers, params, i, dyn_var, ham):
+    """
+    Saves the adiabatic time-overlap rows AFTER step i has been propagated,
+    so frame i carries the interval [t_i, t_i+1] that step i crossed - under
+    BOTH time_overlap_method conventions (the engine computes exactly this
+    interval under method 1; the model supplies it under method 0 via
+    timestep_st). The pre-step savers would instead capture the PREVIOUS
+    interval left in the slot, with a method-dependent frame 0.
+    """
+    mem_output_level = params["mem_output_level"]
+    txt_output_level = params["txt_output_level"]
+    txt2_output_level = params["txt2_output_level"]
+    is_nbra = params["is_nbra"]
+
+    tr_range = [0] if is_nbra == 1 else range(dyn_var.ntraj)
+    for tr in tr_range:
+        St = ham.get_time_overlap_adi(Py2Cpp_int([0, tr]))
+        for key, lvl, txt_type in (("mem_saver", mem_output_level, 0),
+                                   ("txt_saver", txt_output_level, 0),
+                                   ("txt2_saver", txt2_output_level, 1)):
+            saver = _savers[key]
+            if lvl >= 4 and saver is not None:
+                if "St" in saver.keywords and "St" in saver.np_data.keys():
+                    t = 0 if txt_type == 1 else i
+                    saver.save_multi_matrix(t, tr, "St", St)
+
+
 def save_tsh_data_1234_new(_savers, params, i, dyn_var, ham):
 
     hdf5_output_level = params["hdf5_output_level"]
@@ -1102,7 +1129,9 @@ def save_tsh_data_1234_new(_savers, params, i, dyn_var, ham):
     for tr in tr_range:
 
         U = ham.get_basis_transform(Py2Cpp_int([0, tr]))
-        St = ham.get_time_overlap_adi(Py2Cpp_int([0, tr]))
+        # St is saved AFTER the step by save_time_overlaps: at this point the
+        # slot still holds the PREVIOUS interval (or the init ingestion)
+        St = None
         T = dyn_var.get_proj_adi(tr)
 
         q_aux, p_aux, nab_phase = None, None, None
