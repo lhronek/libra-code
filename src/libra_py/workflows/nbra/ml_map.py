@@ -818,17 +818,22 @@ def compute_properties(params, models, input_scalers, output_scalers):
             # Compute the time-overlaps if we are at the next step
             zero_mat = np.zeros(mo_overlap.shape)
             if i > 0:
+                # the AO shells are built at the geometry arguments - they
+                # must be the PREVIOUS and CURRENT steps of the two
+                # eigenvector sets (indices may be non-consecutive, so the
+                # tracked step_prev, not step - 1)
                 mo_time_overlap = compute_mo_overlaps(params,
                                                       eigenvectors_prev,
                                                       eigenvectors,
-                                                      step,
-                                                      step + 1)[lowest_orbital - 1:highest_orbital,
-                                                                :][:,
-                                                                   lowest_orbital - 1:highest_orbital]
+                                                      step_prev,
+                                                      step)[lowest_orbital - 1:highest_orbital,
+                                                            :][:,
+                                                               lowest_orbital - 1:highest_orbital]
                 mo_time_overlap = data_conv.form_block_matrix(mo_time_overlap, zero_mat, zero_mat, mo_time_overlap)
                 mo_time_overlap_sparse = sp.csc_matrix(mo_time_overlap)
                 sp.save_npz(params["res_dir"] + F'/St_ks_{step-1}.npz', mo_time_overlap_sparse)
             eigenvectors_prev = eigenvectors
+            step_prev = step
             # Writing overlap, and time-overlap files as in .npz file for other steps
             mo_overlap_sparse = sp.csc_matrix(mo_overlap)
             sp.save_npz(params["res_dir"] + F'/S_ks_{step}.npz', mo_overlap_sparse)
