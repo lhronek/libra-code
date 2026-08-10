@@ -792,6 +792,9 @@ vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_pre
   \param[in] act_state_indx - index of the current adiabatic state
   \param[in] rep index selecting the type of representation to be used: 0 - diabatic, 1 - adiabatic based on the min of diabatic 
   gap, 2 - adiabatic, based on the switch of the NAC sign
+  5 - adiabatic, minimum-based: the prefilled squared-gap minimum with the Massey
+  exponent at the reconstructed NAC peak (nac Z^2 is conserved along a locally-linear
+  passage; exact for such passages at any sampling)
   3 - diabatic, generalized-linear LZ: Eq. (3) of Belyaev, Lasser, Trigila (JCP 140, 224108 (2014))
   evaluated at the gap minimum of the linearized passage, detected inside the last step
   \param[in] p [ndof x 1] or [ndof x ntraj] matrix of nuclear momenta
@@ -809,11 +812,24 @@ vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_pre
 
   // Determine the dimensions
   if(rep==0 || rep==3){ nstates = ham->ndia;  }
-  else if(rep==1 || rep==2){  nstates = ham->nadi;  }
+  else if(rep==1 || rep==2 || rep==5){  nstates = ham->nadi;  }
   else{
-    cout<<"Error in hopping_probabilities_lz(): rep can be 0, 1, 2 or 3; the Belyaev-Lebedev \
+    cout<<"Error in hopping_probabilities_lz(): rep can be 0, 1, 2, 3 or 5; the Belyaev-Lebedev \
 gap-minimum probabilities (rep_lz = 4) come from hopping_probabilities_bllz \n";
     throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
+  if(rep==2){
+    // NAC sign switches on real manifolds fire away from the gap minima
+    // (spurious population drain) - the detection, not the P formula,
+    // dominates the variant's behavior
+    static bool warned_rep2 = false;
+    if(!warned_rep2){ warned_rep2 = true;
+      cout<<"WARNING in hopping_probabilities_lz(): rep_lz = 2 detects NAC sign "
+          <<"switches, which on real manifolds fire away from the gap minima "
+          <<"(spurious population drain); prefer the minimum-based rep_lz = 5 "
+          <<"or the energy-only rep_lz = 4\n";
+    }
   }
 
 //  vector<double> g(nstates, 0.0);
@@ -917,7 +933,7 @@ must supply obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
 
 
   // Adiabatic representation
-  else if(rep==1 || rep==2){
+  else if(rep==1 || rep==2 || rep==5){
 
     // Update adiabatic NACs - assume those are updated 
     //ham->compute_nac_adi(p, invM);
@@ -970,16 +986,39 @@ obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
             if(gap_in[j] >= 0.0){ Z_star = gap_in[j]; }
           }
         }
+        else if(rep==5){
+          // minimum-based detection: the dispatch prefills the squared-gap
+          // parabola minimum whenever the three-point energy history
+          // brackets one
+          if(gap_in[j] >= 0.0){
+            nonzero = 1;
+            Z_star = gap_in[j];
+          }
+        }
 
         if(nonzero==1){  // This is the condition of intersection of diabatic surfaces, alternatively, we 
                          // could be looking to locate the adiabatic surfaces minimum
           double g_ij = 0.0;
-          // the probability's gap and the stored acceptance gap both
-          // evaluate at the crossing when it is known
-          double Z_ij = (Z_star >= 0.0) ? Z_star
-                      : fabs(ham_adi.get(i,i) - ham_adi.get(j,j));
-          double nac_ij = fabs(nac_adi.get(i,j));
-          if(nac_ij > 0.0){ g_ij = exp(-0.25*M_PI*Z_ij/nac_ij);     }
+          if(rep==5){
+            // Massey exponent at the reconstructed NAC peak: nac Z^2 is
+            // conserved along a locally-linear passage, so nac_max =
+            // nac(t1) Z1^2 / Z_min^2 with the bracket's middle sample at
+            // the previous step; the regular form has no small divisors
+            double Z1 = fabs(ham_adi_prev.get(i,i) - ham_adi_prev.get(j,j));
+            double nac1 = fabs(nac_adi_prev.get(i,j));
+            if(Z_star <= 0.0){ g_ij = 1.0; }  // trivial crossing
+            else if(nac1*Z1 > 0.0){
+              g_ij = exp(-0.25*M_PI*Z_star*Z_star*Z_star/(nac1*Z1*Z1));
+            }  // zero coupling: no proposal
+          }
+          else{
+            // the probability's gap and the stored acceptance gap both
+            // evaluate at the crossing when it is known
+            double Z_ij = (Z_star >= 0.0) ? Z_star
+                        : fabs(ham_adi.get(i,i) - ham_adi.get(j,j));
+            double nac_ij = fabs(nac_adi.get(i,j));
+            if(nac_ij > 0.0){ g_ij = exp(-0.25*M_PI*Z_ij/nac_ij);     }
+          }
           gap_mins[j] = Z_star;
           g[j] = g_ij;
         }
@@ -1596,7 +1635,7 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
         if(dyn_var.lz_gap_min_status == 0){ dyn_var.allocate_lz_gap_min(); }
         int nst_t = ham.children[traj]->nadi;
         vector<double> gms(nst_t, -1.0);
-        if(prms.rep_lz == 2 && dyn_var.bllz_vars_status == 1 &&
+        if((prms.rep_lz == 2 || prms.rep_lz == 5) && dyn_var.bllz_vars_status == 1 &&
            dyn_var.bllz_hist_size >= 2){
           // pre-fill the three-point gap-parabola minima so the rep-2
           // probability and the acceptance both evaluate at the crossing
