@@ -54,12 +54,14 @@ vector<double> hopping_probabilities_mssh(dyn_control_params& prms, CMATRIX& den
 //vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM, double dt);
 //vector<double> hopping_probabilities_lz(nHamiltonian& ham, nHamiltonian& ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM, double dt);
 vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM, double dt);
+vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM, double dt, vector<double>& gap_mins);
 vector<double> hopping_probabilities_lz(nHamiltonian& ham, nHamiltonian& ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM, double dt);
 vector<double> hopping_probabilities_bllz(MATRIX& E_prev2, MATRIX& E_prev, MATRIX& E_curr, int act_state_indx, double dt);
 vector<double> hopping_probabilities_bllz(MATRIX& E_prev2, MATRIX& E_prev, MATRIX& E_curr, int act_state_indx, double dt, vector<double>& gap_mins);
 
 
 vector<double> hopping_probabilities_zn(nHamiltonian* ham, nHamiltonian* ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM);
+vector<double> hopping_probabilities_zn(nHamiltonian* ham, nHamiltonian* ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM, vector<double>& gap_mins);
 vector<double> hopping_probabilities_zn(nHamiltonian& ham, nHamiltonian& ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM);
 
 

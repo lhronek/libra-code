@@ -321,12 +321,16 @@ class dyn_variables{
   /**
     MATRIX(nadi, ntraj)
 
-    The extrapolated gap minimum per proposed channel from the last
-    BLLZ proposal step (-1 where no minimum was detected) - the
-    Boltzmann acceptance evaluates upward hops at this gap, the same
-    geometry the proposal probability uses
+    The at-crossing gap per proposed channel from the last LZ/ZN
+    proposal step (-1 where no crossing was detected) - the Boltzmann
+    acceptance evaluates upward hops at this gap, the same geometry
+    the proposal fires for. Written by every tsh_method 3/4 variant:
+    rep_lz 0/1 and ZN store 2|H_ij_dia| interpolated to the diabatic
+    crossing, rep_lz 2 the three-point gap parabola minimum, rep_lz 3
+    its linearized-passage minimum, rep_lz 4 the BLLZ parabola minimum
   */
-  MATRIX* bllz_gap_min;
+  int lz_gap_min_status;
+  MATRIX* lz_gap_min;
 
   /**
     How many history levels are filled so far (0, 1 or 2)
@@ -679,6 +683,7 @@ class dyn_variables{
   void allocate_afssh();
   void allocate_bcsh();
   void allocate_bllz();
+  void allocate_lz_gap_min();
   void allocate_dish();
   void allocate_fssh2();
   void allocate_shxf();

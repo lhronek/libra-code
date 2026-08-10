@@ -700,12 +700,13 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
       double E_i = hvib.get(old_st, old_st).real();  // initial potential energy
       double E_f = hvib.get(new_st, new_st).real();  // final potential energy  
 
-      // BLLZ (tsh_method 3, rep_lz 4) proposes one step past the gap
-      // minimum, where the gap has reopened - evaluate the thermal filter
-      // at the parabola's extrapolated minimum instead, the same geometry
-      // the proposal probability uses
-      if(prms.tsh_method == 3 && prms.rep_lz == 4 && dyn_var.bllz_vars_status == 1){
-        double gm = dyn_var.bllz_gap_min->get(new_st, traj);
+      // the LZ/ZN proposals (tsh_method 3/4) fire one step past the
+      // crossing, where the gap has reopened - evaluate the thermal
+      // filter at the stored at-crossing gap instead, the same geometry
+      // the proposal fires for
+      if((prms.tsh_method == 3 || prms.tsh_method == 4) &&
+         dyn_var.lz_gap_min_status == 1){
+        double gm = dyn_var.lz_gap_min->get(new_st, traj);
         if(gm >= 0.0 && E_f > E_i){ E_f = E_i + gm; }
       }
 
@@ -744,12 +745,13 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
       double E_i = hvib.get(old_st, old_st).real();  // initial potential energy
       double E_f = hvib.get(new_st, new_st).real();  // final potential energy  
 
-      // BLLZ (tsh_method 3, rep_lz 4) proposes one step past the gap
-      // minimum, where the gap has reopened - evaluate the thermal filter
-      // at the parabola's extrapolated minimum instead, the same geometry
-      // the proposal probability uses
-      if(prms.tsh_method == 3 && prms.rep_lz == 4 && dyn_var.bllz_vars_status == 1){
-        double gm = dyn_var.bllz_gap_min->get(new_st, traj);
+      // the LZ/ZN proposals (tsh_method 3/4) fire one step past the
+      // crossing, where the gap has reopened - evaluate the thermal
+      // filter at the stored at-crossing gap instead, the same geometry
+      // the proposal fires for
+      if((prms.tsh_method == 3 || prms.tsh_method == 4) &&
+         dyn_var.lz_gap_min_status == 1){
+        double gm = dyn_var.lz_gap_min->get(new_st, traj);
         if(gm >= 0.0 && E_f > E_i){ E_f = E_i + gm; }
       }
 
@@ -789,12 +791,13 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
       double E_i = hvib.get(old_st, old_st).real();  // initial potential energy
       double E_f = hvib.get(new_st, new_st).real();  // final potential energy  
 
-      // BLLZ (tsh_method 3, rep_lz 4) proposes one step past the gap
-      // minimum, where the gap has reopened - evaluate the thermal filter
-      // at the parabola's extrapolated minimum instead, the same geometry
-      // the proposal probability uses
-      if(prms.tsh_method == 3 && prms.rep_lz == 4 && dyn_var.bllz_vars_status == 1){
-        double gm = dyn_var.bllz_gap_min->get(new_st, traj);
+      // the LZ/ZN proposals (tsh_method 3/4) fire one step past the
+      // crossing, where the gap has reopened - evaluate the thermal
+      // filter at the stored at-crossing gap instead, the same geometry
+      // the proposal fires for
+      if((prms.tsh_method == 3 || prms.tsh_method == 4) &&
+         dyn_var.lz_gap_min_status == 1){
+        double gm = dyn_var.lz_gap_min->get(new_st, traj);
         if(gm >= 0.0 && E_f > E_i){ E_f = E_i + gm; }
       }
 

@@ -102,6 +102,7 @@ dyn_variables::dyn_variables(int _ndia, int _nadi, int _ndof, int _ntraj){
   ///================= BLLZ ====================
   bllz_vars_status = 0;
   bllz_hist_size = 0;
+  lz_gap_min_status = 0;
 
   ///================= DISH ====================
   dish_vars_status = 0;
@@ -173,16 +174,27 @@ void dyn_variables::allocate_bllz(){
 
     bllz_E_prev = new MATRIX(nadi, ntraj);
     bllz_E_prev2 = new MATRIX(nadi, ntraj);
-    bllz_gap_min = new MATRIX(nadi, ntraj);
-    for(int st = 0; st < nadi; st++){
-      for(int tr = 0; tr < ntraj; tr++){ bllz_gap_min->set(st, tr, -1.0); }
-    }
     bllz_hist_size = 0;
     bllz_vars_status = 1;
 
   }
 
 }// allocate_bllz
+
+
+void dyn_variables::allocate_lz_gap_min(){
+
+  if(lz_gap_min_status==0){
+
+    lz_gap_min = new MATRIX(nadi, ntraj);
+    for(int st = 0; st < nadi; st++){
+      for(int tr = 0; tr < ntraj; tr++){ lz_gap_min->set(st, tr, -1.0); }
+    }
+    lz_gap_min_status = 1;
+
+  }
+
+}// allocate_lz_gap_min
 
 
 void dyn_variables::allocate_dish(){
@@ -439,10 +451,15 @@ dyn_variables::dyn_variables(const dyn_variables& x){
     // Copy content
     *bllz_E_prev = *x.bllz_E_prev;
     *bllz_E_prev2 = *x.bllz_E_prev2;
-    *bllz_gap_min = *x.bllz_gap_min;
     bllz_hist_size = x.bllz_hist_size;
 
   }// if BLLZ vars
+
+  // The LZ/ZN at-crossing gap channel - only if initialized
+  if(x.lz_gap_min_status==1){
+    allocate_lz_gap_min();
+    *lz_gap_min = *x.lz_gap_min;
+  }// if lz_gap_min
 
   // DISH vars - only if initialized
   if(x.dish_vars_status==1){
@@ -626,9 +643,13 @@ dyn_variables::~dyn_variables(){
   if(bllz_vars_status==1){
     delete bllz_E_prev;
     delete bllz_E_prev2;
-    delete bllz_gap_min;
 
     bllz_vars_status = 0;
+  }
+
+  if(lz_gap_min_status==1){
+    delete lz_gap_min;
+    lz_gap_min_status = 0;
   }
 
   if(dish_vars_status==1){

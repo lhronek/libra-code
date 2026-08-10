@@ -777,8 +777,8 @@ vector<double> hopping_probabilities_mssh(dyn_control_params& prms, CMATRIX& den
 }
 
 
-//vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM, double dt){
-vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM, double dt){
+//vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM, double dt, vector<double>& gap_mins){
+vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM, double dt, vector<double>& gap_mins){
 /**
   \brief This function computes the surface hopping probabilities according to Landau-Zener formula.
 
@@ -827,6 +827,13 @@ gap-minimum probabilities (rep_lz = 4) come from hopping_probabilities_bllz \n";
  
   */
   
+  // in-out channel: incoming entries may carry the dispatch's three-point
+  // gap-parabola minima (rep 2); the vector is rewritten with the
+  // at-crossing gaps of the channels this call detects (-1 elsewhere)
+  vector<double> gap_in(gap_mins);
+  if((int)gap_in.size() != nstates){ gap_in.assign(nstates, -1.0); }
+  gap_mins.assign(nstates, -1.0);
+
   if(rep==0){
 
     // Diabatic Ham matrices
@@ -892,6 +899,11 @@ must supply obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
 
           double h_ij = ham_dia.get(i,j);
           double g_ij = exp(-2.0*M_PI*h_ij*h_ij / dHv.get(i,j) );
+          // the two-state adiabatic gap at the diabatic crossing is
+          // exactly 2|H_ij| - interpolate the coupling to the crossing
+          double frac = dh_prev/(dh_prev - dh);
+          gap_mins[j] = 2.0*fabs( ham_dia_prev.get(i,j)
+                        + frac*(h_ij - ham_dia_prev.get(i,j)) );
 
           g[j] = g_ij;
           //g[j] = g_ij;
@@ -936,23 +948,39 @@ obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
       if(j!=i){
 
         int nonzero = 0;
+        double Z_star = -1.0;   // the at-crossing adiabatic gap, when known
         if(rep==1){
           double dh = ham_dia.get(i,i) - ham_dia.get(j,j);
           double dh_prev = ham_dia_prev.get(i,i) - ham_dia_prev.get(j,j);
-          if( dh * dh_prev < 0.0){ nonzero = 1; }
+          if( dh * dh_prev < 0.0){
+            nonzero = 1;
+            // 2|H_ij| interpolated to the diabatic crossing
+            double frac = dh_prev/(dh_prev - dh);
+            Z_star = 2.0*fabs( ham_dia_prev.get(i,j)
+                     + frac*(ham_dia.get(i,j) - ham_dia_prev.get(i,j)) );
+          }
         }
         else if(rep==2){
           double nac = nac_adi.get(i,j);
           double nac_prev = nac_adi_prev.get(i,j);
-          if( nac * nac_prev < 0.0){ nonzero = 1; }
+          if( nac * nac_prev < 0.0){
+            nonzero = 1;
+            // the dispatch pre-fills the three-point gap-parabola minimum
+            // when the energy history holds one
+            if(gap_in[j] >= 0.0){ Z_star = gap_in[j]; }
+          }
         }
 
         if(nonzero==1){  // This is the condition of intersection of diabatic surfaces, alternatively, we 
                          // could be looking to locate the adiabatic surfaces minimum
           double g_ij = 0.0;
-          double Z_ij = fabs(ham_adi.get(i,i) - ham_adi.get(j,j));
+          // the probability's gap and the stored acceptance gap both
+          // evaluate at the crossing when it is known
+          double Z_ij = (Z_star >= 0.0) ? Z_star
+                      : fabs(ham_adi.get(i,i) - ham_adi.get(j,j));
           double nac_ij = fabs(nac_adi.get(i,j));
-          if(nac_ij > 0.0){ g_ij = exp(-0.25*M_PI*Z_ij/nac_ij);     }         
+          if(nac_ij > 0.0){ g_ij = exp(-0.25*M_PI*Z_ij/nac_ij);     }
+          gap_mins[j] = Z_star;
           g[j] = g_ij;
         }
         else{ g[j] = 0.0; }
@@ -1029,6 +1057,8 @@ must supply obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
             // probability does not depend on where in the step it is evaluated
             double cross = v1c*v2d[j] - v2c*v1d[j];
             g[j] = exp(-M_PI * cross*cross / (den*sqrt(den)) );
+            // the linear passage's minimal adiabatic gap: 2|v|_min
+            gap_mins[j] = 2.0*fabs(cross)/sqrt(den);
           }
           else{ g[j] = 0.0; }
         }// gap minimum inside the step
@@ -1048,6 +1078,13 @@ must supply obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
   return g;
 
 }// lz
+
+vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM, double dt){
+
+  vector<double> gap_mins;
+  return hopping_probabilities_lz(ham, ham_prev, act_state_indx, rep, p, invM, dt, gap_mins);
+
+}// lz, no at-crossing-gap output
 
 
 //vector<double> hopping_probabilities_lz(nHamiltonian& ham, nHamiltonian& ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM, double dt){
@@ -1149,7 +1186,7 @@ vector<double> hopping_probabilities_bllz(MATRIX& E_prev2, MATRIX& E_prev, MATRI
 
 }// bllz, no gap-minimum output
 
-vector<double> hopping_probabilities_zn(nHamiltonian* ham, nHamiltonian* ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM){
+vector<double> hopping_probabilities_zn(nHamiltonian* ham, nHamiltonian* ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM, vector<double>& gap_mins){
 /**
   \brief This function computes the surface hopping probabilities according to Zhu-Nakamura generalized to multiple dimensons 
   according to formula of Yu et al. See my Chapter, Eqs. 3.89 - 3.91
@@ -1205,6 +1242,8 @@ Adiabatic-native models must supply obj.ham_dia \n";
   F = ham->all_forces_adi(st).real().T();
   Fi = F.col(i);
 
+  gap_mins.assign(nstates, -1.0);
+
   // Off-diagonal elements - only, if we meet the gap minimum
   for(j=0; j<nstates; j++){
 
@@ -1230,6 +1269,11 @@ Adiabatic-native models must supply obj.ham_dia \n";
         double y = sqrt( fabs(tmp.sum() ) );
 
         double h = fabs(ham_dia.get(i,j));
+        // the two-state adiabatic gap at the diabatic crossing is
+        // exactly 2|H_ij| - interpolate the coupling to the crossing
+        double frac = dh_prev/(dh_prev - dh);
+        gap_mins[j] = 2.0*fabs( ham_dia_prev.get(i,j)
+                      + frac*(ham_dia.get(i,j) - ham_dia_prev.get(i,j)) );
 
         if(h > 0.0 && x > 0.0){
           double a2 = 0.0625 * x * y / (h * h * h);
@@ -1256,6 +1300,13 @@ Adiabatic-native models must supply obj.ham_dia \n";
   return g;
 
 }
+
+vector<double> hopping_probabilities_zn(nHamiltonian* ham, nHamiltonian* ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM){
+
+  vector<double> gap_mins;
+  return hopping_probabilities_zn(ham, ham_prev, act_state_indx, rep, p, invM, gap_mins);
+
+}// zn, no at-crossing-gap output
 
 vector<double> hopping_probabilities_zn(nHamiltonian& ham, nHamiltonian& ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM){
 
@@ -1507,10 +1558,11 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
         // lives in dyn_var (allocated on first use) and the first two steps
         // propose nothing while it fills
         if(dyn_var.bllz_vars_status == 0){ dyn_var.allocate_bllz(); }
+        if(dyn_var.lz_gap_min_status == 0){ dyn_var.allocate_lz_gap_min(); }
         int nst_t = ham.children[traj]->nadi;
-        // the acceptance reads the extrapolated minima AFTER the history
-        // has shifted - stale entries must not survive a step
-        for(int st=0; st<nst_t; st++){ dyn_var.bllz_gap_min->set(st, traj, -1.0); }
+        // the acceptance reads the at-crossing gaps AFTER the history has
+        // shifted - stale entries must not survive a step
+        for(int st=0; st<nst_t; st++){ dyn_var.lz_gap_min->set(st, traj, -1.0); }
         vector<double> gg(nst_t, 0.0);
         gg[dyn_var.act_states[traj]] = 1.0;
         if(dyn_var.bllz_hist_size >= 2){
@@ -1525,22 +1577,45 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
           }// for st
           vector<double> gms(nst_t, -1.0);
           gg = hopping_probabilities_bllz(Ep2, Ep, Ec, dyn_var.act_states[traj], prms.dt, gms);
-          for(int st=0; st<nst_t; st++){ dyn_var.bllz_gap_min->set(st, traj, gms[st]); }
+          for(int st=0; st<nst_t; st++){ dyn_var.lz_gap_min->set(st, traj, gms[st]); }
         }
         g[traj] = gg;
       }
       else{
         pop_submatrix(*dyn_var.p, p_traj, nucl_stenc_x, nucl_stenc_y);
+        if(dyn_var.lz_gap_min_status == 0){ dyn_var.allocate_lz_gap_min(); }
+        int nst_t = ham.children[traj]->nadi;
+        vector<double> gms(nst_t, -1.0);
+        if(prms.rep_lz == 2 && dyn_var.bllz_vars_status == 1 &&
+           dyn_var.bllz_hist_size >= 2){
+          // pre-fill the three-point gap-parabola minima so the rep-2
+          // probability and the acceptance both evaluate at the crossing
+          MATRIX Ec(nst_t, 1);
+          MATRIX Ep(nst_t, 1);
+          MATRIX Ep2(nst_t, 1);
+          CMATRIX Ham_t(ham.children[traj]->get_ham_adi());
+          for(int st=0; st<nst_t; st++){
+            Ec.set(st, 0, Ham_t.get(st, st).real());
+            Ep.set(st, 0, dyn_var.bllz_E_prev->get(st, traj));
+            Ep2.set(st, 0, dyn_var.bllz_E_prev2->get(st, traj));
+          }// for st
+          hopping_probabilities_bllz(Ep2, Ep, Ec, dyn_var.act_states[traj], prms.dt, gms);
+        }
         g[traj] = hopping_probabilities_lz(ham.children[traj], ham_prev.children[traj], dyn_var.act_states[traj], 
-                  prms.rep_lz, p_traj, *dyn_var.iM, prms.dt);
+                  prms.rep_lz, p_traj, *dyn_var.iM, prms.dt, gms);
+        for(int st=0; st<nst_t; st++){ dyn_var.lz_gap_min->set(st, traj, gms[st]); }
       }
 
     }
     else if(prms.tsh_method == 4){ // ZN
 
       pop_submatrix(*dyn_var.p, p_traj, nucl_stenc_x, nucl_stenc_y);
+      if(dyn_var.lz_gap_min_status == 0){ dyn_var.allocate_lz_gap_min(); }
+      int nst_t = ham.children[traj]->nadi;
+      vector<double> gms(nst_t, -1.0);
       g[traj] = hopping_probabilities_zn(ham.children[traj], ham_prev.children[traj], dyn_var.act_states[traj],
-                prms.rep_lz, p_traj, *dyn_var.iM);
+                prms.rep_lz, p_traj, *dyn_var.iM, gms);
+      for(int st=0; st<nst_t; st++){ dyn_var.lz_gap_min->set(st, traj, gms[st]); }
 
     }
  
@@ -1611,8 +1686,9 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
 
   }// for traj
 
-  if(prms.tsh_method == 3 && prms.rep_lz == 4){
-    // push the current energies into the history AFTER all proposals
+  if(prms.tsh_method == 3 || prms.tsh_method == 4){
+    // push the current energies into the history AFTER all proposals -
+    // it feeds the BLLZ (rep_lz 4) parabola and the rep-2 pre-fill
     if(dyn_var.bllz_vars_status == 0){ dyn_var.allocate_bllz(); }
     for(traj=0; traj<ntraj; traj++){
       CMATRIX Ham_t(ham.children[traj]->get_ham_adi());
