@@ -1120,6 +1120,14 @@ must supply obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
 
 vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM, double dt){
 
+  if(rep==5){
+    cout<<"Error in hopping_probabilities_lz(): rep_lz = 5 needs the three-point"
+        <<" gap prefill, which this entry cannot supply - use"
+        <<" hopping_probabilities_lz_gaps (prefill via"
+        <<" hopping_probabilities_bllz_gaps) or the engine dispatch"
+        <<" (tsh_method 3)\n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
+  }
   vector<double> gap_mins;
   return hopping_probabilities_lz(ham, ham_prev, act_state_indx, rep, p, invM, dt, gap_mins);
 

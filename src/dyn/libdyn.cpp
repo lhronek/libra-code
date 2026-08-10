@@ -643,6 +643,44 @@ void export_dyn_hop_acceptance_objects(){
 }
 
 
+boost::python::list expt_hopping_probabilities_lz_gaps
+(nHamiltonian& ham, nHamiltonian& ham_prev, int act_state_indx, int rep,
+ MATRIX& p, const MATRIX& invM, double dt, boost::python::list gap_mins_in){
+  // the gap_mins-carrying entry: the in-list may carry the three-point
+  // prefill (rep 2/5); returns [probabilities, at-crossing gaps]
+  vector<double> gms;
+  for(int a=0; a<len(gap_mins_in); a++){ gms.push_back(extract<double>(gap_mins_in[a])); }
+  vector<double> g = hopping_probabilities_lz(&ham, &ham_prev, act_state_indx, rep, p, invM, dt, gms);
+  boost::python::list gl, ml, res;
+  for(size_t a=0; a<g.size(); a++){ gl.append(g[a]); }
+  for(size_t a=0; a<gms.size(); a++){ ml.append(gms[a]); }
+  res.append(gl); res.append(ml);
+  return res;
+}
+
+boost::python::list expt_hopping_probabilities_zn_gaps
+(nHamiltonian& ham, nHamiltonian& ham_prev, int act_state_indx, int rep,
+ MATRIX& p, const MATRIX& invM){
+  vector<double> gms;
+  vector<double> g = hopping_probabilities_zn(&ham, &ham_prev, act_state_indx, rep, p, invM, gms);
+  boost::python::list gl, ml, res;
+  for(size_t a=0; a<g.size(); a++){ gl.append(g[a]); }
+  for(size_t a=0; a<gms.size(); a++){ ml.append(gms[a]); }
+  res.append(gl); res.append(ml);
+  return res;
+}
+
+boost::python::list expt_hopping_probabilities_bllz_gaps
+(MATRIX& E_prev2, MATRIX& E_prev, MATRIX& E_curr, int act_state_indx, double dt){
+  vector<double> gms;
+  vector<double> g = hopping_probabilities_bllz(E_prev2, E_prev, E_curr, act_state_indx, dt, gms);
+  boost::python::list gl, ml, res;
+  for(size_t a=0; a<g.size(); a++){ gl.append(g[a]); }
+  for(size_t a=0; a<gms.size(); a++){ ml.append(gms[a]); }
+  res.append(gl); res.append(ml);
+  return res;
+}
+
 void export_dyn_hop_proposal_objects(){
 
   //============= dyn_hop_proposal.cpp ======================
@@ -698,6 +736,12 @@ void export_dyn_hop_proposal_objects(){
   (nHamiltonian& ham, nHamiltonian& ham_prev, int act_state_indx, int rep,
   MATRIX& p, const MATRIX& invM) = &hopping_probabilities_zn;
   def("hopping_probabilities_zn", expt_hopping_probabilities_zn_v1);
+
+  // gap_mins-carrying entries: return [probabilities, at-crossing gaps];
+  // the lz form accepts the three-point prefill list (rep 2/5)
+  def("hopping_probabilities_lz_gaps", expt_hopping_probabilities_lz_gaps);
+  def("hopping_probabilities_zn_gaps", expt_hopping_probabilities_zn_gaps);
+  def("hopping_probabilities_bllz_gaps", expt_hopping_probabilities_bllz_gaps);
 
 
 
