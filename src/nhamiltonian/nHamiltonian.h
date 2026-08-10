@@ -178,6 +178,9 @@ public:
 
   CMATRIX* hvib_adi;          ///< Vibronic Hamiltonian in adiabatic representation
   int hvib_adi_mem_status;
+  ///< whether the model object supplied hvib_adi at the last ingestion -
+  ///< hvib_update_method 1 must not silently overwrite it
+  int hvib_adi_supplied;
 
 
   vector<CMATRIX*> d1ham_adi; ///< first order derivatives of the Hamiltonian matrix in the adiabatic basis (diagonal)

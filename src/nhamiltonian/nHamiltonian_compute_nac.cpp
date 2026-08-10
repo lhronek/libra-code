@@ -457,6 +457,27 @@ void nHamiltonian::compute_hvib_adi() {
     throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
+  // a model that supplies its own vibronic Hamiltonian must not have it
+  // silently overwritten by a DISAGREEING rebuild (absent nac_adi strips
+  // the couplings and freezes the electronic dynamics)
+  if (hvib_adi_supplied) {
+    double max_diff = 0.0;
+    for (int i = 0; i < nadi; i++) {
+      for (int j = 0; j < nadi; j++) {
+        double d = abs(ham_adi->get(i, j) - ihbar * nac_adi->get(i, j)
+                       - hvib_adi->get(i, j));
+        if (d > max_diff) { max_diff = d; }
+      } // for j
+    } // for i
+    if (max_diff > 1e-8) {
+      cout << "Error in compute_hvib_adi(): the model supplies obj.hvib_adi, but "
+              "hvib_update_method = 1 rebuilds it as ham_adi - i*nac_adi and the two "
+              "disagree - the supplied vibronic Hamiltonian would be overwritten "
+              "(an absent nac_adi strips the couplings). Use hvib_update_method = 0 "
+              "(consume the supplied hvib), or supply a consistent nac_adi\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+  }
   for (int i = 0; i < nadi; i++) {
     for (int j = 0; j < nadi; j++) {
       hvib_adi->set(i, j, ham_adi->get(i, j) - ihbar * nac_adi->get(i, j));
