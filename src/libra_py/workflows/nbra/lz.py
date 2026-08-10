@@ -72,15 +72,28 @@ def Belyaev_Lebedev(Hvib, params):
             * **params["target_space"]** ( int ): how to select the space of target states for each source state
                 Options:
 
-                    - 0 - only adjacent states
+                    - 0 - only index-adjacent states (assumes the energy order matches the
+                        index order - breaks momentarily at crossings)
                     - 1 - all states available [ default ]
+                    - 2 - only energy-adjacent states: a pair is eligible iff no third
+                        state's energy lies strictly inside its interval at the given step
+                        (order-free; a pairwise minimum with intervening states is not a
+                        two-state passage)
+
+            * **params["gap_fit"]** ( int ): which variable the 3-point Lagrange parabola fits
+                Options:
+
+                    - 0 - the gap itself [ default, legacy ] - in the V-shaped wings the vertex
+                        lands at the middle-sample scale and overestimates the minimum as dt grows
+                    - 1 - the SQUARED gap - exactly quadratic for a locally-linear passage, so the
+                        vertex and the probability are sampling-exact at any dt
 
 
     """
 
     # Control parameters
     critical_params = []
-    default_params = {"T": 300.0, "Boltz_opt_BL": 1, "dt": 41.0, "gap_min_exception": 0, "target_space": 1}
+    default_params = {"T": 300.0, "Boltz_opt_BL": 1, "dt": 41.0, "gap_min_exception": 0, "target_space": 1, "gap_fit": 0}
     comn.check_input(params, default_params, critical_params)
 
     boltz_opt = params["Boltz_opt_BL"]
@@ -88,6 +101,7 @@ def Belyaev_Lebedev(Hvib, params):
     dt = params["dt"]
     gap_min_exception = params["gap_min_exception"]
     target_space = params["target_space"]
+    gap_fit = params["gap_fit"]
 
     # Data dimensions
     nsteps = len(Hvib)
@@ -132,6 +146,23 @@ def Belyaev_Lebedev(Hvib, params):
 
                 targets = range(0, nstates)
 
+            elif target_space == 2:
+                # Energy-adjacent targets: k sits between i and j iff both
+                # dE(i,k) and dE(k,j) are smaller than dE(i,j) - order-free
+                targets = []
+                for i in range(0, nstates):
+                    if i == j:
+                        continue
+                    zij = dE[n].get(i, j)
+                    between = False
+                    for k in range(0, nstates):
+                        if k != i and k != j and \
+                           dE[n].get(i, k) < zij and dE[n].get(k, j) < zij:
+                            between = True
+                            break
+                    if not between:
+                        targets.append(i)
+
             # with how many other states, does the current (source) state has minima?
             # apparently, this can not be more than 2
             normalization = 0.0
@@ -144,32 +175,50 @@ def Belyaev_Lebedev(Hvib, params):
 
                 if (dE[n - 1].get(i, j) > dE[n].get(i, j) and dE[n].get(i, j) < dE[n + 1].get(i, j)):
 
-                    denom = dE[n - 1].get(i, j) - 2.0 * dE[n].get(i, j) + dE[n + 1].get(i, j)
+                    if gap_fit == 1:
+                        # squared-gap fit: Z^2 of a locally-linear passage is
+                        # exactly quadratic, so the vertex is sampling-exact
+                        z0 = dE[n - 1].get(i, j) ** 2
+                        z1 = dE[n].get(i, j) ** 2
+                        z2 = dE[n + 1].get(i, j) ** 2
+                    else:
+                        z0 = dE[n - 1].get(i, j)
+                        z1 = dE[n].get(i, j)
+                        z2 = dE[n + 1].get(i, j)
+                    denom = z0 - 2.0 * z1 + z2
                     if denom > 0.0:
 
-                        t_min = 0.5 * (dE[n - 1].get(i, j) - dE[n + 1].get(i, j)) * dt / denom
+                        t_min = 0.5 * (z0 - z2) * dt / denom
 
                         if t_min < -dt or t_min > dt:
                             raise ValueError("error determining t_min in the interpolation")
 
-                        gap_min = 0.5 * (t_min * (t_min - dt) * dE[n - 1].get(i, j)
-                                         - 2.0 * (t_min + dt) * (t_min - dt) * dE[n].get(i, j) +
-                                         t_min * (t_min + dt) * dE[n + 1].get(i, j)) / (dt * dt)
+                        v_min = 0.5 * (t_min * (t_min - dt) * z0
+                                       - 2.0 * (t_min + dt) * (t_min - dt) * z1 +
+                                       t_min * (t_min + dt) * z2) / (dt * dt)
 
-                        if gap_min < 0.0:
+                        if v_min < 0.0:
                             if gap_min_exception == 0:
-                                gap_min = 0.0
+                                v_min = 0.0
                             elif gap_min_exception == 1:
-                                gap_min = dE[n].get(i, j)
+                                v_min = z1
 
-                        if gap_min > dE[n - 1].get(i, j) or gap_min > dE[n + 1].get(i, j):
+                        if v_min > z0 or v_min > z2:
                             raise ValueError("the extrapolated gap is larger than the bounding values")
 
-                        second_deriv = denom / (dt * dt)
+                        if gap_fit == 1:
+                            gap_min = math.sqrt(v_min)
+                            # Z_min^3/Z_dd = Q_min^2/a with a = Qdd/2 - regular
+                            # at Q_min -> 0 (the trivial-crossing limit, p = 1)
+                            a_q = 0.5 * denom / (dt * dt)
+                            p = math.exp(-0.5 * math.pi * v_min / math.sqrt(a_q))
+                        else:
+                            gap_min = v_min
+                            second_deriv = denom / (dt * dt)
 
-                        argg = (gap_min**3) / second_deriv
+                            argg = (gap_min**3) / second_deriv
 
-                        p = math.exp(-0.5 * math.pi * math.sqrt(argg))
+                            p = math.exp(-0.5 * math.pi * math.sqrt(argg))
 
                         # Optionally, can correct transition probabilitieis to
                         # account for Boltzmann factor
