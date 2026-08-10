@@ -156,6 +156,19 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
       for (int traj = 0; traj < ntraj; traj++) {
         st = ham_prev.children[traj]->get_basis_transform().H() *
              ham.children[traj]->get_basis_transform();
+        // a model that supplies its own time-overlaps must not have them
+        // silently overwritten by a DISAGREEING recomputation (identity
+        // basis transforms make st = I and freeze the electronic dynamics)
+        if (ham.children[traj]->time_overlap_adi_supplied &&
+            abs((st - ham.children[traj]->get_time_overlap_adi()).max_elt()) > 1e-8) {
+          cout << "Error in the time-overlap update: the model supplies "
+                  "obj.time_overlap_adi, but time_overlap_method = 1 recomputes the "
+                  "time-overlap from the basis transforms and the two disagree - the "
+                  "supplied data would be overwritten. Use time_overlap_method = 0 "
+                  "(consume the supplied time-overlaps), or supply basis transforms "
+                  "consistent with them\n";
+          throw std::runtime_error("libra C++ error - see the message printed above");
+        }
         ham.children[traj]->set_time_overlap_adi_by_val(st);
       }
     } // 1
@@ -370,6 +383,19 @@ void update_time_overlaps(dyn_control_params &prms, dyn_variables &dyn_var,
     for (int traj = 0; traj < ntraj; traj++) {
       st = ham_prev.children[traj]->get_basis_transform().H() *
            ham.children[traj]->get_basis_transform();
+      // a model that supplies its own time-overlaps must not have them
+      // silently overwritten by a DISAGREEING recomputation (identity
+      // basis transforms make st = I and freeze the electronic dynamics)
+      if (ham.children[traj]->time_overlap_adi_supplied &&
+          abs((st - ham.children[traj]->get_time_overlap_adi()).max_elt()) > 1e-8) {
+        cout << "Error in update_time_overlaps(): the model supplies "
+                "obj.time_overlap_adi, but time_overlap_method = 1 recomputes the "
+                "time-overlap from the basis transforms and the two disagree - the "
+                "supplied data would be overwritten. Use time_overlap_method = 0 "
+                "(consume the supplied time-overlaps), or supply basis transforms "
+                "consistent with them\n";
+        throw std::runtime_error("libra C++ error - see the message printed above");
+      }
       ham.children[traj]->set_time_overlap_adi_by_val(st);
     }
   } // 1

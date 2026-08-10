@@ -217,6 +217,9 @@ public:
 
   CMATRIX* time_overlap_adi;  ///< These are <psi_i_adi (t) | psi_j_adi (t+dt)> matrices
   int time_overlap_adi_mem_status;
+  ///< whether the model object supplied time_overlap_adi at the last
+  ///< ingestion - time_overlap_method 1 must not silently overwrite it
+  int time_overlap_adi_supplied;
 
   CMATRIX* time_overlap_dia;  ///< These are <psi_i_dia (t) | psi_j_dia (t+dt)> matrices
   int time_overlap_dia_mem_status;

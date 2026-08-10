@@ -657,6 +657,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
 
     has_attr = 0;
     has_attr = (int)hasattr(obj, "time_overlap_adi");
+    time_overlap_adi_supplied = has_attr;
     if (has_attr) {
 
       check_cmatrix(obj, "time_overlap_adi", nadi, nadi);
