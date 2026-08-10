@@ -756,8 +756,9 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       static bool warned_dia_ignored = false;
       if (!warned_dia_ignored) {
         const char* dia_names[] = {"nac_dia", "hvib_dia", "dc1_dia",
-                                   "d1ham_dia", "time_overlap_dia"};
-        for (int a = 0; a < 5; a++) {
+                                   "d1ham_dia", "d2ham_dia",
+                                   "time_overlap_dia"};
+        for (int a = 0; a < 6; a++) {
           if ((int)hasattr(obj, dia_names[a])) {
             cout << "WARNING in compute_adiabatic(): the model supplies obj."
                  << dia_names[a] << ", which the adiabatic harvest"

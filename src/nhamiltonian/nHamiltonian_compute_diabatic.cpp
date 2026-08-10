@@ -251,8 +251,9 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
       if(!warned_adi_ignored){
         const char* adi_names[] = {"ham_adi", "hvib_adi", "nac_adi",
                                    "time_overlap_adi", "basis_transform",
-                                   "dc1_adi", "d1ham_adi"};
-        for(int a=0;a<7;a++){
+                                   "dc1_adi", "d1ham_adi", "d2ham_adi",
+                                   "gs_kinetic_energy"};
+        for(int a=0;a<9;a++){
           if((int)hasattr(obj, adi_names[a])){
             cout<<"WARNING in compute_diabatic(): the model supplies obj."
                 <<adi_names[a]<<", which the diabatic harvest"
