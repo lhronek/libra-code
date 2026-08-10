@@ -700,6 +700,15 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
       double E_i = hvib.get(old_st, old_st).real();  // initial potential energy
       double E_f = hvib.get(new_st, new_st).real();  // final potential energy  
 
+      // BLLZ (tsh_method 3, rep_lz 4) proposes one step past the gap
+      // minimum, where the gap has reopened - evaluate the thermal filter
+      // at the parabola's extrapolated minimum instead, the same geometry
+      // the proposal probability uses
+      if(prms.tsh_method == 3 && prms.rep_lz == 4 && dyn_var.bllz_vars_status == 1){
+        double gm = dyn_var.bllz_gap_min->get(new_st, traj);
+        if(gm >= 0.0 && E_f > E_i){ E_f = E_i + gm; }
+      }
+
       double prob = boltz_factor(E_f, E_i, prms.Temperature, 1);
 
       double ksi = rnd.uniform(0.0, 1.0);
@@ -734,6 +743,15 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
       }
       double E_i = hvib.get(old_st, old_st).real();  // initial potential energy
       double E_f = hvib.get(new_st, new_st).real();  // final potential energy  
+
+      // BLLZ (tsh_method 3, rep_lz 4) proposes one step past the gap
+      // minimum, where the gap has reopened - evaluate the thermal filter
+      // at the parabola's extrapolated minimum instead, the same geometry
+      // the proposal probability uses
+      if(prms.tsh_method == 3 && prms.rep_lz == 4 && dyn_var.bllz_vars_status == 1){
+        double gm = dyn_var.bllz_gap_min->get(new_st, traj);
+        if(gm >= 0.0 && E_f > E_i){ E_f = E_i + gm; }
+      }
 
       double prob = boltz_factor(E_f, E_i, prms.Temperature, 2);
 
@@ -770,6 +788,15 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
       }
       double E_i = hvib.get(old_st, old_st).real();  // initial potential energy
       double E_f = hvib.get(new_st, new_st).real();  // final potential energy  
+
+      // BLLZ (tsh_method 3, rep_lz 4) proposes one step past the gap
+      // minimum, where the gap has reopened - evaluate the thermal filter
+      // at the parabola's extrapolated minimum instead, the same geometry
+      // the proposal probability uses
+      if(prms.tsh_method == 3 && prms.rep_lz == 4 && dyn_var.bllz_vars_status == 1){
+        double gm = dyn_var.bllz_gap_min->get(new_st, traj);
+        if(gm >= 0.0 && E_f > E_i){ E_f = E_i + gm; }
+      }
 
       double prob = boltz_factor(E_f, E_i, prms.Temperature, 3);
 

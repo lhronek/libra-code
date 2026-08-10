@@ -1079,7 +1079,7 @@ vector<double> hopping_probabilities_lz(nHamiltonian& ham, nHamiltonian& ham_pre
 }
 
 
-vector<double> hopping_probabilities_bllz(MATRIX& E_prev2, MATRIX& E_prev, MATRIX& E_curr, int act_state_indx, double dt){
+vector<double> hopping_probabilities_bllz(MATRIX& E_prev2, MATRIX& E_prev, MATRIX& E_curr, int act_state_indx, double dt, vector<double>& gap_mins){
 /**
   \brief Belyaev-Lebedev hopping probabilities - Eq. (4) of Belyaev, Lasser, Trigila,
   JCP 140, 224108 (2014) - from a three-step adiabatic energy history of one trajectory
@@ -1102,6 +1102,7 @@ vector<double> hopping_probabilities_bllz(MATRIX& E_prev2, MATRIX& E_prev, MATRI
 
   int nstates = E_curr.n_rows;
   vector<double> g(nstates, 0.0);
+  gap_mins.assign(nstates, -1.0);
   int i = act_state_indx;
   int j;
 
@@ -1122,6 +1123,7 @@ vector<double> hopping_probabilities_bllz(MATRIX& E_prev2, MATRIX& E_prev, MATRI
         if(gap_min < 0.0){ gap_min = 0.0; }
 
         double Zdd = denom/(dt*dt);
+        gap_mins[j] = gap_min;
         g[j] = exp(-0.5*M_PI*sqrt(gap_min*gap_min*gap_min/Zdd));
         sum += g[j];
       }// local minimum
@@ -1139,6 +1141,13 @@ vector<double> hopping_probabilities_bllz(MATRIX& E_prev2, MATRIX& E_prev, MATRI
   return g;
 
 }// bllz
+
+vector<double> hopping_probabilities_bllz(MATRIX& E_prev2, MATRIX& E_prev, MATRIX& E_curr, int act_state_indx, double dt){
+
+  vector<double> gap_mins;
+  return hopping_probabilities_bllz(E_prev2, E_prev, E_curr, act_state_indx, dt, gap_mins);
+
+}// bllz, no gap-minimum output
 
 vector<double> hopping_probabilities_zn(nHamiltonian* ham, nHamiltonian* ham_prev, int act_state_indx, int rep, MATRIX& p, const MATRIX& invM){
 /**
@@ -1499,6 +1508,9 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
         // propose nothing while it fills
         if(dyn_var.bllz_vars_status == 0){ dyn_var.allocate_bllz(); }
         int nst_t = ham.children[traj]->nadi;
+        // the acceptance reads the extrapolated minima AFTER the history
+        // has shifted - stale entries must not survive a step
+        for(int st=0; st<nst_t; st++){ dyn_var.bllz_gap_min->set(st, traj, -1.0); }
         vector<double> gg(nst_t, 0.0);
         gg[dyn_var.act_states[traj]] = 1.0;
         if(dyn_var.bllz_hist_size >= 2){
@@ -1511,7 +1523,9 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
             Ep.set(st, 0, dyn_var.bllz_E_prev->get(st, traj));
             Ep2.set(st, 0, dyn_var.bllz_E_prev2->get(st, traj));
           }// for st
-          gg = hopping_probabilities_bllz(Ep2, Ep, Ec, dyn_var.act_states[traj], prms.dt);
+          vector<double> gms(nst_t, -1.0);
+          gg = hopping_probabilities_bllz(Ep2, Ep, Ec, dyn_var.act_states[traj], prms.dt, gms);
+          for(int st=0; st<nst_t; st++){ dyn_var.bllz_gap_min->set(st, traj, gms[st]); }
         }
         g[traj] = gg;
       }

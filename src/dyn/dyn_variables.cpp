@@ -173,6 +173,10 @@ void dyn_variables::allocate_bllz(){
 
     bllz_E_prev = new MATRIX(nadi, ntraj);
     bllz_E_prev2 = new MATRIX(nadi, ntraj);
+    bllz_gap_min = new MATRIX(nadi, ntraj);
+    for(int st = 0; st < nadi; st++){
+      for(int tr = 0; tr < ntraj; tr++){ bllz_gap_min->set(st, tr, -1.0); }
+    }
     bllz_hist_size = 0;
     bllz_vars_status = 1;
 
@@ -435,6 +439,7 @@ dyn_variables::dyn_variables(const dyn_variables& x){
     // Copy content
     *bllz_E_prev = *x.bllz_E_prev;
     *bllz_E_prev2 = *x.bllz_E_prev2;
+    *bllz_gap_min = *x.bllz_gap_min;
     bllz_hist_size = x.bllz_hist_size;
 
   }// if BLLZ vars
@@ -621,6 +626,7 @@ dyn_variables::~dyn_variables(){
   if(bllz_vars_status==1){
     delete bllz_E_prev;
     delete bllz_E_prev2;
+    delete bllz_gap_min;
 
     bllz_vars_status = 0;
   }

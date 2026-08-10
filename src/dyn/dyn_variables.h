@@ -319,6 +319,16 @@ class dyn_variables{
   MATRIX* bllz_E_prev2;
 
   /**
+    MATRIX(nadi, ntraj)
+
+    The extrapolated gap minimum per proposed channel from the last
+    BLLZ proposal step (-1 where no minimum was detected) - the
+    Boltzmann acceptance evaluates upward hops at this gap, the same
+    geometry the proposal probability uses
+  */
+  MATRIX* bllz_gap_min;
+
+  /**
     How many history levels are filled so far (0, 1 or 2)
   */
   int bllz_hist_size;
