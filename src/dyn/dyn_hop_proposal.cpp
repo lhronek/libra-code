@@ -958,6 +958,15 @@ Hamiltonian, which is all-zero at two consecutive steps. Adiabatic-native models
 obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
       throw std::runtime_error("libra C++ error - see the message printed above");
     }
+    // the same silent-zero-detection class for the NAC-switch detector:
+    // NAC matrices are antisymmetric, so an all-zero real part has
+    // max_elt exactly zero
+    if(rep==2 && nac_adi.max_elt()==0.0 && nac_adi_prev.max_elt()==0.0){
+      cout<<"Error in hopping_probabilities_lz(): rep_lz = 2 detects sign switches of the REAL \
+part of nac_adi, which is all-zero at two consecutive steps. NBRA models must supply \
+obj.nac_adi with the couplings in the real part (obj.nac_ci is not an ingested attribute) \n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
+    }
 
     // Off-diagonal elements
     for(j=0;j<nstates;j++){
