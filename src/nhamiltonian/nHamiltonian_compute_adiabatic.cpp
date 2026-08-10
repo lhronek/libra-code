@@ -565,6 +565,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
 
     has_attr = 0;
     has_attr = (int)hasattr(obj, "nac_adi");
+    nac_adi_supplied = 0;
     if (has_attr) {
 
       check_cmatrix(obj, "nac_adi", nadi, nadi);
@@ -578,11 +579,13 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
         PyErr_Print();
         throw;
       }
+      // an all-zero supply is the ecosystem's placeholder convention - not data
+      nac_adi_supplied = (abs(nac_adi->max_elt()) != 0.0);
     }
 
     has_attr = 0;
     has_attr = (int)hasattr(obj, "hvib_adi");
-    hvib_adi_supplied = has_attr;
+    hvib_adi_supplied = 0;
     if (has_attr) {
 
       check_cmatrix(obj, "hvib_adi", nadi, nadi);
@@ -596,6 +599,8 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
         PyErr_Print();
         throw;
       }
+      // an all-zero supply is the ecosystem's placeholder convention - not data
+      hvib_adi_supplied = (abs(hvib_adi->max_elt()) != 0.0);
     }
 
     has_attr = 0;
@@ -659,7 +664,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
 
     has_attr = 0;
     has_attr = (int)hasattr(obj, "time_overlap_adi");
-    time_overlap_adi_supplied = has_attr;
+    time_overlap_adi_supplied = 0;
     if (has_attr) {
 
       check_cmatrix(obj, "time_overlap_adi", nadi, nadi);
@@ -673,6 +678,8 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
         PyErr_Print();
         throw;
       }
+      // an all-zero supply is the ecosystem's placeholder convention - not data
+      time_overlap_adi_supplied = (abs(time_overlap_adi->max_elt()) != 0.0);
     }
 
     has_attr = 0;

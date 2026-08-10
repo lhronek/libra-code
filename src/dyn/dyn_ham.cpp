@@ -287,6 +287,17 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
       MATRIX nac_im(nadi, nadi);
 
       for (int traj = 0; traj < ntraj; traj++) {
+        // flag-only, no compare: the HST/NPI derivatives legitimately
+        // differ from supplied NACs at O(dt), so no consistent-redundancy
+        // case exists - the combination itself is the contradiction
+        if (ham.children[traj]->nac_adi_supplied) {
+          cout << "Error in the NAC update: the model supplies obj.nac_adi, but "
+                  "nac_update_method = 2 replaces it with time-overlap (HST/NPI) "
+                  "derivatives - the supplied couplings would be discarded. Use "
+                  "nac_update_method = 0 (consume the supplied NACs), or stop "
+                  "supplying nac_adi\n";
+          throw std::runtime_error("libra C++ error - see the message printed above");
+        }
         st = ham.children[traj]->get_time_overlap_adi();
 
         if (prms.nac_algo == 0) {

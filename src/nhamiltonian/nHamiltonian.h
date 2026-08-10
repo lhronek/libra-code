@@ -181,6 +181,9 @@ public:
   ///< whether the model object supplied hvib_adi at the last ingestion -
   ///< hvib_update_method 1 must not silently overwrite it
   int hvib_adi_supplied;
+  int hvib_dia_supplied;
+  int nac_adi_supplied;
+  int nac_dia_supplied;
 
 
   vector<CMATRIX*> d1ham_adi; ///< first order derivatives of the Hamiltonian matrix in the adiabatic basis (diagonal)

@@ -215,6 +215,9 @@ void nHamiltonian::init_mem_status(int ndia_, int nadi_, int nnucl_) {
   time_overlap_adi_mem_status = 0;
   time_overlap_adi_supplied = 0;
   hvib_adi_supplied = 0;
+  hvib_dia_supplied = 0;
+  nac_adi_supplied = 0;
+  nac_dia_supplied = 0;
   time_overlap_dia = nullptr;
   time_overlap_dia_mem_status = 0;
 

@@ -53,6 +53,11 @@ void nHamiltonian::compute_nac_dia(MATRIX &p, const MATRIX &invM) {
     throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
+  // a model-supplied (non-placeholder) nac_dia must not be silently
+  // overwritten by a disagreeing dc1.v recomputation
+  CMATRIX nac_dia_prior(ndia, ndia);
+  if (nac_dia_supplied) { nac_dia_prior = *nac_dia; }
+
   nac_dia->set(-1, std::complex<double>(0.0, 0.0));
 
   for (int n = 0; n < nnucl; n++) {
@@ -74,6 +79,15 @@ void nHamiltonian::compute_nac_dia(MATRIX &p, const MATRIX &invM) {
     } // for i
 
   } // for n
+
+  if (nac_dia_supplied && abs((*nac_dia - nac_dia_prior).max_elt()) > 1e-8) {
+    cout << "Error in compute_nac_dia(): the model supplies obj.nac_dia, but "
+            "nac_update_method = 1 recomputes it as dc1_dia . v and the two "
+            "disagree - the supplied couplings would be overwritten. Use "
+            "nac_update_method = 0 (consume the supplied NACs), or supply a "
+            "consistent dc1_dia\n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 }
 
 void nHamiltonian::compute_nac_dia(MATRIX &p, const MATRIX &invM,
@@ -223,6 +237,11 @@ void nHamiltonian::compute_nac_adi(MATRIX &p, const MATRIX &invM) {
     throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
+  // a model-supplied (non-placeholder) nac_adi must not be silently
+  // overwritten by a disagreeing dc1.v recomputation
+  CMATRIX nac_adi_prior(nadi, nadi);
+  if (nac_adi_supplied) { nac_adi_prior = *nac_adi; }
+
   nac_adi->set(-1, std::complex<double>(0.0, 0.0));
 
   for (int n = 0; n < nnucl; n++) {
@@ -244,6 +263,15 @@ void nHamiltonian::compute_nac_adi(MATRIX &p, const MATRIX &invM) {
     } // for i
 
   } // for n
+
+  if (nac_adi_supplied && abs((*nac_adi - nac_adi_prior).max_elt()) > 1e-8) {
+    cout << "Error in compute_nac_adi(): the model supplies obj.nac_adi, but "
+            "nac_update_method = 1 recomputes it as dc1_adi . v and the two "
+            "disagree - the supplied couplings would be overwritten. Use "
+            "nac_update_method = 0 (consume the supplied NACs), or supply a "
+            "consistent dc1_adi\n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 }
 
 void nHamiltonian::compute_nac_adi(MATRIX &p, const MATRIX &invM,
@@ -377,6 +405,27 @@ void nHamiltonian::compute_hvib_dia() {
     throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
+  // a model that supplies its own vibronic Hamiltonian must not have it
+  // silently overwritten by a DISAGREEING rebuild (absent nac_dia strips
+  // the couplings and freezes the electronic dynamics)
+  if (hvib_dia_supplied) {
+    double max_diff = 0.0;
+    for (int i = 0; i < ndia; i++) {
+      for (int j = 0; j < ndia; j++) {
+        double d = abs(ham_dia->get(i, j) - ihbar * nac_dia->get(i, j)
+                       - hvib_dia->get(i, j));
+        if (d > max_diff) { max_diff = d; }
+      } // for j
+    } // for i
+    if (max_diff > 1e-8) {
+      cout << "Error in compute_hvib_dia(): the model supplies obj.hvib_dia, but "
+              "hvib_update_method = 1 rebuilds it as ham_dia - i*nac_dia and the two "
+              "disagree - the supplied vibronic Hamiltonian would be overwritten "
+              "(an absent nac_dia strips the couplings). Use hvib_update_method = 0 "
+              "(consume the supplied hvib), or supply a consistent nac_dia\n";
+      throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+  }
   for (int i = 0; i < ndia; i++) {
     for (int j = 0; j < ndia; j++) {
       hvib_dia->set(i, j, ham_dia->get(i, j) - ihbar * nac_dia->get(i, j));

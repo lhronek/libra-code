@@ -169,20 +169,26 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
 
     has_attr=0;
     has_attr = (int)hasattr(obj,"nac_dia");        
+    nac_dia_supplied = 0;
     if(has_attr){    
 
       check_cmatrix(obj, "nac_dia", ndia, ndia);
       if(nac_dia_mem_status==0){ init_nac_dia(); }
       *nac_dia = extract<CMATRIX>(obj.attr("nac_dia"));    
+      // an all-zero supply is the ecosystem's placeholder convention - not data
+      nac_dia_supplied = (abs(nac_dia->max_elt()) != 0.0);
     }
 
     has_attr=0;
     has_attr = (int)hasattr(obj,"hvib_dia");        
+    hvib_dia_supplied = 0;
     if(has_attr){    
 
       check_cmatrix(obj, "hvib_dia", ndia, ndia);
       if(hvib_dia_mem_status==0){ init_hvib_dia(); }
       *hvib_dia = extract<CMATRIX>(obj.attr("hvib_dia"));    
+      // an all-zero supply is the ecosystem's placeholder convention - not data
+      hvib_dia_supplied = (abs(hvib_dia->max_elt()) != 0.0);
     }
     
     has_attr=0;
