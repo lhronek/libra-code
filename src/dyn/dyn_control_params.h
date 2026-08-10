@@ -111,6 +111,17 @@ class dyn_control_params{
   int rep_lz;
 
 
+  /**
+    Which states may receive LZ/ZN/BLLZ proposals from the active state:
+      - 0: energy-adjacent only - a pair is eligible iff no third state's
+           energy lies strictly inside its interval at the evaluation step
+           (a pairwise minimum with intervening states is not a two-state
+           passage; equals lz.py's target_space 0 on energy-sorted states)
+      - 1: all pairs with detected crossings [ default ]
+  */
+  int lz_target_space;
+
+
   /** 
     In which representation to compute forces. To clarify - the forces
     in both representations shall be equivalent, so this flag actually

@@ -42,6 +42,7 @@ dyn_control_params::dyn_control_params(){
   ham_transform_method = 1;
   rep_sh = 1;
   rep_lz = 0;
+  lz_target_space = 1;
   rep_force = 1;
   force_method = 1;
   sqc_gamma = 0.0;
@@ -165,6 +166,7 @@ dyn_control_params::dyn_control_params(const dyn_control_params& x){
   ham_transform_method = x.ham_transform_method;
   rep_sh = x.rep_sh;
   rep_lz = x.rep_lz;
+  lz_target_space = x.lz_target_space;
   rep_force = x.rep_force;
   force_method = x.force_method;
   sqc_gamma = x.sqc_gamma;
@@ -305,6 +307,12 @@ dyn_control_params::~dyn_control_params() {
 
 void dyn_control_params::sanity_check(){
 
+  if(!(lz_target_space==0 || lz_target_space==1)){
+    std::cout<<"Error in dyn_control_params::sanity_check: lz_target_space = "
+        <<lz_target_space<<" is not allowed (0 - energy-adjacent only, 1 - all pairs)\n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
   ///=================== Options for state tracking ======================
   if(state_tracking_algo==-1 ||
      state_tracking_algo==0 || state_tracking_algo==1 ||
@@ -435,6 +443,7 @@ void dyn_control_params::set_parameters(bp::dict params){
     else if(key=="ham_transform_method") { ham_transform_method = bp::extract<int>(params.values()[i]);   }
     else if(key=="rep_sh") { rep_sh = bp::extract<int>(params.values()[i]);  }
     else if(key=="rep_lz") { rep_lz = bp::extract<int>(params.values()[i]);  }
+    else if(key=="lz_target_space") { lz_target_space = bp::extract<int>(params.values()[i]);  }
     else if(key=="rep_force") { rep_force = bp::extract<int>(params.values()[i]);  }
     else if(key=="force_method") { force_method = bp::extract<int>(params.values()[i]);  }
     else if(key=="sqc_gamma") { sqc_gamma = bp::extract<double>(params.values()[i]);  }

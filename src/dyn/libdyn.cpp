@@ -67,6 +67,7 @@ void export_dyn_control_params_objects(){
       .def_readwrite("ham_transform_method", &dyn_control_params::ham_transform_method)    
       .def_readwrite("rep_sh", &dyn_control_params::rep_sh)
       .def_readwrite("rep_lz", &dyn_control_params::rep_lz)
+      .def_readwrite("lz_target_space", &dyn_control_params::lz_target_space)
       .def_readwrite("rep_force", &dyn_control_params::rep_force)
       .def_readwrite("force_method", &dyn_control_params::force_method)
       .def_readwrite("sqc_gamma", &dyn_control_params::sqc_gamma)

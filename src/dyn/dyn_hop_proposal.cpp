@@ -1163,6 +1163,34 @@ vector<double> hopping_probabilities_lz(nHamiltonian& ham, nHamiltonian& ham_pre
 }
 
 
+static void filter_lz_target_space(vector<double>& g, vector<double>& gap_mins,
+                                   const vector<double>& E, int i){
+  /**
+    Adjacent-only proposals (lz_target_space = 0): zero every channel whose
+    pair holds a third state's energy strictly inside its interval - such a
+    pairwise minimum is not a two-state passage; the intervening states
+    mediate. Equals lz.py's target_space 0 on energy-sorted states and stays
+    correct when the instantaneous order deviates from the index order.
+    The stay probability is recomputed with the producers' convention.
+  */
+  int n = (int)g.size();
+  double sum = 0.0;
+  for(int j=0; j<n; j++){
+    if(j==i){ continue; }
+    if(g[j] > 0.0){
+      double lo = (E[i] < E[j]) ? E[i] : E[j];
+      double hi = (E[i] < E[j]) ? E[j] : E[i];
+      for(int k=0; k<n; k++){
+        if(k!=i && k!=j && E[k] > lo && E[k] < hi){
+          g[j] = 0.0;  gap_mins[j] = -1.0;  break;
+        }
+      }// for k
+    }
+    sum += g[j];
+  }// for j
+  g[i] = 1.0 - sum;
+}// filter_lz_target_space
+
 vector<double> hopping_probabilities_bllz(MATRIX& E_prev2, MATRIX& E_prev, MATRIX& E_curr, int act_state_indx, double dt, vector<double>& gap_mins){
 /**
   \brief Belyaev-Lebedev hopping probabilities - Eq. (4) of Belyaev, Lasser, Trigila,
@@ -1634,6 +1662,12 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
           }// for st
           vector<double> gms(nst_t, -1.0);
           gg = hopping_probabilities_bllz(Ep2, Ep, Ec, dyn_var.act_states[traj], prms.dt, gms);
+          if(prms.lz_target_space == 0){
+            // adjacency at the bracket middle - where the minima live
+            vector<double> Ecol(nst_t, 0.0);
+            for(int st=0; st<nst_t; st++){ Ecol[st] = Ep.get(st, 0); }
+            filter_lz_target_space(gg, gms, Ecol, dyn_var.act_states[traj]);
+          }
           for(int st=0; st<nst_t; st++){ dyn_var.lz_gap_min->set(st, traj, gms[st]); }
         }
         g[traj] = gg;
@@ -1660,6 +1694,26 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
         }
         g[traj] = hopping_probabilities_lz(ham.children[traj], ham_prev.children[traj], dyn_var.act_states[traj], 
                   prms.rep_lz, p_traj, *dyn_var.iM, prms.dt, gms);
+        if(prms.lz_target_space == 0){
+          // energies of the proposal's own representation: diabatic for
+          // rep 0/3, adiabatic otherwise; rep 5's bracket middle is the
+          // previous step
+          int nfil = (int)g[traj].size();
+          vector<double> Ecol(nfil, 0.0);
+          if(prms.rep_lz == 0 || prms.rep_lz == 3){
+            CMATRIX Hdia_t(ham.children[traj]->get_ham_dia());
+            for(int st=0; st<nfil; st++){ Ecol[st] = Hdia_t.get(st, st).real(); }
+          }
+          else if(prms.rep_lz == 5){
+            CMATRIX Hadi_p(ham_prev.children[traj]->get_ham_adi());
+            for(int st=0; st<nfil; st++){ Ecol[st] = Hadi_p.get(st, st).real(); }
+          }
+          else{
+            CMATRIX Hadi_t(ham.children[traj]->get_ham_adi());
+            for(int st=0; st<nfil; st++){ Ecol[st] = Hadi_t.get(st, st).real(); }
+          }
+          filter_lz_target_space(g[traj], gms, Ecol, dyn_var.act_states[traj]);
+        }
         for(int st=0; st<nst_t; st++){ dyn_var.lz_gap_min->set(st, traj, gms[st]); }
       }
 
@@ -1672,6 +1726,13 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
       vector<double> gms(nst_t, -1.0);
       g[traj] = hopping_probabilities_zn(ham.children[traj], ham_prev.children[traj], dyn_var.act_states[traj],
                 prms.rep_lz, p_traj, *dyn_var.iM, gms);
+      if(prms.lz_target_space == 0){
+        int nfil = (int)g[traj].size();
+        vector<double> Ecol(nfil, 0.0);
+        CMATRIX Hadi_t(ham.children[traj]->get_ham_adi());
+        for(int st=0; st<nfil; st++){ Ecol[st] = Hadi_t.get(st, st).real(); }
+        filter_lz_target_space(g[traj], gms, Ecol, dyn_var.act_states[traj]);
+      }
       for(int st=0; st<nst_t; st++){ dyn_var.lz_gap_min->set(st, traj, gms[st]); }
 
     }
