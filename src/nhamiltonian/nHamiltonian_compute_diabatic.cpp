@@ -244,6 +244,26 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
       *time_overlap_dia = extract<CMATRIX>(obj.attr("time_overlap_dia"));    
     }
 
+    // attributes of the OTHER representation are silently dropped by this
+    // harvest - say so once
+    {
+      static bool warned_adi_ignored = false;
+      if(!warned_adi_ignored){
+        const char* adi_names[] = {"ham_adi", "hvib_adi", "nac_adi",
+                                   "time_overlap_adi", "basis_transform",
+                                   "dc1_adi", "d1ham_adi"};
+        for(int a=0;a<7;a++){
+          if((int)hasattr(obj, adi_names[a])){
+            cout<<"WARNING in compute_diabatic(): the model supplies obj."
+                <<adi_names[a]<<", which the diabatic harvest"
+                <<" (ham_update_method = 1) IGNORES - adiabatic attributes are"
+                <<" ingested only under ham_update_method = 2\n";
+            warned_adi_ignored = true;
+          }
+        }
+      }
+    }
+
 
   //exit(0); 
     
