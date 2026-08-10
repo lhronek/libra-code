@@ -17,6 +17,7 @@
 
 #if defined(USING_PCH)
 #include "../pch.h"
+#include <exception>
 #include <stdexcept>
 #else
 #include <omp.h>
@@ -750,13 +751,21 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
 #else
     int nthreads = 1;
 #endif
+    // exceptions (including python errors from the model callback) cannot
+    // leave an OMP-outlined region - capture and rethrow outside
+    std::exception_ptr omp_eptr = nullptr;
 #pragma omp parallel num_threads(nthreads)
     {
 #pragma omp for
       for (auto i = 0u; i < children.size(); i++) {
-        children[i]->compute_adiabatic(py_funct, q, params, lvl);
+        try { children[i]->compute_adiabatic(py_funct, q, params, lvl); }
+        catch (...) {
+          #pragma omp critical
+          { if (!omp_eptr) { omp_eptr = std::current_exception(); } }
+        }
       }
     } // pragma
+    if (omp_eptr) { std::rethrow_exception(omp_eptr); }
 
   }
 

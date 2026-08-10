@@ -14,6 +14,7 @@
 */
 
 #include "../util/libutil.h"
+#include <exception>
 #include <stdexcept>
 #include "../converters/libconverters.h"
 #include "dyn_variables.h"
@@ -169,9 +170,13 @@ void dyn_variables::update_amplitudes(dyn_control_params& dyn_params){
 */
   // Deterministic per-trajectory transforms - parallel-safe (each iteration
   // reads/writes only its own column); results identical for any thread count
+  // exceptions cannot leave an OMP-outlined region (even serialized) -
+  // capture and rethrow outside so the guards stay translatable
+  std::exception_ptr omp_eptr = nullptr;
   #pragma omp parallel for num_threads(dyn_params.omp_num_threads) \
       if (dyn_params.omp_num_threads > 1)
   for(int traj=0; traj<ntraj; traj++){
+    try {
 
     CMATRIX cd(ndia, 1);
     CMATRIX ca(nadi, 1);
@@ -190,7 +195,12 @@ void dyn_variables::update_amplitudes(dyn_control_params& dyn_params){
       for(int i=0;i<ndia;i++){ ampl_dia->set(i, traj, cd.get(i,0) ); }
     }
 
+    } catch (...) {
+      #pragma omp critical
+      { if (!omp_eptr) { omp_eptr = std::current_exception(); } }
+    }
   }// for traj
+  if (omp_eptr) { std::rethrow_exception(omp_eptr); }
 
 }
 
@@ -237,9 +247,13 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params){
   // matrix is identity S = I
   // Deterministic per-trajectory updates - parallel-safe (each iteration
   // writes only its own dm slots); results identical for any thread count
+  // exceptions cannot leave an OMP-outlined region (even serialized) -
+  // capture and rethrow outside so the guards stay translatable
+  std::exception_ptr omp_eptr = nullptr;
   #pragma omp parallel for num_threads(dyn_params.omp_num_threads) \
       if (dyn_params.omp_num_threads > 1)
   for(int traj=0; traj<ntraj; traj++){
+    try {
 
     CMATRIX cd(ndia, 1);
     CMATRIX ca(nadi, 1);
@@ -270,7 +284,12 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params){
       }
     }
 
+    } catch (...) {
+      #pragma omp critical
+      { if (!omp_eptr) { omp_eptr = std::current_exception(); } }
+    }
   }// for traj
+  if (omp_eptr) { std::rethrow_exception(omp_eptr); }
 
 }
 

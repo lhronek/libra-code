@@ -15,6 +15,7 @@
 */
 
 #include "dyn_ham.h"
+#include <exception>
 #include <stdexcept>
 #include "dyn_projectors.h"
 
@@ -419,9 +420,13 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
   int nchildren = Ham.children.size();
   // Deterministic per-trajectory projector updates - parallel-safe (each
   // iteration writes only proj_adi[itraj]); identical for any thread count
+  // exceptions cannot leave an OMP-outlined region (even a serialized
+  // one) - capture and rethrow outside so the guards stay translatable
+  std::exception_ptr omp_eptr = nullptr;
   #pragma omp parallel for num_threads(prms.omp_num_threads) \
       if (prms.omp_num_threads > 1)
   for (int itraj = 0; itraj < ntraj; itraj++) {
+    try {
     vector<int> traj_id(1, 0);
     CMATRIX f_prev(dyn_var.nadi, dyn_var.ndof);
     CMATRIX f_curr(dyn_var.nadi, dyn_var.ndof);
@@ -532,8 +537,13 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
     }// 6 adaptive SVD-based LD
 
     *dyn_var.proj_adi[itraj] = T_new;
+    } catch (...) {
+      #pragma omp critical
+      { if (!omp_eptr) { omp_eptr = std::current_exception(); } }
+    }
 
   } // for ntraj
+  if (omp_eptr) { std::rethrow_exception(omp_eptr); }
 
 } // reproject_basis
 

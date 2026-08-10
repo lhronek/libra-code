@@ -16,6 +16,7 @@
 */
 
 #include "heom.h"
+#include <exception>
 #include <stdexcept>
 #include "../../util/libutil.h"
 #include "../../math_linalg/liblinalg.h"
@@ -559,14 +560,23 @@ CMATRIX compute_heom_derivatives(CMATRIX& RHO, bp::dict prms){
 
     int nn_nonzero = adm_list.size();
 
+    // exceptions cannot leave an OMP-outlined region - capture and
+    // rethrow outside so the guards stay translatable
+    std::exception_ptr omp_eptr = nullptr;
     #pragma omp parallel num_threads(n_threads)
     {
         #pragma omp for
         for(int n1=0; n1<nn_nonzero; n1++){
+            try {
             drho_unpacked[adm_list[n1]] = compute_deriv_n(adm_list[n1], rho_unpacked, Ham, el_phon_couplings, eta, temperature, 
                 gamma_matsubara, c_matsubara, truncation_scheme, truncation_prefactor, do_scale, nonzero, nvec, nvec_plus, nvec_minus);
+            } catch (...) {
+              #pragma omp critical
+              { if (!omp_eptr) { omp_eptr = std::current_exception(); } }
+            }
         }
     }
+    if (omp_eptr) { std::rethrow_exception(omp_eptr); }
 
 
     pack_mtx(drho_unpacked, dRHO);

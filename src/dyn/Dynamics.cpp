@@ -24,6 +24,7 @@
 */
 
 #include "../calculators/NPI.h"
+#include <exception>
 #include <stdexcept>
 #include <memory>
 #include "Dynamics.h"
@@ -978,9 +979,13 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
   // cleanly and the results are identical for any thread count. The
   // density-matrix representations (rep >= 2) stay serial - their per-
   // iteration Liouvillian workspaces would multiply a large memory footprint.
+  // exceptions cannot leave an OMP-outlined region (even a serialized
+  // one) - capture and rethrow outside so the guards stay translatable
+  std::exception_ptr omp_eptr = nullptr;
   #pragma omp parallel for num_threads(prms.omp_num_threads) \
       if (prms.omp_num_threads > 1 && rep <= 1)
   for (int itraj = 0; itraj < ntraj; itraj++) {
+    try {
 
     // rep >= 2 propagates the density matrices - Coeff is the 1x1
     // dummy there, so the amplitude round-trip stays in the
@@ -1338,7 +1343,12 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
       }
     }
 
+    } catch (...) {
+      #pragma omp critical
+      { if (!omp_eptr) { omp_eptr = std::current_exception(); } }
+    }
   } // for itraj - all trajectories
+  if (omp_eptr) { std::rethrow_exception(omp_eptr); }
 
   } // NBRA fast path vs per-trajectory loop
 }
