@@ -1128,9 +1128,13 @@ vector<double> hopping_probabilities_bllz(MATRIX& E_prev2, MATRIX& E_prev, MATRI
   \param[in] dt the integration timestep (a.u.)
 
   A pair's gap history Z(t-2dt) > Z(t-dt) < Z(t) marks a local minimum; the Lagrange
-  parabola through the three gaps gives the extrapolated minimum and the second time
-  derivative, and P = exp( -(pi/2) sqrt(Z_min^3 / Z_dd) ). A negative extrapolated
-  minimum is clamped to zero - the trivial-crossing limit, P = 1. Detailed balance is
+  parabola through the three SQUARED gaps gives the extrapolated minimum and the
+  curvature - Z^2 of a locally-linear passage is exactly quadratic, so the vertex is
+  sampling-exact where a parabola on Z lands at the middle-sample scale and
+  overestimates the minimum as dt grows. In the regular form
+  Z_min^3/Z_dd = Q_min^2/a (a = half the Q-parabola curvature):
+  P = exp( -(pi/2) Q_min / sqrt(a) ), with a negative vertex clamped to zero - the
+  trivial-crossing limit, P = 1. Detailed balance is
   NOT applied here: the hop acceptance machinery owns it.
 
   Returns:
@@ -1151,17 +1155,23 @@ vector<double> hopping_probabilities_bllz(MATRIX& E_prev2, MATRIX& E_prev, MATRI
       double z2 = fabs(E_curr.get(i,0) - E_curr.get(j,0));
 
       if(z0 > z1 && z1 < z2){
+        // fit the SQUARED gap: Z^2 of a locally-linear passage is exactly
+        // quadratic in time, so the vertex recovers the true minimum at any
+        // sampling; a parabola on Z itself sits at the middle-sample scale
+        // in the V-shaped wings and overestimates the minimum with dt
+        double q0 = z0*z0, q1 = z1*z1, q2 = z2*z2;
         // the strict minimum makes denom > 0 and keeps |t_min| < dt/2
-        double denom = z0 - 2.0*z1 + z2;
-        double t_min = 0.5*(z0 - z2)*dt/denom;
-        double gap_min = 0.5*( t_min*(t_min - dt)*z0
-                       - 2.0*(t_min + dt)*(t_min - dt)*z1
-                       + t_min*(t_min + dt)*z2 )/(dt*dt);
-        if(gap_min < 0.0){ gap_min = 0.0; }
+        double denom = q0 - 2.0*q1 + q2;
+        double t_min = 0.5*(q0 - q2)*dt/denom;
+        double q_min = 0.5*( t_min*(t_min - dt)*q0
+                      - 2.0*(t_min + dt)*(t_min - dt)*q1
+                      + t_min*(t_min + dt)*q2 )/(dt*dt);
+        if(q_min < 0.0){ q_min = 0.0; }  // conical/trivial crossing
 
-        double Zdd = denom/(dt*dt);
-        gap_mins[j] = gap_min;
-        g[j] = exp(-0.5*M_PI*sqrt(gap_min*gap_min*gap_min/Zdd));
+        // Z_min^3/Z_dd = Q_min^2/a, a = Qdd/2 - regular at Q_min -> 0
+        double a = 0.5*denom/(dt*dt);
+        gap_mins[j] = sqrt(q_min);
+        g[j] = exp(-0.5*M_PI*q_min/sqrt(a));
         sum += g[j];
       }// local minimum
     }// j!=i
