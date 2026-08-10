@@ -265,6 +265,42 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
       }
     }
 
+    // any attribute matching NO harvest name in EITHER representation is
+    // silently dropped - report each unknown name once per process
+    {
+      static bool warned_unknown = false;
+      if (!warned_unknown && (int)hasattr(obj, "__dict__")) {
+        // the union of both harvests; overlap_adi is the deliberate
+        // python-side auxiliary channel (drivers/certifiers read it
+        // from the model object directly - never ingested)
+        const char* known[] = {"ham_dia", "ovlp_dia", "nac_dia",
+            "hvib_dia", "dc1_dia", "d1ham_dia", "d2ham_dia",
+            "time_overlap_dia", "ham_adi", "nac_adi", "hvib_adi",
+            "time_overlap_adi", "basis_transform", "dc1_adi",
+            "d1ham_adi", "d2ham_adi", "gs_kinetic_energy",
+            "overlap_adi"};
+        boost::python::dict dct =
+            extract<boost::python::dict>(obj.attr("__dict__"));
+        boost::python::list keys = dct.keys();
+        for (int a = 0; a < len(keys); a++) {
+          std::string name = extract<std::string>(keys[a]);
+          if (name.rfind("_", 0) == 0) { continue; }
+          bool match = false;
+          for (int b = 0; b < 18; b++) {
+            if (name == known[b]) { match = true; break; }
+          }
+          if (!match) {
+            cout << "WARNING in compute_diabatic(): the model supplies obj."
+                 << name << ", which matches NO ingested attribute name in"
+                 << " either representation - it is silently dropped (check"
+                 << " the spelling against the harvest lists in"
+                 << " nHamiltonian_compute_adiabatic/diabatic.cpp)\n";
+            warned_unknown = true;
+          }
+        }
+      }
+    }
+
 
   //exit(0); 
     
