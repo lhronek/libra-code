@@ -129,6 +129,11 @@ void export_libint2_wrappers_objects(){
    const std::vector<libint2::Shell>& shells_2, int number_of_threads) = &compute_emultipole3;
 
   def("compute_emultipole3", expt_compute_emultipole3_v1);
+  std::vector<MATRIX> (*expt_compute_emultipole3_v2)
+  (const std::vector<libint2::Shell>& shells_1,
+   const std::vector<libint2::Shell>& shells_2, int number_of_threads,
+   const VECTOR& origin) = &compute_emultipole3;
+  def("compute_emultipole3", expt_compute_emultipole3_v2);
 
 /*
   MATRIX (*expt_compute_overlaps_serial_v1)

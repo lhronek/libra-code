@@ -718,7 +718,8 @@ const std::vector<libint2::Shell>& shells_2) {
 
 std::vector<MATRIX> compute_1body_ints_parallel_emultipole3(
     const std::vector<libint2::Shell> &shells_1,
-    const std::vector<libint2::Shell> &shells_2, int nthreads) {
+    const std::vector<libint2::Shell> &shells_2, int nthreads,
+    const VECTOR &origin) {
   // using libint2::nthreads;
 
   const auto n_1 = nbasis(shells_1);
@@ -757,6 +758,9 @@ std::vector<MATRIX> compute_1body_ints_parallel_emultipole3(
   // shown below)
   engines[0] =
       libint2::Engine(libint2::Operator::emultipole3, max_n, max_lval, 0);
+  // the multipole reference point; set BEFORE the pool is cloned from
+  // engines[0] so every copy inherits it
+  engines[0].set_params(std::array<double, 3>{origin.x, origin.y, origin.z});
   // This part is for other operators, I'll keep it but not necessary.
   //  engines[0].set_params(oparams);
   // Other engines
@@ -855,6 +859,15 @@ compute_emultipole3(const std::vector<libint2::Shell> &shells_1,
                     const std::vector<libint2::Shell> &shells_2,
                     int number_of_threads) {
 
+  VECTOR origin(0.0, 0.0, 0.0);
+  return compute_emultipole3(shells_1, shells_2, number_of_threads, origin);
+}
+
+std::vector<MATRIX>
+compute_emultipole3(const std::vector<libint2::Shell> &shells_1,
+                    const std::vector<libint2::Shell> &shells_2,
+                    int number_of_threads, const VECTOR &origin) {
+
   // int nthreads;
 
   //  using libint2::Operator;
@@ -883,7 +896,8 @@ compute_emultipole3(const std::vector<libint2::Shell> &shells_1,
   libint2::initialize();
   // Compute the AO overlap matrix
   std::vector<MATRIX> S =
-      compute_1body_ints_parallel_emultipole3(shells_1, shells_2, nthreads);
+      compute_1body_ints_parallel_emultipole3(shells_1, shells_2, nthreads,
+                                              origin);
   // auto S = compute_1body_ints_parallel_emultipole3(shells_1, shells_2,
   // nthreads); std::cout << "\n\tFinished computing overlap integral\n";
   //  End of AO matrix calculation

@@ -509,6 +509,9 @@ def run_cp2k_libint_step2(params):
         'cp2k_data_dir': '',
         'omp_num_threads': 1,
         'use_emultipole': False,
+        # the multipole reference point (a.u.); moments about any other
+        # origin are exact binomial combinations of these plus S
+        'emultipole_origin': [0.0, 0.0, 0.0],
         'emultipole_components': [
             'S',
             'x',
@@ -543,6 +546,12 @@ def run_cp2k_libint_step2(params):
 
     # number of processors
     nprocs = params['nprocs']
+
+    # the multipole reference point for every emultipole call of this run
+    _eo = params['emultipole_origin']
+    emultipole_origin = VECTOR(float(_eo[0]), float(_eo[1]), float(_eo[2]))
+    if params['use_emultipole'] and (_eo[0] != 0.0 or _eo[1] != 0.0 or _eo[2] != 0.0):
+        print(F'emultipole reference point: {_eo}')
 
     # CP2K executable
     cp2k_exe = params['cp2k_exe']
@@ -727,7 +736,7 @@ def run_cp2k_libint_step2(params):
             print('Computing atomic orbital overlap matrix...')
             t1 = time.time()
             if params['use_emultipole']:
-                AO_c_all = compute_emultipole3(shell_1, shell_1, nprocs)
+                AO_c_all = compute_emultipole3(shell_1, shell_1, nprocs, emultipole_origin)
                 emultipole_index, emultipole_labels = component_to_index(params['emultipole_components'])
             else:
                 AO_S = compute_overlaps(shell_1, shell_1, nprocs)
@@ -745,7 +754,7 @@ def run_cp2k_libint_step2(params):
                     shell_1p, l_vals = molden_methods.molden_file_to_libint_shell(
                         molden_filename, is_spherical, is_periodic, cell, translational_vector)
                     if params['use_emultipole']:
-                        AO_c_all_p = compute_emultipole3(shell_1, shell_1p, nprocs)
+                        AO_c_all_p = compute_emultipole3(shell_1, shell_1p, nprocs, emultipole_origin)
                         for counter1 in range(20):
                             AO_c_all[counter1] += AO_c_all_p[counter1]
                     else:
@@ -943,8 +952,8 @@ def run_cp2k_libint_step2(params):
             print('Computing atomic orbital overlap matrix...')
             t1 = time.time()
             if params['use_emultipole']:
-                AO_c_all = compute_emultipole3(shell_2, shell_2, nprocs)
-                AO_t_all = compute_emultipole3(shell_1, shell_2, nprocs)
+                AO_c_all = compute_emultipole3(shell_2, shell_2, nprocs, emultipole_origin)
+                AO_t_all = compute_emultipole3(shell_1, shell_2, nprocs, emultipole_origin)
                 emultipole_index, emultipole_labels = component_to_index(params['emultipole_components'])
             else:
                 AO_S = compute_overlaps(shell_2, shell_2, nprocs)
@@ -963,8 +972,8 @@ def run_cp2k_libint_step2(params):
                     shell_2p, l_vals = molden_methods.molden_file_to_libint_shell(
                         molden_filename, is_spherical, is_periodic, cell, translational_vector)
                     if params['use_emultipole']:
-                        AO_c_all_p = compute_emultipole3(shell_2, shell_2p, nprocs)
-                        AO_t_all_p = compute_emultipole3(shell_1, shell_2p, nprocs)
+                        AO_c_all_p = compute_emultipole3(shell_2, shell_2p, nprocs, emultipole_origin)
+                        AO_t_all_p = compute_emultipole3(shell_1, shell_2p, nprocs, emultipole_origin)
                         for counter1 in range(20):
                             AO_c_all[counter1] += AO_c_all_p[counter1]
                             AO_t_all[counter1] += AO_t_all_p[counter1]
