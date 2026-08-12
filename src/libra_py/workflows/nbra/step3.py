@@ -448,10 +448,12 @@ def get_Lowdin(S):
     pop_submatrix(S, S_aa, alp, alp)
     pop_submatrix(S, S_bb, bet, bet)
 
+    _validate_cmatrix_overlap(S_aa, "get_Lowdin S_aa")
     is_inv = FullPivLU_rank_invertible(S_aa)
     if is_inv[1] != 1:
         raise ValueError("S_aa is not invertible")
 
+    _validate_cmatrix_overlap(S_bb, "get_Lowdin S_bb")
     is_inv = FullPivLU_rank_invertible(S_bb)
     if is_inv[1] != 1:
         raise ValueError("S_bb is not invertible")
@@ -552,6 +554,7 @@ def get_Lowdin_general(S):
     """
 
     nstates = int(S.num_of_cols)  # division by 2 because it is a super-matrix
+    _validate_cmatrix_overlap(S, "get_Lowdin_general")
     is_inv = FullPivLU_rank_invertible(S)
     if is_inv[1] != 1:
         S.show_matrix()
@@ -2030,6 +2033,21 @@ def _check_input_overlap(S, tag, step, threshold=0.05, allow_dirty=False):
     return dev
 
 
+def _validate_cmatrix_overlap(S, label):
+    """CMATRIX front-end of validate_overlap_matrix for the legacy Lowdin
+    implementations, plus the positive-semidefiniteness raise their
+    sqrt_matrix stage would otherwise hide (an indefinite S passes the
+    rank check and produces garbage silently)."""
+    S_np = (data_conv.MATRIX2nparray(S.real()) +
+            1j * data_conv.MATRIX2nparray(S.imag()))
+    validate_overlap_matrix(S_np, label)
+    w_min = float(np.linalg.eigvalsh(0.5 * (S_np + S_np.conj().T)).min())
+    if w_min < -1e-8 * max(1.0, float(np.abs(S_np).max())):
+        raise ValueError(
+            F"{label}: the overlap matrix has a negative eigenvalue "
+            F"({w_min:.3e}) - not a valid Gram matrix; corrupted data")
+
+
 def _check_contraction(St, step, basis, tol=1e-6):
     """An overlap between two orthonormalized frames is U^H V with
     orthonormal columns, so every singular value is <= 1. A violation
@@ -2346,6 +2364,8 @@ def _orthonormalize_ks_overlaps(step, params):
 
     St_step_sparse = sp.csc_matrix(St_step)
     S_step_sparse = sp.csc_matrix(S_step)
+    validate_overlap_matrix(np.asarray(S_step_sparse.todense()),
+                            F"S_ks_{step} (step-3 output)")
 
     sp.save_npz(F'{params["path_to_save_ks_Hvibs"]}/St_ks_orthonormalized_{step}.npz', St_step_sparse)
     sp.save_npz(F'{params["path_to_save_ks_Hvibs"]}/S_ks_{step}.npz', S_step_sparse)

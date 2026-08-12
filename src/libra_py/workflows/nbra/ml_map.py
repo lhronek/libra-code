@@ -25,6 +25,7 @@ import time
 import numpy as np
 import multiprocessing as mp
 import scipy.sparse as sp
+from libra_py import orthogonalizations
 import pickle
 import json
 import joblib
@@ -836,6 +837,11 @@ def compute_properties(params, models, input_scalers, output_scalers):
             step_prev = step
             # Writing overlap, and time-overlap files as in .npz file for other steps
             mo_overlap_sparse = sp.csc_matrix(mo_overlap)
+            # a produced MO self-overlap must be a clean identity - anything
+            # else means the mapped-eigenvector chain is broken
+            orthogonalizations.validate_overlap_matrix(
+                np.asarray(mo_overlap), F"S_ks_{step} (ml_map production)",
+                require_identity=0.05)
             sp.save_npz(params["res_dir"] + F'/S_ks_{step}.npz', mo_overlap_sparse)
             os.system(f'rm {params["path_to_input_mats"]}/{params["prefix"]}_{params["input_property"]}_{step}.npy')
         # Writing the energy files into the res directory
