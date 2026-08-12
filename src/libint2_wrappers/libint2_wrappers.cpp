@@ -249,32 +249,31 @@ map_shell_to_basis_function(const std::vector<libint2::Shell> &shells) {
 
 /*
 
-// Computing the integrals between two shells serial
-MATRIX compute_1body_ints(const std::vector<libint2::Shell>& shells_1, const
-std::vector<libint2::Shell>& shells_2,libint2::Operator obtype)
-{
+// Computing the integrals between two shells serial - kept in sync with the
+// parallel kernel below (solid-harmonic permutation, null-batch fail-loud,
+// no transpose-mirror) so a revival carries no stale semantics
+MATRIX compute_1body_ints(const std::vector<libint2::Shell>& shells_1,
+                          const std::vector<libint2::Shell>& shells_2,
+                          libint2::Operator obtype) {
 
   const auto n_1 = nbasis(shells_1);
   const auto n_2 = nbasis(shells_2);
-  //std::cout << "nbasis (shells_1)" << n_1 << "\n";
-  //std::cout << "nbasis (shells_2)" << n_2 << "\n";
-  Matrix result(n_1,n_2);
+
+  // the runtime's solid-harmonic ordering, probed once: standard-ordered
+  // blocks are permuted below so the output is always gaussian-ordered
+  const bool shg_std = shg_ordering_is_standard();
+
+  Matrix result(n_1, n_2);
   int max_n;
   int max_lval;
-  if (max_nprim(shells_1)>max_nprim(shells_2))
-  {
+  if (max_nprim(shells_1) > max_nprim(shells_2)) {
     max_n = max_nprim(shells_1);
-  }
-  else
-  {
+  } else {
     max_n = max_nprim(shells_2);
   }
-  if (max_l(shells_1)>max_l(shells_2))
-  {
+  if (max_l(shells_1) > max_l(shells_2)) {
     max_lval = max_l(shells_1);
-  }
-  else
-  {
+  } else {
     max_lval = max_l(shells_2);
   }
 
@@ -283,57 +282,58 @@ std::vector<libint2::Shell>& shells_2,libint2::Operator obtype)
   auto shell2bf_1 = map_shell_to_basis_function(shells_1);
   auto shell2bf_2 = map_shell_to_basis_function(shells_2);
 
-  // buf[0] points to the target shell set after every call  to engine.compute()
+  // buf[0] points to the target shell set after every call to engine.compute()
   const auto& buf = engine.results();
 
-  // loop over unique shell pairs, {s1,s2} such that s1 >= s2
-  // this is due to the permutational symmetry of the real integrals over
-Hermitian operators: (1|2) = (2|1)
-  //std::cout << shells_1.size();
-  for(auto s1=0; s1!=shells_1.size(); ++s1) {
-
+  // loop over ALL shell pairs: two different shell sets (time-overlap pairs)
+  // have no permutational symmetry, so there is no transpose-mirror here -
+  // it is only valid when shells_1 == shells_2 (same convention as the
+  // parallel kernels)
+  for (auto s1 = 0ul; s1 != shells_1.size(); ++s1) {
     auto bf1 = shell2bf_1[s1]; // first basis function in this shell
-    //std::cout << "Flag bf1: " << bf1 << "\n";
     auto n1 = shells_1[s1].size();
 
-    //std::cout << "shells_1[s1]" << shells_1[s1].size() << "\n";
-
-    //for(auto s2=0; s2<=s1; ++s2) {
-    for(auto s2=0; s2!=shells_2.size(); ++s2) {
-
+    for (auto s2 = 0ul; s2 != shells_2.size(); ++s2) {
       auto bf2 = shell2bf_2[s2];
-      //std::cout << "Flag bf2: " << bf2 << "\n";
       auto n2 = shells_2[s2].size();
-
-      //std::cout << "shells_2[s2]" << shells_2[s2].size() << "\n";
 
       // compute shell pair
       engine.compute(shells_1[s1], shells_2[s2]);
-      //std::cout << "Flag after engine.compute" << "\n";
-      // "map" buffer to a const Eigen Matrix, and copy it to the corresponding
-blocks of the result Eigen::Map<const Matrix> buf_mat(buf[0], n1, n2);
-      //std::cout << "Flag after buf_mat" << "\n" << "buf_mat.size: \n" <<
-buf_mat.size() << "\n";
-      //std::cout << "Flag after buf_mat" << "\n" << "buf_mat  \n" << buf_mat <<
-"\n";
-      //std::cout << "Flag after buf_mat" << "\n" << "bf1.size" << bf1.size() <<
-"\n";
-      //std::cout << "Flag after buf_mat" << "\n" << "bf2.size" << bf2.size() <<
-"\n"; result.block(bf1, bf2, n1, n2) = buf_mat;
-      //std::cout << "Flag after result.block" << "\n";
-      if (s1 != s2) // if s1 >= s2, copy {s1,s2} to the corresponding {s2,s1}
-block, note the transpose! result.block(bf2, bf1, n2, n1) = buf_mat.transpose();
-      //std::cout << "Flag after buf_mat.transpose" << "\n";
-    }
-  }
-  //std::cout << "Flag before MATRIX res" << "\n";
-  MATRIX res(n_1, n_2);
-  for(int i=0;i<n_1;i++){
-    for(int j=0; j<n_2;j++){
-      res.set(i,j, result(i,j));
+
+      // a 1-body engine must always produce a batch (screening-to-null is a
+      // 2-body behavior) - serial runs on the calling thread, throw directly
+      if (buf[0] == nullptr) {
+        std::cout << "Error in compute_1body_ints: libint returned a null "
+                     "result batch for shell pair (" << s1 << ", " << s2
+                  << ") - 1-body engines must always produce a batch; the "
+                     "engine or shell setup is corrupted\n";
+        throw std::runtime_error(
+            "libra C++ error - see the message printed above");
+      }
+
+      // map the buffer and scatter it into the result block
+      Eigen::Map<const Matrix> buf_mat(buf[0], n1, n2);
+      if (!shg_std) {
+        result.block(bf1, bf2, n1, n2) = buf_mat;
+      } else {
+        std::vector<std::size_t> map1, map2;
+        shg_index_map(shells_1[s1], map1);
+        shg_index_map(shells_2[s2], map2);
+        for (std::size_t f1 = 0; f1 < n1; f1++) {
+          for (std::size_t f2 = 0; f2 < n2; f2++) {
+            result(bf1 + map1[f1], bf2 + map2[f2]) = buf_mat(f1, f2);
+          }
+        }
+      }
     }
   }
 
+  MATRIX res(n_1, n_2);
+  for (auto i = 0u; i < n_1; ++i) {
+    for (auto j = 0u; j < n_2; ++j) {
+      res.set(i, j, result(i, j));
+    }
+  }
 
   return res;
 }
