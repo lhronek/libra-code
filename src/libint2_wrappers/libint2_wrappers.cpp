@@ -25,6 +25,7 @@
 */
 
 #include "libint2_wrappers.h"
+#include <cmath>
 
 /// liblibra namespace
 namespace liblibra {
@@ -75,6 +76,74 @@ libint2::Shell unit_shell() {
   const auto &unitshell = libint2::Shell::unit();
 
   return unitshell;
+}
+
+// ---------------------------------------------------------------------
+// Solid-harmonic component ordering of the linked libint runtime.
+//
+// libint emits pure-shell components in one of two compile-time orders:
+// gaussian (m = 0, +1, -1, +2, -2, ...) or standard (m = -l..+l). The
+// molden/molog readers and the step-2 writers all assume gaussian, and
+// the LIBINT_SHGSHELL_ORDERING header macro cannot be trusted (packaged
+// headers are known to disagree with the shipped binary). Probe the
+// runtime once: the overlap of an s shell at the origin with a pure p
+// shell displaced along z is nonzero only in the p_z (m = 0) component,
+// whose position identifies the ordering.
+static bool shg_ordering_is_standard() {
+  static const bool is_standard = [] {
+    if (!libint2::initialized()) { libint2::initialize(); }
+    libint2::svector<double> e;
+    e.push_back(1.0);
+    libint2::svector<double> c;
+    c.push_back(1.0);
+    libint2::Shell s_shell{e, {{0, false, c}}, {{0.0, 0.0, 0.0}}};
+    libint2::Shell p_shell{e, {{1, true, c}}, {{0.0, 0.0, 1.0}}};
+    libint2::Engine engine(libint2::Operator::overlap, 1, 1, 0);
+    const auto &buf = engine.results();
+    engine.compute(s_shell, p_shell);
+    const double a0 = std::fabs(buf[0][0]);
+    const double a1 = std::fabs(buf[0][1]);
+    const double a2 = std::fabs(buf[0][2]);
+    const double big = std::max(a0, std::max(a1, a2));
+    const double tol = 1e-8 * (big > 0.0 ? big : 1.0);
+    const bool gauss = (a0 > tol) && (a1 <= tol) && (a2 <= tol);
+    const bool standard = (a1 > tol) && (a0 <= tol) && (a2 <= tol);
+    if (!gauss && !standard) {
+      std::cout << "Error in libint2_wrappers: the solid-harmonic ordering "
+                   "probe (s at origin vs pure p at z = 1) has no single "
+                   "dominant component (" << a0 << ", " << a1 << ", " << a2
+                << ") - expected p_z first (gaussian) or second (standard)\n";
+      throw std::runtime_error(
+          "libra C++ error - see the message printed above");
+    }
+    std::cout << "libint solid-harmonic ordering: "
+              << (standard ? "standard (m = -l..+l) - wrapper outputs are "
+                             "permuted to the gaussian convention"
+                           : "gaussian (m = 0, +1, -1, ...)")
+              << "\n";
+    return standard;
+  }();
+  return is_standard;
+}
+
+// gaussian position of the f-th standard-ordered component of a pure
+// shell with angular momentum l: m = f - l; gaussian packs m = 0 first,
+// then +1, -1, +2, -2, ...
+static inline std::size_t shg_gaussian_pos(int l, std::size_t f) {
+  const int m = static_cast<int>(f) - l;
+  return static_cast<std::size_t>(m == 0 ? 0 : (m > 0 ? 2 * m - 1 : -2 * m));
+}
+
+// Component index map of one shell: identity for cartesian shells and on
+// gaussian-ordered runtimes.
+static void shg_index_map(const libint2::Shell &sh, std::vector<std::size_t> &map) {
+  const std::size_t n = sh.size();
+  map.resize(n);
+  const int l = sh.contr[0].l;
+  const bool pure = sh.contr[0].pure;
+  for (std::size_t f = 0; f < n; f++) {
+    map[f] = (pure && l > 0) ? shg_gaussian_pos(l, f) : f;
+  }
 }
 
 // This function adds the basis sets for each atomic type to a libint2::Shell
@@ -282,6 +351,10 @@ MATRIX compute_1body_ints_parallel(const std::vector<libint2::Shell> &shells_1,
   const auto n_1 = nbasis(shells_1);
   const auto n_2 = nbasis(shells_2);
 
+  // the runtime's solid-harmonic ordering, probed once: standard-ordered
+  // blocks are permuted below so the output is always gaussian-ordered
+  const bool shg_std = shg_ordering_is_standard();
+
   // The AO overlap matrix n x n
   Matrix result(n_1, n_2);
   int max_n;
@@ -335,7 +408,18 @@ MATRIX compute_1body_ints_parallel(const std::vector<libint2::Shell> &shells_1,
         engines[thread_id].compute(shells_1[s1], shells_2[s2]);
         // The results block
         Eigen::Map<const Matrix> buf_mat(buf[0], n1, n2);
-        result.block(bf1, bf2, n1, n2) = buf_mat;
+        if (!shg_std) {
+          result.block(bf1, bf2, n1, n2) = buf_mat;
+        } else {
+          std::vector<std::size_t> map1, map2;
+          shg_index_map(shells_1[s1], map1);
+          shg_index_map(shells_2[s2], map2);
+          for (std::size_t f1 = 0; f1 < n1; f1++) {
+            for (std::size_t f2 = 0; f2 < n2; f2++) {
+              result(bf1 + map1[f1], bf2 + map2[f2]) = buf_mat(f1, f2);
+            }
+          }
+        }
         // if (s1 != s2)  // if s1 >= s2, copy {s1,s2} to the corresponding
         //                // {s2,s1} block, note the transpose!
         // result.block(bf2, bf1, n2, n1) = buf_mat.transpose();
@@ -445,6 +529,10 @@ std::vector<MATRIX> compute_1body_ints_parallel_emultipole3(
   const auto n_1 = nbasis(shells_1);
   const auto n_2 = nbasis(shells_2);
 
+  // the runtime's solid-harmonic ordering, probed once (see the overlap
+  // kernel note)
+  const bool shg_std = shg_ordering_is_standard();
+
   std::vector<MATRIX> res;
   for (int i = 0; i < 20; i++) {
     MATRIX m2(n_1, n_2);
@@ -504,10 +592,24 @@ std::vector<MATRIX> compute_1body_ints_parallel_emultipole3(
 
         // Make compute for each engine
         engines[thread_id].compute(shells_1[s1], shells_2[s2]);
+        std::vector<std::size_t> map1, map2;
+        if (shg_std) {
+          shg_index_map(shells_1[s1], map1);
+          shg_index_map(shells_2[s2], map2);
+        }
         for (int index = 0; index < 20; index++) {
           // The results block
           Eigen::Map<const Matrix> buf_mat(buf[index], n1, n2);
-          results[index].block(bf1, bf2, n1, n2) = buf_mat;
+          if (!shg_std) {
+            results[index].block(bf1, bf2, n1, n2) = buf_mat;
+          } else {
+            for (std::size_t f1 = 0; f1 < n1; f1++) {
+              for (std::size_t f2 = 0; f2 < n2; f2++) {
+                results[index](bf1 + map1[f1], bf2 + map2[f2]) =
+                    buf_mat(f1, f2);
+              }
+            }
+          }
           // NO transpose-mirror into the {s2,s1} block here: the loop runs over
           // ALL shell pairs (both triangles are computed directly), and the
           // mirror is only valid when shells_1 == shells_2 - for two different
