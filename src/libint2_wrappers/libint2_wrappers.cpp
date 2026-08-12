@@ -26,6 +26,7 @@
 
 #include "libint2_wrappers.h"
 #include <cmath>
+#include <atomic>
 
 /// liblibra namespace
 namespace liblibra {
@@ -385,6 +386,8 @@ MATRIX compute_1body_ints_parallel(const std::vector<libint2::Shell> &shells_1,
   // Mapping the shells into basis sets
   auto shell2bf1 = map_shell_to_basis_function(shells_1);
   auto shell2bf2 = map_shell_to_basis_function(shells_2);
+  // first shell pair that produced a null batch (packed s1*1e6 + s2)
+  std::atomic<long long> null_pair(-1);
   // Compute for each thread_id
   auto compute = [&](int thread_id) {
     const auto &buf = engines[thread_id].results();
@@ -406,6 +409,17 @@ MATRIX compute_1body_ints_parallel(const std::vector<libint2::Shell> &shells_1,
 
         // Make compute for each engine
         engines[thread_id].compute(shells_1[s1], shells_2[s2]);
+        // a 1-body engine must always produce a batch (screening-to-null
+        // is a 2-body behavior) - a null here means a corrupted engine or
+        // shell setup; record it and throw after the join (throwing from
+        // a worker thread would std::terminate)
+        if (buf[0] == nullptr) {
+          long long expected = -1;
+          null_pair.compare_exchange_strong(
+              expected, static_cast<long long>(s1) * 1000000LL +
+                            static_cast<long long>(s2));
+          return;
+        }
         // The results block
         Eigen::Map<const Matrix> buf_mat(buf[0], n1, n2);
         if (!shg_std) {
@@ -430,6 +444,16 @@ MATRIX compute_1body_ints_parallel(const std::vector<libint2::Shell> &shells_1,
   MATRIX res(n_1, n_2);
   // Now for compute, do parallel
   parallel_do(compute, nthreads);
+  if (null_pair.load() >= 0) {
+    std::cout << "Error in compute_1body_ints_parallel: libint returned a "
+                 "null result batch for shell pair ("
+              << null_pair.load() / 1000000LL << ", "
+              << null_pair.load() % 1000000LL
+              << ") - 1-body engines must always produce a batch; the "
+                 "engine or shell setup is corrupted\n";
+    throw std::runtime_error(
+        "libra C++ error - see the message printed above");
+  }
   for (auto i = 0u; i < n_1; ++i) {
     for (auto j = 0u; j < n_2; ++j) {
       res.set(i, j, result(i, j));
@@ -504,7 +528,9 @@ double compute_4center_eri(const std::vector<libint2::Shell> &shells_1,
   engine.compute(shells_1[0], shells_2[0], shells_3[0], shells_4[0]);
   const auto *integral_val = buf[0];
   libint2::finalize(); // done with libint
-  return integral_val[0];
+  // 2-body engines screen negligible quartets to a null batch - the
+  // integral is genuinely zero within the engine precision
+  return integral_val == nullptr ? 0.0 : integral_val[0];
 }
 
 /*
@@ -572,6 +598,8 @@ std::vector<MATRIX> compute_1body_ints_parallel_emultipole3(
   // Mapping the shells into basis sets
   auto shell2bf1 = map_shell_to_basis_function(shells_1);
   auto shell2bf2 = map_shell_to_basis_function(shells_2);
+  // first shell pair that produced a null batch (packed s1*1e6 + s2)
+  std::atomic<long long> null_pair(-1);
   // Compute for each thread_id
   auto compute = [&](int thread_id) {
     const auto &buf = engines[thread_id].results();
@@ -598,6 +626,15 @@ std::vector<MATRIX> compute_1body_ints_parallel_emultipole3(
           shg_index_map(shells_2[s2], map2);
         }
         for (int index = 0; index < 20; index++) {
+          // 1-body engines must always produce a batch (see the overlap
+          // kernel) - record and throw after the join
+          if (buf[index] == nullptr) {
+            long long expected = -1;
+            null_pair.compare_exchange_strong(
+                expected, static_cast<long long>(s1) * 1000000LL +
+                              static_cast<long long>(s2));
+            return;
+          }
           // The results block
           Eigen::Map<const Matrix> buf_mat(buf[index], n1, n2);
           if (!shg_std) {
@@ -623,6 +660,16 @@ std::vector<MATRIX> compute_1body_ints_parallel_emultipole3(
   // std::cout << "Done";
   //  Now for compute, do parallel
   parallel_do(compute, nthreads);
+  if (null_pair.load() >= 0) {
+    std::cout << "Error in compute_1body_ints_parallel_emultipole3: libint "
+                 "returned a null result batch for shell pair ("
+              << null_pair.load() / 1000000LL << ", "
+              << null_pair.load() % 1000000LL
+              << ") - 1-body engines must always produce a batch; the "
+                 "engine or shell setup is corrupted\n";
+    throw std::runtime_error(
+        "libra C++ error - see the message printed above");
+  }
   for (int index = 0; index < 20; index++) {
     for (auto i = 0u; i < n_1; ++i) {
       for (auto j = 0u; j < n_2; ++j) {
