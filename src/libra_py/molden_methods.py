@@ -57,6 +57,25 @@ def molden_file_to_libint_shell(molden_filename: str, is_spherical: bool, is_per
     lines = file.readlines()
     file.close()
 
+    # The cartesian chain is unvalidated at three stacked levels: this parser
+    # reads no [6D]/[10F] sections, libint's cartesian component ordering has
+    # five build-time conventions (only the spherical ordering is detected and
+    # permuted at runtime), and the CCA cross-term normalization factors are
+    # never applied - fail loud instead of misparsing
+    if not is_spherical:
+        raise ValueError(
+            "molden_file_to_libint_shell: is_spherical=False (cartesian "
+            "shells) is not supported - the cartesian molden sections, "
+            "libint's five cartesian component orderings and the CCA "
+            "normalization are all unhandled")
+    for line in lines:
+        u = line.upper().replace(" ", "")
+        if u.startswith("[6D") or u.startswith("[10F"):
+            raise ValueError(
+                F"molden_file_to_libint_shell: {molden_filename} declares "
+                F"cartesian sections ({line.strip()}) - only [5D7F] "
+                "(spherical) molden files are supported")
+
     # The characters in the molden file start with '[' including
     # coordinates, basis sets, eigenvectors, etc. We store them
     # into chars to move between them in a for loop
