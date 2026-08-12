@@ -35,6 +35,7 @@ import libra_py.packages.cp2k.methods as CP2K_methods
 from libra_py import cube_file_methods
 from libra_py import molden_methods
 from libra_py import data_conv
+from libra_py import orthogonalizations
 from libra_py import units
 
 # import libra_py.common_utils as comn
@@ -681,6 +682,11 @@ def run_cp2k_libint_step2(params):
             E_b = np.diag((mo_curr['E_b'] if isUKS else mo_curr['E'])[lowest_orbital - 1:highest_orbital])
             zero_mat = np.zeros_like(S_a)
             S_step_sparse = scipy.sparse.csc_matrix(data_conv.form_block_matrix(S_a, zero_mat, zero_mat, S_b))
+            # a freshly produced MO self-overlap must be a clean identity -
+            # anything else means the producing chain is broken NOW
+            orthogonalizations.validate_overlap_matrix(
+                np.asarray(S_step_sparse.todense()), F'S_ks_{step} (production)',
+                require_identity=0.05)
             scipy.sparse.save_npz(params['res_dir'] + F'/S_ks_{step}.npz', S_step_sparse)
             E_step_sparse = scipy.sparse.csc_matrix(data_conv.form_block_matrix(E_a, zero_mat, zero_mat, E_b))
             scipy.sparse.save_npz(params['res_dir'] + F'/E_ks_{step}.npz', E_step_sparse)
@@ -850,6 +856,11 @@ def run_cp2k_libint_step2(params):
                     S_step = data_conv.form_block_matrix(S_alpha, zero_mat, zero_mat.T, S_beta)
                     # Since a lot of the data are zeros we save them as sparse matrices
                     S_step_sparse = scipy.sparse.csc_matrix(S_step)
+                    # a freshly produced MO self-overlap must be a clean identity -
+                    # anything else means the producing chain is broken NOW
+                    orthogonalizations.validate_overlap_matrix(
+                        np.asarray(S_step_sparse.todense()), F'S_ks_{step} (production)',
+                        require_identity=0.05)
                     scipy.sparse.save_npz(params['res_dir'] + F'/S_ks_{step}.npz', S_step_sparse)
                 E_step = data_conv.form_block_matrix(
                     np.diag(alpha_energies_1)[
@@ -889,6 +900,11 @@ def run_cp2k_libint_step2(params):
                     S_step = data_conv.form_block_matrix(S, zero_mat, zero_mat, S)
                     # Since a lot of the data are zeros we save them as sparse matrices
                     S_step_sparse = scipy.sparse.csc_matrix(S_step)
+                    # a freshly produced MO self-overlap must be a clean identity -
+                    # anything else means the producing chain is broken NOW
+                    orthogonalizations.validate_overlap_matrix(
+                        np.asarray(S_step_sparse.todense()), F'S_ks_{step} (production)',
+                        require_identity=0.05)
                     scipy.sparse.save_npz(params['res_dir'] + F'/S_ks_{step}.npz', S_step_sparse)
                 E_step = data_conv.form_block_matrix(
                     np.diag(energies_1)[
@@ -1058,6 +1074,11 @@ def run_cp2k_libint_step2(params):
                     St_step = data_conv.form_block_matrix(St_alpha, zero_mat, zero_mat.T, St_beta)
                     S_step_sparse = scipy.sparse.csc_matrix(S_step)
                     St_step_sparse = scipy.sparse.csc_matrix(St_step)
+                    # a freshly produced MO self-overlap must be a clean identity -
+                    # anything else means the producing chain is broken NOW
+                    orthogonalizations.validate_overlap_matrix(
+                        np.asarray(S_step_sparse.todense()), F'S_ks_{step} (production)',
+                        require_identity=0.05)
                     scipy.sparse.save_npz(params['res_dir'] + F'/S_ks_{step}.npz', S_step_sparse)
                     scipy.sparse.save_npz(params['res_dir'] + F'/St_ks_{step-1}.npz', St_step_sparse)
 
@@ -1109,6 +1130,11 @@ def run_cp2k_libint_step2(params):
                     St_step = data_conv.form_block_matrix(St, zero_mat, zero_mat, St)
                     S_step_sparse = scipy.sparse.csc_matrix(S_step)
                     St_step_sparse = scipy.sparse.csc_matrix(St_step)
+                    # a freshly produced MO self-overlap must be a clean identity -
+                    # anything else means the producing chain is broken NOW
+                    orthogonalizations.validate_overlap_matrix(
+                        np.asarray(S_step_sparse.todense()), F'S_ks_{step} (production)',
+                        require_identity=0.05)
                     scipy.sparse.save_npz(params['res_dir'] + F'/S_ks_{step}.npz', S_step_sparse)
                     scipy.sparse.save_npz(params['res_dir'] + F'/St_ks_{step-1}.npz', St_step_sparse)
                 E_step = data_conv.form_block_matrix(

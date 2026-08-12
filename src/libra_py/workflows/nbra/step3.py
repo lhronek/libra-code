@@ -50,7 +50,8 @@ import libra_py.units as units
 import libra_py.data_read as data_read
 import libra_py.data_conv as data_conv
 import libra_py.hungarian as hungarian
-from libra_py.orthogonalizations import (get_Lowdin_scipy,
+from libra_py.orthogonalizations import (validate_overlap_matrix,
+                                         get_Lowdin_scipy,
                                          apply_orthonormalization_scipy,
                                          lowdin_digest)
 
@@ -1994,19 +1995,38 @@ def _parent_blas_threads(params):
 _IDENTITY_WARNED = set()
 
 
-def _check_input_overlap(S, tag, step, threshold=0.05):
-    """The stored step-2 MO self-overlaps must be near-identity - large
-    deviations signal a step-2 defect (AO mis-mapping, truncation), not
-    physics. The Lowdin stage re-orthonormalizes either way; warn once
-    per process per tag so a dirty dataset cannot pass silently."""
+def _check_input_overlap(S, tag, step, threshold=0.05, allow_dirty=False):
+    """The stored step-2 MO self-overlaps must be near-identity: an
+    identity-far S is the Gram matrix of the WRONG vectors (a step-2
+    defect - AO mis-mapping, ordering, truncation), and the Lowdin
+    repair of the downstream results is only empirical (~1-4% NAC
+    agreement measured for the known corruption class, unguaranteed for
+    other causes). Raise by default; allow_dirty (the
+    allow_nonorthonormal_overlaps parameter) turns it into a
+    once-per-process warning for conscious legacy reprocessing.
+    Structural invalidity (non-finite, non-Hermitian, non-positive
+    diagonal) raises unconditionally - nothing can repair it."""
+    validate_overlap_matrix(S, F"{tag} at step {step}")
     dev = float(np.abs(S - np.eye(S.shape[0])).max())
-    if dev > threshold and tag not in _IDENTITY_WARNED:
-        _IDENTITY_WARNED.add(tag)
-        print(F"WARNING: {tag} deviates from identity by {dev:.3f} at step "
-              F"{step} (threshold {threshold}) - the step-2 MO overlaps are "
-              F"not orthonormal, which signals a step-2 defect; the Lowdin "
-              F"stage re-orthonormalizes, but regenerating step 2 is "
-              F"recommended")
+    if dev > threshold:
+        if not allow_dirty:
+            raise ValueError(
+                F"{tag} at step {step} deviates from identity by {dev:.3f} "
+                F"(threshold {threshold}) - the step-2 MO overlaps are not "
+                F"orthonormal, so the stored data describe the wrong "
+                F"vectors; results after the Lowdin repair are only "
+                F"empirically ~1-4% accurate for the known corruption "
+                F"class. Regenerate step 2, or set "
+                F"allow_nonorthonormal_overlaps=True to reprocess this "
+                F"legacy data consciously")
+        if tag not in _IDENTITY_WARNED:
+            _IDENTITY_WARNED.add(tag)
+            print(F"WARNING: {tag} deviates from identity by {dev:.3f} at "
+                  F"step {step} (threshold {threshold}) - reprocessing "
+                  F"non-orthonormal legacy data (allow_nonorthonormal_"
+                  F"overlaps=True); the Lowdin repair is empirical (~1-4% "
+                  F"for the known corruption class) - regenerating step 2 "
+                  F"is recommended")
     return dev
 
 
@@ -2302,8 +2322,11 @@ def _orthonormalize_ks_overlaps(step, params):
     # to the next step, one fractional matrix power per step instead of two), or
     # "none"/False (raw pass-through)
     mode = _orthonormalization_mode(params.get('apply_orthonormalization', 'lowdin_cached'))
-    _check_input_overlap(np.asarray(S_1.todense()), 'S_ks(t)', step)
-    _check_input_overlap(np.asarray(S_2.todense()), 'S_ks(t+1)', step)
+    _allow_dirty = params.get('allow_nonorthonormal_overlaps', False)
+    _check_input_overlap(np.asarray(S_1.todense()), 'S_ks(t)', step,
+                         allow_dirty=_allow_dirty)
+    _check_input_overlap(np.asarray(S_2.todense()), 'S_ks(t+1)', step,
+                         allow_dirty=_allow_dirty)
     if mode == "none":
         St_step, S_step = St_step.todense(), S_1.todense()
     elif mode == "lowdin_cached":
@@ -2926,8 +2949,11 @@ def _compute_sd_overlaps(step, params):
                       [active_space, :][:, active_space]).real
     s_ks_2 = np.array(sp.load_npz(F'{res_dir_1}/S_ks_{step+start_time+1}.npz').todense()
                       [active_space, :][:, active_space]).real
-    _check_input_overlap(s_ks_1, 'S_ks(t)', step + start_time)
-    _check_input_overlap(s_ks_2, 'S_ks(t+1)', step + start_time)
+    _allow_dirty = params.get('allow_nonorthonormal_overlaps', False)
+    _check_input_overlap(s_ks_1, 'S_ks(t)', step + start_time,
+                         allow_dirty=_allow_dirty)
+    _check_input_overlap(s_ks_2, 'S_ks(t+1)', step + start_time,
+                         allow_dirty=_allow_dirty)
     # This is not needed anymore as we use the numpy approach
     # that works with numpy array of the matrices below
     x = sp.load_npz(F'{res_dir_1}/St_ks_{step+start_time}.npz').todense() 

@@ -42,6 +42,40 @@ def carried_state_digest(state):
     return hashlib.blake2b(pickle.dumps(state, protocol=4), digest_size=16).digest()
 
 
+def validate_overlap_matrix(S, label="overlap", require_identity=None,
+                            sym_tol=1e-8):
+    """A valid overlap (Gram) matrix is finite, Hermitian and has a strictly
+    positive diagonal; anything else is corrupted data, not physics, and
+    no orthonormalization can repair it. With require_identity set, the
+    matrix must additionally stay within that deviation from identity -
+    the invariant of freshly produced MO self-overlaps (production-time
+    check; loaders keep the softer warning so legacy archives remain
+    repairable). Returns the deviation from identity."""
+    S = np.asarray(S)
+    if not np.all(np.isfinite(S)):
+        raise ValueError(F"{label}: the overlap matrix contains non-finite "
+                         "entries - corrupted data")
+    scale = max(1.0, float(np.abs(S).max()))
+    asym = float(np.abs(S - S.conj().T).max())
+    if asym > sym_tol * scale:
+        raise ValueError(F"{label}: the overlap matrix is not Hermitian "
+                         F"(max|S - S^H| = {asym:.3e} at scale {scale:.3e}) - "
+                         "a Gram matrix must be Hermitian; corrupted data")
+    dmin = float(np.real(np.diag(S)).min())
+    if dmin <= 0.0:
+        raise ValueError(F"{label}: the overlap matrix has a non-positive "
+                         F"diagonal entry ({dmin:.3e}) - vector norms must be "
+                         "positive; corrupted data")
+    dev = float(np.abs(S - np.eye(S.shape[0])).max())
+    if require_identity is not None and dev > require_identity:
+        raise ValueError(F"{label}: the overlap matrix deviates from identity "
+                         F"by {dev:.3f} (limit {require_identity}) - freshly "
+                         "produced MO self-overlaps must be orthonormal; the "
+                         "producing chain (AO ordering, normalization, "
+                         "conversion) is broken")
+    return dev
+
+
 def lowdin_inverse_sqrt(S, thresh=1e-10):
     """
     Compute the inverse square root of an overlap matrix using Löwdin symmetric orthogonalization.
@@ -106,6 +140,15 @@ def lowdin_inverse_sqrt(S, thresh=1e-10):
 
     eigvals, eigvecs = np.linalg.eigh(S)
 
+    # a Gram matrix is positive semi-definite: eigenvalues below -noise are
+    # corruption, not linear dependency - refuse to silently project them out
+    neg_tol = max(thresh, 1e-8 * float(np.abs(eigvals).max()))
+    if float(eigvals.min()) < -neg_tol:
+        raise ValueError(
+            F"lowdin_inverse_sqrt: the overlap matrix has a negative "
+            F"eigenvalue ({float(eigvals.min()):.3e}) - not a valid Gram "
+            "matrix; corrupted data")
+
     eigvals_inv_sqrt = np.zeros_like(eigvals)
 
     for i, val in enumerate(eigvals):
@@ -131,6 +174,13 @@ def get_Lowdin_scipy(S):
 
         S_inverse_square_root (numpy array): The inverse square root of S.
     """
+    # a non-PSD input would make the fractional power silently complex
+    validate_overlap_matrix(S, "get_Lowdin_scipy")
+    neg = float(np.linalg.eigvalsh(0.5 * (np.asarray(S) + np.asarray(S).conj().T)).min())
+    if neg < -1e-8:
+        raise ValueError(F"get_Lowdin_scipy: the overlap matrix has a negative "
+                         F"eigenvalue ({neg:.3e}) - not a valid Gram matrix; "
+                         "corrupted data")
     # Return the fractional matrix with the power of -1/2
     S_inverse_square_root = fractional_matrix_power(S, -1 / 2)
 
