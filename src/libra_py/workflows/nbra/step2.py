@@ -765,7 +765,8 @@ def run_cp2k_libint_step2(params):
             # Now, we need to resort the eigenvectors based on the new indices
             print('Resorting eigenvectors elements...')
             t1 = time.time()
-            new_indices = CP2K_methods.resort_molog_eigenvectors(l_vals)
+            new_indices = CP2K_methods.resort_molog_eigenvectors(
+                l_vals, molden_methods.molden_purity(molden_filename, l_vals))
             eigenvectors_1 = []
 
             for j in range(len(eig_vect_1)):
@@ -987,7 +988,8 @@ def run_cp2k_libint_step2(params):
             # Now, we need to resort the eigenvectors based on the new indices
             print('Resorting eigenvectors elements...')
             t1 = time.time()
-            new_indices = CP2K_methods.resort_molog_eigenvectors(l_vals)
+            new_indices = CP2K_methods.resort_molog_eigenvectors(
+                l_vals, molden_methods.molden_purity(molden_filename, l_vals))
             eigenvectors_2 = []
 
             for j in range(len(eig_vect_2)):

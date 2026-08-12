@@ -1526,7 +1526,7 @@ def make_shell(coordinates: list, basis_set_data: list, is_spherical: bool):
     return shell
 
 
-def resort_molog_eigenvectors(l_vals):
+def resort_molog_eigenvectors(l_vals, purity=None):
     """
     This function returns the resotring indices for resoting the MOLog
     eigenvectors according to this order:
@@ -1556,7 +1556,12 @@ def resort_molog_eigenvectors(l_vals):
     for i in range(len(l_vals)):
         l_val = l_vals[i]
         # find the reorder indices needed for this l_val
-        reordered_indices = index_reorder(l_val)
+        if purity is not None and l_val >= 1 and not purity.get(l_val, True):
+            # cartesian shells arrive already in the lexicographic canonical
+            # order (molden_methods resorts them in one stage) - identity
+            reordered_indices = np.arange((l_val + 1) * (l_val + 2) // 2)
+        else:
+            reordered_indices = index_reorder(l_val)
         for j in range(len(reordered_indices)):
             # now append it by plus the counter since
             # we aim to do it for all the eigenvectors

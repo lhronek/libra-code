@@ -31,6 +31,139 @@ from libra_py import units
 import math
 
 
+# Molden cartesian component orders (the molden format specification, l <= 4)
+# mapped to the descending-lexicographic canonical order the libint wrappers
+# emit: entry k = the molden position feeding canonical slot k
+_MOLDEN_CART_TO_LEX = {
+    0: [0],
+    1: [0, 1, 2],                                              # x, y, z
+    2: [0, 3, 4, 1, 5, 2],
+    3: [0, 4, 5, 3, 9, 6, 1, 8, 7, 2],
+    4: [0, 3, 4, 9, 12, 10, 5, 13, 14, 7, 1, 6, 11, 8, 2],
+}
+
+
+def molden_convention(lines, l_vals):
+    """Derive the per-l purity map of a molden file and cross-check the basis
+    size. Molden defaults to CARTESIAN d/f/g; the [5D]/[5D7F]/[5D10F]/[7F]/
+    [9G] markers switch per l, and a markerless cartesian file carries no
+    marker at all - the [MO] coefficient indices are the ground truth.
+
+    Args:
+        lines (list): The molden file lines.
+        l_vals (list): Angular momenta of the shells, in file order.
+
+    Returns:
+        tuple: (purity, expected, alternate, file_nbasis) - the {l: bool
+        spherical} map, the basis size implied by the markers, the size under
+        the flipped d/f/g convention, and the largest AO index seen in the
+        [MO] section (None if the file has no [MO] coefficients).
+    """
+    d_sph = f_sph = g_sph = False
+    for ln in lines:
+        u = ln.upper().replace(' ', '')
+        if u.startswith('[5D7F]') or u.startswith('[5D]'):
+            d_sph = True
+            f_sph = True                       # molden: [5D] implies 7F
+        if u.startswith('[5D10F]'):
+            d_sph = True
+            f_sph = False
+        if u.startswith('[7F]'):
+            f_sph = True
+        if u.startswith('[6D10F]') or u.startswith('[6D]'):
+            d_sph = False
+        if u.startswith('[10F]'):
+            f_sph = False
+        if u.startswith('[9G]'):
+            g_sph = True
+    # p follows the d convention: spherical files keep the historical pure-p
+    # route, cartesian files use cartesian p (the same x, y, z order)
+    purity = {0: True, 1: d_sph, 2: d_sph, 3: f_sph, 4: g_sph}
+
+    def _size(l, sph):
+        return 2 * l + 1 if (sph or l < 2) else (l + 1) * (l + 2) // 2
+
+    expected = sum(_size(l, purity[l]) for l in l_vals)
+    alternate = sum(_size(l, not purity[l] if l >= 2 else purity[l])
+                    for l in l_vals)
+    file_n = 0
+    in_mo = False
+    for ln in lines:
+        if '[MO]' in ln.upper():
+            in_mo = True
+            continue
+        if in_mo:
+            t = ln.split()
+            if len(t) == 2:
+                try:
+                    file_n = max(file_n, int(t[0]))
+                except ValueError:
+                    pass
+    return purity, expected, alternate, (file_n if file_n > 0 else None)
+
+
+def _cart_coeff_scale(l_vals, purity):
+    """Per-AO coefficient scale, in the lexicographic canonical order: molden
+    cartesian coefficients refer to shared-shell-scaled components (the pure
+    power carries the shell normalization), so a component x^i y^j z^k needs
+    sqrt((2l-1)!!/((2i-1)!!(2j-1)!!(2k-1)!!)) to refer to the unit-normalized
+    cartesians the libint wrappers emit (sqrt(3) for xy-type, sqrt(15) for
+    xyz; empirically exact on CP2K GTO_KIND CARTESIAN output)."""
+    def dfact(n):
+        r = 1.0
+        while n > 1:
+            r *= n
+            n -= 2
+        return r
+
+    scale = []
+    for l in l_vals:
+        if purity.get(l, True) or l < 2:
+            scale += [1.0] * (2 * l + 1 if l != 1 else 3)
+        else:
+            for i in range(l, -1, -1):
+                for j in range(l - i, -1, -1):
+                    k = l - i - j
+                    cca = dfact(2 * i - 1) * dfact(2 * j - 1) * \
+                        dfact(2 * k - 1) / dfact(2 * l - 1)
+                    scale.append(1.0 / np.sqrt(cca))
+    return np.array(scale)
+
+
+def molden_purity(molden_filename, l_vals):
+    """The per-l spherical-purity map of a molden file, with the coefficient
+    count as the ground truth for markerless cartesian files."""
+    with open(molden_filename) as f:
+        lines = f.readlines()
+    purity, expected, alternate, file_n = molden_convention(lines, l_vals)
+    if file_n is not None and file_n == alternate and file_n != expected:
+        purity = {k: (not v if k >= 2 else v) for k, v in purity.items()}
+        purity[1] = purity[2]
+    return purity
+
+
+def _molden_gto_l_vals(lines):
+    """Angular momenta of the [GTO] shells, in file order (pre-pass so the
+    convention can be validated before the shells are built)."""
+    letters = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4}
+    start = end = None
+    for i, ln in enumerate(lines):
+        u = ln.upper().replace(' ', '')
+        if u.startswith('[GTO]'):
+            start = i
+        elif start is not None and u.startswith('[') and i > start:
+            end = i
+            break
+    if end is None:
+        end = len(lines)
+    l_vals = []
+    for i in range(start + 1, end):
+        t = lines[i].split()
+        if len(t) >= 2 and t[0].lower() in letters:
+            l_vals.append(letters[t[0].lower()])
+    return l_vals
+
+
 def molden_file_to_libint_shell(molden_filename: str, is_spherical: bool, is_periodic=False,
                                 cell=np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]]), R_vec=np.array([0, 0, 0])):
     """
@@ -57,24 +190,34 @@ def molden_file_to_libint_shell(molden_filename: str, is_spherical: bool, is_per
     lines = file.readlines()
     file.close()
 
-    # The cartesian chain is unvalidated at three stacked levels: this parser
-    # reads no [6D]/[10F] sections, libint's cartesian component ordering has
-    # five build-time conventions (only the spherical ordering is detected and
-    # permuted at runtime), and the CCA cross-term normalization factors are
-    # never applied - fail loud instead of misparsing
-    if not is_spherical:
-        raise ValueError(
-            "molden_file_to_libint_shell: is_spherical=False (cartesian "
-            "shells) is not supported - the cartesian molden sections, "
-            "libint's five cartesian component orderings and the CCA "
-            "normalization are all unhandled")
-    for line in lines:
-        u = line.upper().replace(" ", "")
-        if u.startswith("[6D") or u.startswith("[10F"):
+    # Derive the file's convention (markers + the [MO] coefficient-count
+    # cross-check: molden defaults to cartesian and a cartesian CP2K molden
+    # is MARKERLESS, so counts are the ground truth) and validate the
+    # caller's flag against it
+    _l_pre = _molden_gto_l_vals(lines)
+    purity, _expected, _alternate, _file_n = molden_convention(lines, _l_pre)
+    if _file_n is not None and _file_n != _expected:
+        if _file_n == _alternate:
+            purity = {k: (not v if k >= 2 else v) for k, v in purity.items()}
+            purity[1] = purity[2]
+        else:
             raise ValueError(
-                F"molden_file_to_libint_shell: {molden_filename} declares "
-                F"cartesian sections ({line.strip()}) - only [5D7F] "
-                "(spherical) molden files are supported")
+                F"molden_file_to_libint_shell: {molden_filename} has "
+                F"{_file_n} AO coefficient rows per MO, but the section "
+                F"markers imply {_expected} (flipped d/f/g convention: "
+                F"{_alternate}) - inconsistent molden file")
+    _lge2 = [l for l in set(_l_pre) if l >= 2]
+    _all_sph = all(purity[l] for l in _lge2) if _lge2 else True
+    if is_spherical and not _all_sph:
+        raise ValueError(
+            F"molden_file_to_libint_shell: {molden_filename} carries "
+            "CARTESIAN d/f/g shells (markers/coefficient count) but "
+            "is_spherical=True was requested - pass is_spherical=False")
+    if (not is_spherical) and _all_sph and _lge2:
+        raise ValueError(
+            F"molden_file_to_libint_shell: {molden_filename} is a spherical "
+            "([5D7F]-class) file but is_spherical=False was requested - "
+            "pass is_spherical=True")
 
     # The characters in the molden file start with '[' including
     # coordinates, basis sets, eigenvectors, etc. We store them
@@ -232,10 +375,10 @@ def molden_file_to_libint_shell(molden_filename: str, is_spherical: bool, is_per
             # If the counter is the first one
             if c == 1:
                 # initialize the shell by creating a shell type object
-                shell = initialize_shell(int(l_vals[c1]), is_spherical, Py2Cpp_double(exp), Py2Cpp_double(coeff), a)
+                shell = initialize_shell(int(l_vals[c1]), bool(purity[int(l_vals[c1])]), Py2Cpp_double(exp), Py2Cpp_double(coeff), a)
             else:
                 # we now use the add_to_shell function to add the necessary values to the shell
-                add_to_shell(shell, int(l_vals[c1]), is_spherical, Py2Cpp_double(exp), Py2Cpp_double(coeff), a)
+                add_to_shell(shell, int(l_vals[c1]), bool(purity[int(l_vals[c1])]), Py2Cpp_double(exp), Py2Cpp_double(coeff), a)
             c1 += 1
         h1 += 1
 
@@ -288,6 +431,12 @@ def eigenvectors_molden(molden_filename: str, nbasis: int, l_vals: list):
     # make it a numpy array
     orbital_energies = np.array(orbital_energies)
 
+    # the file's per-l purity: cartesian shells resort directly to the
+    # lexicographic canonical order the libint wrappers emit, and their
+    # coefficients are rescaled to the unit-normalized component convention
+    _purity = molden_purity(molden_filename, l_vals)
+    _cscale = _cart_coeff_scale(l_vals, _purity)
+
     # eigenvectors list
     eigenvectors = []
     # loop over the ener_lines
@@ -311,16 +460,16 @@ def eigenvectors_molden(molden_filename: str, nbasis: int, l_vals: list):
 
 #         eigenvector = np.array(eigenvector)
         # new indices form resot eigenvectors based on l_vals
-        new_indices = resort_eigenvectors(l_vals)
+        new_indices = resort_eigenvectors(l_vals, _purity)
         # the new and sorted eigenvector
-        eigenvector = eigenvector[new_indices]
+        eigenvector = eigenvector[new_indices] * _cscale
         # append it to the eigenvectors list
         eigenvectors.append(eigenvector)
 
     return eigenvectors, orbital_energies
 
 
-def resort_eigenvectors(l_vals):
+def resort_eigenvectors(l_vals, purity=None):
     """
     This function resorts the indices of the eigenvectors based on the
     angular momentum values.
@@ -328,6 +477,12 @@ def resort_eigenvectors(l_vals):
     Args:
 
         l_vals (list): All the values of the angular momentum for all the atoms.
+
+        purity (dict): Optional {l: bool} spherical-purity map of the file
+                       (molden_convention). None keeps the historical
+                       all-spherical behavior; cartesian shells resort from
+                       the molden cartesian order to the lexicographic
+                       canonical order.
 
     Returns:
 
@@ -376,7 +531,10 @@ def resort_eigenvectors(l_vals):
     for i in range(len(l_vals)):
         l_val = l_vals[i]
         # find the reorder indices needed for this l_val
-        reordered_indices = index_reorder(l_val)
+        if purity is not None and l_val >= 1 and not purity.get(l_val, True):
+            reordered_indices = np.array(_MOLDEN_CART_TO_LEX[l_val])
+        else:
+            reordered_indices = index_reorder(l_val)
         for j in range(len(reordered_indices)):
             # now append it by plus the counter since
             # we aim to do it for all the eigenvectors
