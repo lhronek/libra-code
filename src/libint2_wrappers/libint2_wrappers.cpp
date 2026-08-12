@@ -147,6 +147,175 @@ static void shg_index_map(const libint2::Shell &sh, std::vector<std::size_t> &ma
   }
 }
 
+// ---------------------------------------------------------------------
+// Cartesian component ordering and normalization of the linked runtime.
+//
+// libint's cartesian ordering has SIX build-time conventions (standard/
+// intv3/gamess/orca/bagel/molden) and its components carry the CCA
+// normalization (only the pure-power x^l component is unit-normalized).
+// Both are identified/verified EMPIRICALLY per angular momentum: the
+// overlap row of an s shell displaced to a generic point against the
+// cartesian shell factorizes into 1D integrals I_i(Rx) I_j(Ry) I_k(Rz),
+// all distinct at a generic point, so ranking |values| identifies each
+// slot's (i, j, k); the self-overlap diagonal must then match the CCA
+// pattern prod(2n-1)!!/(2l-1)!!. Outputs are permuted to the descending-
+// lexicographic order (xx, xy, xz, yy, yz, zz, ...) and rescaled to
+// unit-normalized components - the molden/CP2K coefficient convention.
+
+static double cart_double_factorial(int n) {
+  double r = 1.0;
+  for (int k = n; k > 1; k -= 2) { r *= k; }
+  return r;
+}
+
+// 1D overlap of unit-exponent gaussians: int e^{-(x-X)^2} x^a e^{-x^2} dx
+static double cart_probe_I(int a, double X) {
+  const double mu = 0.5 * X;
+  std::vector<double> M(a + 1, 0.0);
+  M[0] = std::sqrt(2.0 * std::atan(1.0) * 2.0) * 0.5; // sqrt(pi/2)/... see below
+  M[0] = std::sqrt(4.0 * std::atan(1.0) / 2.0);       // sqrt(pi/2)
+  for (int k = 2; k <= a; k += 2) { M[k] = 0.25 * (k - 1) * M[k - 2]; }
+  double binom = 1.0;
+  double s = 0.0;
+  for (int k = 0; k <= a; k++) {
+    if (k > 0) { binom *= static_cast<double>(a - k + 1) / k; }
+    if (k % 2 == 0) { s += binom * std::pow(mu, a - k) * M[k]; }
+  }
+  return std::exp(-0.5 * X * X) * s;
+}
+
+struct CartMap {
+  std::vector<std::size_t> to_lex; // runtime slot -> lexicographic slot
+  std::vector<double> scale;       // per runtime slot: CCA -> unit norm
+};
+
+static const CartMap &cart_lex_map(int l) {
+  static std::map<int, CartMap> cache;
+  static std::mutex mtx;
+  std::lock_guard<std::mutex> lock(mtx);
+  auto it = cache.find(l);
+  if (it != cache.end()) { return it->second; }
+
+  if (!libint2::initialized()) { libint2::initialize(); }
+  const std::size_t n = static_cast<std::size_t>((l + 1) * (l + 2) / 2);
+  // descending-lexicographic (i, j, k) enumeration - the canonical order
+  std::vector<std::array<int, 3>> lex;
+  for (int i = l; i >= 0; i--) {
+    for (int j = l - i; j >= 0; j--) { lex.push_back({i, j, l - i - j}); }
+  }
+
+  const double R[3] = {0.37, 0.61, 0.83};
+  libint2::svector<double> e;
+  e.push_back(1.0);
+  libint2::svector<double> c;
+  c.push_back(1.0);
+  libint2::Shell s_shell{e, {{0, false, c}}, {{R[0], R[1], R[2]}}};
+  libint2::Shell cart_shell{e, {{l, false, c}}, {{0.0, 0.0, 0.0}}};
+  libint2::Engine engine(libint2::Operator::overlap, 1, l, 0);
+  const auto &buf = engine.results();
+  engine.compute(s_shell, cart_shell);
+  std::vector<double> meas(n);
+  for (std::size_t f = 0; f < n; f++) { meas[f] = buf[0][f]; }
+
+  // predictions in lexicographic order (common positive prefactor):
+  // the s shell is unit-normalized and the cartesian shell shares one
+  // contraction scale, so relative values identify the slots
+  std::vector<double> pred(n);
+  for (std::size_t q = 0; q < n; q++) {
+    pred[q] = cart_probe_I(lex[q][0], R[0]) * cart_probe_I(lex[q][1], R[1]) *
+              cart_probe_I(lex[q][2], R[2]);
+  }
+
+  // rank matching: all predictions are positive and distinct at a
+  // generic point, so sorted measured values correspond to sorted
+  // predictions one-to-one
+  std::vector<std::size_t> order_m(n), order_p(n);
+  for (std::size_t q = 0; q < n; q++) { order_m[q] = order_p[q] = q; }
+  std::sort(order_m.begin(), order_m.end(),
+            [&](std::size_t a1, std::size_t a2) { return meas[a1] < meas[a2]; });
+  std::sort(order_p.begin(), order_p.end(),
+            [&](std::size_t a1, std::size_t a2) { return pred[a1] < pred[a2]; });
+  CartMap cm;
+  cm.to_lex.resize(n);
+  cm.scale.resize(n);
+  for (std::size_t q = 0; q < n; q++) { cm.to_lex[order_m[q]] = order_p[q]; }
+
+  // verify the identification: measured / predicted must be one common
+  // positive constant across every slot
+  const double lam = meas[order_m[n - 1]] / pred[order_p[n - 1]];
+  for (std::size_t f = 0; f < n; f++) {
+    const double rel =
+        std::fabs(meas[f] - lam * pred[cm.to_lex[f]]) / std::fabs(meas[f]);
+    if (!(rel < 1e-6) || !(lam > 0.0)) {
+      std::cout << "Error in libint2_wrappers: the cartesian ordering probe"
+                   " for l = " << l << " does not factorize as cartesian"
+                   " gaussian overlaps (slot " << f << ", relative deviation "
+                << rel << ") - unknown component convention\n";
+      throw std::runtime_error(
+          "libra C++ error - see the message printed above");
+    }
+  }
+
+  // verify the CCA normalization on the self-overlap diagonal and build
+  // the unit-normalization rescale
+  libint2::Engine engine2(libint2::Operator::overlap, 1, l, 0);
+  const auto &buf2 = engine2.results();
+  engine2.compute(cart_shell, cart_shell);
+  const double dfl = cart_double_factorial(2 * l - 1);
+  for (std::size_t f = 0; f < n; f++) {
+    const auto &t = lex[cm.to_lex[f]];
+    const double cca = cart_double_factorial(2 * t[0] - 1) *
+                       cart_double_factorial(2 * t[1] - 1) *
+                       cart_double_factorial(2 * t[2] - 1) / dfl;
+    const double diag = buf2[0][f * n + f];
+    if (!(std::fabs(diag - cca) < 1e-6)) {
+      std::cout << "Error in libint2_wrappers: the cartesian self-overlap"
+                   " diagonal for l = " << l << " slot " << f << " is "
+                << diag << ", expected the CCA value " << cca
+                << " - unknown normalization convention\n";
+      throw std::runtime_error(
+          "libra C++ error - see the message printed above");
+    }
+    cm.scale[f] = 1.0 / std::sqrt(cca);
+  }
+
+  return cache.emplace(l, std::move(cm)).first->second;
+}
+
+// Combined per-shell output transform: index map + per-component scale.
+// Pure shells: the solid-harmonic permutation (unit scale); cartesian
+// l >= 2: the empirical lexicographic map + CCA -> unit rescale.
+static bool shell_out_transform(const libint2::Shell &sh, bool shg_std,
+                                std::vector<std::size_t> &map,
+                                std::vector<double> &scale) {
+  const std::size_t n = sh.size();
+  const int l = sh.contr[0].l;
+  const bool pure = sh.contr[0].pure;
+  map.resize(n);
+  scale.assign(n, 1.0);
+  if (pure) {
+    for (std::size_t f = 0; f < n; f++) {
+      map[f] = (shg_std && l > 0) ? shg_gaussian_pos(l, f) : f;
+    }
+    return shg_std && l > 0;
+  }
+  if (l < 2) {
+    for (std::size_t f = 0; f < n; f++) { map[f] = f; }
+    return false;
+  }
+  const CartMap &cm = cart_lex_map(l);
+  map = cm.to_lex;
+  scale = cm.scale;
+  return true;
+}
+
+// main-thread warm-up: probing must not happen inside worker threads
+static void cart_warmup(const std::vector<libint2::Shell> &shells) {
+  for (const auto &sh : shells) {
+    if (!sh.contr[0].pure && sh.contr[0].l >= 2) { cart_lex_map(sh.contr[0].l); }
+  }
+}
+
 // This function adds the basis sets for each atomic type to a libint2::Shell
 // variable
 void add_to_shell(std::vector<libint2::Shell> &shells, int l_val,
