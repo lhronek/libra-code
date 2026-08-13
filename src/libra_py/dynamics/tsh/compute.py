@@ -38,6 +38,7 @@ import os
 import sys
 import math
 import copy
+import json
 import time
 if sys.platform == "cygwin":
     from cyglibra_core import *
@@ -73,8 +74,123 @@ def _with_blas_cap(param_pos):
     return deco
 
 
+_TSH_METHOD_NAMES = {-1: "no hops", 0: "FSSH", 1: "GFSH", 2: "MSSH", 3: "LZ",
+                     4: "ZN", 5: "DISH", 6: "MASH", 7: "FSSH2", 8: "FSSH3",
+                     9: "GFSH original"}
+_ENSEMBLE_NAMES = {0: "NVE", 1: "NVT"}
+
+
+def _params_json_default(obj):
+    """JSON fallback for non-serializable parameter values: matrices reduce
+    to shape tags (the payloads do not belong in a provenance file)."""
+    if hasattr(obj, "num_of_rows") and hasattr(obj, "num_of_cols"):
+        return F"<{type(obj).__name__} {obj.num_of_rows}x{obj.num_of_cols}>"
+    if isinstance(obj, range):
+        return list(obj)
+    return repr(obj)
+
+
+def _dump_simulation_params(prefix, dyn_params, model_params, init_params):
+    """Write the full merged parameter dictionaries into
+    {prefix}/simulation-params.json."""
+    payload = {"dyn_params": dyn_params, "model_params": model_params}
+    if init_params:
+        payload.update(init_params)
+    os.makedirs(prefix, exist_ok=True)
+    with open(F"{prefix}/simulation-params.json", "w") as f:
+        json.dump(payload, f, indent=2, default=_params_json_default)
+
+
+def _print_simulation_params(dyn_params, nadi, init_params=None, model_params=None):
+    """The curated run-settings block: groups organized by meaning, keys 1:1
+    with the parameter dicts (dotted init_elec./init_nucl./model_params.
+    paths match the JSON structure), values right-aligned to column 80."""
+    IND, W = 24, 80
+
+    def row(key, val, label=""):
+        left = (label + " " * IND)[:IND]
+        s = left + key
+        return s + str(val).rjust(W - len(s))
+
+    def named(value, names):
+        v = int(value)
+        return F"{names[v]} ({v})" if v in names else v
+
+    dashes = " " * IND + "-" * (W - IND)
+    p = dyn_params
+    lines = [
+        row("nsteps:", p["nsteps"], "SIMULATION"),
+        row("dt [fs]:", F"{p['dt'] * units.au2fs:.4f}"),
+        row("ntraj:", p["ntraj"]),
+        row("nstates (nadi):", nadi),
+        row("icond:", p["icond"]),
+        dashes,
+    ]
+    if init_params:
+        ie = init_params.get("init_elec", {})
+        inl = init_params.get("init_nucl", {})
+        if ie:
+            lines += [row("init_elec.rep:", ie.get("rep", "n/a"), "INITIAL CONDITIONS"),
+                      row("init_elec.init_type:", ie.get("init_type", "n/a")),
+                      row("init_elec.istate:", ie.get("istate", "n/a")),
+                      row("init_elec.init_dm_type:", ie.get("init_dm_type", "n/a"))]
+            if int(ie.get("init_type", 0)) in (2, 3):
+                ist = ie.get("istates", [])
+                val = ist if len(ist) <= 6 else F"list({len(ist)})"
+                lines.append(row("init_elec.istates:", val))
+        if inl:
+            lines += [row("init_nucl.init_type:", inl.get("init_type", "n/a")),
+                      row("init_nucl.ndof:", inl.get("ndof", "n/a"))]
+        if ie or inl:
+            lines.append(dashes)
+    lines += [
+        row("ham_update_method:", p["ham_update_method"], "HAMILTONIAN"),
+        row("ham_transform_method:", p["ham_transform_method"]),
+        row("time_overlap_method:", p["time_overlap_method"]),
+        row("isNBRA:", p["isNBRA"]),
+        row("nfiles:", p["nfiles"]),
+    ]
+    if model_params and "model" in model_params:
+        lines.append(row("model_params.model:", model_params["model"]))
+    lines += [
+        dashes,
+        row("nac_update_method:", p["nac_update_method"], "NACs"),
+        row("nac_algo:", p["nac_algo"]),
+        row("hvib_update_method:", p["hvib_update_method"]),
+        row("do_nac_phase_correction:", p["do_nac_phase_correction"]),
+        dashes,
+        row("rep_tdse:", p["rep_tdse"], "ELECTRONIC PROPAGATION"),
+        row("electronic_integrator:", p["electronic_integrator"]),
+        row("num_electronic_substeps:", p["num_electronic_substeps"]),
+        row("state_tracking_algo:", p["state_tracking_algo"]),
+        row("do_phase_correction:", p["do_phase_correction"]),
+        dashes,
+        row("force_method:", p["force_method"], "NUCLEAR MOTION"),
+        row("rep_force:", p["rep_force"]),
+        row("ensemble:", named(p["ensemble"], _ENSEMBLE_NAMES)),
+        row("Temperature [K]:", F"{p['Temperature']:.2f}"),
+        dashes,
+        row("tsh_method:", named(p["tsh_method"], _TSH_METHOD_NAMES), "SURFACE HOPPING"),
+        row("rep_sh:", p["rep_sh"]),
+        row("hop_acceptance_algo:", p["hop_acceptance_algo"]),
+        row("momenta_rescaling_algo:", p["momenta_rescaling_algo"]),
+        dashes,
+    ]
+    deco = int(p["decoherence_algo"])
+    if deco == -1:
+        lines.append(("DECOHERENCE" + " " * IND)[:IND] +
+                     "No decoherence (decoherence_algo = -1)")
+    else:
+        lines.append(row("decoherence_algo:", deco, "DECOHERENCE"))
+        lines.append(row("decoherence_times_type:", p.get("decoherence_times_type", "n/a")))
+        lines.append(row("dephasing_informed:", p.get("dephasing_informed", "n/a")))
+    lines.append(dashes)
+    lines.append(row("parameters dumped to:", "simulation-params.json"))
+    print("\n".join(lines), flush=True)
+
+
 @_with_blas_cap(1)
-def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd):
+def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, init_params=None):
     """
 
     Args:
@@ -770,6 +886,15 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd):
             * **dyn_params["nprint"]** ( int ): the number of steps in between data saves [ default: 1 ]
 
 
+            * **dyn_params["print_params"]** ( int ): what to report about the simulation
+                parameters at the start of the run:
+
+                - 0: nothing [ default ]
+                - 1: a curated settings block to stdout + the full parameter dictionaries
+                    dumped to {prefix}/simulation-params.json
+                - 2: additionally the full dyn_params echoed to stdout
+
+
             * **dyn_params["prefix"]** ( string ): the name of the folder to be created by this function.
                 All the data files will be created in that folder [ default: "out" ]
 
@@ -946,6 +1071,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd):
     # ================= Variables specific to Python version: saving ================
     default_params.update({"nsteps": 1,
                            "nprint": 1,
+                           "print_params": 0,
                            "prefix": "out",
                            "prefix2": "out2",
                            "hdf5_output_level": -1,
@@ -1030,6 +1156,13 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd):
 
     if (dyn_params["quantum_dofs"] is None):
         dyn_params["quantum_dofs"] = list(range(nnucl))
+
+    if dyn_params["print_params"] > 0:
+        _print_simulation_params(dyn_params, nadi, init_params, model_params)
+        _dump_simulation_params(prefix, dyn_params, model_params, init_params)
+    if dyn_params["print_params"] > 1:
+        for key in sorted(dyn_params.keys()):
+            print(F"  {key} = {dyn_params[key]}")
 
     # Initialize savers
     #_savers = save.init_tsh_savers(dyn_params, model_params, nsteps, ntraj, nnucl, nadi, ndia)
@@ -1433,7 +1566,8 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
 
     # Finally, start the dynamics calculations
     #sys.exit(0)
-    res = run_dynamics(dyn_var, dyn_params, ham, compute_model, model_params, rnd)
+    res = run_dynamics(dyn_var, dyn_params, ham, compute_model, model_params, rnd,
+                       init_params={"init_elec": init_elec, "init_nucl": init_nucl})
     return res
 
 
