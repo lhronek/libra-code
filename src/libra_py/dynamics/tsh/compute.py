@@ -164,18 +164,103 @@ def _print_simulation_params(dyn_params, nadi, init_params=None, model_params=No
         row("num_electronic_substeps:", p["num_electronic_substeps"]),
         row("state_tracking_algo:", p["state_tracking_algo"]),
         row("do_phase_correction:", p["do_phase_correction"]),
+    ]
+    if int(p.get("do_phase_correction", 0)) and "phase_correction_tol" in p:
+        lines.append(row("phase_correction_tol:", p["phase_correction_tol"]))
+    tracking = int(p["state_tracking_algo"])
+    if tracking in (2, 21, 4):
+        for key in ("MK_alpha", "MK_verbosity", "MK_scaling_function"):
+            if key in p:
+                lines.append(row(F"{key}:", p[key]))
+    if tracking in (3, 32, 33):
+        for key in ("convergence", "max_number_attempts",
+                    "min_probability_reordering"):
+            if key in p:
+                lines.append(row(F"{key}:", p[key]))
+    if int(p.get("do_ssy", 0)):
+        lines.append(row("do_ssy:", p["do_ssy"]))
+    lines += [
         dashes,
         row("force_method:", p["force_method"], "NUCLEAR MOTION"),
         row("rep_force:", p["rep_force"]),
         row("ensemble:", named(p["ensemble"], _ENSEMBLE_NAMES)),
         row("Temperature [K]:", F"{p['Temperature']:.2f}"),
+    ]
+    if int(p.get("ensemble", 0)) == 1:
+        tdofs = p.get("thermostat_dofs", [])
+        lines.append(row("thermostat_dofs:",
+                         F"list({len(tdofs)})" if len(tdofs) > 6 else tdofs))
+        tp = p.get("thermostat_params", {})
+        if isinstance(tp, dict) and 0 < len(tp) <= 6:
+            for tk in sorted(tp):
+                lines.append(row(F"thermostat_params.{tk}:", tp[tk]))
+        elif tp:
+            lines.append(row("thermostat_params:", F"dict({len(tp)})"))
+    cdofs = p.get("constrained_dofs", [])
+    if cdofs:
+        lines.append(row("constrained_dofs:",
+                         F"list({len(cdofs)})" if len(cdofs) > 6 else cdofs))
+    if int(p.get("entanglement_opt", 0)):
+        lines.append(dashes)
+        lines.append(row("entanglement_opt:", p["entanglement_opt"], "ENTANGLEMENT"))
+        for key in ("ETHD3_alpha", "ETHD3_beta"):
+            if key in p:
+                lines.append(row(F"{key}:", p[key]))
+    lines += [
         dashes,
         row("tsh_method:", named(p["tsh_method"], _TSH_METHOD_NAMES), "SURFACE HOPPING"),
         row("rep_sh:", p["rep_sh"]),
         row("hop_acceptance_algo:", p["hop_acceptance_algo"]),
         row("momenta_rescaling_algo:", p["momenta_rescaling_algo"]),
-        dashes,
     ]
+    tshm = int(p["tsh_method"])
+    if tshm == 7 and "fssh2_revision" in p:
+        lines.append(row("fssh2_revision:", p["fssh2_revision"]))
+    if tshm == 8:
+        for key in ("fssh3_size_option", "fssh3_approach_option",
+                    "fssh3_decomp_option", "fssh3_dt", "fssh3_max_steps",
+                    "fssh3_err_tol"):
+            if key in p:
+                lines.append(row(F"{key}:", p[key]))
+    if tshm in (3, 4):
+        for key in ("rep_lz", "lz_target_space"):
+            if key in p:
+                lines.append(row(F"{key}:", p[key]))
+    if tshm == 5 and "dish_decoherence_event_option" in p:
+        lines.append(row("dish_decoherence_event_option:",
+                         p["dish_decoherence_event_option"]))
+    if int(p.get("use_boltz_factor", 0)):
+        lines.append(row("use_boltz_factor:", p["use_boltz_factor"]))
+    if float(p.get("reorg_energy", 0.0)) != 0.0:
+        lines.append(row("reorg_energy:", p["reorg_energy"]))
+    if int(p.get("use_Jasper_Truhlar_criterion", 0)):
+        lines.append(row("use_Jasper_Truhlar_criterion:",
+                         p["use_Jasper_Truhlar_criterion"]))
+    if int(p.get("enforce_state_following", 0)):
+        lines.append(row("enforce_state_following:", p["enforce_state_following"]))
+        if "enforced_state_index" in p:
+            lines.append(row("enforced_state_index:", p["enforced_state_index"]))
+    if int(p.get("use_qtsh", 0)):
+        lines.append(dashes)
+        lines.append(row("use_qtsh:", p["use_qtsh"], "QTSH"))
+        if "qtsh_force_option" in p:
+            lines.append(row("qtsh_force_option:", p["qtsh_force_option"]))
+    if int(p.get("use_kcrpmd", 0)):
+        lines.append(dashes)
+        lines.append(row("use_kcrpmd:", p["use_kcrpmd"], "KC-RPMD"))
+        for key in ("kcrpmd_eta", "kcrpmd_a", "kcrpmd_b", "kcrpmd_c",
+                    "kcrpmd_gamma", "kcrpmd_gammaKP"):
+            if key in p:
+                lines.append(row(F"{key}:", p[key]))
+    if int(p.get("thermally_corrected_nbra", 0)):
+        lines.append(dashes)
+        lines.append(row("thermally_corrected_nbra:",
+                         p["thermally_corrected_nbra"], "TC-NBRA"))
+        for key in ("total_energy", "tcnbra_nu_therm", "tcnbra_nhc_size",
+                    "tcnbra_do_nac_scaling"):
+            if key in p:
+                lines.append(row(F"{key}:", p[key]))
+    lines.append(dashes)
     deco = int(p["decoherence_algo"])
     if deco == -1:
         lines.append(("DECOHERENCE" + " " * IND)[:IND] +
@@ -184,6 +269,30 @@ def _print_simulation_params(dyn_params, nadi, init_params=None, model_params=No
         lines.append(row("decoherence_algo:", deco, "DECOHERENCE"))
         lines.append(row("decoherence_times_type:", p.get("decoherence_times_type", "n/a")))
         lines.append(row("dephasing_informed:", p.get("dephasing_informed", "n/a")))
+        for key in ("decoherence_rates", "ave_gaps"):
+            if key in p and hasattr(p[key], "num_of_rows"):
+                lines.append(row(F"{key}:", _params_json_default(p[key])))
+        if deco == 0 and "sdm_norm_tolerance" in p:
+            lines.append(row("sdm_norm_tolerance:", p["sdm_norm_tolerance"]))
+        if deco == 1:
+            for key in ("instantaneous_decoherence_variant", "collapse_option"):
+                if key in p:
+                    lines.append(row(F"{key}:", p[key]))
+        if deco in (5, 6):
+            for key in ("coherence_threshold", "e_mask", "use_xf_force",
+                        "project_out_aux", "tp_algo", "use_td_width"):
+                if key in p:
+                    lines.append(row(F"{key}:", p[key]))
+        dtt = int(p.get("decoherence_times_type", -1))
+        if dtt == 1:
+            for key in ("decoherence_C_param", "decoherence_eps_param"):
+                if key in p:
+                    lines.append(row(F"{key}:", p[key]))
+        if dtt in (2, 3, 4):
+            for key in ("schwartz_decoherence_inv_alpha",
+                        "schwartz_interaction_width"):
+                if key in p:
+                    lines.append(row(F"{key}:", p[key]))
     lines.append(dashes)
     lines.append(row("parameters dumped to:", "simulation-params.json"))
     print("\n".join(lines), flush=True)
