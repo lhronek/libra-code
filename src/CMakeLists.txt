@@ -175,6 +175,9 @@ set(LIBRA_SRC ${CMAKE_CURRENT_SOURCE_DIR}/liblibra_core.cpp ${LIBRA_HEADERS})
 
 ADD_LIBRARY(libra_core_stat STATIC ${LIBRA_SRC})
 ADD_LIBRARY(libra_core SHARED ${LIBRA_SRC})
+# the version header is regenerated before every build
+ADD_DEPENDENCIES(libra_core libra_version_h)
+ADD_DEPENDENCIES(libra_core_stat libra_version_h)
 
 #ADD_LIBRARY(libra_core SHARED ${LIBRA_SRC})
 

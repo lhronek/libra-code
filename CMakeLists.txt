@@ -170,6 +170,39 @@ endif()
 # Now building the project
 #
 MESSAGE("Going into subdirectory src...")
+#
+#  Build-time version stamping for the import banner
+#
+set(LIBRA_VERSION_STRING "" CACHE STRING "Override the composed Libra version string verbatim")
+# the development branch carries no release number - releases stamp one
+# through LIBRA_VERSION_STRING, or set a fixed base here:
+#set(LIBRA_VERSION_BASE "5.13.0")
+set(LIBRA_VERSION_BASE "devel")
+set(LIBRA_FLAGS "libint boost_python")
+if(WITH_OPENMP)
+  set(LIBRA_FLAGS "omp ${LIBRA_FLAGS}")
+endif()
+# WITH_BLAS_GEMM is declared in src/math_linalg (default ON) - on the very
+# first configure it is not in the cache yet, so undefined means ON
+if(NOT DEFINED WITH_BLAS_GEMM OR WITH_BLAS_GEMM)
+  set(LIBRA_FLAGS "${LIBRA_FLAGS} blas_gemm")
+endif()
+if(USING_PCH)
+  set(LIBRA_FLAGS "${LIBRA_FLAGS} pch")
+endif()
+add_custom_target(libra_version_h ALL
+  COMMAND ${CMAKE_COMMAND}
+    -DSRC_DIR=${CMAKE_SOURCE_DIR}
+    -DOUT_FILE=${CMAKE_BINARY_DIR}/generated/libra_version.h
+    -DBASE_VERSION=${LIBRA_VERSION_BASE}
+    "-DOVERRIDE=${LIBRA_VERSION_STRING}"
+    "-DLIBINT_VER=${Libint2_VERSION}"
+    "-DFLAGS_STR=${LIBRA_FLAGS}"
+    -P ${CMAKE_SOURCE_DIR}/cmake/gen_version.cmake
+  COMMENT "Stamping libra_version.h"
+  BYPRODUCTS ${CMAKE_BINARY_DIR}/generated/libra_version.h)
+INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR}/generated)
+
 ADD_SUBDIRECTORY("src")
 
 

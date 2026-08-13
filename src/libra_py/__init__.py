@@ -7,6 +7,11 @@
 # * http://www.gnu.org/copyleft/gpl.txt
 # ***********************************************************/
 
+try:
+    from liblibra_core import __version__
+except Exception:
+    __version__ = "unknown"
+
 __all__ = ["models",
            "workflows",
            "recipes",
