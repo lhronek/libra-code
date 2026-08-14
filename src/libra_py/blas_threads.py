@@ -59,18 +59,24 @@ def blas_thread_limit(n):
                 # OpenBLAS pool (BLAS + its bundled LAPACK)
                 get = getattr(handle, 'openblas_get_num_threads', None)
                 set_ = getattr(handle, 'openblas_set_num_threads', None)
-                if set_ is not None:
-                    saved.append((set_, get() if get is not None else 0))
-                    set_(n)
+                # cap only what can be restored - a getter-less cap
+                # would stick process-wide
+                if set_ is not None and get is not None:
+                    old = get()
+                    if old > 0:
+                        saved.append((set_, old))
+                        set_(n)
                 # OpenMP runtime (Eigen products, raw omp regions) -
                 # threadpoolctl caps it, so the fallback must too;
                 # omp_set_num_threads acts on the calling thread's ICV,
                 # which is the thread running this compute region
                 oget = getattr(handle, 'omp_get_max_threads', None)
                 oset = getattr(handle, 'omp_set_num_threads', None)
-                if oset is not None:
-                    saved.append((oset, oget() if oget is not None else 0))
-                    oset(n)
+                if oset is not None and oget is not None:
+                    old = oget()
+                    if old > 0:
+                        saved.append((oset, old))
+                        oset(n)
             except OSError:
                 pass
     except OSError:
