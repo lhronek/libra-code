@@ -383,6 +383,14 @@ void dyn_control_params::sanity_check(){
     }
   }
 
+  /// TC-NBRA scales per-trajectory couplings - a shared NBRA child
+  /// would compound every trajectory's factor on the same matrices
+  if(thermally_corrected_nbra==1 && isNBRA==1){
+    std::cout<<"Error in dyn_control_params::sanity_check: thermally_corrected_nbra needs "
+        <<"per-trajectory child Hamiltonians - run it with isNBRA = 0\n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
   /// Shall not use DISH with the decoherence correction
   /// (tsh_method 3 is Landau-Zener - DISH is 5)
   if(tsh_method==5 && decoherence_algo!=-1){

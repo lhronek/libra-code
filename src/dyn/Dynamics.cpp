@@ -157,12 +157,14 @@ void apply_afssh(dyn_variables &dyn_var, CMATRIX &C, vector<int> &act_states,
   //=========================== Propagate moments ===============
   for (traj = 0; traj < ntraj; traj++) {
 
-    hvib_curr = ham.children[traj]->get_hvib_adi();
+    // the shared NBRA child serves every trajectory
+    nHamiltonian *chld = ham.child(traj);
+    hvib_curr = chld->get_hvib_adi();
     c_traj = C.col(traj);
 
     for (idof = 0; idof < ndof; idof++) {
 
-      force_full = -1.0 * ham.children[traj]->get_d1ham_adi(idof);
+      force_full = -1.0 * chld->get_d1ham_adi(idof);
 
       for (i = 0; i < nst; i++) {
         force_diag.set(i, i, force_full.get(i, i));
@@ -198,14 +200,14 @@ void apply_afssh(dyn_variables &dyn_var, CMATRIX &C, vector<int> &act_states,
 
         double dx_ii = dR_afssh.get(i, i).real();
         int as = act_states[traj];
-        double f_i = -ham.children[traj]->get_d1ham_adi(idof).get(i, i).real();
+        double f_i = -ham.child(traj)->get_d1ham_adi(idof).get(i, i).real();
         double f_as =
-            -ham.children[traj]->get_d1ham_adi(idof).get(as, as).real();
+            -ham.child(traj)->get_d1ham_adi(idof).get(as, as).real();
 
         gamma_reset_i -= 0.5 * (f_i - f_as) * dx_ii;
 
         double f_ji =
-            -ham.children[traj]->get_d1ham_adi(idof).get(as, i).real();
+            -ham.child(traj)->get_d1ham_adi(idof).get(as, i).real();
         gamma_collapse_i += f_ji * dx_ii;
 
       } // for idof
@@ -447,6 +449,16 @@ void apply_thermal_correction(dyn_variables &dyn_var, nHamiltonian &ham,
     nst = -1;
   } // to throw an error
 
+  // per-trajectory scale factors cannot live on a shared NBRA child -
+  // every trajectory's factor would compound on the same matrices
+  if ((int)ham.children.size() < ntraj) {
+    cout << "Error in apply_thermal_correction(): TC-NBRA scales per-trajectory "
+         << "couplings, but the hierarchy carries " << ham.children.size()
+         << " children for " << ntraj << " trajectories - per-trajectory "
+         << "child Hamiltonians are required\n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
   for (int itraj = 0; itraj < ntraj; itraj++) {
 
     int i = dyn_var.act_states[itraj];
@@ -528,6 +540,16 @@ void remove_thermal_correction(dyn_variables &dyn_var, nHamiltonian &ham,
     nst = ndia;
   } else if (prms.rep_tdse == 1 || prms.rep_tdse == 3) {
     nst = nadi;
+  }
+
+  // per-trajectory scale factors cannot live on a shared NBRA child -
+  // every trajectory's factor would compound on the same matrices
+  if ((int)ham.children.size() < ntraj) {
+    cout << "Error in remove_thermal_correction(): TC-NBRA scales per-trajectory "
+         << "couplings, but the hierarchy carries " << ham.children.size()
+         << " children for " << ntraj << " trajectories - per-trajectory "
+         << "child Hamiltonians are required\n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   for (int itraj = 0; itraj < ntraj; itraj++) {
@@ -2106,8 +2128,9 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       for (i = 0; i < nadi; i++) {
         for (j = 0; j < nadi; j++) {
             // dE_ij = E_i - E_j
-            double E_i = ham.children[traj]->hvib_adi->get(i,i).real();
-            double E_j = ham.children[traj]->hvib_adi->get(j,j).real();
+            // the shared NBRA child serves every trajectory
+            double E_i = ham.child(traj)->hvib_adi->get(i,i).real();
+            double E_j = ham.child(traj)->hvib_adi->get(j,j).real();
             double dE_ij = E_i - E_j;
             dyn_var.gaps_curr[traj][i][j] = dE_ij;
             dyn_var.coherence_clocks[traj][i][j] += prms.dt;
