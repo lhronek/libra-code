@@ -7,10 +7,16 @@
 # * http://www.gnu.org/copyleft/gpl.txt
 # ***********************************************************/
 
-try:
-    from liblibra_core import __version__
-except Exception:
-    __version__ = "unknown"
+def __getattr__(name):
+    # lazy: importing libra_py must not load the C++ extension (banner
+    # side effect, segfault surface under a mismatched python)
+    if name == "__version__":
+        try:
+            from liblibra_core import __version__ as v
+        except Exception:
+            v = "unknown"
+        return v
+    raise AttributeError(F"module 'libra_py' has no attribute '{name}'")
 
 __all__ = ["models",
            "workflows",
