@@ -1236,6 +1236,23 @@ void exp_(CMATRIX& res, CMATRIX& x, complex<double> dt){
   if(res.n_rows != sz || res.n_cols != sz){
     cout<<"Error in libspecialfunctions::exp_ : the output matrix does not match the input size\n"; throw std::runtime_error("libra C++ error - see the message printed above");
   }
+  // both eigensolver paths read ONE triangle - a non-Hermitian input
+  // silently becomes the exp of its mirrored matrix (zheevd mirrors the
+  // upper of the row-major buffer, the Eigen fallback the lower)
+  double amax_ = 0.0, hdev_ = 0.0;
+  for(i = 0; i < sz; i++){
+    for(int j = i; j < sz; j++){
+      double m_ = std::max(std::abs(x.get(i,j)), std::abs(x.get(j,i)));
+      if(m_ > amax_){ amax_ = m_; }
+      double d_ = std::abs(x.get(i,j) - std::conj(x.get(j,i)));
+      if(d_ > hdev_){ hdev_ = d_; }
+    }
+  }
+  if(hdev_ > 1e-8 * std::max(amax_, 1.0)){
+    cout<<"Error in libspecialfunctions::exp_ : the input matrix is not Hermitian "
+        <<"(max |x_ij - conj(x_ji)| = "<<hdev_<<" at scale "<<amax_<<")\n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 #ifdef HAVE_LAPACK_ZHEEVD
   {
     // LAPACK divide-and-conquer path. x is Hermitian; its row-major buffer
