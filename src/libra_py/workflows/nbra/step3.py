@@ -2401,7 +2401,10 @@ def run_step3_sd_nacs_libint(params):
                 overlaps (same vocabulary as cp2k_compute_adi): "lowdin"/True,
                 "lowdin_cached" [default] (identical to "lowdin"; the ket factor is carried to
                 the next step in a per-process cache - one fractional matrix power per
-                step serially, hits inside contiguous Pool chunks too), "none"/False
+                step serially, hits inside contiguous Pool chunks too), "none"/False.
+                The default CHANGED from the historical False (raw overlaps) to
+                "lowdin_cached" - the Lowdin route is the validated convention;
+                set "none" explicitly to reproduce pre-change data
             * **params['npz_file_ks_homo_index']** (integer): the KS HOMO index of the raw npz files.
             * **params['is_many_body']** (bool): a True or False flag for computing the overlaps and energies
                                                  for many-body states
