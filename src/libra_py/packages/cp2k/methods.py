@@ -2513,7 +2513,9 @@ def compute_energies_coeffs(ks_mat, overlap):
     U_inv = np.linalg.inv(U)
     UT_inv = np.linalg.inv(U.T)
     K_prime = np.linalg.multi_dot([UT_inv, ks_mat, U_inv])
-    eigenvalues, eigenvectors = np.linalg.eig(K_prime)
+    # the symmetric solver: eig leaves (near-)degenerate subspaces
+    # non-orthogonal, breaking V S V^T = I downstream
+    eigenvalues, eigenvectors = np.linalg.eigh(K_prime)
     # Transform back the coefficients
     eigenvectors = np.dot(U_inv, eigenvectors)
     sorted_indices = np.argsort(eigenvalues)
@@ -2534,15 +2536,17 @@ def compute_energies_coeffs_scipy(ks_mat, overlap):
         eigenvalues (numpy array): The energies (eigenvalues)
         eigenvectors (numpy array): The MO coefficients
     """
-    # Cholesky decomposition of the overlap matrix
-    U = scipy.linalg.cholesky(overlap).T
+    # Cholesky decomposition of the overlap matrix; scipy returns the
+    # UPPER factor (S = U^T U) - numpy returns the lower, hence no .T here
+    U = scipy.linalg.cholesky(overlap)
     # One ca also use the following as well but it is computationally more demanding
     # U = scipy.linalg.fractional_matrix_power(S, 0.5)
     U_inv = scipy.linalg.inv(U)
     UT_inv = scipy.linalg.inv(U.T)
     # K_prime = scipy.linalg.multi_dot( [UT_inv, ks_mat, U_inv] )
     K_prime = UT_inv @ ks_mat @ U_inv
-    eigenvalues, eigenvectors = scipy.linalg.eig(K_prime)
+    # the symmetric solver, as in compute_energies_coeffs
+    eigenvalues, eigenvectors = scipy.linalg.eigh(K_prime)
     # Transform back the coefficients
     eigenvectors = U_inv @ eigenvectors
     sorted_indices = np.argsort(eigenvalues)
