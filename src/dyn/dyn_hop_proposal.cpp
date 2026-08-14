@@ -827,6 +827,14 @@ gap-minimum probabilities (rep_lz = 4) come from hopping_probabilities_bllz \n";
     throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
+  // reps 0 and 3 pair diabatic crossings with adiabatic state labels
+  if((rep==0 || rep==3) && ham->ndia != ham->nadi){
+    cout<<"Error in hopping_probabilities_lz(): rep_lz = "<<rep<<" pairs diabatic \
+crossings with adiabatic state labels - it requires ndia == nadi (got ndia = "
+        <<ham->ndia<<", nadi = "<<ham->nadi<<"); use rep_lz = 5 or 4 \n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
   if(rep==2){
     // NAC sign switches on real manifolds fire away from the gap minima
     // (spurious population drain) - the detection, not the P formula,
@@ -980,9 +988,10 @@ obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
     // the same silent-zero-detection class for the NAC-switch detector:
     // NAC matrices are antisymmetric, so an all-zero real part has
     // max_elt exactly zero
-    if(rep==2 && nac_adi.max_elt()==0.0 && nac_adi_prev.max_elt()==0.0){
-      cout<<"Error in hopping_probabilities_lz(): rep_lz = 2 detects sign switches of the REAL \
-part of nac_adi, which is all-zero at two consecutive steps. NBRA models must supply \
+    if((rep==2 || rep==5) && nac_adi.max_elt()==0.0 && nac_adi_prev.max_elt()==0.0){
+      cout<<"Error in hopping_probabilities_lz(): rep_lz = "<<rep<<" uses the REAL part \
+of nac_adi (sign-switch detection / the Massey exponent), which is all-zero at two \
+consecutive steps. NBRA models must supply \
 obj.nac_adi with the couplings in the real part (obj.nac_ci is not an ingested attribute) \n";
       throw std::runtime_error("libra C++ error - see the message printed above");
     }
@@ -1045,6 +1054,12 @@ obj.nac_adi with the couplings in the real part (obj.nac_ci is not an ingested a
             double Z_ij = (Z_star >= 0.0) ? Z_star
                         : fabs(ham_adi.get(i,i) - ham_adi.get(j,j));
             double nac_ij = fabs(nac_adi.get(i,j));
+            if(Z_star > 0.0){
+              // nac Z^2 is conserved along a locally-linear passage -
+              // evaluate the NAC at the crossing, like rep 5
+              double Z_c = fabs(ham_adi.get(i,i) - ham_adi.get(j,j));
+              nac_ij *= (Z_c/Z_star)*(Z_c/Z_star);
+            }
             if(nac_ij > 0.0){ g_ij = exp(-0.25*M_PI*Z_ij/nac_ij);     }
           }
           gap_mins[j] = Z_star;
@@ -1334,6 +1349,14 @@ vector<double> hopping_probabilities_zn(nHamiltonian* ham, nHamiltonian* ham_pre
   int ndof = ham->nnucl;
   int nstates = ham->ndia; 
 //  int ntraj = ham->children.size();
+
+  // ZN pairs diabatic crossings and forces with adiabatic state labels
+  if(ham->ndia != ham->nadi){
+    cout<<"Error in hopping_probabilities_zn(): the crossing detection pairs diabatic \
+channels with adiabatic state labels - it requires ndia == nadi (got ndia = "
+        <<ham->ndia<<", nadi = "<<ham->nadi<<") \n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
   vector<double> g(nstates, 0.0);
 
