@@ -58,29 +58,29 @@ def init_qtag_data(saver, output_level, _nsteps, _ntraj, _ndof, _nstates):
     if output_level >= 2:
 
         # State populations
-        if "pops" in saver.keywords:  # and "pops" in saver.np_data.keys():
+        if "pops" in saver.keywords:  # _has_slot(saver, "pops"):
             saver.add_dataset("pops", (_nsteps, _nstates), "R")
 
         # Trajectory basis coefficients
-        if "coeffs" in saver.keywords:  # and "coeffs" in saver.np_data.keys():
+        if "coeffs" in saver.keywords:  # _has_slot(saver, "coeffs"):
             saver.add_dataset("coeffs", (_nsteps, 1, _ntraj), "C")
 
     if output_level >= 3:
 
         # Trajectory positions
-        if "q" in saver.keywords:  # and "q" in saver.np_data.keys():
+        if "q" in saver.keywords:  # _has_slot(saver, "q"):
             saver.add_dataset("q", (_nsteps, _ntraj, _ndof), "R")
 
         # Trajectory x-dependent phases
-        if "p" in saver.keywords:  # and "p" in saver.np_data.keys():
+        if "p" in saver.keywords:  # _has_slot(saver, "p"):
             saver.add_dataset("p", (_nsteps, _ntraj, _ndof), "R")
 
         # Trajectory widths
-        if "a" in saver.keywords:  # and "a" in saver.np_data.keys():
+        if "a" in saver.keywords:  # _has_slot(saver, "a"):
             saver.add_dataset("a", (_nsteps, _ntraj, _ndof), "R")
 
         # Trajectory x-independent phases
-        if "s" in saver.keywords:  # and "s" in saver.np_data.keys():
+        if "s" in saver.keywords:  # _has_slot(saver, "s"):
             saver.add_dataset("s", (_nsteps, _ntraj, _ndof), "R")
 
 
