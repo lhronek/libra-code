@@ -3986,10 +3986,14 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
         run_params.pop(k, None)
     q2 = np.concatenate([np.asarray(coords_prev_bohr, dtype=float),
                          np.asarray(coords_curr_bohr, dtype=float)])
-    logfile = run_cp2k(q2, run_params)
     project = run_params.get("project", "libra")
     csr = os.path.join(run_params.get("working_directory", "wd"),
                        f"{project}-S_SPIN_1-1_0.csr")
+    # consume only a csr written by THIS run - a stale one (e.g. left
+    # by a pre-rebuild patched CP2K) would freeze the AO overlap
+    if os.path.exists(csr):
+        os.remove(csr)
+    logfile = run_cp2k(q2, run_params)
     if os.path.exists(csr):        # patched CP2K + &S_CSR_WRITE template: O(nnz)
         S = read_cp2k_s_csr(csr)
     else:                          # fallback: dense &AO_MATRICES log print
