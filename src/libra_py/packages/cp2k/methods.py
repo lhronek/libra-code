@@ -3699,8 +3699,12 @@ def sd_overlaps(sd_states, St_mo, S_mo_prev, S_mo_curr, orthonormalize=True,
     s2 = sc[:, None] * ovlp(sd_states, sd_states,
                             _two_spinor(S_mo_curr)) * sc[None, :]
     if mode == "lowdin":
-        st, _ = ortho.apply_orthonormalization_scipy(s1, s2, st)
-        s2, _ = ortho.apply_orthonormalization_scipy(s2, s2, s2)
+        # two factorizations, not four: the composed helper calls
+        # re-factorized s2 three times
+        u1 = ortho.get_Lowdin_scipy(s1)
+        u2 = ortho.get_Lowdin_scipy(s2)
+        st = np.linalg.multi_dot([u1.transpose(), st, u2])
+        s2 = np.linalg.multi_dot([u2.transpose(), s2, u2])
     elif mode == "lowdin_cached":
         i1 = None
         if cache.get("digest") == ortho.lowdin_digest(S_mo_prev, repr(sd_states_prev) + kernel):
