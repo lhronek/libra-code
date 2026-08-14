@@ -513,10 +513,8 @@ def run_cp2k_libint_step2(params):
             'x',
             'y',
             'z']}
-    # every read of the xTB flag uses 'isxTB' (and the defaults dict used to
-    # misspell it 'isXTB', so the default never applied) - a params dict
-    # carrying the capital form can only be a typo, and it would otherwise
-    # silently fall back to the DFT branch now that the lowercase default exists
+    # every read of the xTB flag uses 'isxTB' - a dict carrying the capital
+    # form can only be a typo and would silently fall back to the DFT branch
     if 'isXTB' in params:
         raise ValueError("params['isXTB'] is not read by this workflow - use 'isxTB'")
     comn.check_input(params, default_params, critical_params)

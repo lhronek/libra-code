@@ -713,9 +713,7 @@ def make_active_space(num_occ,
         new_ks_homo_index = num_occ
         return new_active_space, new_ks_homo_index
     elif isUKS:
-        # per-channel bounds (the old check compared the generic num_unocc
-        # against the alpha HOMO only, while the ranges below use the
-        # per-channel values)
+        # per-channel bounds
         if not 1 <= homo_alpha <= num_states - 1 or not 1 <= homo_beta <= num_states - 1:
             raise ValueError(F"the stored orbital range does not bracket the HOMOs "
                              F"(per-spin HOMO indices alpha={homo_alpha}, "
@@ -1960,9 +1958,8 @@ def sort_unique_SD_basis_scipy(step, sd_states_unique, sd_states_reindexed, _par
     return E_this_sd_sparse, sd_states_unique_sorted, sd_states_reindexed_sorted, reindex_nsteps
 
 
-# The BLAS thread cap lives in libra_py.blas_threads - it is shared with
-# the TSH dynamics loop (dyn_params["blas_num_threads"]); the old private
-# name is kept as an alias for the call sites below.
+# shared with the TSH dynamics loop (dyn_params["blas_num_threads"]);
+# the underscore alias serves the call sites below
 from libra_py.blas_threads import blas_thread_limit as _blas_thread_limit
 
 
