@@ -3845,7 +3845,7 @@ def make_overlap_deltat_input(template_file, csr_write=True):
                 emit_overlap_print(indent + "  ")
                 have_out = True
             if name == "TOPOLOGY":
-                pass    # CONNECTIVITY handled below via lookahead flag
+                pass    # CONNECTIVITY enforced in the per-section walk below
             continue
         if skip_until is not None:
             continue
@@ -3861,16 +3861,39 @@ def make_overlap_deltat_input(template_file, csr_write=True):
                 continue
         out.append(ln)
 
-    # enforce CONNECTIVITY OFF in every &TOPOLOGY section
+    # every &TOPOLOGY section ends up with exactly CONNECTIVITY OFF:
+    # existing directives are replaced, absent ones injected
     fixed = []
-    depth_topo = 0
-    topo_has_conn = "CONNECTIVITY" in "\n".join(out).upper()
+    in_topo = False
+    topo_sub = []          # subsection names inside the current &TOPOLOGY
+    topo_done = False
     for ln in out:
+        word = ln.strip()
+        up = word.upper()
+        indent = ln[:len(ln) - len(ln.lstrip())]
+        if in_topo and up.startswith("&END"):
+            if topo_sub:
+                topo_sub.pop()
+            else:
+                if not topo_done:
+                    fixed.append(F"{indent}  CONNECTIVITY OFF")
+                in_topo = False
+            fixed.append(ln)
+            continue
+        if up.startswith("&TOPOLOGY"):
+            in_topo = True
+            topo_done = False
+            fixed.append(ln)
+            continue
+        if in_topo and up.startswith("&"):
+            topo_sub.append(up[1:].split()[0] if len(up) > 1 else "")
+            fixed.append(ln)
+            continue
+        if in_topo and not topo_sub and up.startswith("CONNECTIVITY"):
+            fixed.append(F"{indent}CONNECTIVITY OFF")
+            topo_done = True
+            continue
         fixed.append(ln)
-        up = ln.strip().upper()
-        if up.startswith("&TOPOLOGY") and not topo_has_conn:
-            indent = ln[:len(ln) - len(ln.lstrip())]
-            fixed.append(F"{indent}  CONNECTIVITY OFF")
     return "\n".join(fixed) + "\n"
 
 
