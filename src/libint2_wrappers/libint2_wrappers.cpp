@@ -137,16 +137,6 @@ static inline std::size_t shg_gaussian_pos(int l, std::size_t f) {
 
 // Component index map of one shell: identity for cartesian shells and on
 // gaussian-ordered runtimes.
-static void shg_index_map(const libint2::Shell &sh, std::vector<std::size_t> &map) {
-  const std::size_t n = sh.size();
-  map.resize(n);
-  const int l = sh.contr[0].l;
-  const bool pure = sh.contr[0].pure;
-  for (std::size_t f = 0; f < n; f++) {
-    map[f] = (pure && l > 0) ? shg_gaussian_pos(l, f) : f;
-  }
-}
-
 // ---------------------------------------------------------------------
 // Cartesian component ordering and normalization of the linked runtime.
 //
@@ -431,6 +421,9 @@ MATRIX compute_1body_ints(const std::vector<libint2::Shell>& shells_1,
   // the runtime's solid-harmonic ordering, probed once: standard-ordered
   // blocks are permuted below so the output is always gaussian-ordered
   const bool shg_std = shg_ordering_is_standard();
+  // cartesian probing must not run inside worker threads
+  cart_warmup(shells_1);
+  cart_warmup(shells_2);
 
   Matrix result(n_1, n_2);
   int max_n;
@@ -482,15 +475,17 @@ MATRIX compute_1body_ints(const std::vector<libint2::Shell>& shells_1,
 
       // map the buffer and scatter it into the result block
       Eigen::Map<const Matrix> buf_mat(buf[0], n1, n2);
-      if (!shg_std) {
+      std::vector<std::size_t> map1, map2;
+      std::vector<double> scl1, scl2;
+      const bool t1 = shell_out_transform(shells_1[s1], shg_std, map1, scl1);
+      const bool t2 = shell_out_transform(shells_2[s2], shg_std, map2, scl2);
+      if (!t1 && !t2) {
         result.block(bf1, bf2, n1, n2) = buf_mat;
       } else {
-        std::vector<std::size_t> map1, map2;
-        shg_index_map(shells_1[s1], map1);
-        shg_index_map(shells_2[s2], map2);
         for (std::size_t f1 = 0; f1 < n1; f1++) {
           for (std::size_t f2 = 0; f2 < n2; f2++) {
-            result(bf1 + map1[f1], bf2 + map2[f2]) = buf_mat(f1, f2);
+            result(bf1 + map1[f1], bf2 + map2[f2]) =
+                scl1[f1] * scl2[f2] * buf_mat(f1, f2);
           }
         }
       }
@@ -524,6 +519,9 @@ MATRIX compute_1body_ints_parallel(const std::vector<libint2::Shell> &shells_1,
   // the runtime's solid-harmonic ordering, probed once: standard-ordered
   // blocks are permuted below so the output is always gaussian-ordered
   const bool shg_std = shg_ordering_is_standard();
+  // cartesian probing must not run inside worker threads
+  cart_warmup(shells_1);
+  cart_warmup(shells_2);
 
   // The AO overlap matrix n x n
   Matrix result(n_1, n_2);
@@ -591,15 +589,17 @@ MATRIX compute_1body_ints_parallel(const std::vector<libint2::Shell> &shells_1,
         }
         // The results block
         Eigen::Map<const Matrix> buf_mat(buf[0], n1, n2);
-        if (!shg_std) {
+        std::vector<std::size_t> map1, map2;
+        std::vector<double> scl1, scl2;
+        const bool t1 = shell_out_transform(shells_1[s1], shg_std, map1, scl1);
+        const bool t2 = shell_out_transform(shells_2[s2], shg_std, map2, scl2);
+        if (!t1 && !t2) {
           result.block(bf1, bf2, n1, n2) = buf_mat;
         } else {
-          std::vector<std::size_t> map1, map2;
-          shg_index_map(shells_1[s1], map1);
-          shg_index_map(shells_2[s2], map2);
           for (std::size_t f1 = 0; f1 < n1; f1++) {
             for (std::size_t f2 = 0; f2 < n2; f2++) {
-              result(bf1 + map1[f1], bf2 + map2[f2]) = buf_mat(f1, f2);
+              result(bf1 + map1[f1], bf2 + map2[f2]) =
+                  scl1[f1] * scl2[f2] * buf_mat(f1, f2);
             }
           }
         }
@@ -728,6 +728,9 @@ std::vector<MATRIX> compute_1body_ints_parallel_emultipole3(
   // the runtime's solid-harmonic ordering, probed once (see the overlap
   // kernel note)
   const bool shg_std = shg_ordering_is_standard();
+  // cartesian probing must not run inside worker threads
+  cart_warmup(shells_1);
+  cart_warmup(shells_2);
 
   std::vector<MATRIX> res;
   for (int i = 0; i < 20; i++) {
@@ -794,10 +797,9 @@ std::vector<MATRIX> compute_1body_ints_parallel_emultipole3(
         // Make compute for each engine
         engines[thread_id].compute(shells_1[s1], shells_2[s2]);
         std::vector<std::size_t> map1, map2;
-        if (shg_std) {
-          shg_index_map(shells_1[s1], map1);
-          shg_index_map(shells_2[s2], map2);
-        }
+        std::vector<double> scl1, scl2;
+        const bool t1 = shell_out_transform(shells_1[s1], shg_std, map1, scl1);
+        const bool t2 = shell_out_transform(shells_2[s2], shg_std, map2, scl2);
         for (int index = 0; index < 20; index++) {
           // 1-body engines must always produce a batch (see the overlap
           // kernel) - record and throw after the join
@@ -810,13 +812,13 @@ std::vector<MATRIX> compute_1body_ints_parallel_emultipole3(
           }
           // The results block
           Eigen::Map<const Matrix> buf_mat(buf[index], n1, n2);
-          if (!shg_std) {
+          if (!t1 && !t2) {
             results[index].block(bf1, bf2, n1, n2) = buf_mat;
           } else {
             for (std::size_t f1 = 0; f1 < n1; f1++) {
               for (std::size_t f2 = 0; f2 < n2; f2++) {
                 results[index](bf1 + map1[f1], bf2 + map2[f2]) =
-                    buf_mat(f1, f2);
+                    scl1[f1] * scl2[f2] * buf_mat(f1, f2);
               }
             }
           }

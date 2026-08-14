@@ -102,34 +102,6 @@ def molden_convention(lines, l_vals):
     return purity, expected, alternate, (file_n if file_n > 0 else None)
 
 
-def _cart_coeff_scale(l_vals, purity):
-    """Per-AO coefficient scale, in the lexicographic canonical order: molden
-    cartesian coefficients refer to shared-shell-scaled components (the pure
-    power carries the shell normalization), so a component x^i y^j z^k needs
-    sqrt((2l-1)!!/((2i-1)!!(2j-1)!!(2k-1)!!)) to refer to the unit-normalized
-    cartesians the libint wrappers emit (sqrt(3) for xy-type, sqrt(15) for
-    xyz; empirically exact on CP2K GTO_KIND CARTESIAN output)."""
-    def dfact(n):
-        r = 1.0
-        while n > 1:
-            r *= n
-            n -= 2
-        return r
-
-    scale = []
-    for l in l_vals:
-        if purity.get(l, True) or l < 2:
-            scale += [1.0] * (2 * l + 1 if l != 1 else 3)
-        else:
-            for i in range(l, -1, -1):
-                for j in range(l - i, -1, -1):
-                    k = l - i - j
-                    cca = dfact(2 * i - 1) * dfact(2 * j - 1) * \
-                        dfact(2 * k - 1) / dfact(2 * l - 1)
-                    scale.append(1.0 / np.sqrt(cca))
-    return np.array(scale)
-
-
 def molden_purity(molden_filename, l_vals):
     """The per-l spherical-purity map of a molden file, with the coefficient
     count as the ground truth for markerless cartesian files."""
@@ -432,10 +404,9 @@ def eigenvectors_molden(molden_filename: str, nbasis: int, l_vals: list):
     orbital_energies = np.array(orbital_energies)
 
     # the file's per-l purity: cartesian shells resort directly to the
-    # lexicographic canonical order the libint wrappers emit, and their
-    # coefficients are rescaled to the unit-normalized component convention
+    # lexicographic unit-normalized convention the libint wrappers emit -
+    # the molden coefficient convention, so no rescale applies
     _purity = molden_purity(molden_filename, l_vals)
-    _cscale = _cart_coeff_scale(l_vals, _purity)
 
     # loop-invariant: one resort map serves every MO
     new_indices = resort_eigenvectors(l_vals, _purity)
@@ -463,7 +434,7 @@ def eigenvectors_molden(molden_filename: str, nbasis: int, l_vals: list):
 
 #         eigenvector = np.array(eigenvector)
         # the new and sorted eigenvector
-        eigenvector = eigenvector[new_indices] * _cscale
+        eigenvector = eigenvector[new_indices]
         # append it to the eigenvectors list
         eigenvectors.append(eigenvector)
 
