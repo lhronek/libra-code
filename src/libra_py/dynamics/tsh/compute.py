@@ -300,6 +300,14 @@ def _print_simulation_params(dyn_params, nadi, ntraj, init_params=None, model_pa
     print("\n".join(lines), flush=True)
 
 
+def _sync_nbra_flag(dyn_params):
+    """The C++ layer reads isNBRA, the python layers is_nbra - accept
+    either spelling and write both (isNBRA wins when both differ)."""
+    v = int(dyn_params.get("isNBRA", dyn_params.get("is_nbra", 0)))
+    dyn_params["isNBRA"] = dyn_params["is_nbra"] = v
+    return v
+
+
 @_with_blas_cap(1)
 def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, init_params=None):
     """
@@ -1266,7 +1274,9 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
     ensemble = dyn_params["ensemble"]
     time_overlap_method = dyn_params["time_overlap_method"]
     decoherence_algo = dyn_params["decoherence_algo"]
-    is_nbra = dyn_params["is_nbra"]
+    # accept either NBRA spelling and sync both (the C++ layer reads
+    # isNBRA, the python layers is_nbra; isNBRA wins when both differ)
+    is_nbra = _sync_nbra_flag(dyn_params)
     icond = dyn_params["icond"]    # Setting the initial geoemtry in the dynamics
     nfiles = dyn_params["nfiles"]  # The number of loaded Ham files
     tsh_method = dyn_params["tsh_method"]
@@ -1507,12 +1517,8 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
                                   }, [])
 
     # Extract info from the updated dyn_params. Historically two spellings of
-    # the NBRA flag coexist: the init path read "isNBRA" while the dynamics
-    # loop and the save layer read "is_nbra" - accept either and sync both,
-    # otherwise an isNBRA=1 run creates a single child Hamiltonian but the
-    # rest of the machinery still assumes one child per trajectory.
-    is_nbra = dyn_params.get("isNBRA", dyn_params.get("is_nbra", 0))
-    dyn_params["isNBRA"] = dyn_params["is_nbra"] = is_nbra
+    # accept either NBRA spelling and sync both (single resolver)
+    is_nbra = _sync_nbra_flag(dyn_params)
 
     # Resolve the "auto" policy for maintaining the diabatic density matrix.
     ntraj = dyn_params["ntraj"]
