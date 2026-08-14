@@ -1225,6 +1225,24 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
 
     comn.check_input(dyn_params, default_params, critical_params)
 
+    # dm_dia is a derived quantity in the adiabatic representations, costing
+    # two nadi x nadi matrix products per trajectory per step, and is consumed
+    # only by diabatic-representation hopping/dynamics and the diabatic
+    # observables among the requested outputs. Resolved HERE, after the
+    # defaults merge - the default properties list itself carries diabatic
+    # observables, so an earlier resolution against a user dict without
+    # properties_to_save would skip dm_dia and save them as silent zeros
+    if dyn_params.get("compute_dm_dia", -1) == -1:
+        # Saved properties backed by dm_dia: D_dia/D_dia_raw directly;
+        # se_pop_dia, coherence_dia and mash_pop_dia via compute_average_dm(0);
+        # sh_pop_adi_TR via compute_average_sh_pop_TR(1) - the transformed
+        # populations read the OPPOSITE representation's density matrix
+        dia_props = {"D_dia", "D_dia_raw", "se_pop_dia", "coherence_dia",
+                     "mash_pop_dia", "sh_pop_adi_TR"}
+        need = (dyn_params["rep_tdse"] in (0, 2)) or (dyn_params["rep_sh"] == 0) \
+            or bool(dia_props.intersection(dyn_params["properties_to_save"]))
+        dyn_params["compute_dm_dia"] = 1 if need else 0
+
     prefix = dyn_params["prefix"]
     prefix2 = dyn_params["prefix2"]
     rep_tdse = dyn_params["rep_tdse"]
@@ -1495,21 +1513,6 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
     dyn_params["isNBRA"] = dyn_params["is_nbra"] = is_nbra
 
     # Resolve the "auto" policy for maintaining the diabatic density matrix.
-    # dm_dia is a derived quantity in the adiabatic representations, costing
-    # two nadi x nadi matrix products per trajectory per step, and is consumed
-    # only by diabatic-representation hopping/dynamics and the diabatic
-    # observables among the requested outputs.
-    if dyn_params.get("compute_dm_dia", -1) == -1:
-        props = dyn_params.get("properties_to_save", [])
-        # Saved properties backed by dm_dia: D_dia/D_dia_raw directly;
-        # se_pop_dia, coherence_dia and mash_pop_dia via compute_average_dm(0);
-        # sh_pop_adi_TR via compute_average_sh_pop_TR(1) - the transformed
-        # populations read the OPPOSITE representation's density matrix
-        dia_props = {"D_dia", "D_dia_raw", "se_pop_dia", "coherence_dia",
-                     "mash_pop_dia", "sh_pop_adi_TR"}
-        need = (dyn_params.get("rep_tdse", 1) in (0, 2)) or (dyn_params.get("rep_sh", 1) == 0) \
-            or bool(dia_props.intersection(props))
-        dyn_params["compute_dm_dia"] = 1 if need else 0
     ntraj = dyn_params["ntraj"]
     direct_init = dyn_params["direct_init"]
 
