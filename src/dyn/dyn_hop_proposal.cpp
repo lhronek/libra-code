@@ -1121,7 +1121,13 @@ must supply obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
   for(j=0;j<nstates;j++){
     if(j!=i){  sum += g[j];   }
   }// for i
-  g[i] = 1.0 - sum;
+  // proposals may sum above 1 when several channels fire in the same
+  // step - rescale, as the BLLZ producer does
+  if(sum < 1.0){  g[i] = 1.0 - sum; }
+  else{
+    g[i] = 0.0;
+    for(j=0; j<nstates; j++){  if(j!=i){ g[j] /= sum; }  }
+  }
 
   return g;
 
@@ -1389,7 +1395,13 @@ Adiabatic-native models must supply obj.ham_dia \n";
   for(j=0;j<nstates;j++){
     if(j!=i){  sum += g[j];   }
   }// for i
-  g[i] = 1.0 - sum;
+  // proposals may sum above 1 when several channels fire in the same
+  // step - rescale, as the BLLZ producer does
+  if(sum < 1.0){  g[i] = 1.0 - sum; }
+  else{
+    g[i] = 0.0;
+    for(j=0; j<nstates; j++){  if(j!=i){ g[j] /= sum; }  }
+  }
 
   return g;
 
