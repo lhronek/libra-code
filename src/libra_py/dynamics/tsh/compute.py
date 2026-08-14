@@ -56,17 +56,19 @@ import libra_py.tsh_stat as tsh_stat
 from . import save
 
 
-def _with_blas_cap(param_pos):
+def _with_blas_cap(param_pos, param_name="_dyn_params"):
     """Cap the BLAS/OpenMP pools for the WHOLE dynamics entry: the init
     phases (the initial Hamiltonian diagonalization per trajectory, the
     density-matrix and basis-transform setup) run before the propagation
     loop's own cap and otherwise engage the pools at full machine width.
-    param_pos locates the dyn_params dict in the wrapped signature;
-    blas_num_threads: default 1, explicit 0 = leave the pools alone."""
+    param_pos/param_name locate the dyn_params dict in the wrapped
+    signature (positional or keyword call); blas_num_threads: default 1,
+    explicit 0 = leave the pools alone."""
     def deco(fn):
         @functools.wraps(fn)
         def wrapped(*args, **kwargs):
-            prms = args[param_pos]
+            prms = (args[param_pos] if param_pos < len(args)
+                    else kwargs.get(param_name, {}))
             nbt = prms.get("blas_num_threads", 1) if hasattr(prms, "get") else 1
             with blas_thread_limit(1 if nbt is None else nbt):
                 return fn(*args, **kwargs)
