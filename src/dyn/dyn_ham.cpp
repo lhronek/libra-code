@@ -327,6 +327,8 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
             if (SIGN(x1) * SIGN(x2) < 0.0) {
               ham.children[traj]->nac_adi->scale(i, j, -1.0);
               ham.children[traj]->nac_adi->scale(j, i, -1.0);
+              // the flip invalidates the supplied-hvib comparison
+              ham.children[traj]->hvib_adi_supplied = 0;
             }
           } // for j
         } // for i

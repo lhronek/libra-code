@@ -88,6 +88,8 @@ void nHamiltonian::compute_nac_dia(MATRIX &p, const MATRIX &invM) {
             "consistent dc1_dia\n";
     throw std::runtime_error("libra C++ error - see the message printed above");
   }
+  // validated once at harvest-time conditions (see compute_nac_adi)
+  nac_dia_supplied = 0;
 }
 
 void nHamiltonian::compute_nac_dia(MATRIX &p, const MATRIX &invM,
@@ -272,6 +274,9 @@ void nHamiltonian::compute_nac_adi(MATRIX &p, const MATRIX &invM) {
             "consistent dc1_adi\n";
     throw std::runtime_error("libra C++ error - see the message printed above");
   }
+  // one validation per harvest: post-kick rebuilds must not compare
+  // against their own earlier rebuild
+  nac_adi_supplied = 0;
 }
 
 void nHamiltonian::compute_nac_adi(MATRIX &p, const MATRIX &invM,
@@ -425,6 +430,8 @@ void nHamiltonian::compute_hvib_dia() {
               "(consume the supplied hvib), or supply a consistent nac_dia\n";
       throw std::runtime_error("libra C++ error - see the message printed above");
     }
+  // validated once at harvest-time conditions
+  hvib_dia_supplied = 0;
   }
   for (int i = 0; i < ndia; i++) {
     for (int j = 0; j < ndia; j++) {
@@ -526,6 +533,8 @@ void nHamiltonian::compute_hvib_adi() {
               "(consume the supplied hvib), or supply a consistent nac_adi\n";
       throw std::runtime_error("libra C++ error - see the message printed above");
     }
+  // one validation per harvest; the NAC phase correction disarms it
+  hvib_adi_supplied = 0;
   }
   for (int i = 0; i < nadi; i++) {
     for (int j = 0; j < nadi; j++) {
