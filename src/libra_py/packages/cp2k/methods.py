@@ -2735,7 +2735,8 @@ def compute_mo_overlap(params):
     # Create Libint integral shells for each molden file
     shell_1, l_vals_1 = molden_methods.molden_file_to_libint_shell(params['molden_file_1'], params['is_spherical'])
     shell_2, l_vals_2 = molden_methods.molden_file_to_libint_shell(params['molden_file_2'], params['is_spherical'])
-    new_indices = resort_molog_eigenvectors(l_vals_1)
+    new_indices = resort_molog_eigenvectors(
+        l_vals_1, molden_methods.molden_purity(params['molden_file_1'], l_vals_1))
     eig_vect_1, energies_1 = molden_methods.eigenvectors_molden(params['molden_file_1'], nbasis(shell_1), l_vals_1)
     eig_vect_2, energies_2 = molden_methods.eigenvectors_molden(params['molden_file_2'], nbasis(shell_2), l_vals_2)
     
@@ -3518,7 +3519,8 @@ def load_molden_data(molden_file, is_spherical=True, isUKS=False):
                          F"the CP2K template's UKS/MULTIPLICITY must match the isUKS parameter")
     shell, l_vals = molden_methods.molden_file_to_libint_shell(molden_file, is_spherical)
     C, E = molden_methods.eigenvectors_molden(molden_file, nbasis(shell), l_vals)
-    idx = resort_molog_eigenvectors(l_vals)
+    idx = resort_molog_eigenvectors(
+        l_vals, molden_methods.molden_purity(molden_file, l_vals))
     C = np.array([c[idx] for c in C])
     E = np.array(E)
     out = {"shell": shell, "resort_idx": np.array(idx), "nspin": 2 if isUKS else 1}
