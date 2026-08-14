@@ -192,7 +192,8 @@ def ovlp_arb(_SD1, _SD2, S, active_space=None, verbose=False):
     if verbose==True:
         print(s)
 
-    res = np.linalg.det(s)
+    # x the sort parities: det over sorted rows -> the listed-order overlap
+    res = p1 * p2 * np.linalg.det(s)
 
     return res
 
@@ -391,7 +392,8 @@ def orbs2spinorbs(s):
 
 def ovlp_mat_arb_batched(SD1, SD2, S2, active_space=None, mem_limit_mb=256):
     """
-    Batched equivalent of ovlp_mat_arb: one LAPACK-batched det call per chunk
+    Batched equivalent of ovlp_mat_arb (listed-order determinant convention:
+    rows enter the determinants as given): one LAPACK-batched det call per chunk
     instead of nSD1*nSD2 Python-level np.linalg.det calls. Bit-exact against
     the loop and 7-11x faster; chunked over bra SDs so the gathered submatrix
     stack stays under mem_limit_mb.
@@ -413,18 +415,19 @@ def ovlp_mat_arb_batched(SD1, SD2, S2, active_space=None, mem_limit_mb=256):
     n_half = S2.shape[0] // 2
 
     def indices(SDs, label):
-        # canonical per-row order, as ovlp_arb (do_sort=True)
-        rows = _sd_index_rows(SDs, n_half, active_space, sort=True)
+        rows = _sd_index_rows(SDs, n_half, active_space)
         lengths = {len(r) for r in rows}
         if len(lengths) != 1:
             raise ValueError(f"{label}: SDs retain different electron counts "
                              f"{sorted(lengths)} (after active-space filtering); "
                              f"overlaps between determinants of different size "
                              f"are not defined")
-        return np.array(rows)
+        rows = np.array(rows)
+        # dets over sorted rows, x the sort parities = listed-order overlaps
+        return np.sort(rows, axis=1), _sort_parities(rows)
 
-    i1 = indices(SD1, "SD1")
-    i2 = indices(SD2, "SD2")
+    i1, p1 = indices(SD1, "SD1")
+    i2, p2 = indices(SD2, "SD2")
     n1, n2, ne = len(i1), len(i2), i1.shape[1]
     if i2.shape[1] != ne:
         raise ValueError(f"SD1 and SD2 have different electron counts "
@@ -435,7 +438,7 @@ def ovlp_mat_arb_batched(SD1, SD2, S2, active_space=None, mem_limit_mb=256):
         b = min(a + chunk, n1)
         sub = S2[i1[a:b, None, :, None], i2[None, :, None, :]]
         res[a:b] = np.linalg.det(sub)
-    return res
+    return res * np.outer(p1, p2)
 
 
 def _sd_index_rows(SDs, n_half, active_space=None, sort=False):
@@ -544,7 +547,8 @@ def _degree_groups(deg, holes, parts, table_orbs):
 def ovlp_mat_arb_lemma(SD1, SD2, S2, active_space=None, mem_limit_mb=256):
     """
     Fast SD overlaps for common-reference excited bases via the generalized
-    matrix determinant lemma - ARBITRARY excitation degrees.
+    matrix determinant lemma - ARBITRARY excitation degrees. Listed-order
+    determinant convention (rows enter the determinants as given).
 
     Every SD is treated as an excitation of the reference determinant of its
     list (the row of minimal spin-orbital index sum). A bra SD replacing k
@@ -655,13 +659,14 @@ def ovlp_mat_arb_lemma(SD1, SD2, S2, active_space=None, mem_limit_mb=256):
                     block[s:e] = np.linalg.det(B)
                 block *= D0
             res[np.ix_(I, J)] = block
-    # convert from the in-place arrangement to the canonical sorted convention
-    res *= np.outer(sig1, sig2)
+    # in-place arrangement -> sorted (sig) -> listed order (sort parities)
+    res *= np.outer(sig1 * _sort_parities(i1), sig2 * _sort_parities(i2))
     return res
 
 
 def ovlp_mat_arb_auto(SD1, SD2, S2, active_space=None, mem_limit_mb=256):
-    """Determinant-lemma kernel with automatic fallback to the batched one."""
+    """Determinant-lemma kernel with automatic fallback to the batched one.
+    Listed-order determinant convention, like every ovlp kernel here."""
     res = ovlp_mat_arb_lemma(SD1, SD2, S2, active_space, mem_limit_mb)
     if res is None:
         res = ovlp_mat_arb_batched(SD1, SD2, S2, active_space, mem_limit_mb)

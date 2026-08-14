@@ -2798,6 +2798,7 @@ def _uks_ci_overlap(S2, data_bra, data_ket, info, lo):
     sd_b, C_b = _uks_sd_expansion(data_bra, info, lo)
     sd_k, C_k = _uks_sd_expansion(data_ket, info, lo)
     S_sd = mapping.ovlp_mat_arb_auto(list(sd_b), list(sd_k), np.asarray(S2))
+    # listed-order kernel convention matches the listed-order expansion
     return C_b @ S_sd @ C_k.T
 
 

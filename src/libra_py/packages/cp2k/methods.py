@@ -3700,17 +3700,11 @@ def sd_overlaps(sd_states, St_mo, S_mo_prev, S_mo_curr, orthonormalize=True,
     if sd_states_prev is None:
         sd_states_prev = sd_states
     n_half = (St_mo[0] if isinstance(St_mo, (tuple, list)) else St_mo).shape[0]
-    # mapping's fast kernels use the canonical (sorted) determinant convention;
-    # convert back to the list-order convention with the per-SD sort parities
-    # so that the SD2CI amplitudes (built without parities) stay consistent
-    sp = mapping._sort_parities(mapping._sd_indices(sd_states_prev, n_half))
-    sc = mapping._sort_parities(mapping._sd_indices(sd_states, n_half))
-    st = sp[:, None] * ovlp(sd_states_prev, sd_states,
-                            _two_spinor(St_mo)) * sc[None, :]
-    s1 = sp[:, None] * ovlp(sd_states_prev, sd_states_prev,
-                            _two_spinor(S_mo_prev)) * sp[None, :]
-    s2 = sc[:, None] * ovlp(sd_states, sd_states,
-                            _two_spinor(S_mo_curr)) * sc[None, :]
+    # the kernels return listed-order overlaps - consistent with the SD2CI
+    # amplitudes (built without parities) as-is
+    st = ovlp(sd_states_prev, sd_states, _two_spinor(St_mo))
+    s1 = ovlp(sd_states_prev, sd_states_prev, _two_spinor(S_mo_prev))
+    s2 = ovlp(sd_states, sd_states, _two_spinor(S_mo_curr))
     if mode == "lowdin":
         # two factorizations, not four: the composed helper calls
         # re-factorized s2 three times

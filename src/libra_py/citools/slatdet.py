@@ -309,14 +309,17 @@ def slater_overlap_matrix(dets_A, dets_B, S_orb, complex_valued=False, phases_A=
                     and not S[n_half:, :n_half].any()):
                 from libra_py.workflows.nbra import mapping as _mapping
                 res = _mapping.ovlp_mat_arb_auto(list(dets_A), list(dets_B), S)
-                # the kernels return the canonical sorted-row convention; the
-                # loop evaluates rows in the LISTED order - convert with the
-                # per-determinant sort parities, then apply the caller phases
-                sA = _mapping._sort_parities(np.array(_listed_rows(dets_A, n_half)))
-                sB = _mapping._sort_parities(np.array(_listed_rows(dets_B, n_half)))
+                # the kernels order determinant rows as written (spins
+                # interleaved); the loop groups alphas before betas -
+                # bridge the two row orders with their sort-parity
+                # products, then apply the caller phases
+                gA = (_mapping._sort_parities(_mapping._sd_indices(list(dets_A), n_half)) *
+                      _mapping._sort_parities(np.array(_listed_rows(dets_A, n_half))))
+                gB = (_mapping._sort_parities(_mapping._sd_indices(list(dets_B), n_half)) *
+                      _mapping._sort_parities(np.array(_listed_rows(dets_B, n_half))))
                 ph_A = np.ones(len(dets_A)) if phases_A is None else np.asarray(phases_A, dtype=float)
                 ph_B = np.ones(len(dets_B)) if phases_B is None else np.asarray(phases_B, dtype=float)
-                return res * np.outer(sA * ph_A, sB * ph_B)
+                return res * np.outer(gA * ph_A, gB * ph_B)
     return slater_overlap_matrix_loop(dets_A, dets_B, S_orb, complex_valued, phases_A, phases_B)
 
 
