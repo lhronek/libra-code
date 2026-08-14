@@ -784,8 +784,9 @@ def _set_method(params, ham_rep=0, is_nbra=0, method=0):
         is_nbra ( int ): -1 - custom (leave the keys alone); 0 - non-NBRA;
             1 - file-based NBRA; 2 - on-the-fly NBRA
 
-        method ( int ): -1 - custom; 0 - FSSH; 1 - IDA; 2 - mSDM; 3 - DISH;
-            21 - mSDM, dephasing-informed; 31 - DISH, dephasing-informed
+        method ( int ): -1 - custom; 0 - FSSH; 1 - IDA; 2 - mSDM; 5 - DISH
+            (the engine's tsh_method id; 3 = legacy alias); 21 - mSDM,
+            dephasing-informed; 51 - DISH, dephasing-informed (31 = legacy)
     """
 
     # ham_rep 0: diabatic model diagonalized; 1: adiabatic-native
@@ -818,16 +819,22 @@ def _set_method(params, ham_rep=0, is_nbra=0, method=0):
         params.update({"tsh_method": 0, "decoherence_algo": 1, "dephasing_informed": 0})
     elif method == 2:    # mSDM
         params.update({"tsh_method": 0, "decoherence_algo": 0, "dephasing_informed": 0})
-    elif method == 3:    # DISH
-        params.update({"tsh_method": 3, "decoherence_algo": -1, "dephasing_informed": 0})
+    elif method in (3, 5):    # DISH (5 = the engine's tsh_method id; 3 = legacy preset)
+        # tsh_method 3 is Landau-Zener; DISH is 5 (Dynamics.cpp gates dish() on it)
+        params.update({"tsh_method": 5, "decoherence_algo": -1, "dephasing_informed": 0})
     elif method == 21:   # mSDM, dephasing-informed
         params.update({"tsh_method": 0, "decoherence_algo": 0, "dephasing_informed": 1})
-    elif method == 31:   # DISH, dephasing-informed
-        params.update({"tsh_method": 3, "decoherence_algo": -1, "dephasing_informed": 1})
+    elif method in (31, 51):   # DISH, dephasing-informed (51 = canonical, 31 = legacy)
+        params.update({"tsh_method": 5, "decoherence_algo": -1, "dephasing_informed": 1})
+    else:
+        # preset ids, not engine tsh_method values - unknown ids used
+        # to fall through silently, leaving the params unchanged
+        raise ValueError(F"unknown method preset {method}; -1 custom, 0 FSSH, "
+                         F"1 IDA, 2 mSDM, 3/5 DISH, 21 mSDM2, 31/51 DISH2")
 
 
 def make_var_pool(dyn_params, compute_model, model_params, _rnd,
-                  method_names_map={0: "FSSH", 1: "IDA", 2: "mSDM", 3: "DISH", 21: "mSDM2", 31: "DISH2"},
+                  method_names_map={0: "FSSH", 1: "IDA", 2: "mSDM", 3: "DISH", 5: "DISH", 21: "mSDM2", 31: "DISH2", 51: "DISH2"},
                   init_states=[1], tsh_methods=[0], batches=list(range(10)), ham_rep=1, is_nbra=1):
     """
     This function prepares the variables pool for the parallelization
@@ -903,7 +910,7 @@ def make_var_pool(dyn_params, compute_model, model_params, _rnd,
 
 
 def namd_workflow(dyn_params, compute_model, model_params, _rnd, nthreads=4,
-                  method_names_map={0: "FSSH", 1: "IDA", 2: "mSDM", 3: "DISH", 21: "mSDM2", 31: "DISH2"},
+                  method_names_map={0: "FSSH", 1: "IDA", 2: "mSDM", 3: "DISH", 5: "DISH", 21: "mSDM2", 31: "DISH2", 51: "DISH2"},
                   init_states=[1], tsh_methods=[0], batches=list(range(10)), fork_or_spawn="fork", parallel=True,
                   ham_rep=1, is_nbra=1):
     """

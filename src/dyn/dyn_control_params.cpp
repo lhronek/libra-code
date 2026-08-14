@@ -384,8 +384,9 @@ void dyn_control_params::sanity_check(){
   }
 
   /// Shall not use DISH with the decoherence correction
-  if(tsh_method==3 && decoherence_algo!=-1){
-    cout<<"Error in dyn_control_params::sanity_check: Shall not use DISH (tsh_method == 3) with the \
+  /// (tsh_method 3 is Landau-Zener - DISH is 5)
+  if(tsh_method==5 && decoherence_algo!=-1){
+    cout<<"Error in dyn_control_params::sanity_check: Shall not use DISH (tsh_method == 5) with the \
            decoherence correction (any but decoherence_algo == -1)\n";
     throw std::runtime_error("libra C++ error - see the message printed above");
   }
