@@ -417,7 +417,10 @@ void SSY_correction(CMATRIX &Ham, dyn_variables &dyn_var, nHamiltonian &ham,
 void propagate_electronic(dyn_variables &dyn_var, nHamiltonian &ham,
                           nHamiltonian &ham_prev, dyn_control_params &prms) {
 
-  propagate_electronic(dyn_var, &ham, &ham_prev, prms, 0);
+  // a single external call covers the whole step - act as its last
+  // substep so the reprojection T applies
+  propagate_electronic(dyn_var, &ham, &ham_prev, prms,
+                       prms.num_electronic_substeps - 1);
 }
 
 void propagate_electronic(dyn_variables &dyn_var, nHamiltonian &ham,
@@ -929,7 +932,10 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
 void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
                           nHamiltonian *Ham_prev, dyn_control_params &prms) {
 
-  propagate_electronic(dyn_var, Ham, Ham_prev, prms, 0);
+  // a single external call covers the whole step - act as its last
+  // substep so the reprojection T applies
+  propagate_electronic(dyn_var, Ham, Ham_prev, prms,
+                       prms.num_electronic_substeps - 1);
 }
 
 void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
