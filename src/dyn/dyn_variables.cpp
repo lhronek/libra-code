@@ -389,6 +389,23 @@ dyn_variables::dyn_variables(const dyn_variables& x){
   ndof = x.ndof;
   ntraj = x.ntraj;
 
+  // the conditional copy blocks below and the destructor key on these
+  electronic_vars_status = 0;
+  nuclear_vars_status = 0;
+  afssh_vars_status = 0;
+  bcsh_vars_status = 0;
+  bllz_vars_status = 0;
+  bllz_hist_size = 0;
+  lz_gap_min_status = 0;
+  dish_vars_status = 0;
+  fssh2_vars_status = 0;
+  shxf_vars_status = 0;
+  mqcxf_vars_status = 0;
+  tcnbra_vars_status = 0;
+  qtsh_vars_status = 0;
+  kcrpmd_vars_status = 0;
+  simple_decoherence_vars_status = 0;
+
   // copy content of electronic vars, only if initialized 
   if(x.electronic_vars_status==1){
 
