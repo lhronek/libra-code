@@ -599,7 +599,8 @@ def write_molden_file(filename, sample_molden_file, path_to_trajectory, step):
     for i in range(len(lines)):
         if '[GTO]' in lines[i]:
             start = i
-        elif '[5D7F]' in lines[i]:
+        elif lines[i].strip().upper().startswith(('[5D', '[7F', '[9G')):
+            # every purity marker line survives, [9G] included
             end = i
 
     atoms, coords = data_read.read_atom_coords(path_to_trajectory, step)
