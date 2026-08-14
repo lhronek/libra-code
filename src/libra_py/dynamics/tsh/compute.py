@@ -101,7 +101,7 @@ def _dump_simulation_params(prefix, dyn_params, model_params, init_params):
         json.dump(payload, f, indent=2, default=_params_json_default)
 
 
-def _print_simulation_params(dyn_params, nadi, init_params=None, model_params=None):
+def _print_simulation_params(dyn_params, nadi, ntraj, init_params=None, model_params=None):
     """The curated run-settings block: groups organized by meaning, keys 1:1
     with the parameter dicts (dotted init_elec./init_nucl./model_params.
     paths match the JSON structure), values right-aligned to column 80."""
@@ -121,7 +121,7 @@ def _print_simulation_params(dyn_params, nadi, init_params=None, model_params=No
     lines = [
         row("nsteps:", p["nsteps"], "SIMULATION"),
         row("dt [fs]:", F"{p['dt'] * units.au2fs:.4f}"),
-        row("ntraj:", p["ntraj"]),
+        row("ntraj:", ntraj),
         row("nstates (nadi):", nadi),
         row("icond:", p["icond"]),
         dashes,
@@ -147,7 +147,7 @@ def _print_simulation_params(dyn_params, nadi, init_params=None, model_params=No
         row("ham_update_method:", p["ham_update_method"], "HAMILTONIAN"),
         row("ham_transform_method:", p["ham_transform_method"]),
         row("time_overlap_method:", p["time_overlap_method"]),
-        row("isNBRA:", p["isNBRA"]),
+        row("isNBRA:", p["is_nbra"]),
         row("nfiles:", p["nfiles"]),
     ]
     if model_params and "model" in model_params:
@@ -1285,7 +1285,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
         dyn_params["quantum_dofs"] = list(range(nnucl))
 
     if dyn_params["print_params"] > 0:
-        _print_simulation_params(dyn_params, nadi, init_params, model_params)
+        _print_simulation_params(dyn_params, nadi, dyn_var.ntraj, init_params, model_params)
         _dump_simulation_params(prefix, dyn_params, model_params, init_params)
     if dyn_params["print_params"] > 1:
         for key in sorted(dyn_params.keys()):
