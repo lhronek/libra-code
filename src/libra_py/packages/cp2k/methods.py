@@ -3636,9 +3636,21 @@ def read_ci_data(logfile, nstates, tolerance=0.01, lowest_orbital=1, highest_orb
         basis = [list(b) for b in basis[:nstates]]
         coeff = coeff[:nstates]
         spin = spin[:nstates]
+    # the parser reads only orbital_space - clip the configs to the
+    # requested window here, as ci_data_from_newtonx does (out-of-window
+    # amplitudes cannot be represented in the windowed overlap machinery)
+    lo_w, hi_w = int(lowest_orbital), int(highest_orbital)
     amps = []
-    for c in coeff:
-        a = np.array(c, dtype=float)
+    for k in range(len(basis)):
+        keep = [j for j, c in enumerate(basis[k])
+                if lo_w <= int(c[0]) and int(c[1]) <= hi_w]
+        if not keep:
+            raise ValueError(F"read_ci_data: state {k + 1} retains no configs "
+                             F"inside orbitals [{lo_w}, {hi_w}] of {logfile}")
+        if len(keep) < len(basis[k]):
+            basis[k] = [basis[k][j] for j in keep]
+            spin[k] = [spin[k][j] for j in keep]
+        a = np.array([coeff[k][j] for j in keep], dtype=float)
         amps.append(a / np.linalg.norm(a))
     return {"E": E, "configs": basis, "amps": amps, "spins": spin}
 
@@ -4101,6 +4113,9 @@ def ci_data_from_newtonx(newtonx, omegas_Ha, ci_threshold=0.001,
             a += [Mc[r, c] for r, c in sel]
             sp += [tag] * len(sel)
         a = np.array(a, dtype=float)
+        if a.size == 0:
+            raise ValueError(F"ci_data_from_newtonx: state {ist + 1} retains no "
+                             F"configs above the threshold inside the window")
         a /= np.linalg.norm(a)
         configs.append(conf)
         amps.append(a)
