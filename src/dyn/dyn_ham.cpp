@@ -448,8 +448,10 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
 
     nHamiltonian *ham = Ham.children[traj1];
     nHamiltonian *ham_prev = Ham_prev.children[traj1];
-    p = momenta.col(traj1);
-    int act_state = dyn_var.act_states[traj1];
+    // the clamp serves the ham index only - momenta and the active
+    // state are per-trajectory
+    p = momenta.col(itraj);
+    int act_state = dyn_var.act_states[itraj];
 
     //================= Basis re-expansion ===================
     CMATRIX P(ham->nadi, ham->nadi);
