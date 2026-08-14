@@ -726,7 +726,10 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
         }
         exp_(B, Hvib, complex<double>(0.0, -0.5 * dt));
 
-        if (t_identity || t_ampl_skip) { C.product(B, A, C); }
+        if (t_identity) { C.product(B, A, C); }
+        // early substeps stay in the old frame: dress the new-frame
+        // half-step, defer the relabel to the last substep
+        else if (t_ampl_skip) { C.product(adjoint(T_new), B, T_new, A, C); }
         else { C.product(B, T_new, A, C); }
       } // method == 0 && 100
 
@@ -744,7 +747,10 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
         }
         exp_(A, Hvib, complex<double>(0.0, -0.5 * dt));
 
-        if (t_identity || t_ampl_skip) { C.product(B, A, B, C); }
+        if (t_identity) { C.product(B, A, B, C); }
+        // dressed old-frame step; the leading relabel waits for the
+        // last substep
+        else if (t_ampl_skip) { C.product(B, adjoint(T_new), A, T_new, B, C); }
         else { C.product(T_new, B, adjoint(T_new), A, T_new, B, C); }
       } // method == 1 && 101
 
@@ -1130,13 +1136,15 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
           SSY_correction(Hvib, dyn_var, ham_prev, itraj);
         }
         propagate_electronic_rot(0.5 * dt, C, Hvib);
-        C = T_ampl * C;
+        C = T_new * C;
 
         Hvib = ham->get_ham_adi();
         if (is_ssy) {
           SSY_correction(Hvib, dyn_var, ham, itraj);
         }
         propagate_electronic_rot(0.5 * dt, C, Hvib);
+        // early substeps: undo the relabel, keep the dressing
+        if (t_skip) { C = T_new.H() * C; }
 
       } // method == 10 && 110
 
@@ -1152,10 +1160,11 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         }
 
         propagate_electronic_rot(0.25 * dt, C, Hvib_old);
-        C = T_ampl * C;
+        C = T_new * C;
         propagate_electronic_rot(0.5 * dt, C, Hvib);
-        C = T_ampl.H() * C;
+        C = T_new.H() * C;
         propagate_electronic_rot(0.25 * dt, C, Hvib_old);
+        // the leading relabel waits for the last substep
         C = T_ampl * C;
 
       } // method == 11 && 111
