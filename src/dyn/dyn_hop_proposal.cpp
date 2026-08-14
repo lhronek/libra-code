@@ -136,6 +136,9 @@ MATRIX hopping_probabilities_fssh(dyn_control_params& prms, CMATRIX& Coeff, CMAT
 
     }// for j
 
+    // the vector overload's cap: a row's leaving probability tops out
+    // at 1 (hop() renormalizes the channels)
+    if(sum > 1.0){ sum = 1.0; }
     g.set(i,i,1.0 - sum);
 
   }// for i
