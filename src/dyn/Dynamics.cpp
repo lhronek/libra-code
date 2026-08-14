@@ -988,7 +988,10 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
   // ntraj matrix exponentials per step. Falls back to the per-trajectory
   // loop for the rotation-based integrators (single-column by construction),
   // SSY corrections (trajectory-dependent) and non-amplitude representations.
+  // state_tracking_algo 4 builds proj_adi from per-trajectory momenta -
+  // trajectory 0's projector does not serve the whole batch there
   if (prms.isNBRA == 1 && is_ssy == 0 && rep == 1 && ntraj > 0 &&
+      prms.state_tracking_algo != 4 &&
       (method <= 8 || (method >= 100 && method <= 108))) {
     CMATRIX T_new(*dyn_var.proj_adi[0]);
     // proj_adi is the per-nuclear-step reprojection: the amplitude-side
