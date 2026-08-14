@@ -1276,12 +1276,16 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
       if (method == 0 || method == 100) {
         // Based on Lowdin transformations, using mid-point Hvib
         CMATRIX Hvib(ham->nadi, ham->nadi);
-        Hvib = 0.5 * (T_new.H() * ham->get_ham_adi() * T_new +
-                      ham_prev->get_ham_adi()); // "raw" to dyn-const
-
+        CMATRIX Hvib_prev(ham->nadi, ham->nadi);
+        Hvib = T_new.H() * ham->get_ham_adi() * T_new; // "raw" to dyn-const
+        Hvib_prev = ham_prev->get_ham_adi();
+        // SSY REPLACES the diagonal - correct each endpoint with its
+        // own step, then take the midpoint (the m4/m5 convention)
         if (is_ssy) {
-          SSY_correction(Hvib, dyn_var, ham_prev, itraj);
+          SSY_correction(Hvib, dyn_var, ham, itraj);
+          SSY_correction(Hvib_prev, dyn_var, ham_prev, itraj);
         }
+        Hvib = 0.5 * (Hvib + Hvib_prev);
 
         L = make_Liouvillian(Hvib);
 
@@ -1322,12 +1326,16 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
       else if (method == 10 || method == 110) {
         // Same as 0, but with rotations
         CMATRIX Hvib(ham->nadi, ham->nadi);
-        Hvib = 0.5 * (T_new.H() * ham->get_ham_adi() * T_new +
-                      ham_prev->get_ham_adi()); // "raw" to dyn-const
-
+        CMATRIX Hvib_prev(ham->nadi, ham->nadi);
+        Hvib = T_new.H() * ham->get_ham_adi() * T_new; // "raw" to dyn-const
+        Hvib_prev = ham_prev->get_ham_adi();
+        // SSY REPLACES the diagonal - correct each endpoint with its
+        // own step, then take the midpoint (the m4/m5 convention)
         if (is_ssy) {
-          SSY_correction(Hvib, dyn_var, ham_prev, itraj);
+          SSY_correction(Hvib, dyn_var, ham, itraj);
+          SSY_correction(Hvib_prev, dyn_var, ham_prev, itraj);
         }
+        Hvib = 0.5 * (Hvib + Hvib_prev);
 
         L = make_Liouvillian(Hvib);
         // RHO = T_new.H() * (*dyn_var.dm_adi[itraj]) * T; // "raw" to dyn-const
