@@ -1242,8 +1242,8 @@ vector<double> hopping_probabilities_bllz(MATRIX& E_prev2, MATRIX& E_prev, MATRI
   sampling-exact where a parabola on Z lands at the middle-sample scale and
   overestimates the minimum as dt grows. In the regular form
   Z_min^3/Z_dd = Q_min^2/a (a = half the Q-parabola curvature):
-  P = exp( -(pi/2) Q_min / sqrt(a) ), with a negative vertex clamped to zero - the
-  trivial-crossing limit, P = 1. Detailed balance is
+  P = exp( -(pi/2) Q_min / sqrt(a) ); a negative vertex (the parabola undershooting
+  the bracket) falls back to the middle sample Q_1. Detailed balance is
   NOT applied here: the hop acceptance machinery owns it.
 
   Returns:
@@ -1275,7 +1275,12 @@ vector<double> hopping_probabilities_bllz(MATRIX& E_prev2, MATRIX& E_prev, MATRI
         double q_min = 0.5*( t_min*(t_min - dt)*q0
                       - 2.0*(t_min + dt)*(t_min - dt)*q1
                       + t_min*(t_min + dt)*q2 )/(dt*dt);
-        if(q_min < 0.0){ q_min = 0.0; }  // conical/trivial crossing
+        if(q_min < 0.0){
+          // a negative vertex means the parabola undershoots the sampled
+          // bracket (asymmetric sampling); the middle sample bounds the
+          // true minimum, and the conical limit keeps P -> 1 as q1 -> 0
+          q_min = q1;
+        }
 
         // Z_min^3/Z_dd = Q_min^2/a, a = Qdd/2 - regular at Q_min -> 0
         double a = 0.5*denom/(dt*dt);
