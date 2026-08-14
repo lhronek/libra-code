@@ -437,6 +437,8 @@ def eigenvectors_molden(molden_filename: str, nbasis: int, l_vals: list):
     _purity = molden_purity(molden_filename, l_vals)
     _cscale = _cart_coeff_scale(l_vals, _purity)
 
+    # loop-invariant: one resort map serves every MO
+    new_indices = resort_eigenvectors(l_vals, _purity)
     # eigenvectors list
     eigenvectors = []
     # loop over the ener_lines
@@ -453,14 +455,13 @@ def eigenvectors_molden(molden_filename: str, nbasis: int, l_vals: list):
         # now loop between them
         for j in range(ener_lines[i] + 3, endl):
             # the index in the molden file
-            c = int(lines[j].split()[0]) - 1
+            parts = lines[j].split()
+            c = int(parts[0]) - 1
             # append the eigenvector value to
             # the np.zero eigenvector
-            eigenvector[c] = float(lines[j].split()[1])
+            eigenvector[c] = float(parts[1])
 
 #         eigenvector = np.array(eigenvector)
-        # new indices form resot eigenvectors based on l_vals
-        new_indices = resort_eigenvectors(l_vals, _purity)
         # the new and sorted eigenvector
         eigenvector = eigenvector[new_indices] * _cscale
         # append it to the eigenvectors list
