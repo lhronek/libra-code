@@ -4966,6 +4966,15 @@ def cp2k_compute_adi_impl(q, params, full_id):
         obj.overlap_adi.set(i, i, 1.0 + 0.0j)
         for j in range(nstates):
             obj.time_overlap_adi.set(i, j, float(st_ci[i, j]) * (1.0 + 0.0j))
+    dt = float(params.get("dt", 41.0))    # the NBRA twin's default
+    # off-diagonal couplings -i (St_ij - St_ji)/(2 dt), the NBRA-twin
+    # convention: a diagonal-only supplied hvib armed the overwrite guard
+    # against any engine rebuild and carried no couplings to consume
+    for i in range(nstates):
+        for j in range(i + 1, nstates):
+            dij = float(st_ci[i, j] - st_ci[j, i]) / (2.0 * dt)
+            obj.hvib_adi.set(i, j, -1j * dij)
+            obj.hvib_adi.set(j, i, +1j * dij)
 
     obj.d1ham_adi = CMATRIXList()
     obj.dc1_adi = CMATRIXList()
