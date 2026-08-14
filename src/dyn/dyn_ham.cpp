@@ -44,10 +44,8 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
     The key parameters in the `prms` are:
 
     time_overlap_method:
-       - 0: based on the wavefunctions (the Hamiltonian shall have the
-    basis_transform variables updated)
-       - 1: based on external calculations (the Hamiltonian shall have the
-    time_overlap_adi member updated)
+       - 0: don't update - time_overlap_adi is supplied externally
+       - 1: compute from the basis_transform pair U_prev^H U
 
     ham_update_method:
        - 0: don't update any Hamiltonians

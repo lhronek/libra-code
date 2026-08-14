@@ -735,8 +735,9 @@ def run_tsh(common_params, compute_model, model_params):
     ielec = params["elec_init_type"]
 
     # Nuclear
-    init_nucl = {"init_type": inucl, "force_constant": k0, "ntraj": ntraj}
-    q, p, iM = tsh_dynamics.init_nuclear_dyn_var(x0, p0, masses, init_nucl, rnd)
+    init_nucl = {"init_type": inucl, "q": list(x0), "p": list(p0),
+                 "mass": list(masses), "force_constant": list(k0),
+                 "ndof": len(x0), "ntraj": ntraj}
 
     # Electronic
     istate = params["istate"]
@@ -744,7 +745,9 @@ def run_tsh(common_params, compute_model, model_params):
     for i in range(nstates):
         istates.append(0.0)
     istates[istate[1]] = 1.0
-    _init_elec = {"init_type": ielec, "nstates": nstates, "istates": istates, "rep": istate[0], "ntraj": ntraj}
+    _init_elec = {"init_type": ielec, "nstates": nstates, "istates": istates,
+                  "rep": istate[0], "ntraj": ntraj,
+                  "ndia": nstates, "nadi": nstates}
 
     # ============= Dynamical variables ==============
     dyn_params = dict(common_params)
@@ -758,7 +761,8 @@ def run_tsh(common_params, compute_model, model_params):
     _model_params.update({"model0": model_params["model"]})
 
     start = time.time()
-    res = tsh_dynamics.generic_recipe(q, p, iM, dyn_params, compute_model, _model_params, _init_elec, rnd)
+    res = tsh_dynamics.generic_recipe(dyn_params, compute_model, _model_params,
+                                      _init_elec, init_nucl, rnd)
     end = time.time()
     print(F"Calculation time = {end - start} seconds")
 
@@ -784,25 +788,26 @@ def _set_method(params, ham_rep=0, is_nbra=0, method=0):
             21 - mSDM, dephasing-informed; 31 - DISH, dephasing-informed
     """
 
-    params.update({"rep_ham": ham_rep})
+    # ham_rep 0: diabatic model diagonalized; 1: adiabatic-native
+    params.update({"ham_update_method": 1 if ham_rep == 0 else 2})
 
     if is_nbra == -1:    # custom
         pass
     elif is_nbra == 0:   # non-NBRA
         params.update({"force_method": 1, "rep_force": 1})    # state-specific forces, in the adiabatic rep
         params.update({"nac_update_method": 1})               # NACs from derivative couplings and momenta
-        params.update({"time_overlap_method": 0})             # on-the-fly time-overlaps
+        params.update({"time_overlap_method": 1})             # compute from basis_transform pairs
         params.update({"hop_acceptance_algo": 20, "momenta_rescaling_algo": 200})  # Tully-style rescaling
     elif is_nbra == 1:   # file-based NBRA
         params.update({"force_method": 0})                    # don't compute forces
         params.update({"nac_update_method": 0})               # NACs defined directly
-        params.update({"time_overlap_method": 1})             # time-overlaps from external sources
+        params.update({"time_overlap_method": 0})             # supplied externally, don't recompute
         params.update({"hop_acceptance_algo": 31, "momenta_rescaling_algo": 0})  # Boltzmann acceptance, no rescaling
     elif is_nbra == 2:   # on-the-fly NBRA
         params.update({"force_method": 1, "rep_force": 1})    # state-specific forces
         params.update({"enforce_state_following": 0})
         params.update({"nac_update_method": 1})
-        params.update({"time_overlap_method": 0})
+        params.update({"time_overlap_method": 1})   # compute from basis_transform pairs
         params.update({"hop_acceptance_algo": 31, "momenta_rescaling_algo": 0})
 
     if method == -1:     # custom
