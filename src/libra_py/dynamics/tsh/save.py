@@ -1025,20 +1025,35 @@ def save_time_overlaps(_savers, params, i, dyn_var, ham):
     timestep_st). The pre-step savers would instead capture the PREVIOUS
     interval left in the slot, with a method-dependent frame 0.
     """
+    hdf5_output_level = params["hdf5_output_level"]
     mem_output_level = params["mem_output_level"]
     txt_output_level = params["txt_output_level"]
     txt2_output_level = params["txt2_output_level"]
     is_nbra = params["is_nbra"]
+    nprint = params["nprint"]
+
+    # the savers allocate ceil(nsteps/nprint) rows and every other
+    # quantity writes strided - an unstrided write misaligns the St
+    # rows and runs off the end at i = nrows
+    if i % nprint != 0:
+        return
+    i = int(i / nprint)
 
     tr_range = [0] if is_nbra == 1 else range(dyn_var.ntraj)
     for tr in tr_range:
         St = ham.get_time_overlap_adi(Py2Cpp_int([0, tr]))
-        for key, lvl, txt_type in (("mem_saver", mem_output_level, 0),
+        for key, lvl, txt_type in (("hdf5_saver", hdf5_output_level, 0),
+                                   ("mem_saver", mem_output_level, 0),
                                    ("txt_saver", txt_output_level, 0),
                                    ("txt2_saver", txt2_output_level, 1)):
             saver = _savers[key]
             if lvl >= 4 and saver is not None:
-                if "St" in saver.keywords and "St" in saver.np_data.keys():
+                # the hdf5 saver writes datasets directly and carries no
+                # np_data staging dict
+                has_slot = "St" in saver.keywords
+                if hasattr(saver, "np_data"):
+                    has_slot = has_slot and "St" in saver.np_data.keys()
+                if has_slot:
                     t = 0 if txt_type == 1 else i
                     saver.save_multi_matrix(t, tr, "St", St)
 
