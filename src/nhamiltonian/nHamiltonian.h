@@ -281,6 +281,14 @@ public:
   ///< Tree management utilities
   void set_levels(int lvl_);            ///< Updates node levels downstream
   void add_new_children(int _ndia, int _nadi, int _nnucl, int nchildren);
+  nHamiltonian* child(int traj){
+    ///< Per-trajectory child access with the NBRA clamp: a single
+    ///< shared child (isNBRA==1) serves every trajectory, so an index
+    ///< beyond the allocated children folds to 0 instead of reading
+    ///< past the vector
+    if(traj >= (int)children.size()){ traj = 0; }
+    return children[traj];
+  }
   void add_child(nHamiltonian& child);  ///< Associate an existing Hamiltonian with the present one
                                         ///< to become its child
   vector<int> get_full_id();            ///< Entire path of the note in the tree

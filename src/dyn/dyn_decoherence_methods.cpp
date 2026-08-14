@@ -750,12 +750,12 @@ void wp_reversal_events(dyn_variables &dyn_var, nHamiltonian &ham, double dt) {
         pa, *dyn_var.iM); // kinetic energy on the active state
 
     // Energy
-    E = ham.children[itraj]->get_ham_adi();
+    E = ham.child(itraj)->get_ham_adi();
     double E_a = E.get(a, a).real(); // potential energy on the active state
 
     // Forces on all states
     for (int idof = 0; idof < ndof; idof++) {
-      dE = -1.0 * ham.children[itraj]->get_d1ham_adi(idof);
+      dE = -1.0 * ham.child(itraj)->get_d1ham_adi(idof);
       for (int i = 0; i < nadi; i++) {
         F.set(idof, i, dE.get(i, i).real());
       }
@@ -1281,8 +1281,8 @@ void shxf(dyn_variables &dyn_var, nHamiltonian &ham, nHamiltonian &ham_prev,
 
     CMATRIX ham_adi(nadi, nadi);
     CMATRIX ham_adi_prev(nadi, nadi);
-    ham_adi = ham.children[traj]->get_ham_adi();
-    ham_adi_prev = ham_prev.children[traj]->get_ham_adi();
+    ham_adi = ham.child(traj)->get_ham_adi();
+    ham_adi_prev = ham_prev.child(traj)->get_ham_adi();
 
     for (int i = 0; i < nadi; i++) {
       for (int idof = 0; idof < ndof; idof++) {
@@ -1486,8 +1486,8 @@ void mqcxf(dyn_variables &dyn_var, nHamiltonian &ham, nHamiltonian &ham_prev,
 
     CMATRIX ham_adi(nadi, nadi);
     CMATRIX ham_adi_prev(nadi, nadi);
-    ham_adi = ham.children[traj]->get_ham_adi();
-    ham_adi_prev = ham_prev.children[traj]->get_ham_adi();
+    ham_adi = ham.child(traj)->get_ham_adi();
+    ham_adi_prev = ham_prev.child(traj)->get_ham_adi();
 
     for (int i = 0; i < nadi; i++) {
       for (int idof = 0; idof < ndof; idof++) {
@@ -1646,7 +1646,7 @@ void mqcxf(dyn_variables &dyn_var, nHamiltonian &ham, nHamiltonian &ham_prev,
     MATRIX &nab_phase = *dyn_var.nab_phase[traj];
 
     CMATRIX E(nadi, nadi);
-    E = ham.children[traj]->get_ham_adi();
+    E = ham.child(traj)->get_ham_adi();
 
     MATRIX p_real(ndof, 1);
     p_real = dyn_var.p->col(traj);
@@ -1799,7 +1799,7 @@ void update_forces_xf(dyn_variables &dyn_var, nHamiltonian &ham,
     C = Coeff.col(traj);
 
     CMATRIX E(nst, nst);
-    E = ham.children[traj]->get_ham_adi();
+    E = ham.child(traj)->get_ham_adi();
 
     double Epot = (C.H() * E * C).get(0, 0).real();
 
@@ -1877,7 +1877,7 @@ void propagate_half_xf(dyn_variables &dyn_var, nHamiltonian &Ham,
       traj1 = 0;
     }
 
-    nHamiltonian *ham = Ham.children[traj1];
+    nHamiltonian *ham = Ham.child(traj1);
 
     // Generate the half-time exponential operator
     Hxf = *dyn_var.ham_xf[itraj];

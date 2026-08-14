@@ -54,7 +54,7 @@ MATRIX compute_dkinemat(dyn_variables& dyn_var, nHamiltonian& ham){
   for(int idof=0; idof<ndof; idof++){
     for(int itraj=0; itraj<ntraj; itraj++){
 
-      if(ham.children[itraj]->dc1_adi_mem_status[idof]==0){
+      if(ham.child(itraj)->dc1_adi_mem_status[idof]==0){
         cout<<"Error in compute_dkinemat(): the derivative coupling w.r.t. the nuclear \
 DOF "<<idof<<" is not allocated for trajectory "<<itraj<<" but is needed for the calculations \n";
         throw std::runtime_error("libra C++ error - see the message printed above");
@@ -64,8 +64,8 @@ DOF "<<idof<<" is not allocated for trajectory "<<itraj<<" but is needed for the
       double sum = 0.0;
       for(int n=0; n<nadi; n++){
         for(int k=0; k<n; k++){
-          //sum += ham.children[itraj]->dc1_adi[idof]->get(k, n).real() * dyn_var.dm_adi[itraj]->get(k, n).imag();
-          sum += (T.H() * (*ham.children[itraj]->dc1_adi[idof]) * T).get(k, n).real() * (T.H() * (*dyn_var.dm_adi[itraj]) * T ).get(k, n).imag();
+          //sum += ham.child(itraj)->dc1_adi[idof]->get(k, n).real() * dyn_var.dm_adi[itraj]->get(k, n).imag();
+          sum += (T.H() * (*ham.child(itraj)->dc1_adi[idof]) * T).get(k, n).real() * (T.H() * (*dyn_var.dm_adi[itraj]) * T ).get(k, n).imag();
         }// for k
       }// for n
 

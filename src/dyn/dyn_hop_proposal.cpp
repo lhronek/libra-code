@@ -1504,7 +1504,7 @@ vector<MATRIX> hop_proposal_probabilities(dyn_control_params& prms,
     if(isNBRA==1){
     // Only compute the Hvib for one traj, traj==0
       if(traj==0){
-      Hvib = ham.children[traj]->get_hvib_adi();
+      Hvib = ham.child(traj)->get_hvib_adi();
 
       //Transform Hamiltonian to the dynamically-consistent form:
       //Hvib = projectors[traj].H() * Hvib * projectors[traj];
@@ -1513,7 +1513,7 @@ vector<MATRIX> hop_proposal_probabilities(dyn_control_params& prms,
 
     else{
     // Compute the Hvib for all traj
-    Hvib = ham.children[traj]->get_hvib_adi();
+    Hvib = ham.child(traj)->get_hvib_adi();
 
     //Transform Hamiltonian to the dynamically-consistent form:
     //Hvib = projectors[traj].H() * Hvib * projectors[traj];
@@ -1537,7 +1537,7 @@ vector<MATRIX> hop_proposal_probabilities(dyn_control_params& prms,
     else if(prms.tsh_method == 3){ // LZ
 
 //      pop_submatrix(p, p_traj, nucl_stenc_x, nucl_stenc_y);
-//      g[traj] = hopping_probabilities_lz(ham.children[traj], ham_prev.children[traj], dyn_var.act_states[traj], prms.rep_lz, p_traj, *dyn_var.iM, prms.dt);
+//      g[traj] = hopping_probabilities_lz(ham.child(traj), ham_prev.child(traj), dyn_var.act_states[traj], prms.rep_lz, p_traj, *dyn_var.iM, prms.dt);
 
     }
 
@@ -1607,18 +1607,18 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
 
     if(isNBRA==1){
       // Only compute the Hvib for one traj, traj==0
-      if(traj==0){   Hvib = ham.children[traj]->get_hvib_adi();   }
+      if(traj==0){   Hvib = ham.child(traj)->get_hvib_adi();   }
     }
 
     else{
       // Compute the Hvib for all traj
       if(prms.rep_sh==1){
-        Hvib = ham.children[traj]->get_hvib_adi();
-        //if(prms.rep_tdse==0 || prms.rep_tdse==2){ Hvib = ham.children[traj]->get_hvib_dia(); }
-        if(prms.rep_tdse==2){ Hvib = ham.children[traj]->get_hvib_dia(); }
+        Hvib = ham.child(traj)->get_hvib_adi();
+        //if(prms.rep_tdse==0 || prms.rep_tdse==2){ Hvib = ham.child(traj)->get_hvib_dia(); }
+        if(prms.rep_tdse==2){ Hvib = ham.child(traj)->get_hvib_dia(); }
       }
       else{
-        Hvib = ham.children[traj]->get_hvib_dia();
+        Hvib = ham.child(traj)->get_hvib_dia();
       }
     }
 
@@ -1653,7 +1653,7 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
         // propose nothing while it fills
         if(dyn_var.bllz_vars_status == 0){ dyn_var.allocate_bllz(); }
         if(dyn_var.lz_gap_min_status == 0){ dyn_var.allocate_lz_gap_min(); }
-        int nst_t = ham.children[traj]->nadi;
+        int nst_t = ham.child(traj)->nadi;
         // the acceptance reads the at-crossing gaps AFTER the history has
         // shifted - stale entries must not survive a step
         for(int st=0; st<nst_t; st++){ dyn_var.lz_gap_min->set(st, traj, -1.0); }
@@ -1663,7 +1663,7 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
           MATRIX Ec(nst_t, 1);
           MATRIX Ep(nst_t, 1);
           MATRIX Ep2(nst_t, 1);
-          CMATRIX Ham_t(ham.children[traj]->get_ham_adi());
+          CMATRIX Ham_t(ham.child(traj)->get_ham_adi());
           for(int st=0; st<nst_t; st++){
             Ec.set(st, 0, Ham_t.get(st, st).real());
             Ep.set(st, 0, dyn_var.bllz_E_prev->get(st, traj));
@@ -1684,7 +1684,7 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
       else{
         pop_submatrix(*dyn_var.p, p_traj, nucl_stenc_x, nucl_stenc_y);
         if(dyn_var.lz_gap_min_status == 0){ dyn_var.allocate_lz_gap_min(); }
-        int nst_t = ham.children[traj]->nadi;
+        int nst_t = ham.child(traj)->nadi;
         vector<double> gms(nst_t, -1.0);
         if((prms.rep_lz == 2 || prms.rep_lz == 5) && dyn_var.bllz_vars_status == 1 &&
            dyn_var.bllz_hist_size >= 2){
@@ -1693,7 +1693,7 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
           MATRIX Ec(nst_t, 1);
           MATRIX Ep(nst_t, 1);
           MATRIX Ep2(nst_t, 1);
-          CMATRIX Ham_t(ham.children[traj]->get_ham_adi());
+          CMATRIX Ham_t(ham.child(traj)->get_ham_adi());
           for(int st=0; st<nst_t; st++){
             Ec.set(st, 0, Ham_t.get(st, st).real());
             Ep.set(st, 0, dyn_var.bllz_E_prev->get(st, traj));
@@ -1701,7 +1701,7 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
           }// for st
           hopping_probabilities_bllz(Ep2, Ep, Ec, dyn_var.act_states[traj], prms.dt, gms);
         }
-        g[traj] = hopping_probabilities_lz(ham.children[traj], ham_prev.children[traj], dyn_var.act_states[traj], 
+        g[traj] = hopping_probabilities_lz(ham.child(traj), ham_prev.child(traj), dyn_var.act_states[traj], 
                   prms.rep_lz, p_traj, *dyn_var.iM, prms.dt, gms);
         if(prms.lz_target_space == 0){
           // energies of the proposal's own representation: diabatic for
@@ -1710,15 +1710,15 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
           int nfil = (int)g[traj].size();
           vector<double> Ecol(nfil, 0.0);
           if(prms.rep_lz == 0 || prms.rep_lz == 3){
-            CMATRIX Hdia_t(ham.children[traj]->get_ham_dia());
+            CMATRIX Hdia_t(ham.child(traj)->get_ham_dia());
             for(int st=0; st<nfil; st++){ Ecol[st] = Hdia_t.get(st, st).real(); }
           }
           else if(prms.rep_lz == 5){
-            CMATRIX Hadi_p(ham_prev.children[traj]->get_ham_adi());
+            CMATRIX Hadi_p(ham_prev.child(traj)->get_ham_adi());
             for(int st=0; st<nfil; st++){ Ecol[st] = Hadi_p.get(st, st).real(); }
           }
           else{
-            CMATRIX Hadi_t(ham.children[traj]->get_ham_adi());
+            CMATRIX Hadi_t(ham.child(traj)->get_ham_adi());
             for(int st=0; st<nfil; st++){ Ecol[st] = Hadi_t.get(st, st).real(); }
           }
           filter_lz_target_space(g[traj], gms, Ecol, dyn_var.act_states[traj]);
@@ -1731,14 +1731,14 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
 
       pop_submatrix(*dyn_var.p, p_traj, nucl_stenc_x, nucl_stenc_y);
       if(dyn_var.lz_gap_min_status == 0){ dyn_var.allocate_lz_gap_min(); }
-      int nst_t = ham.children[traj]->nadi;
+      int nst_t = ham.child(traj)->nadi;
       vector<double> gms(nst_t, -1.0);
-      g[traj] = hopping_probabilities_zn(ham.children[traj], ham_prev.children[traj], dyn_var.act_states[traj],
+      g[traj] = hopping_probabilities_zn(ham.child(traj), ham_prev.child(traj), dyn_var.act_states[traj],
                 prms.rep_lz, p_traj, *dyn_var.iM, gms);
       if(prms.lz_target_space == 0){
         int nfil = (int)g[traj].size();
         vector<double> Ecol(nfil, 0.0);
-        CMATRIX Hadi_t(ham.children[traj]->get_ham_adi());
+        CMATRIX Hadi_t(ham.child(traj)->get_ham_adi());
         for(int st=0; st<nfil; st++){ Ecol[st] = Hadi_t.get(st, st).real(); }
         filter_lz_target_space(g[traj], gms, Ecol, dyn_var.act_states[traj]);
       }
@@ -1818,8 +1818,8 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
     // it feeds the BLLZ (rep_lz 4) parabola and the rep-2 pre-fill
     if(dyn_var.bllz_vars_status == 0){ dyn_var.allocate_bllz(); }
     for(traj=0; traj<ntraj; traj++){
-      CMATRIX Ham_t(ham.children[traj]->get_ham_adi());
-      int nst_t = ham.children[traj]->nadi;
+      CMATRIX Ham_t(ham.child(traj)->get_ham_adi());
+      int nst_t = ham.child(traj)->nadi;
       for(int st=0; st<nst_t; st++){
         dyn_var.bllz_E_prev2->set(st, traj, dyn_var.bllz_E_prev->get(st, traj));
         dyn_var.bllz_E_prev->set(st, traj, Ham_t.get(st, st).real());
