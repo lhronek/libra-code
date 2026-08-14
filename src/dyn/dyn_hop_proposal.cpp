@@ -947,19 +947,30 @@ must supply obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
     //ham->compute_nac_adi(p, invM);
 
     // Now calculate the hopping probabilities
-    MATRIX ham_dia(nstates,nstates);
     MATRIX ham_adi(nstates,nstates);
     MATRIX nac_adi(nstates,nstates);
     MATRIX ham_adi_prev(nstates,nstates);
-    MATRIX ham_dia_prev(nstates,nstates);
     MATRIX nac_adi_prev(nstates,nstates);
+    // the diabatic matrices are (ndia x ndia); only the rep-1 crossing
+    // detector reads them
+    MATRIX ham_dia(ham->ndia, ham->ndia);
+    MATRIX ham_dia_prev(ham->ndia, ham->ndia);
 
-    ham_dia = ham->get_ham_dia().real();
     ham_adi = ham->get_ham_adi().real();
     nac_adi = ham->get_nac_adi().real();
     ham_adi_prev = ham_prev->get_ham_adi().real();
-    ham_dia_prev = ham_prev->get_ham_dia().real();
     nac_adi_prev = ham_prev->get_nac_adi().real();
+    if(rep==1){
+      // rep 1 pairs diabatic crossings with adiabatic state labels
+      if(ham->ndia != ham->nadi){
+        cout<<"Error in hopping_probabilities_lz(): rep_lz = 1 pairs diabatic crossings \
+with adiabatic state labels - it requires ndia == nadi (got ndia = "<<ham->ndia
+            <<", nadi = "<<ham->nadi<<"); use rep_lz = 5 or 4 \n";
+        throw std::runtime_error("libra C++ error - see the message printed above");
+      }
+      ham_dia = ham->get_ham_dia().real();
+      ham_dia_prev = ham_prev->get_ham_dia().real();
+    }
     if(rep==1 && ham_dia.max_elt()==0.0 && ham_dia_prev.max_elt()==0.0){
       cout<<"Error in hopping_probabilities_lz(): rep_lz = 1 detects crossings in the diabatic \
 Hamiltonian, which is all-zero at two consecutive steps. Adiabatic-native models must supply \
