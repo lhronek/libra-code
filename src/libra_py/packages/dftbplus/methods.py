@@ -2802,6 +2802,9 @@ def _uks_ci_overlap(S2, data_bra, data_ket, info, lo):
     return C_b @ S_sd @ C_k.T
 
 
+_warned_partial_forces = False
+
+
 def dftb_compute_adi(q, params, full_id):
     """
     Compute adiabatic electronic properties and derivative couplings for one trajectory
@@ -3004,6 +3007,14 @@ def dftb_compute_adi(q, params, full_id):
     # supplying it
     if "StateOfInterest" in dftb_params:
         dftb_params["StateOfInterest"] = max(int(act_state), 1)
+    else:
+        # the excited input always carries StateCouplings (generator
+        # default {0 2}), and DFTB+ 24.1/25.1 abort without a nonzero
+        # StateOfInterest - fail here with the reason instead
+        raise ValueError("dftb_compute_adi: dftb_run_params needs "
+                         "StateOfInterest (the excited input always "
+                         "carries StateCouplings, which DFTB+ rejects "
+                         "without a nonzero StateOfInterest)")
 
     #make_dftb_input(dftb_params)
     prms1 = {
@@ -3264,6 +3275,13 @@ def dftb_compute_adi(q, params, full_id):
         # FD-verified on the allyl doublet
         f_ex = np.asarray(results_ex["forces"]) if "forces" in results_ex else None
         soi_row = max(int(act_state), 1)
+        global _warned_partial_forces
+        if not _warned_partial_forces:
+            _warned_partial_forces = True
+            print(F"WARNING in dftb_compute_adi: no FRC.DAT - d1ham_adi "
+                  F"carries gradients on rows 0 and {soi_row} only; "
+                  F"mean-field or diabatic-force consumers must not "
+                  F"rely on the other diagonals")
         for iatom in range(nat):
             for k in range(3):
                 if f_gs is not None:
