@@ -645,6 +645,9 @@ vector<double> hopping_probabilities_fssh2(dyn_control_params& prms, CMATRIX& de
 
   }// for j
 
+  // the vector-FSSH cap: the leaving probability tops out at 1 and
+  // hop() renormalizes the channels; version 1 rebuilds the row below
+  if(version==0 && sum > 1.0){ sum = 1.0; }
   g[i] = 1.0 - sum;
 
   if(version==1){  // Revision as discussed
