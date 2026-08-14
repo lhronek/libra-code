@@ -217,6 +217,8 @@ public:
                    "of the target";
       std::cout << " matrix (" << n_rows << " , " << n_cols << "), that is "
                 << n_rows * n_cols << " elements\n";
+      // the copy loop below would read past the shorter input
+      throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     int indx = 0;
