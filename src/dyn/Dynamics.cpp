@@ -797,7 +797,7 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
 
         Hvib = ham->get_hvib_adi_ref();
         if (is_ssy) {
-          SSY_correction(Hvib, dyn_var, ham_prev, itraj);
+          SSY_correction(Hvib, dyn_var, ham, itraj);
         }
 
         Hvib += Hvib_old;
@@ -835,7 +835,7 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
 
         Hvib = ham->get_hvib_adi_ref();
         if (is_ssy) {
-          SSY_correction(Hvib, dyn_var, ham_prev, itraj);
+          SSY_correction(Hvib, dyn_var, ham, itraj);
         }
 
         Hvib += Hvib_old;
@@ -1208,7 +1208,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
 
         Hvib = ham->get_hvib_adi();
         if (is_ssy) {
-          SSY_correction(Hvib, dyn_var, ham_prev, itraj);
+          SSY_correction(Hvib, dyn_var, ham, itraj);
         }
 
         Hvib += Hvib_old;
