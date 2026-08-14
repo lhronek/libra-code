@@ -512,6 +512,14 @@ void nHamiltonian::copy_level_content(nHamiltonian *src) {
 
   gs_kinetic_energy = src->gs_kinetic_energy;
 
+  // the supplied-flags arm the overwrite guards - a copy without them
+  // would silently disarm every guard on model-supplied data
+  hvib_adi_supplied = src->hvib_adi_supplied;
+  hvib_dia_supplied = src->hvib_dia_supplied;
+  nac_adi_supplied = src->nac_adi_supplied;
+  nac_dia_supplied = src->nac_dia_supplied;
+  time_overlap_adi_supplied = src->time_overlap_adi_supplied;
+
 } // copy_level_content
 
 void nHamiltonian::init_aux(int target_lvl) {
