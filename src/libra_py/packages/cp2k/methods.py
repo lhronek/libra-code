@@ -3567,9 +3567,10 @@ def align_mo_phases(C_prev_aligned, data_curr, St_mo):
     Args:
         C_prev_aligned: unused except for interface symmetry (phases are
             defined by St_mo, which must be <prev_aligned | curr_raw>)
-        data_curr (dict): current-step molden data; C is modified IN PLACE
+        data_curr (dict): unused here - the CALLER applies the returned
+            phases to its MO matrix; kept for call-site symmetry
         St_mo (np.ndarray): time-overlap computed with the RAW current MOs,
-            windowed, one spin channel; also fixed in place (columns flipped)
+            windowed, one spin channel; fixed in place (columns flipped)
 
     Returns:
         phases (np.ndarray, norb_w): the +-1 factors applied (window orbitals)
