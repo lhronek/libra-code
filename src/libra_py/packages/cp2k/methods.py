@@ -33,7 +33,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
 
-from libra_py import data_outs, data_stat, data_conv
+from libra_py import data_outs, data_read, data_stat, data_conv
 from libra_py import units, molden_methods
 import libra_py.orthogonalizations as ortho
 
@@ -345,8 +345,9 @@ def read_cp2k_tddfpt_log_file(params):
     orbital_space = params.get("orbital_space", None)
 
     # ===================== Read file ======================
-    with open(logfile_name, "r") as f:
-        lines = f.readlines()
+    # the driver parses one step's log several times (CI data, info,
+    # homo) - the stat-keyed cache reads it once
+    lines = data_read.read_lines_cached(logfile_name)
 
     nlines = len(lines)
 

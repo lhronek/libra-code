@@ -35,6 +35,7 @@ import libra_py.packages.cp2k.methods as CP2K_methods
 from libra_py import cube_file_methods
 from libra_py import molden_methods
 from libra_py import data_conv
+from libra_py import data_read
 from libra_py import orthogonalizations
 from libra_py import units
 
@@ -353,14 +354,9 @@ def component_to_index(components):
 
 
 def _read_xyz_frame(filename, step):
-    """Labels and coordinates (Angstrom, shape (N, 3)) of the step-th frame of an xyz trajectory."""
-    with open(filename) as f:
-        lines = f.readlines()
-    nat = int(lines[0].split()[0])
-    off = step * (nat + 2) + 2
-    labels = [line.split()[0] for line in lines[off:off + nat]]
-    R = np.array([[float(x) for x in line.split()[1:4]] for line in lines[off:off + nat]])
-    return labels, R
+    """Labels and coordinates (Angstrom, shape (N, 3)) of the step-th frame
+    of an xyz trajectory - data_read.read_atom_coords with its lines cache."""
+    return data_read.read_atom_coords(filename, step)
 
 
 def run_cp2k_libint_step2(params):

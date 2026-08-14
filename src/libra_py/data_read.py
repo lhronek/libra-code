@@ -17,6 +17,7 @@
 
 """
 
+import functools
 import os
 import sys
 import math
@@ -437,6 +438,21 @@ def get_all_data(params):
     return Hadi, Hvib, nac, St, nstates
 
 
+def read_lines_cached(filename):
+    """Stat-keyed cached line list: a finished file is read once across
+    the per-step parsers, a changed file is re-read."""
+    st = os.stat(filename)
+    return _lines_cached(filename, (st.st_mtime_ns, st.st_size))
+
+
+@functools.lru_cache(maxsize=4)
+def _lines_cached(filename, _stamp):
+    """Whole-file line list, cached per (path, mtime, size) - the per-step
+    frame readers otherwise re-read the entire trajectory every call."""
+    with open(filename) as f:
+        return f.readlines()
+
+
 def read_atom_coords(filename, step):
     """
     This function reads the trajectory xyz file and returns the atoms and coordiantes of step^th geometry.
@@ -447,9 +463,7 @@ def read_atom_coords(filename, step):
         atoms (list): A list that contains the atoms names.
         coords (nparray): A numpy array that contains the X,Y, and Z coordinates of each atom.
     """
-    f = open(filename, 'r')
-    lines = f.readlines()
-    f.close()
+    lines = read_lines_cached(filename)
     natoms = int(lines[0].split()[0])
     coords = []
     start = step * (natoms + 2) + 2
