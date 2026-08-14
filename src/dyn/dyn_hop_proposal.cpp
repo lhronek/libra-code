@@ -653,8 +653,10 @@ vector<double> hopping_probabilities_fssh2(dyn_control_params& prms, CMATRIX& de
   if(version==1){  // Revision as discussed
 
     if(sum>0.0){
-      g[i] = P_out_ii;
-      for(j=0;j<nstates;j++){  if(j!=i){  g[j] *= (1.0 - P_out_ii)/sum; }  }
+      // total hop probability = the active state's fractional loss
+      // P_out, channels proportional to their population gains
+      g[i] = 1.0 - P_out_ii;
+      for(j=0;j<nstates;j++){  if(j!=i){  g[j] *= P_out_ii/sum; }  }
     }else{
       g[i] = 1.0; 
       for(j=0;j<nstates;j++){  if(j!=i){  g[j] = 0.0; }  }
