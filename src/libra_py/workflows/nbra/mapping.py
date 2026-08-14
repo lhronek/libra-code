@@ -662,7 +662,7 @@ def ovlp_mat_arb_lemma(SD1, SD2, S2, active_space=None, mem_limit_mb=256):
 
 def ovlp_mat_arb_auto(SD1, SD2, S2, active_space=None, mem_limit_mb=256):
     """Determinant-lemma kernel with automatic fallback to the batched one."""
-    res = ovlp_mat_arb_lemma(SD1, SD2, S2, active_space)
+    res = ovlp_mat_arb_lemma(SD1, SD2, S2, active_space, mem_limit_mb)
     if res is None:
         res = ovlp_mat_arb_batched(SD1, SD2, S2, active_space, mem_limit_mb)
     return res
