@@ -1572,7 +1572,12 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
 
     # Compute internals of the Hamiltonian objects
     model_params1 = copy.deepcopy(model_params)
-    model_params1.update({"model": model_params["model0"], "timestep": 0, "timestep_st": 0})
+    # the trajectory starts at frame icond - the init model call must
+    # evaluate there, or timestep-dependent models (file-fed NBRA, the
+    # on-the-fly drivers) initialize every icond from frame 0
+    icond0 = int(dyn_params.get("icond", 0))
+    model_params1.update({"model": model_params["model0"],
+                          "timestep": icond0, "timestep_st": icond0})
 
     # We set up this temporary dict such that we we request diabatic Ham calculations
     # followed by the transformation to the adiabatic one - this is what we need to get
