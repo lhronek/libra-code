@@ -421,6 +421,7 @@ void dyn_control_params::sanity_check(){
   if(num_electronic_substeps<=0){
       cout<<"Error in dyn_control_params::sanity_check: num_electronic_substeps = "<<num_electronic_substeps
           <<" should be a positive integer"<<endl;
+      throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
 }
