@@ -618,11 +618,11 @@ def run_cp2k_libint_step2(params):
                 step)
             if params["restart_file"]:
                 os.system(f'cp {params["restart_file"]} ./Diag_libra-{step}-RESTART.wfn')
-            # a single rank gains nothing from mpirun, and OpenMPI's default
-            # bind-to-core would pin all OMP threads of the rank onto ONE core
-            launcher = F'{mpi_executable} -n {nprocs} ' if int(nprocs) > 1 else ''
-            os.system(F'OMP_NUM_THREADS={params["omp_num_threads"]} {launcher}'
-                      F'{cp2k_exe} -i Diag_libra-{step}.inp -o step_{step}.log')
+            CP2K_methods.execute_cp2k(cp2k_exe, F'Diag_libra-{step}.inp',
+                                      F'step_{step}.log',
+                                      omp_num_threads=params["omp_num_threads"],
+                                      mpi_executable=mpi_executable,
+                                      nprocs=nprocs)
             molden_filename = F'Diag_libra-{step}-1_0.molden'
         print('Done with step', step, 'Elapsed time:', time.time() - t1)
 #        if params['is_many_body']:

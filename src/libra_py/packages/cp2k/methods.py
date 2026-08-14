@@ -1885,9 +1885,6 @@ def run_cp2k_xtb(params):
     # threads per MPI rank - without an explicit value many psmp builds default
     # to ALL cores per rank, oversubscribing the node for nprocs > 1
     omp = int(params.get('omp_num_threads', 1))
-    # a single rank gains nothing from mpirun, and OpenMPI's default
-    # bind-to-core would pin all OMP threads of the rank onto ONE core
-    launcher = '%s -n %d ' % (mpi_executable, nprocs) if int(nprocs) > 1 else ''
 
     if ot_input_template is not None:
         # Run OT; the diag run restarts from the same-step OT wfn (the
@@ -1895,8 +1892,9 @@ def run_cp2k_xtb(params):
         print('Step', step, 'Computing the OT method wfn file...')
         cp2k_xtb_ot_inp(ot_input_template, trajectory_xyz_filename, step)
         t1 = time.time()
-        os.system('OMP_NUM_THREADS=%d %s%s -i xtb_ot_step_%d.inp -o OUT-ot_%d.log' %
-                  (omp, launcher, cp2k_exe, step, step))
+        execute_cp2k(cp2k_exe, F'xtb_ot_step_{step}.inp', F'OUT-ot_{step}.log',
+                     omp_num_threads=omp, mpi_executable=mpi_executable,
+                     nprocs=nprocs)
         print('Done with OT wfn. Elapsed time:', time.time() - t1)
         diag_wfn_restart, diag_traj = None, None
     else:
@@ -1911,8 +1909,9 @@ def run_cp2k_xtb(params):
     t1 = time.time()
     print('Computing the wfn file using diagonalization method...')
     cp2k_xtb_diag_inp(diag_input_template, step, diag_wfn_restart, diag_traj)
-    os.system('OMP_NUM_THREADS=%d %s%s -i xtb_diag_step_%d.inp -o OUT-diag_%d.log' %
-              (omp, launcher, cp2k_exe, step, step))
+    execute_cp2k(cp2k_exe, F'xtb_diag_step_{step}.inp', F'OUT-diag_{step}.log',
+                 omp_num_threads=omp, mpi_executable=mpi_executable,
+                 nprocs=nprocs)
     print('Done with diagonalization. Elapsed time:', time.time() - t1)
 
 
@@ -3178,6 +3177,37 @@ def make_cp2k_input(params, working_directory="."):
     return input_path
 
 
+def execute_cp2k(exe, input_name, logname, wd=".", omp_num_threads=1,
+                 mpi_executable=None, nprocs=1, cp2k_data_dir=None):
+    """Launch one CP2K run: argv list (no shell), OMP/data-dir env for
+    the child only, single-rank mpirun skip, log dedup (CP2K's -o
+    APPENDS), and a fail-loud tail on nonzero exit."""
+    env = dict(os.environ)
+    env["OMP_NUM_THREADS"] = str(omp_num_threads)
+    if cp2k_data_dir:
+        env["CP2K_DATA_DIR"] = cp2k_data_dir
+    logfile = os.path.join(wd, logname)
+    if os.path.exists(logfile):
+        os.remove(logfile)
+    cmd = [exe, "-i", input_name, "-o", logname]
+    # a single rank gains nothing from mpirun, and OpenMPI's default
+    # bind-to-core would pin all OMP threads of the rank onto ONE core.
+    # shlex: the launcher may carry flags ("mpirun --bind-to none")
+    if mpi_executable is not None and int(nprocs) > 1:
+        cmd = shlex.split(str(mpi_executable)) + ["-n", str(nprocs)] + cmd
+    res = subprocess.run(cmd, cwd=wd, env=env,
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if res.returncode != 0:
+        tail = ""
+        if os.path.exists(logfile):
+            with open(logfile) as f:
+                tail = "".join(f.readlines()[-30:])
+        raise RuntimeError(
+            F"CP2K failed (exit {res.returncode}) in {wd} ({input_name})\n"
+            F"stderr: {res.stderr.decode()[-2000:]}\nlog tail:\n{tail}")
+    return logfile
+
+
 def run_cp2k(coords_bohr, params):
     """
     Execute one CP2K calculation in a trajectory-specific working directory.
@@ -3234,27 +3264,10 @@ def run_cp2k(coords_bohr, params):
         env["CP2K_DATA_DIR"] = params["cp2k_data_dir"]
 
     def _execute(input_name, logname):
-        logfile = os.path.join(wd, logname)
-        if os.path.exists(logfile):
-            os.remove(logfile)  # CP2K's -o APPENDS; keep one run per log
-        cmd = [exe, "-i", input_name, "-o", logname]
-        # a single rank gains nothing from mpirun, and OpenMPI's default
-        # bind-to-core would pin all OMP threads of the rank onto ONE core.
-        # shlex: the launcher may carry flags ("mpirun --bind-to none") -
-        # as one argv element it would be looked up as the binary name
-        if mpi is not None and int(nprocs) > 1:
-            cmd = shlex.split(str(mpi)) + ["-n", str(nprocs)] + cmd
-        res = subprocess.run(cmd, cwd=wd, env=env,
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if res.returncode != 0:
-            tail = ""
-            if os.path.exists(logfile):
-                with open(logfile) as f:
-                    tail = "".join(f.readlines()[-30:])
-            raise RuntimeError(
-                f"CP2K failed (exit {res.returncode}) in {wd} ({input_name})\n"
-                f"stderr: {res.stderr.decode()[-2000:]}\nlog tail:\n{tail}")
-        return logfile
+        return execute_cp2k(exe, input_name, logname, wd=wd,
+                            omp_num_threads=params.get("omp_num_threads", 1),
+                            mpi_executable=mpi, nprocs=nprocs,
+                            cp2k_data_dir=params.get("cp2k_data_dir", None))
 
     # ---- optional OT pre-convergence run (large systems / hard SCF) ----
     # Two-run scheme a la the NBRA step2 xTB workflow: a cheap OT ENERGY run
