@@ -153,6 +153,31 @@ IF(NOT CMAKE_BUILD_TYPE)
 ENDIF()
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 
+# Optional host-specific vectorization. PROJECT-WIDE by construction: the
+# Eigen templates instantiated in math_meigen, libint2_wrappers and solvers
+# are folded into one liblibra_core.so, and Eigen's alignment/kernel choice
+# depends on __AVX__ (EIGEN_IDEAL_MAX_ALIGN_BYTES 16 -> 32) - every TU must
+# agree. Opt-in: the objects require AVX2+FMA hardware, and FMA contraction
+# shifts eigensolver results at machine epsilon.
+OPTION(WITH_AVX2 "Compile the whole project with -mavx2 -mfma (host must support AVX2/FMA)" OFF)
+# WITH_AVX2_MEIGEN was the earlier per-target spelling - honor it as an alias
+IF(DEFINED WITH_AVX2_MEIGEN AND WITH_AVX2_MEIGEN)
+  SET(WITH_AVX2 ON CACHE BOOL "Compile the whole project with -mavx2 -mfma (host must support AVX2/FMA)" FORCE)
+ENDIF()
+SET(LIBRA_HAVE_AVX2 "" CACHE INTERNAL "project compiled with -mavx2 -mfma")
+IF(WITH_AVX2)
+  INCLUDE(CheckCXXCompilerFlag)
+  CHECK_CXX_COMPILER_FLAG("-mavx2" LIBRA_CXX_HAS_AVX2)
+  CHECK_CXX_COMPILER_FLAG("-mfma" LIBRA_CXX_HAS_FMA)
+  IF(LIBRA_CXX_HAS_AVX2 AND LIBRA_CXX_HAS_FMA)
+    MESSAGE(STATUS "compiling the project with -mavx2 -mfma")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx2 -mfma")
+    SET(LIBRA_HAVE_AVX2 1 CACHE INTERNAL "project compiled with -mavx2 -mfma")
+  ELSE()
+    MESSAGE(STATUS "compiler lacks -mavx2/-mfma - WITH_AVX2 ignored")
+  ENDIF()
+ENDIF()
+
 
 
 #
@@ -208,8 +233,8 @@ endif()
 if(LIBRA_HAVE_ZHEEVD_BACKEND)
   set(LIBRA_FLAGS "${LIBRA_FLAGS} lapack_zheevd")
 endif()
-if(LIBRA_HAVE_AVX2_MEIGEN)
-  set(LIBRA_FLAGS "${LIBRA_FLAGS} avx2_meigen")
+if(LIBRA_HAVE_AVX2)
+  set(LIBRA_FLAGS "${LIBRA_FLAGS} avx2")
 endif()
 if(USING_PCH)
   set(LIBRA_FLAGS "${LIBRA_FLAGS} pch")
