@@ -34,7 +34,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 import util.libutil as comn
 
 from libra_py import data_outs, data_read, data_stat, data_conv
-from libra_py import units, molden_methods
+from libra_py import units, molden_methods, orthogonalizations
 import libra_py.orthogonalizations as ortho
 
 
@@ -3411,7 +3411,10 @@ def compute_state_energy_and_force(coords_bohr, params):
         run_params["act_state"] = 0
         logfile = run_cp2k(coords_bohr, run_params)
         E_gs = read_cp2k_total_energy(logfile)
-        forces = read_cp2k_forces(logfile)
+        if params.get("force_source", "active_state") == "none":
+            forces = np.zeros((len(params["atom_labels"]), 3))
+        else:
+            forces = read_cp2k_forces(logfile)
         return {"E_total": E_gs, "E_gs": E_gs, "forces": forces,
                 "omegas": np.array([]), "fosc": np.array([]),
                 "E_adi": np.array([E_gs]), "logfile": logfile}
@@ -4489,6 +4492,21 @@ def cp2k_compute_adi_nbra(q, params, full_id):
     return obj
 
 
+def _carried(params, key, itraj, current, is_first_time):
+    """Per-trajectory carried state; a missing entry after the first step
+    means the params dict was rebuilt between calls - substituting the
+    current step would silently zero the time-overlap channel."""
+    if is_first_time:
+        return current
+    store = params.get(key)
+    if store is None or itraj not in store:
+        raise RuntimeError(
+            F"cp2k_compute_adi: carried state '{key}' for trajectory {itraj} "
+            F"is missing at timestep {params.get('timestep', '?')} - params "
+            F"must persist between driver calls")
+    return store[itraj]
+
+
 def cp2k_compute_adi_impl(q, params, full_id):
     """
     Compute adiabatic properties for one trajectory at one time step, on the fly.
@@ -4728,7 +4746,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
     homo = params["homo"][itraj]        # int, or (homo_alpha, homo_beta) for UKS
     homos = list(homo) if isUKS else [homo]
 
-    mo_prev = params["mo_prev"].get(itraj, mo_curr) if not is_first_time else mo_curr
+    mo_prev = _carried(params, "mo_prev", itraj, mo_curr, is_first_time)
     if params.get("ao_overlap_method", "cp2k") == "cp2k":
         # CP2K-native AO overlaps (OVERLAP_DELTAT doubled-geometry run)
         if "overlap_template" not in params:
@@ -4740,8 +4758,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
                 print(F"overlap_template not provided - auto-generated from "
                       F"{params['input_template']} -> {auto}")
             params["overlap_template"] = auto
-        coords_prev = (params["coordinates_prev"].get(itraj, coordinates)
-                       if not is_first_time else coordinates)
+        coords_prev = _carried(params, "coordinates_prev", itraj,
+                               coordinates, is_first_time)
         odt = {k: params[k] for k in ("atom_labels", "cp2k_exe", "cp2k_data_dir",
                                       "omp_num_threads", "mpi_executable", "nprocs",
                                       "overlap_template") if k in params}
@@ -4753,7 +4771,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
             raise ValueError('ao_overlap_method="libint" is restricted-only in '
                              'the driver - UKS runs need ao_overlap_method="cp2k"')
         S_curr = mo_overlap(mo_curr, mo_curr, LO, HI)
-        S_prev = params["S_prev"].get(itraj, S_curr) if not is_first_time else S_curr
+        S_prev = _carried(params, "S_prev", itraj, S_curr, is_first_time)
         St_mo = mo_overlap(mo_prev, mo_curr, LO, HI)
 
     # per-channel views (the overlap builders return [alpha, beta] lists for
@@ -4761,6 +4779,13 @@ def cp2k_compute_adi_impl(q, params, full_id):
     St_ch = list(St_mo) if isUKS else [St_mo]
     Sp_ch = list(S_prev) if isUKS else [S_prev]
     Sc_ch = list(S_curr) if isUKS else [S_curr]
+    # a freshly produced MO self-overlap must be a clean identity -
+    # anything else means the producing chain is broken NOW (the same
+    # gate step2 applies to the same producer)
+    for _k, _sc in enumerate(Sc_ch):
+        orthogonalizations.validate_overlap_matrix(
+            np.asarray(_sc), F"S_mo(t) channel {_k} (cp2k driver)",
+            require_identity=0.05)
     C_keys = ("C", "C_b")[:len(St_ch)]
 
     # cumulative MO phase alignment: flip current MOs (in place, so the cache
@@ -4876,7 +4901,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
                 for k, (c, sp) in enumerate(zip(confs, csp)):
                     ph = phases_ch[0] if sp == "alp" else phases_ch[1]
                     amps[k] *= ph[c[0] - LO] * ph[c[1] - LO]
-        ci_prev = params["ci_prev"].get(itraj, ci_curr) if not is_first_time else ci_curr
+        ci_prev = _carried(params, "ci_prev", itraj, ci_curr, is_first_time)
 
         # ---------------- CI time-overlap: backend A or B ----------------
         if backend == "sd":
@@ -4927,14 +4952,15 @@ def cp2k_compute_adi_impl(q, params, full_id):
         T_dia = np.zeros((nstates, nstates))
         for j in range(nstates):
             T_dia[order[j], j] = 1.0
-        sd_prev_sorted = params["sd_prev"].get(itraj, sd_sorted) if not is_first_time else sd_sorted
+        sd_prev_sorted = _carried(params, "sd_prev", itraj, sd_sorted,
+                                  is_first_time)
         st_ci, _ = sd_overlaps(sd_sorted, St_in, Sp_in, Sc_in,
                                orthonormalize=sd_orthon, kernel=sd_kernel,
                                cache=sd_cache, sd_states_prev=sd_prev_sorted)
         params["sd_prev"][itraj] = sd_sorted
 
     # ---------------- mid-point energies ----------------
-    E_adi_prev = params["E_adi_prev"].get(itraj, E_adi_curr) if not is_first_time else E_adi_curr
+    E_adi_prev = _carried(params, "E_adi_prev", itraj, E_adi_curr, is_first_time)
     E_mid = 0.5 * (E_adi_prev + E_adi_curr)
 
     # ---------------- build the returned object ----------------
