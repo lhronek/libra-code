@@ -59,7 +59,7 @@ void Random::bin(vector<double> &in, double minx, double maxx, double dx,
 
 double Random::uniform(double a, double b) {
 
-  double ksi = rand() / ((double)RAND_MAX);
+  double ksi = std::uniform_real_distribution<double>(0.0, 1.0)(gen);
   return (a + (b - a) * ksi);
 }
 double Random::p_uniform(double a, double b) { return (1.0 / (b - a)); }

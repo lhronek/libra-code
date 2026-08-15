@@ -12,6 +12,8 @@
 #ifndef RANDOM_H
 #define RANDOM_H
 
+#include <random>
+
 #if defined(USING_PCH)
 #include "../pch.h"
 #else
@@ -38,14 +40,18 @@ namespace librandom{
 
 class Random{
 
+  // per-object generator: seeding one Random must not disturb any other
+  // (the previous srand/rand pair shared one process-global stream)
+  std::mt19937 gen;
+
   int fact(int k);
   double Gamma(double a);
   void bin(vector<double>& in,double minx,double maxx,double dx,vector< pair<double,double> >& out);
 
   public:
 
-  Random(){   srand(time(0)); }
-  Random(int seed_){ srand(seed_); }  ///< reproducible / worker-safe seeding
+  Random(){ std::random_device rd; gen.seed(rd()); }
+  Random(int seed_){ gen.seed((unsigned int)seed_); }  ///< reproducible / worker-safe seeding
   ~Random(){ ;; }
 
 
