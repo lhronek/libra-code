@@ -675,12 +675,17 @@ int need_active_states_diff_rep(dyn_control_params &prms) {
 
   int list_size = bp::len(prms.properties_to_save);
 
+  // every saved property that reads the active states of the OTHER
+  // representation: the plain SH populations, the Tempelaar-Reichman
+  // TR populations (compute_average_sh_pop_TR(1) reads act_states_dia,
+  // TR(0) reads act_states) and the raw states_dia list
   if (prms.rep_sh == 0) {
     for (int i = 0; i < list_size; ++i) {
       // Extract each element and convert it to a std::string
       std::string property =
           bp::extract<std::string>(prms.properties_to_save[i]);
-      if (property == "sh_pop_adi") {
+      if (property == "sh_pop_adi" || property == "sh_pop_dia_TR" ||
+          property == "states") {
         res = 1;
       }
     }
@@ -689,7 +694,8 @@ int need_active_states_diff_rep(dyn_control_params &prms) {
       // Extract each element and convert it to a std::string
       std::string property =
           bp::extract<std::string>(prms.properties_to_save[i]);
-      if (property == "sh_pop_dia") {
+      if (property == "sh_pop_dia" || property == "sh_pop_adi_TR" ||
+          property == "states_dia") {
         res = 1;
       }
     }
