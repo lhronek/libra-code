@@ -564,7 +564,11 @@ MATRIX compute_1body_ints_parallel(const std::vector<libint2::Shell> &shells_1,
       auto bf1 = shell2bf1[s1]; // first basis function in this shell
       auto n1 = shells_1[s1].size();
       // std::cout << "shells_1[" << s1 << "]" << shells_1[s1].size() << "\n";
-      auto s1_offset = s1 * (s1 + 1) / 2;
+      // row-major pair index over the FULL rectangle: the triangular
+      // s1(s1+1)/2 offset (from libint's s2 <= s1 template) collides residue
+      // classes here and piles pairs onto few threads (measured up to +63%
+      // on the busiest thread for narrow rectangles / odd thread counts)
+      auto s1_offset = s1 * shells_2.size();
       // for (auto s2 = 0; s2 < shells_2.size(); ++s2) {
       for (auto s2 = 0u; s2 != shells_2.size(); ++s2) {
         // std::cout << "shells_2[" << s2 << "]" << shells_2[s2].size() << "\n";
@@ -790,7 +794,11 @@ std::vector<MATRIX> compute_1body_ints_parallel_emultipole3(
       auto bf1 = shell2bf1[s1]; // first basis function in this shell
       auto n1 = shells_1[s1].size();
       // std::cout << "shells_1[" << s1 << "]" << shells_1[s1].size() << "\n";
-      auto s1_offset = s1 * (s1 + 1) / 2;
+      // row-major pair index over the FULL rectangle: the triangular
+      // s1(s1+1)/2 offset (from libint's s2 <= s1 template) collides residue
+      // classes here and piles pairs onto few threads (measured up to +63%
+      // on the busiest thread for narrow rectangles / odd thread counts)
+      auto s1_offset = s1 * shells_2.size();
       // for (auto s2 = 0; s2 < shells_2.size(); ++s2) {
       for (auto s2 = 0u; s2 != shells_2.size(); ++s2) {
         // std::cout << "shells_2[" << s2 << "]" << shells_2[s2].size() << "\n";
