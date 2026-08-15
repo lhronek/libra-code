@@ -2814,7 +2814,10 @@ def run_step3_sd_nacs_libint(params):
                 # Compute the St_ci
                 St_ci = np.linalg.multi_dot([sd2ci_prev.T, St_sds[i].todense().real, sd2ci_curr])
                 St_cis.append(sp.csc_matrix(St_ci))
-                sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/St_ci_{step+start_time}_re.npz', sp.csc_matrix(St_ci))
+                # indexed by the loop variable: `step` is stale here (frozen at
+                # finish_time - 2 by the energy loop above), so every iteration
+                # overwrote the same file
+                sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/St_ci_{i+start_time}_re.npz', sp.csc_matrix(St_ci))
 
     # Now, we move to applying phase-corrections
     if params['apply_phase_correction']:
