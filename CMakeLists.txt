@@ -178,18 +178,9 @@ set(LIBRA_VERSION_STRING "" CACHE STRING "Override the composed Libra version st
 # through LIBRA_VERSION_STRING, or set a fixed base here:
 #set(LIBRA_VERSION_BASE "5.13.0")
 set(LIBRA_VERSION_BASE "devel")
-set(LIBRA_FLAGS "libint boost_python")
-if(WITH_OPENMP)
-  set(LIBRA_FLAGS "omp ${LIBRA_FLAGS}")
-endif()
-# WITH_BLAS_GEMM is declared in src/math_linalg (default ON) - on the very
-# first configure it is not in the cache yet, so undefined means ON
-if(NOT DEFINED WITH_BLAS_GEMM OR WITH_BLAS_GEMM)
-  set(LIBRA_FLAGS "${LIBRA_FLAGS} blas_gemm")
-endif()
-if(USING_PCH)
-  set(LIBRA_FLAGS "${LIBRA_FLAGS} pch")
-endif()
+# the flag string is read at BUILD time through the target property
+# LIBRA_FLAGS_STR, composed after ADD_SUBDIRECTORY(src) from the backend
+# probe results - the banner records what was linked, not what was asked
 add_custom_target(libra_version_h ALL
   COMMAND ${CMAKE_COMMAND}
     -DSRC_DIR=${CMAKE_SOURCE_DIR}
@@ -197,12 +188,32 @@ add_custom_target(libra_version_h ALL
     -DBASE_VERSION=${LIBRA_VERSION_BASE}
     "-DOVERRIDE=${LIBRA_VERSION_STRING}"
     "-DLIBINT_VER=${Libint2_VERSION}"
-    "-DFLAGS_STR=${LIBRA_FLAGS}"
+    "-DFLAGS_STR=$<TARGET_PROPERTY:libra_version_h,LIBRA_FLAGS_STR>"
     -P ${CMAKE_SOURCE_DIR}/cmake/gen_version.cmake
   COMMENT "Stamping libra_version.h"
   BYPRODUCTS ${CMAKE_BINARY_DIR}/generated/libra_version.h)
 INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR}/generated)
 
 ADD_SUBDIRECTORY("src")
+
+# provenance flags of the LINKED build: each numerics-changing backend
+# appears iff its subdirectory probe passed (LIBRA_HAVE_* cache flags)
+set(LIBRA_FLAGS "libint boost_python")
+if(WITH_OPENMP)
+  set(LIBRA_FLAGS "omp ${LIBRA_FLAGS}")
+endif()
+if(LIBRA_HAVE_GEMM_BACKEND)
+  set(LIBRA_FLAGS "${LIBRA_FLAGS} blas_gemm")
+endif()
+if(LIBRA_HAVE_ZHEEVD_BACKEND)
+  set(LIBRA_FLAGS "${LIBRA_FLAGS} lapack_zheevd")
+endif()
+if(LIBRA_HAVE_AVX2_MEIGEN)
+  set(LIBRA_FLAGS "${LIBRA_FLAGS} avx2_meigen")
+endif()
+if(USING_PCH)
+  set(LIBRA_FLAGS "${LIBRA_FLAGS} pch")
+endif()
+set_property(TARGET libra_version_h PROPERTY LIBRA_FLAGS_STR "${LIBRA_FLAGS}")
 
 

@@ -30,6 +30,7 @@ TARGET_LINK_LIBRARIES(specialfunctions_stat linalg_stat meigen_stat random_stat 
 #  Optional LAPACK divide-and-conquer eigensolver for the matrix exponential
 #
 OPTION(WITH_LAPACK_ZHEEVD "Use LAPACK zheevd for the matrix exponential eigensolve" ON)
+SET(LIBRA_HAVE_ZHEEVD_BACKEND "" CACHE INTERNAL "zheevd backend linked (probe passed)")
 IF(WITH_LAPACK_ZHEEVD)
   # both probes RUN 2x2 problems through the int-argument prototypes
   # (ILP64 libraries link but misread the dimensions - see
@@ -57,6 +58,7 @@ IF(WITH_LAPACK_ZHEEVD)
       ENDIF()
     ENDIF()
   ENDIF()
+  SET(LIBRA_HAVE_ZHEEVD_BACKEND "${LIBRA_ZHEEVD_LIBS}" CACHE INTERNAL "zheevd backend linked (probe passed)")
   IF(LIBRA_ZHEEVD_LIBS)
     MESSAGE(STATUS "math_specialfunctions: LAPACK zheevd exponential enabled: ${LIBRA_ZHEEVD_LIBS}")
     SET_SOURCE_FILES_PROPERTIES(${CMAKE_CURRENT_SOURCE_DIR}/SpecialFunctions.cpp

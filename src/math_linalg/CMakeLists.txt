@@ -28,6 +28,7 @@ TARGET_LINK_LIBRARIES(linalg_stat io_stat ${ext_libs})
 #  Optional CBLAS backend for large MATRIX/CMATRIX products
 #
 OPTION(WITH_BLAS_GEMM "Route large MATRIX/CMATRIX products through CBLAS gemm" ON)
+SET(LIBRA_HAVE_GEMM_BACKEND "" CACHE INTERNAL "gemm backend linked (probe passed)")
 IF(WITH_BLAS_GEMM)
   # the probes RUN a 2x2 gemm through the int-argument prototype: a
   # symbol check alone accepts an ILP64 library, whose callee reads the
@@ -53,6 +54,7 @@ IF(WITH_BLAS_GEMM)
       ENDIF()
     ENDIF()
   ENDIF()
+  SET(LIBRA_HAVE_GEMM_BACKEND "${LIBRA_GEMM_LIBS}" CACHE INTERNAL "gemm backend linked (probe passed)")
   IF(LIBRA_GEMM_LIBS)
     MESSAGE(STATUS "math_linalg: CBLAS gemm backend enabled: ${LIBRA_GEMM_LIBS}")
     SET_SOURCE_FILES_PROPERTIES(${CMAKE_CURRENT_SOURCE_DIR}/CMATRIX.cpp ${CMAKE_CURRENT_SOURCE_DIR}/MATRIX.cpp
