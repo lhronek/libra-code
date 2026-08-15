@@ -1080,6 +1080,9 @@ def read_homo_index(filename: str, isUKS: bool = False):
                 homos.append(int(line.split()[-1]))
             if len(homos) >= 2:
                 break
+    if not homos:
+        raise ValueError(F"no 'number ... occupied' orbitals line in {filename} - not a CP2K log "
+                         F"or its SCF section is missing")
     if isUKS:
         return homos
     return homos[0]
