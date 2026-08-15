@@ -359,6 +359,29 @@ def _read_xyz_frame(filename, step):
     return data_read.read_atom_coords(filename, step)
 
 
+def _check_homo_bracket(step, isxTB, isUKS, lowest_orbital, highest_orbital):
+    """A window that does not bracket the HOMO produces npz data the NAC
+    steps reject (make_active_space) - fail before the production run is
+    burned. Runs on every overlap route."""
+    homo_logfile = F'OUT-diag_{step}.log' if isxTB else F'step_{step}.log'
+    if not os.path.exists(homo_logfile):
+        return
+    if isUKS:
+        homo_a, homo_b = CP2K_methods.read_homo_index(homo_logfile, isUKS=True)
+        bracket_ok = (lowest_orbital <= homo_a < highest_orbital
+                      and lowest_orbital <= homo_b < highest_orbital)
+        homo_txt = F"alpha={homo_a}, beta={homo_b}"
+    else:
+        homo_a = CP2K_methods.read_homo_index(homo_logfile)
+        bracket_ok = lowest_orbital <= homo_a < highest_orbital
+        homo_txt = F"{homo_a}"
+    if not bracket_ok:
+        raise ValueError(F"the orbital window [{lowest_orbital}, "
+                         F"{highest_orbital}] does not bracket the HOMO "
+                         F"({homo_txt}) - the NAC steps downstream need "
+                         F"lowest_orbital <= HOMO < highest_orbital")
+
+
 def run_cp2k_libint_step2(params):
     """
     This function runs the step2 for computing the MO overlaps for both DFT and xTB calculations and saves them as sparse
@@ -675,6 +698,9 @@ def run_cp2k_libint_step2(params):
                 odt_params['cp2k_data_dir'] = params['cp2k_data_dir']
             if counter == 0:
                 mo_prev, R_prev = mo_curr, R_curr
+            # the same bracket guard as the libint route
+            _check_homo_bracket(step, isxTB, isUKS, lowest_orbital,
+                                highest_orbital)
             St, S_prev, S = CP2K_methods.mo_overlaps_via_cp2k(mo_prev, mo_curr, R_prev, R_curr,
                                                               lowest_orbital, highest_orbital,
                                                               odt_params)
@@ -793,25 +819,8 @@ def run_cp2k_libint_step2(params):
                                  F"not fit the {nmo_spin} MOs per spin read from the molden "
                                  F"file (1-based) - increase ADDED_MOS in the template or "
                                  F"adjust lowest_orbital/highest_orbital")
-            # a window that does not bracket the HOMO produces npz data the NAC
-            # steps reject (make_active_space) - fail here, before the full
-            # production run is burned
-            homo_logfile = F'OUT-diag_{step}.log' if isxTB else F'step_{step}.log'
-            if os.path.exists(homo_logfile):
-                if isUKS:
-                    homo_a, homo_b = CP2K_methods.read_homo_index(homo_logfile, isUKS=True)
-                    bracket_ok = (lowest_orbital <= homo_a < highest_orbital
-                                  and lowest_orbital <= homo_b < highest_orbital)
-                    homo_txt = F"alpha={homo_a}, beta={homo_b}"
-                else:
-                    homo_a = CP2K_methods.read_homo_index(homo_logfile)
-                    bracket_ok = lowest_orbital <= homo_a < highest_orbital
-                    homo_txt = F"{homo_a}"
-                if not bracket_ok:
-                    raise ValueError(F"the orbital window [{lowest_orbital}, "
-                                     F"{highest_orbital}] does not bracket the HOMO "
-                                     F"({homo_txt}) - the NAC steps downstream need "
-                                     F"lowest_orbital <= HOMO < highest_orbital")
+            _check_homo_bracket(step, isxTB, isUKS, lowest_orbital,
+                                highest_orbital)
             if isUKS:
                 # Alpha spin channel
                 # alpha_eigenvectors_1 = eigenvectors_1[0::2]
