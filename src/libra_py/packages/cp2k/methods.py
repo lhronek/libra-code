@@ -3729,8 +3729,8 @@ def sd_overlaps(sd_states, St_mo, S_mo_prev, S_mo_curr, orthonormalize=True,
         # re-factorized s2 three times
         u1 = ortho.get_Lowdin_scipy(s1)
         u2 = ortho.get_Lowdin_scipy(s2)
-        st = np.linalg.multi_dot([u1.transpose(), st, u2])
-        s2 = np.linalg.multi_dot([u2.transpose(), s2, u2])
+        st = np.linalg.multi_dot([u1.conj().T, st, u2])
+        s2 = np.linalg.multi_dot([u2.conj().T, s2, u2])
     elif mode == "lowdin_cached":
         i1 = None
         if cache.get("digest") == ortho.lowdin_digest(S_mo_prev, repr(sd_states_prev) + kernel):
@@ -3738,8 +3738,8 @@ def sd_overlaps(sd_states, St_mo, S_mo_prev, S_mo_curr, orthonormalize=True,
         if i1 is None:
             i1 = ortho.get_Lowdin_scipy(s1)
         i2 = ortho.get_Lowdin_scipy(s2)
-        st = np.linalg.multi_dot([i1.transpose(), st, i2])
-        s2 = np.linalg.multi_dot([i2.transpose(), s2, i2])
+        st = np.linalg.multi_dot([i1.conj().T, st, i2])
+        s2 = np.linalg.multi_dot([i2.conj().T, s2, i2])
         cache.update(s_ihalf=i2,
                      digest=ortho.lowdin_digest(S_mo_curr, repr(sd_states) + kernel))
     return st, s2

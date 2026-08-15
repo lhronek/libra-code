@@ -2357,8 +2357,8 @@ def _orthonormalize_ks_overlaps(step, params):
             U1 = get_Lowdin_scipy(S_1d)
         U2 = get_Lowdin_scipy(S_2d)
         _lowdin_cache_put(step + 1, lowdin_digest(S_2d), U2)
-        St_step = np.linalg.multi_dot([U1.transpose(), St_step.todense(), U2])
-        S_step = np.linalg.multi_dot([U1.transpose(), S_1d, U1])
+        St_step = np.linalg.multi_dot([U1.conj().T, St_step.todense(), U2])
+        S_step = np.linalg.multi_dot([U1.conj().T, S_1d, U1])
     else:
         St_step, S_step = apply_orthonormalization_scipy(S_1.todense(), S_2.todense(), St_step.todense())
 
@@ -3030,7 +3030,7 @@ def _compute_sd_overlaps(step, params):
 
     if mode == "lowdin_cached":
         print('Applying orthonormalization for SDs for step', step)
-        st_sd = np.linalg.multi_dot([U1.transpose(), st_sd.real, U2])
+        st_sd = np.linalg.multi_dot([U1.conj().T, st_sd.real, U2])
     elif mode == "lowdin":
         print('Applying orthonormalization for SDs for step', step)
         st_sd, s_sd = apply_orthonormalization_scipy(s_sd_1.real, s_sd_2.real, st_sd.real)
