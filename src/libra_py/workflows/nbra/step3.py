@@ -2037,7 +2037,9 @@ def _validate_cmatrix_overlap(S, label):
     rank check and produces garbage silently)."""
     S_np = (data_conv.MATRIX2nparray(S.real()) +
             1j * data_conv.MATRIX2nparray(S.imag()))
-    validate_overlap_matrix(S_np, label)
+    # 8-significant-digit text archives carry ~1e-8-scale round-off
+    # asymmetry - the structural Hermiticity test must sit above it
+    validate_overlap_matrix(S_np, label, sym_tol=1e-6)
     w_min = float(np.linalg.eigvalsh(0.5 * (S_np + S_np.conj().T)).min())
     if w_min < -1e-8 * max(1.0, float(np.abs(S_np).max())):
         raise ValueError(
