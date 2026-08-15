@@ -1011,7 +1011,13 @@ def run_cp2k_libint_step2(params):
                 # append it to the eigenvectors list
                 eigenvectors_2.append(eigenvector_2)
             eigenvectors_2 = np.array(eigenvectors_2)
-            nmo_spin = int(eigenvectors_2.shape[0] / 2) if isUKS else eigenvectors_2.shape[0]
+            if isUKS:
+                # per-spin counts re-read each step: channels are unequal in
+                # general and the counter-0 capture must not go stale
+                nmo_alpha, nmo_beta = CP2K_methods.molden_spin_counts(molden_filename)
+                nmo_spin = min(nmo_alpha, nmo_beta)
+            else:
+                nmo_spin = eigenvectors_2.shape[0]
             if not 1 <= lowest_orbital <= highest_orbital <= nmo_spin:
                 raise ValueError(F"orbital window [{lowest_orbital}, {highest_orbital}] does "
                                  F"not fit the {nmo_spin} MOs per spin read from the molden "
