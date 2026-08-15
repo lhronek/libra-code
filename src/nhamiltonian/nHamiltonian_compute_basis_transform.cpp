@@ -239,6 +239,7 @@ void nHamiltonian::ampl_dia2adi(CMATRIX &ampl_dia, CMATRIX &ampl_adi, int lvl,
   } // lvl == level
 
   else if (lvl > level) { // Cases "c" and "d"
+    require_children(lvl, __func__);
 
     for (auto i = 0u; i < children.size(); i++) {
       children[i]->ampl_dia2adi(ampl_dia, ampl_adi, lvl, split);
@@ -349,6 +350,7 @@ void nHamiltonian::ampl_dia2adi(CMATRIX *ampl_dia, CMATRIX *ampl_adi, int lvl,
   } // lvl == level
 
   else if (lvl > level) { // Cases "c" and "d"
+    require_children(lvl, __func__);
 
     for (int i = 0; i < children.size(); i++) {
       children[i]->ampl_dia2adi(ampl_dia, ampl_adi, lvl, split);
@@ -551,6 +553,7 @@ void nHamiltonian::ampl_adi2dia(CMATRIX &ampl_dia, CMATRIX &ampl_adi, int lvl,
   } // lvl == level
 
   else if (lvl > level) { // Cases "c" and "d"
+    require_children(lvl, __func__);
 
     for (int i = 0; i < children.size(); i++) {
       children[i]->ampl_adi2dia(ampl_dia, ampl_adi, lvl, split);
@@ -661,6 +664,7 @@ void nHamiltonian::ampl_adi2dia(CMATRIX *ampl_dia, CMATRIX *ampl_adi, int lvl,
   } // lvl == level
 
   else if (lvl > level) { // Cases "c" and "d"
+    require_children(lvl, __func__);
 
     for (int i = 0; i < children.size(); i++) {
       children[i]->ampl_adi2dia(ampl_dia, ampl_adi, lvl, split);

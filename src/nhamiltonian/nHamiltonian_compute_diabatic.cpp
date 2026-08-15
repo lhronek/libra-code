@@ -69,6 +69,7 @@ void nHamiltonian::compute_diabatic(int model, vector<double>& q, vector<double>
 */
   }
   else if(lvl>level){
+    require_children(lvl, __func__);
   
     for(int i=0;i<children.size();i++){
       children[i]->compute_diabatic(model, q, params, lvl);
@@ -307,6 +308,7 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
   }// if lvl == level
 
   else if(lvl>level){
+    require_children(lvl, __func__);
 
 #ifdef __OPENMP
     int nthreads = omp_get_num_threads();

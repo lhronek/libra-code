@@ -522,6 +522,17 @@ void nHamiltonian::copy_level_content(nHamiltonian *src) {
 
 } // copy_level_content
 
+void nHamiltonian::require_children(int lvl, const char* fn) const {
+  // a deeper-level request on a childless node would loop over zero
+  // children and silently do nothing
+  if (children.empty()) {
+    cout << "Error in nHamiltonian::" << fn << "(): level " << lvl
+         << " requested from a level-" << level
+         << " node with no children - the call would silently do nothing\n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+}
+
 void nHamiltonian::init_aux(int target_lvl) {
   /**
     Allocate only the read-set of the previous-step Hamiltonian cache

@@ -87,6 +87,7 @@ void nHamiltonian::update_ordering(vector<int> &perm_t, int lvl) {
   } // level==lvl
 
   else if (lvl > level) {
+    require_children(lvl, __func__);
 
     for (auto i = 0u; i < children.size(); i++) {
       children[i]->update_ordering(perm_t, lvl);
@@ -174,6 +175,7 @@ number of columns of \ the hvib_adi matrix\n"; throw std::runtime_error("libra C
   }// level==lvl
 
   else if(lvl>level){
+    require_children(lvl, __func__);
 
     for(int i=0;i<children.size();i++){
       children[i]->apply_phase_corrections(phase_corr, lvl);
@@ -259,6 +261,7 @@ phase_corr_ovlp_tol);
   }// level==lvl
 
   else if(lvl>level){
+    require_children(lvl, __func__);
 
     for(int i=0;i<children.size();i++){
       children[i]->apply_phase_corrections(U_prev, lvl);
@@ -469,6 +472,7 @@ void nHamiltonian::compute_adiabatic(int der_lvl, int lvl) {
   } // level == lvl
 
   else if (lvl > level) {
+    require_children(lvl, __func__);
 
     for (auto i = 0u; i < children.size(); i++) {
       children[i]->compute_adiabatic(der_lvl, lvl);
@@ -809,6 +813,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
   } // if lvl == level
 
   else if (lvl > level) {
+    require_children(lvl, __func__);
 
 #ifdef __OPENMP
     int nthreads = omp_get_num_threads();

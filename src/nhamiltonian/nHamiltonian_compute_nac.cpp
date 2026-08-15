@@ -182,6 +182,7 @@ void nHamiltonian::compute_nac_dia(MATRIX &p, const MATRIX &invM, int lvl,
   } // lvl == level
 
   else if (lvl > level) { // Cases "b" or "d"
+    require_children(lvl, __func__);
 
     for (auto i = 0u; i < children.size(); i++) {
       children[i]->compute_nac_dia(p, invM, lvl, split);
@@ -368,6 +369,7 @@ void nHamiltonian::compute_nac_adi(MATRIX &p, const MATRIX &invM, int lvl,
   } // lvl == level
 
   else if (lvl > level) { // Cases "b" or "d"
+    require_children(lvl, __func__);
 
     for (auto i = 0u; i < children.size(); i++) {
       children[i]->compute_nac_adi(p, invM, lvl, split);
@@ -472,6 +474,7 @@ void nHamiltonian::compute_hvib_dia(int lvl) {
     compute_hvib_dia();
   } // level == lvl
   else if (lvl > level) {
+    require_children(lvl, __func__);
 
     for (auto i = 0u; i < children.size(); i++) {
       children[i]->compute_hvib_dia(lvl);
@@ -575,6 +578,7 @@ void nHamiltonian::compute_hvib_adi(int lvl) {
     compute_hvib_adi();
   } // level == lvl
   else if (lvl > level) {
+    require_children(lvl, __func__);
 
     for (auto i = 0u; i < children.size(); i++) {
       children[i]->compute_hvib_adi(lvl);

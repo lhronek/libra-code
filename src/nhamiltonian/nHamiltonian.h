@@ -227,6 +227,8 @@ public:
   ///< ingestion - time_overlap_method 1 must not silently overwrite it
   int time_overlap_adi_supplied;
 
+  void require_children(int lvl, const char* fn) const; ///< fail-loud for deeper-level requests on childless nodes
+
   CMATRIX* time_overlap_dia;  ///< These are <psi_i_dia (t) | psi_j_dia (t+dt)> matrices
   int time_overlap_dia_mem_status;
 
