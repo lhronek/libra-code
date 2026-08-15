@@ -1349,7 +1349,9 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         vRHO = exp_(L, complex<double>(0.0, -dt)) * vRHO;
 
         RHO = unvectorize_density_matrix(vRHO);
-        RHO = T_ampl.H() * RHO * T_ampl;
+        // dyn-const to "raw", the same direction as methods 0/10:
+        // the Liouvillian is built in the previous step's frame
+        RHO = T_ampl * RHO * T_ampl.H();
         *dyn_var.dm_adi[itraj] = RHO;
 
       } // method == 1 or 101
