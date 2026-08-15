@@ -1153,6 +1153,25 @@ int randperm(int size,int of_size,vector<int>& result){
   return 0;
 }
 
+int randperm(int size, int of_size, vector<int>& result, Random& rnd){
+/** The randperm above, drawing from the caller's generator - the global
+    C RNG variant is only seeded by whoever calls srand
+*/
+  vector<int> all_range(of_size);
+  for(int i=0;i<of_size;i++){ all_range[i] = i; }
+  int lowest=0, highest=of_size-1;
+  int range=(highest-lowest)+1;
+  for(int i=0;i<size;i++){
+    int indx = i+lowest+int((range-i)*rnd.uniform(0.0, 1.0));
+    int tmp = all_range[i];
+    all_range[i] = all_range[indx];
+    all_range[indx] = tmp;
+  }
+  if((int)result.size()>0){ result.clear(); }
+  for(int i=0;i<size;i++){ result.push_back(all_range[i]); }
+  return 0;
+}
+
 
 
 MATRIX3x3 exp_(MATRIX3x3& x,double dt){

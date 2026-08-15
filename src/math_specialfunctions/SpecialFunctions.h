@@ -87,6 +87,7 @@ void Ellint(double m,double sinphi,double tol,double& Km_,double& value);
 
 
 int randperm(int size,int of_size,vector<int>& result);
+int randperm(int size,int of_size,vector<int>& result, Random& rnd); ///< draws from the caller's generator, not the global C RNG
 void sample(MATRIX& x, MATRIX& mean_x, MATRIX& sigma_x, Random& rnd);
 void sample(MATRIX* x, MATRIX& mean_x, MATRIX& sigma_x, Random& rnd);
 int set_random_state(vector<double>& prob, double ksi);

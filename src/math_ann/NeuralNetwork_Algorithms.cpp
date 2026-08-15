@@ -548,7 +548,7 @@ vector<double> NeuralNetwork::train(Random& rnd, bp::dict params, MATRIX& inputs
     for(i = 0; i < steps_per_epoch; i++){
             
         // Make a random selection of the training patterns
-        randperm(epoch_size, n_patterns, subset);
+        randperm(epoch_size, n_patterns, subset, rnd);
         
         // Extract the corresponding matrices from the inputs and outputs
         pop_submatrix(inputs,  input_subset,  inp_dim, subset);

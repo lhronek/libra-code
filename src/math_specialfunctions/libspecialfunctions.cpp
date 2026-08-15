@@ -65,7 +65,10 @@ void export_SpecialFunctions_objects(){
   def("Km", Km);
   def("Ellint",Ellint);
 
-  def("randperm", randperm);
+  int (*expt_randperm_v1)(int, int, std::vector<int>&) = &randperm;
+  int (*expt_randperm_v2)(int, int, std::vector<int>&, Random&) = &randperm;
+  def("randperm", expt_randperm_v1);
+  def("randperm", expt_randperm_v2);
 
   void (*expt_sample_v1)(MATRIX& x, MATRIX& mean_x, MATRIX& sigma_x, Random& rnd) = &sample;
   def("sample", expt_sample_v1);
