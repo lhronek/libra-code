@@ -518,7 +518,7 @@ CMATRIX& CMATRIX_chain_scratch(int slot, int nr, int nc){
 /**
   Thread-local scratch matrices for the chained product: slots 0/1 ping-pong
   the running partial product, slots 2+ hold materialized adjoint() operands.
-  unique_ptr reset on shape change (base_matrix::operator= does not resize).
+  unique_ptr reset on shape change (a fresh object, no reallocation churn).
 */
   const int MAXSLOTS = 8;
   thread_local std::unique_ptr<CMATRIX> pool[8];

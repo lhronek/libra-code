@@ -891,6 +891,13 @@ public:
     if (this == &ob) {
       return *this;
     }
+    // a shape-changing assignment reallocates: copying ob.n_elts into
+    // the old buffer overflowed it (larger source) or left the tail
+    // stale (smaller source)
+    if (n_elts != ob.n_elts) {
+      delete[] M;
+      M = new T1[ob.n_elts];
+    }
     n_rows = ob.n_rows;
     n_cols = ob.n_cols;
     n_elts = ob.n_elts;
@@ -901,6 +908,13 @@ public:
 
     if (this == &ob) {
       return *this;
+    }
+    // a shape-changing assignment reallocates: copying ob.n_elts into
+    // the old buffer overflowed it (larger source) or left the tail
+    // stale (smaller source)
+    if (n_elts != ob.n_elts) {
+      delete[] M;
+      M = new T1[ob.n_elts];
     }
     n_rows = ob.n_rows;
     n_cols = ob.n_cols;
