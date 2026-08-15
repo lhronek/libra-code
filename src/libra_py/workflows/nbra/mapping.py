@@ -236,7 +236,9 @@ def ovlp_mat_arb(SD1, SD2, _S, active_space=None, verbose=False):
         S = _S
 
     N, M = len(SD1), len(SD2)
-    res = np.zeros( (N, M), dtype=np.float64 )
+    # the determinant of a complex overlap is complex - a float64 result
+    # silently dropped the imaginary part (numpy ComplexWarning)
+    res = np.zeros( (N, M), dtype=np.result_type(np.asarray(S).dtype, np.float64) )
 
     for n in range(0, N):
         for m in range(0, M):
@@ -434,7 +436,7 @@ def ovlp_mat_arb_batched(SD1, SD2, S2, active_space=None, mem_limit_mb=256):
     if i2.shape[1] != ne:
         raise ValueError(f"SD1 and SD2 have different electron counts "
                          f"({ne} vs {i2.shape[1]})")
-    res = np.empty((n1, n2))
+    res = np.empty((n1, n2), dtype=np.result_type(S2.dtype, np.float64))
     chunk = max(1, int(mem_limit_mb * 1e6 / (n2 * ne * ne * 8)))
     for a in range(0, n1, chunk):
         b = min(a + chunk, n1)
@@ -625,7 +627,7 @@ def ovlp_mat_arb_lemma(SD1, SD2, S2, active_space=None, mem_limit_mb=256):
     g1 = _degree_groups(deg1, holes1, parts1, pa)
     g2 = _degree_groups(deg2, holes2, parts2, pb)
 
-    res = np.empty((len(i1), len(i2)))
+    res = np.empty((len(i1), len(i2)), dtype=np.result_type(S2.dtype, np.float64))
     for k, (I, P, Ax) in g1.items():
         for l, (J, Q, Bx) in g2.items():
             nk, ml = len(I), len(J)
@@ -649,11 +651,11 @@ def ovlp_mat_arb_lemma(SD1, SD2, S2, active_space=None, mem_limit_mb=256):
                 m = k + l
                 Rblk = R[Ax[:, :, None], P[:, None, :]]            # (nk, k, k)
                 Cblk = C[Q[:, :, None], Bx[:, None, :]]            # (ml, l, l)
-                block = np.empty((nk, ml))
+                block = np.empty((nk, ml), dtype=res.dtype)
                 chunk = max(1, int(mem_limit_mb * 1e6 / (ml * m * m * 8)))
                 for s in range(0, nk, chunk):
                     e = min(s + chunk, nk)
-                    B = np.empty((e - s, ml, m, m))
+                    B = np.empty((e - s, ml, m, m), dtype=res.dtype)
                     B[:, :, :k, :k] = Rblk[s:e, None]
                     B[:, :, :k, k:] = TW[Ax[s:e, None, :, None], Bx[None, :, None, :]]
                     B[:, :, k:, :k] = G[Q[None, :, :, None], P[s:e, None, None, :]]
