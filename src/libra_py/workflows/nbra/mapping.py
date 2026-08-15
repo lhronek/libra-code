@@ -108,7 +108,9 @@ def sd2indx(inp, nbasis=0, do_sort=False, user_notation=0):
         out = sorted(spat, key=slatdet.canonical_sort_key)
         parity = slatdet.permutation_parity(spat, out)
 
-    return np.array(out), parity
+    # plain ints: the C++ bindings (MATRIX.get, Py2Cpp_int, ...) reject
+    # numpy.int64 arguments
+    return [int(x) for x in out], parity
 
 
 

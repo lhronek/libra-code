@@ -615,7 +615,8 @@ def run(_params):
         # Re-indexed SD basis functions for bra and ket SDs
         bra = sd_states_reindexed_sorted[step]
         ket = sd_states_reindexed_sorted[step]
-        s_sd = mapping.ovlp_mat_arb(bra, ket, S[0][step], None, False)
+        # ovlp_mat_arb returns an ndarray - lift it for the CMATRIX algebra below
+        s_sd = data_conv.nparray2CMATRIX(np.asarray(mapping.ovlp_mat_arb(bra, ket, S[0][step], None, False)).astype(complex))
         S_sd.append(s_sd)
         s_sd.real().show_matrix("%s/S_sd_%d_re" % (res_dir, int(start_time + step)))
 
@@ -625,7 +626,7 @@ def run(_params):
         # Re-indexed SD basis functions for bra and ket SDs
         bra = sd_states_reindexed_sorted[step]
         ket = sd_states_reindexed_sorted[step + 1]
-        st_sd = mapping.ovlp_mat_arb(bra, ket, St[0][step], None, False)
+        st_sd = data_conv.nparray2CMATRIX(np.asarray(mapping.ovlp_mat_arb(bra, ket, St[0][step], None, False)).astype(complex))
         St_sd.append(st_sd)
         st_sd.real().show_matrix("%s/St_sd_%d_re" % (res_dir, int(start_time + step)))
 

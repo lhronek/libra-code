@@ -1197,7 +1197,8 @@ def sac_matrices(coeff, basis, S_ks):
 
     # Compute the overlaps of the SDs:
     #
-    Ssd = mapping.ovlp_mat_arb(basis, basis, S_ks)
+    # ovlp_mat_arb returns an ndarray - lift it for the CMATRIX algebra
+    Ssd = data_conv.nparray2CMATRIX(np.asarray(mapping.ovlp_mat_arb(basis, basis, S_ks)).astype(complex))
 
     # Normalize the Chi wavefunctions #
     norm = (P2C.H() * Ssd * P2C).real()
@@ -1313,9 +1314,11 @@ def compute_Hvib(basis, St_ks, E_ks, dE, dt):
 
     """
 
-    St = mapping.ovlp_mat_arb(basis, basis, St_ks)
+    # ovlp_mat_arb returns a real ndarray - form the antisymmetric part in
+    # numpy and lift it into the CMATRIX vibronic Hamiltonian
+    St = np.asarray(mapping.ovlp_mat_arb(basis, basis, St_ks))
     H_el = mapping.energy_mat_arb(basis, E_ks, dE)
-    H_vib = H_el - (0.5j / dt) * CMATRIX((St - St.H()).real())
+    H_vib = H_el - (0.5j / dt) * data_conv.nparray2CMATRIX((St - St.T).astype(complex))
 
     return H_vib
 
