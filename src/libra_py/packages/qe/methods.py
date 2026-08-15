@@ -1956,6 +1956,20 @@ def read_all(params):
     return info, e, coeff, grid
 
 
+def _orthogonalized_checked(coeff, tag):
+    """Orthogonalize the first orbital block and verify C^H C = I; the four
+    read_wfc_grid sites (curr/next, dia/adi) share this so none is left
+    unchecked."""
+    coeff[0] = QE_utils.orthogonalize_orbitals(coeff[0])
+    id1 = CMATRIX(coeff[0].num_of_cols, coeff[0].num_of_cols)
+    id1.identity()
+    dev = abs((coeff[0].H() * coeff[0] - id1).max_elt())
+    if dev > 1e-5:
+        raise RuntimeError(F"in read_wfc_grid ({tag}) - the orthogonalized orbitals failed the "
+                           F"identity check: max |C^H C - I| = {dev:.3e} exceeds 1e-5")
+    return coeff
+
+
 def read_wfc_grid(params):
     """
 
@@ -2055,14 +2069,7 @@ def read_wfc_grid(params):
 
         if orthogonalize == 1:
             print("Do internal orbital orthogonalization")
-            coeff_curr[0] = QE_utils.orthogonalize_orbitals(coeff_curr[0])
-
-            id1 = CMATRIX(coeff_curr[0].num_of_cols, coeff_curr[0].num_of_cols)
-            id1.identity()
-            dev = abs((coeff_curr[0].H() * coeff_curr[0] - id1).max_elt())
-            if dev > 1e-5:
-                raise RuntimeError(F"in read_wfc_grid - the orthogonalized orbitals failed the "
-                                   F"identity check: max |C^H C - I| = {dev:.3e} exceeds 1e-5")
+            coeff_curr = _orthogonalized_checked(coeff_curr, "current step")
 
         C_dia_curr, E_dia_curr = QE_utils.post_process(coeff_curr, e_curr, 0)
         res_curr["Coeff_dia"] = C_dia_curr
@@ -2075,7 +2082,7 @@ def read_wfc_grid(params):
 
         if orthogonalize == 1:
             print("Do internal orbital orthogonalization")
-            coeff_next[0] = QE_utils.orthogonalize_orbitals(coeff_next[0])
+            coeff_next = _orthogonalized_checked(coeff_next, "next step")
 
         C_dia_next, E_dia_next = QE_utils.post_process(coeff_next, e_next, 0)
         res_next["Coeff_dia"] = C_dia_next
@@ -2091,14 +2098,7 @@ def read_wfc_grid(params):
 
         if orthogonalize == 1:
             print("Do internal orbital orthogonalization")
-            coeff_curr[0] = QE_utils.orthogonalize_orbitals(coeff_curr[0])
-
-            id1 = CMATRIX(coeff_curr[0].num_of_cols, coeff_curr[0].num_of_cols)
-            id1.identity()
-            dev = abs((coeff_curr[0].H() * coeff_curr[0] - id1).max_elt())
-            if dev > 1e-5:
-                raise RuntimeError(F"in read_wfc_grid - the orthogonalized orbitals failed the "
-                                   F"identity check: max |C^H C - I| = {dev:.3e} exceeds 1e-5")
+            coeff_curr = _orthogonalized_checked(coeff_curr, "current step")
 
         C_adi_curr, E_adi_curr = QE_utils.post_process(coeff_curr, e_curr, 1)
         res_curr["Coeff_adi"] = C_adi_curr
@@ -2112,7 +2112,7 @@ def read_wfc_grid(params):
 
         if orthogonalize == 1:
             print("Do internal orbital orthogonalization")
-            coeff_next[0] = QE_utils.orthogonalize_orbitals(coeff_next[0])
+            coeff_next = _orthogonalized_checked(coeff_next, "next step")
 
         C_adi_next, E_adi_next = QE_utils.post_process(coeff_next, e_next, 1)
         res_next["Coeff_adi"] = C_adi_next
