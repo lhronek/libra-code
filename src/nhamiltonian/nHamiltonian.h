@@ -288,6 +288,12 @@ public:
     ///< shared child (isNBRA==1) serves every trajectory, so an index
     ///< beyond the allocated children folds to 0 instead of reading
     ///< past the vector
+    if(children.empty() || traj < 0){
+      std::cout<<"Error in nHamiltonian::child(): trajectory "<<traj
+          <<" requested on a node with "<<children.size()
+          <<" children - the dynamics needs a parent hierarchy \n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
     if(traj >= (int)children.size()){ traj = 0; }
     return children[traj];
   }
