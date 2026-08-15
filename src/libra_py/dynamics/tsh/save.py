@@ -1042,16 +1042,24 @@ def save_time_overlaps(_savers, params, i, dyn_var, ham):
     is_nbra = params["is_nbra"]
     nprint = params["nprint"]
 
-    # the savers allocate ceil(nsteps/nprint) rows and every other
-    # quantity writes strided - an unstrided write misaligns the St
-    # rows and runs off the end at i = nrows
-    if i % nprint != 0:
-        return
-    i = int(i / nprint)
+    # frame j of the strided grid carries <t_{j nprint} | t_{(j+1) nprint}>:
+    # the PRODUCT of the raw intervals it spans, accumulated per call and
+    # written when the span closes (a raw-dt sub-sample would make the
+    # standard (St - St^H)/(2 dt_saved) post-processing off by nprint);
+    # the final frame closes early when nprint does not divide nsteps
+    nsteps = params["nsteps"]
+    acc = _savers.setdefault("_St_accum", {})
+    close = ((i + 1) % nprint == 0) or (i == nsteps - 1)
 
     tr_range = [0] if is_nbra == 1 else range(dyn_var.ntraj)
     for tr in tr_range:
-        St = ham.get_time_overlap_adi(Py2Cpp_int([0, tr]))
+        St_step = ham.get_time_overlap_adi(Py2Cpp_int([0, tr]))
+        St = St_step if tr not in acc else acc[tr] * St_step
+        if not close:
+            acc[tr] = St
+            continue
+        acc.pop(tr, None)
+        frame = i // nprint
         for key, lvl, txt_type in (("hdf5_saver", hdf5_output_level, 0),
                                    ("mem_saver", mem_output_level, 0),
                                    ("txt_saver", txt_output_level, 0),
@@ -1059,7 +1067,7 @@ def save_time_overlaps(_savers, params, i, dyn_var, ham):
             saver = _savers[key]
             if lvl >= 4 and saver is not None:
                 if _has_slot(saver, "St"):
-                    t = 0 if txt_type == 1 else i
+                    t = 0 if txt_type == 1 else frame
                     saver.save_multi_matrix(t, tr, "St", St)
 
 
