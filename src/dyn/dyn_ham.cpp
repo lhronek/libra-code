@@ -297,6 +297,35 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
           std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
         st = ham.children[traj]->get_time_overlap_adi();
+        // a per-state phase flip of the new eigenvectors makes St the
+        // product of the physical time-overlap with a diagonal sign
+        // matrix, whose antisymmetric part loses the flipped pair's
+        // coupling for this one step (a reflection has no antisymmetric
+        // part). On the relabel-projector routes the amplitudes are
+        // re-signed by exactly those diagonal signs, so undo the flips
+        // before differentiating and fold the result back into that
+        // gauge. Not on the routes that keep the raw gauge: the St^-1
+        // rotation projectors carry the flip themselves, T = I keeps the
+        // raw amplitudes, and do_nac_phase_correction re-signs the NAC
+        // downstream - a fold there double-corrects
+        // rotation projectors (St^-1) carry the flip in T itself - the raw
+        // St is what they must see; every other route wants the flip
+        // undone in St (else the pair's coupling is zero for this step),
+        // and only the relabel routes need it folded back into the
+        // re-signed amplitude gauge afterwards
+        int rotation_proj = (prms.state_tracking_algo == -1 ||
+                             prms.state_tracking_algo == 5 ||
+                             prms.state_tracking_algo == 6);
+        int relabel_gauge = (prms.assume_always_consistent == 0 && !rotation_proj);
+        vector<double> flip(nadi, 1.0);
+        if (!rotation_proj) {
+          for (int i = 0; i < nadi; i++) {
+            if (st.get(i, i).real() < 0.0) {
+              flip[i] = -1.0;
+              for (int k = 0; k < nadi; k++) { st.scale(k, i, -1.0); }
+            }
+          }
+        }
 
         if (prms.nac_algo == 0) {
           nac = (0.5 / dt) * (st - st.H());
@@ -304,6 +333,15 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
           st_re = st.real();
           nac_re = nac_npi(st_re, dt);
           nac = CMATRIX(nac_re, nac_im);
+        }
+        // back into the re-signed amplitude gauge on the relabel routes:
+        // nac -> F nac F with F = diag(flip)
+        if (relabel_gauge) {
+          for (int i = 0; i < nadi; i++) {
+            for (int j = 0; j < nadi; j++) {
+              if (flip[i] * flip[j] < 0.0) { nac.scale(i, j, -1.0); }
+            }
+          }
         }
 
         ham.children[traj]->set_nac_adi_by_val(nac);
