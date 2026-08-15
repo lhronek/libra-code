@@ -1425,7 +1425,9 @@ Adiabatic-native models must supply obj.ham_dia \n";
         if(h > 0.0 && x > 0.0){
           double a2 = 0.0625 * x * y / (h * h * h);
           double b2 = 0.5 * y/(x * h) ;
-          double g_ij = exp( -(0.25*M_PI / sqrt(a2) ) * sqrt(2.0 / ( b2 + sqrt(b2*b2 + sgn )  )) );
+          // |b^4 + sign(F_i.F_j)| as the docstring states: with opposed forces the
+          // radicand is negative once b^2 < 1, and a NaN here silently disables hopping
+          double g_ij = exp( -(0.25*M_PI / sqrt(a2) ) * sqrt(2.0 / ( b2 + sqrt(fabs(b2*b2 + sgn)) )) );
 
           g[j] = g_ij;
         }
