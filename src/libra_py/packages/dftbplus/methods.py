@@ -2739,7 +2739,18 @@ def read_dftb_orbital_info(params_):
         nocc = nocc_up
         nelec = nocc_up + nocc_dn
     else:
-        nocc = max_occ
+        # the HOMO from band.out (the SCF occupation), not from the thresholded
+        # CI configurations: a state set whose surviving configs all start
+        # below the HOMO would shrink nocc - and with it nelec and the
+        # dia_basis SD window - silently, and even to 0 at high thresholds
+        occ_counts = read_band_occupations(f"{wd}/band.out")
+        if len(occ_counts) != 1:
+            raise RuntimeError(F"{wd}/band.out holds {len(occ_counts)} spin "
+                               F"section(s) - a closed-shell run needs 1")
+        nocc = int(occ_counts[0])
+        if max_occ > nocc:
+            raise RuntimeError(F"CI configurations excite from orbital {max_occ} "
+                               F"above the band.out HOMO {nocc} in {wd}")
         nelec = 2 * nocc
         nocc_up = nocc_dn = nocc
 
