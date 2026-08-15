@@ -568,12 +568,20 @@ def write_molden_file(filename, sample_molden_file, path_to_trajectory, step):
     lines = f.readlines()
     f.close()
 
+    end = None
+    mo_at = len(lines)
     for i in range(len(lines)):
         if '[GTO]' in lines[i]:
             start = i
+        elif lines[i].strip().upper().startswith('[MO]'):
+            mo_at = min(mo_at, i)
         elif lines[i].strip().upper().startswith(('[5D', '[7F', '[9G')):
             # every purity marker line survives, [9G] included
             end = i
+    if end is None:
+        # markerless cartesian files carry no purity line - copy the
+        # basis block up to [MO]
+        end = mo_at - 1
 
     atoms, coords = data_read.read_atom_coords(path_to_trajectory, step)
     coords = coords * units.Angst

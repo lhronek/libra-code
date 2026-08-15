@@ -179,7 +179,9 @@ def get_dftb_matrices(filename, act_sp1=None, act_sp2=None, correction=0, tol=0.
         # when some of the matrix elements printed out are nonsense.
         B = A[5 + ikpt * norbs: 5 + (1 + ikpt) * norbs]
 
-        f1 = open(filename + "_tmp", "w")
+        # lines are built first; the scratch file opens only for the
+        # final write, so the parse raises leak no open handle
+        out_lines = []
         x = MATRIX(norbs, norbs)
 
         for i in range(0, norbs):
@@ -243,8 +245,9 @@ def get_dftb_matrices(filename, act_sp1=None, act_sp2=None, correction=0, tol=0.
                 line = F"{line} {z}" 
             line = line + "\n"
 
-            f1.write(line)
-        f1.close()
+            out_lines.append(line)
+        with open(filename + "_tmp", "w") as f1:
+            f1.writelines(out_lines)
 
         # Read in the temporary file - get the entire matrix
         #x = MATRIX(norbs, norbs)
@@ -2721,6 +2724,10 @@ def read_dftb_orbital_info(params_):
         # per-spin occupied counts from band.out - the CI configs cannot
         # recover both channels robustly
         occ_counts = read_band_occupations(f"{wd}/band.out")
+        if len(occ_counts) < 2:
+            raise RuntimeError(F"{wd}/band.out holds {len(occ_counts)} spin "
+                               F"section(s) - a spin-polarized run needs 2 "
+                               F"(truncated or non-UKS output)")
         nocc_up, nocc_dn = int(occ_counts[0]), int(occ_counts[1])
         nocc = nocc_up
         nelec = nocc_up + nocc_dn
