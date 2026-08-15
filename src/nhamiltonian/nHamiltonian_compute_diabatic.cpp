@@ -15,9 +15,9 @@
 */
 
 
+#include <exception>
 #if defined(USING_PCH)
 #include "../pch.h"
-#include <exception>
 #else
 #include <stdlib.h>
 #include <omp.h>

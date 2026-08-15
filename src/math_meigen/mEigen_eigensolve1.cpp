@@ -8,9 +8,9 @@
 * or <http://www.gnu.org/licenses/>.
 *
 *********************************************************************************/
+#include <stdexcept>
 #if defined(USING_PCH)
 #include "../pch.h"
-#include <stdexcept>
 #else
 #include <Eigen/LU>
 #include <Eigen/Dense>

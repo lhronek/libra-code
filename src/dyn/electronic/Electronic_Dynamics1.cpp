@@ -14,9 +14,9 @@
     
 */
 
+#include <stdexcept>
 #if defined(USING_PCH)
 #include "../../pch.h"
-#include <stdexcept>
 #else
 #include <cmath>
 #endif 
