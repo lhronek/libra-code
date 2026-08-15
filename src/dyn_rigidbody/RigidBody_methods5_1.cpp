@@ -293,6 +293,8 @@ void RigidBody::propagate_exact_rb(double dt){
      (top_l.x==0.0 && top_l.y!=0.0 && top_l.z==0.0 ) ||
      (top_l.x==0.0 && top_l.y==0.0 && top_l.z!=0.0 )
     ){
+      std::cout<<"Error in RigidBody::propagate_exact_rb(): the angular momentum lies along a \
+principal axis - this special case of the exact free-rotor propagation is not implemented\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       T2.Rotation(-t*top_w);
       rb_A_I_to_e = T2 * rb_A_I_to_e;
@@ -302,12 +304,16 @@ void RigidBody::propagate_exact_rb(double dt){
 
   //----------------- Spherical top case ---------------------
   if((I1==I2) && (I2==I3)){
+    std::cout<<"Error in RigidBody::propagate_exact_rb(): spherical top (I1 == I2 == I3) - \
+this case of the exact free-rotor propagation is not implemented\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     T2.Rotation(-t*top_w);
     rb_A_I_to_e = T2 * rb_A_I_to_e;
   }
   //----------------- Symmetric top case ---------------------
   else if(I1==I2) {
+    std::cout<<"Error in RigidBody::propagate_exact_rb(): symmetric top (I1 == I2) - \
+this case of the exact free-rotor propagation is not implemented\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     dir = top_l/Lmod;
     psi = t*(top_l.length()/I1);
