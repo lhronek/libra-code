@@ -396,7 +396,7 @@ def trajectories(_plt_params):
 
     which_states = plt_params['which_states']
     if isinstance(which_states, str):
-        which_states == which_states.lower()
+        which_states = which_states.lower()
     elif isinstance(which_states, list):
         which_states = sorted(which_states)
     else:
