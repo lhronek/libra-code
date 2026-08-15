@@ -1184,6 +1184,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
     default_params.update({"Temperature": 300.0, "ensemble": 0, "thermostat_params": {},
                            "quantum_dofs": None, "thermostat_dofs": [], "constrained_dofs": [],
                            "dt": 1.0 * units.fs2au, "num_electronic_substeps": 1,
+                           "omp_num_threads": 1, "blas_num_threads": 1,
                            "electronic_integrator": 0
                            })
 
@@ -1520,7 +1521,6 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
     # accept either NBRA spelling and sync both (single resolver)
     is_nbra = _sync_nbra_flag(dyn_params)
 
-    # Resolve the "auto" policy for maintaining the diabatic density matrix.
     ntraj = dyn_params["ntraj"]
     direct_init = dyn_params["direct_init"]
 
