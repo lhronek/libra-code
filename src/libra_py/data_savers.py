@@ -117,7 +117,7 @@ class mem_saver:
         to the prepared lists. There is no restriction on the
         data type for the elements added
         """
-        if keyword in self.keywords:
+        if data_name in self.keywords:
             self.data[data_name].append(_data)
 
     def add_dataset(self, data_name, shape, dtype):
