@@ -30,6 +30,29 @@ using namespace liblinalg;
 /// libmeigen namespace
 namespace libmeigen{
 
+// The generalized self-adjoint solver reads ONE triangle of its inputs:
+// with symm = 0 (use as-is) a non-Hermitian H or S would be solved silently
+// as its mirror. Fail loud instead - the general (non-Hermitian) problems
+// have their own entry, solve_eigen_nosort.
+template <typename T1>
+static void require_hermitian_pair(const T1* H, const T1* S, int N, const char* fn){
+  double amax = 0.0, dev = 0.0;
+  for(int i = 0; i < N; i++){
+    for(int j = 0; j < N; j++){
+      amax = std::max(amax, std::abs(H[i*N+j]));
+      amax = std::max(amax, std::abs(S[i*N+j]));
+      dev = std::max(dev, std::abs(H[i*N+j] - std::conj(H[j*N+i])));
+      dev = std::max(dev, std::abs(S[i*N+j] - std::conj(S[j*N+i])));
+    }
+  }
+  if(dev > 1e-8 * std::max(amax, 1.0)){
+    std::cout<<"Error in "<<fn<<"(): symm = 0 with a non-Hermitian H or S (max |A - A^H| = "
+        <<dev<<") - the generalized self-adjoint solver would read one triangle only;"
+        <<" pass symm = 1 to Hermitize, or use solve_eigen_nosort for a general matrix\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+}
+
 
 
 void solve_eigen(CMATRIX* H, CMATRIX* S, CMATRIX* E, CMATRIX* C, int symm){
@@ -80,9 +103,9 @@ void solve_eigen(CMATRIX* H, CMATRIX* S, CMATRIX* E, CMATRIX* C, int symm){
   MatrixXcd A(N_bas,N_bas), B(N_bas,N_bas);
 
   if(symm==0){
+    require_hermitian_pair(H->M, S->M, N_bas, "solve_eigen");
     for(i=0;i<N_bas;i++){
       for(j=0;j<N_bas;j++){
-        // Symmetrize, to reduce numerical errors:
         A(i,j) = H->M[i*N_bas+j];     
         B(i,j) = S->M[i*N_bas+j];     
       }// for j
@@ -205,9 +228,9 @@ void solve_eigen(MATRIX* H, MATRIX* S, CMATRIX* E, CMATRIX* C, int symm){
   MatrixXcd A(N_bas,N_bas), B(N_bas,N_bas);
 
   if(symm==0){
+    require_hermitian_pair(H->M, S->M, N_bas, "solve_eigen");
     for(i=0;i<N_bas;i++){
       for(j=0;j<N_bas;j++){
-        // Symmetrize, to reduce numerical errors:
         A(i,j) = complex<double>(H->M[i*N_bas+j], 0.0);     
         B(i,j) = complex<double>(S->M[i*N_bas+j], 0.0);     
       }// for j
@@ -334,9 +357,9 @@ void solve_eigen(MATRIX* H, MATRIX* S, MATRIX* E, MATRIX* C, int symm){
   MatrixXd A(N_bas,N_bas), B(N_bas,N_bas);
 
   if(symm==0){
+    require_hermitian_pair(H->M, S->M, N_bas, "solve_eigen");
     for(i=0;i<N_bas;i++){
       for(j=0;j<N_bas;j++){
-        // Symmetrize, to reduce numerical errors:
         A(i,j) = H->M[i*N_bas+j];     
         B(i,j) = S->M[i*N_bas+j];     
       }// for j
