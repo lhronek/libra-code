@@ -1207,7 +1207,8 @@ def save_tsh_data_1234_new(_savers, params, i, dyn_var, ham):
                 save_hdf5_5D(_savers["txt_saver"], i, tr, idof, dc1)
 
             if txt2_output_level >= 5 and _savers["txt2_saver"] is not None:
-                save_hdf5_5D(_savers["txt_saver"], i, tr, idof, dc1)
+                # the txt2 saver holds the current step only (txt_type 1)
+                save_hdf5_5D(_savers["txt2_saver"], i, tr, idof, dc1, 1)
 
 
 def print_results12(i, dt, res, prefix, file_output_level):
