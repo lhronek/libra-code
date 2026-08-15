@@ -351,6 +351,17 @@ void dyn_control_params::sanity_check(){
           <<" subsystem\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
+    // the NAC-side sign correction re-signs the couplings by continuity
+    // (raw gauge); a relabel projector re-signs the amplitudes instead -
+    // both at once double-correct every eigenvector branch switch
+    if(do_nac_phase_correction==1 && !rot_proj && assume_always_consistent==0){
+      std::cout<<"Error in dyn_control_params::sanity_check: do_nac_phase_correction = 1"
+          <<" together with a relabel projector (state_tracking_algo = "<<state_tracking_algo
+          <<", assume_always_consistent = 0) corrects each eigenvector sign flip twice -"
+          <<" once in the NACs, once in the amplitudes; use it only with"
+          <<" assume_always_consistent = 1 (no projector), or drop it\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
     if(hvib_int && rot_proj && assume_always_consistent==0){
       std::cout<<"Error in dyn_control_params::sanity_check: the NAC-carrying"
           <<" Hvib integrator (electronic_integrator = "<<electronic_integrator
