@@ -136,14 +136,17 @@ class mem_saver:
         else:
             self.keywords.append(data_name)
 
+        # zero-filled: a requested property no writer serves must read as
+        # zeros in the output, not as heap contents (np.empty gave NaN /
+        # denormal noise for the writer-less legacy keys)
         if dtype == "I":
-            self.np_data[data_name] = np.empty(shape, int)
+            self.np_data[data_name] = np.zeros(shape, int)
 
         elif dtype == "R":
-            self.np_data[data_name] = np.empty(shape, float)
+            self.np_data[data_name] = np.zeros(shape, float)
 
         elif dtype == "C":
-            self.np_data[data_name] = np.empty(shape, complex)
+            self.np_data[data_name] = np.zeros(shape, complex)
 
         else:
             print(F"ERROR: the dtype = {dtype} is not allowed in add_dataset")

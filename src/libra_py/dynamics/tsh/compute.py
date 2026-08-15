@@ -1212,15 +1212,11 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                                                   "dEpot_ave",
                                                   "dEtot_ave",
                                                   "states",
-                                                  "SH_pop",
-                                                  "SH_pop_raw",
                                                   "se_pop_adi",
                                                   "se_pop_dia",
                                                   "sh_pop_adi",
                                                   "D_adi",
-                                                  "D_adi_raw",
                                                   "D_dia",
-                                                  "D_dia_raw",
                                                   "q",
                                                   "p",
                                                   "f",
@@ -1248,7 +1244,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
         # se_pop_dia, coherence_dia and mash_pop_dia via compute_average_dm(0);
         # sh_pop_adi_TR via compute_average_sh_pop_TR(1) - the transformed
         # populations read the OPPOSITE representation's density matrix
-        dia_props = {"D_dia", "D_dia_raw", "se_pop_dia", "coherence_dia",
+        dia_props = {"D_dia", "se_pop_dia", "coherence_dia",
                      "mash_pop_dia", "sh_pop_adi_TR"}
         need = (dyn_params["rep_tdse"] in (0, 2)) or (dyn_params["rep_sh"] == 0) \
             or bool(dia_props.intersection(dyn_params["properties_to_save"]))
