@@ -4170,10 +4170,19 @@ def cp2k_compute_adi_nbra(q, params, full_id):
             Number of adiabatic electronic states.
 
         logfile_name : str
-            Path to CP2K TDDFPT log file.
+            Path to CP2K TDDFPT log file. May carry the format fields {timestep}
+            / {timestep_st}, filled from the engine's per-step model_params;
+            a fixed path is honored (the caller rewrites it per step) but its
+            reuse across two engine steps raises.
 
         time_overlap_filename : str
-            Path to sparse MO overlap matrix file (.npz format).
+            Path to sparse MO overlap matrix file (.npz format); same
+            {timestep}/{timestep_st} templating and reuse guard as logfile_name
+            ({timestep_st} = the interval start the St pairs with).
+
+        overlap_filename : str
+            Path to the sparse MO self-overlap file (.npz); same templating and
+            reuse guard.
 
         atom_labels : list of str
             Atomic symbols (currently not used directly in this function).
@@ -4338,9 +4347,12 @@ def cp2k_compute_adi_nbra(q, params, full_id):
     # ================= Read electronic structure =================
     nstates = params["nstates"]
 
+    logfile_name = _nbra_step_filename(params, "logfile_name", itraj)
+    time_overlap_filename = _nbra_step_filename(params, "time_overlap_filename", itraj)
+
     read_params = {
         "number_of_states": nstates,
-        "logfile_name": params["logfile_name"],
+        "logfile_name": logfile_name,
         "ci_threshold": params.get("ci_threshold", 0.001),
         "isUKS": False,
     }
@@ -4364,7 +4376,7 @@ def cp2k_compute_adi_nbra(q, params, full_id):
     obj.overlap_adi = CMATRIX(nstates, nstates)
 
     # ================= Compute overlaps =================
-    st_mo = sp.load_npz(params["time_overlap_filename"])
+    st_mo = sp.load_npz(time_overlap_filename)
     
     if sp.issparse(st_mo):
         st_mo = st_mo.toarray()  # FIX: no dtype argument allowed
@@ -4372,7 +4384,7 @@ def cp2k_compute_adi_nbra(q, params, full_id):
         st_mo = np.asarray(st_mo)
     st_mo = st_mo.astype(np.float64, copy=False)
 
-    s_mo = sp.load_npz(params["overlap_filename"]).todense()
+    s_mo = sp.load_npz(_nbra_step_filename(params, "overlap_filename", itraj)).todense()
 
     
     ndim = st_mo.shape[0] // 2
@@ -4490,6 +4502,22 @@ def cp2k_compute_adi_nbra(q, params, full_id):
     params["is_first_time"][itraj] = False
 
     return obj
+
+
+def _nbra_step_filename(params, key, itraj):
+    """Per-step input path of the NBRA driver: the {timestep}/{timestep_st}
+    fields are filled from the engine's model_params; a fixed path may not be
+    consumed twice in a row for one trajectory (the file would be stale)."""
+    template = params[key]
+    fields = {k: params[k] for k in ("timestep", "timestep_st") if k in params}
+    name = template.format(**fields) if ("{" in template) else template
+    seen = params.setdefault("_nbra_last_input", {}).setdefault(key, {})
+    if seen.get(itraj) == name and "{" not in template:
+        raise RuntimeError(F"{key} = {name!r} was already consumed for trajectory "
+                           F"{itraj} on the previous step - a fixed path must be "
+                           F"rewritten per step, or carry {{timestep}}/{{timestep_st}}")
+    seen[itraj] = name
+    return name
 
 
 def _carried(params, key, itraj, current, is_first_time):
