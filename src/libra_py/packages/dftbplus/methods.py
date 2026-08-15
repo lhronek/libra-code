@@ -3277,6 +3277,10 @@ def dftb_compute_adi(q, params, full_id):
     print(F"GS energy = {e0}")
     for i in range(nstates):
         obj.ham_adi.add(i, i, e0)
+        # the same shift on hvib: its diagonal must be ham_adi's (the engine's
+        # rebuild is H - i nac, and a supplied hvib is compared against it); a
+        # uniform shift is a global phase of the electronic propagation
+        obj.hvib_adi.add(i, i, e0)
 
     obj.d1ham_adi = CMATRIXList()
     for idof in range(ndof):
@@ -3329,9 +3333,14 @@ def dftb_compute_adi(q, params, full_id):
                     obj.dc1_adi[3 * iatom + 2].set(i, j, nacv[i,j,2,iatom] * (1.0 + 0.0j))
 
     # ================= Compute derivative couplings =================
+    # the HST couplings go into nac_adi as well: the engine reads nac_adi
+    # directly (LZ detectors, NAC phase correction, the nac_adi saver), and
+    # hvib = H - i nac is then the engine's own rebuild convention
     for i in range(nstates):
         for j in range(i + 1, nstates):
             dij = ( obj.time_overlap_adi.get(i, j) - obj.time_overlap_adi.get(j, i) ) / (2.0 * dt)
+            obj.nac_adi.set(i, j, dij)
+            obj.nac_adi.set(j, i, -dij)
             obj.hvib_adi.set(i, j, -1j * dij)
             obj.hvib_adi.set(j, i, +1j * dij)            
             

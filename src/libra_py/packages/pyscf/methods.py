@@ -143,6 +143,10 @@ def pyscf_compute_adi(q, params, full_id):
     for i in range(nstates):
         for j in range(i + 1, nstates):
             dij = ( obj.time_overlap_adi.get(i, j) - obj.time_overlap_adi.get(j, i) ) / (2.0 * dt)
+            # the same couplings in nac_adi (read directly by the LZ detectors,
+            # the NAC phase correction and the nac_adi saver)
+            obj.nac_adi.set(i, j, dij)
+            obj.nac_adi.set(j, i, -dij)
             obj.hvib_adi.set(i, j, -1j * dij)
             obj.hvib_adi.set(j, i, +1j * dij)            
             

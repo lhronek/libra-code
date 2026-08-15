@@ -5031,6 +5031,10 @@ def cp2k_compute_adi_impl(q, params, full_id):
     for i in range(nstates):
         for j in range(i + 1, nstates):
             dij = float(st_ci[i, j] - st_ci[j, i]) / (2.0 * dt)
+            # the same couplings in nac_adi: read directly by the LZ
+            # detectors, the NAC phase correction and the nac_adi saver
+            obj.nac_adi.set(i, j, dij * (1.0 + 0.0j))
+            obj.nac_adi.set(j, i, -dij * (1.0 + 0.0j))
             obj.hvib_adi.set(i, j, -1j * dij)
             obj.hvib_adi.set(j, i, +1j * dij)
 

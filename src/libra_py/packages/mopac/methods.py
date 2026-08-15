@@ -897,6 +897,10 @@ def mopac_compute_adi(q, params, full_id):
     for istate in range(nstates):
         for jstate in range(istate + 1, nstates):
             dij = (obj.time_overlap_adi.get(istate, jstate) - obj.time_overlap_adi.get(jstate, istate)) / (2.0 * dt)
+            # the same couplings in nac_adi (read directly by the LZ detectors,
+            # the NAC phase correction and the nac_adi saver)
+            obj.nac_adi.set(istate, jstate, dij)
+            obj.nac_adi.set(jstate, istate, -dij)
             obj.hvib_adi.set(istate, jstate, dij * (0.0 - 1.0j))
             obj.hvib_adi.set(jstate, istate, dij * (0.0 + 1.0j))
 
