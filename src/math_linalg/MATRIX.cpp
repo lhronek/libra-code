@@ -14,9 +14,10 @@
     
 */
 
+#include <stdexcept>
+#include <utility>
 #if defined(USING_PCH)
 #include "../pch.h"
-#include <stdexcept>
 #else
 #include <stdio.h>
 #include <memory>
@@ -416,7 +417,7 @@ void MATRIX::product(const MATRIX& B, const MATRIX& C){
   if((M == B.M || M == C.M) && B.n_cols == C.n_rows && n_rows == B.n_rows && n_cols == C.n_cols){
     MATRIX tmp(n_rows, n_cols);
     tmp.product(B, C);
-    *this = tmp;
+    std::swap(M, tmp.M);
     return;
   }
 #ifdef HAVE_CBLAS_GEMM

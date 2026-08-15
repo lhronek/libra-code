@@ -17,9 +17,10 @@
 #ifndef base_matrix_H
 #define base_matrix_H
 
+#include <stdexcept>
+#include <utility>
 #if defined(USING_PCH)
 #include "../pch.h"
-#include <stdexcept>
 #else
 #include <boost/python.hpp>
 #include <boost/python/suite/indexing/vector_indexing_suite.hpp>
@@ -404,6 +405,16 @@ public:
       throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
+    // aliased call (the caller is an operand): the target is zeroed
+    // before it is read - accumulate into a temporary and take its
+    // buffer (the temporary frees the caller's old one)
+    if (M == B.M || M == C.M) {
+      base_matrix<T1> tmp(n_rows, n_cols);
+      tmp.product(B, C);
+      std::swap(M, tmp.M);
+      return;
+    }
+
     for (int i = 0; i < n_elts; i++) {
       M[i] = (T1)0.0;
     }
@@ -462,6 +473,15 @@ public:
       std::cout << " produce a matrix with " << _N * _Q
                 << " columns\n";
       throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+
+    // aliased call: same hazard as product() - the target is zeroed
+    // before the operands are read
+    if (M == B.M || M == C.M) {
+      base_matrix<T1> tmp(n_rows, n_cols);
+      tmp.kron(B, C);
+      std::swap(M, tmp.M);
+      return;
     }
 
     for (int i = 0; i < n_elts; i++) {
