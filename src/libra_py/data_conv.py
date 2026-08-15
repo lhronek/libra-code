@@ -505,15 +505,11 @@ def form_block_matrix(mat_a, mat_b, mat_c, mat_d):
 
     """
 
-    # Concatenate the two marix on their row axis
-    block_1 = np.concatenate((mat_a, mat_b))
-    block_2 = np.concatenate((mat_c, mat_d))
-
-    # Now concatenate the above concatenated matrices on their
-    # column axis and form the final matrix
-    block_matrix = np.concatenate((block_1, block_2), axis=1)
-
-    return block_matrix
+    # rows [a | b] and [c | d], stacked - the documented layout; the earlier
+    # stacking built its transpose [[a, c], [b, d]], invisible for square
+    # equal blocks and a shape error for the rectangular UKS off-diagonals
+    return np.block([[np.asarray(mat_a), np.asarray(mat_b)],
+                     [np.asarray(mat_c), np.asarray(mat_d)]])
 
 
 def vasp_to_xyz(filename):
