@@ -578,19 +578,25 @@ void check_input(boost::python::dict params, boost::python::dict default_params,
   }
 
 
-  for(i=0;i<len(default_params.keys());i++){
-      key = boost::python::extract<std::string>(default_params.keys()[i]);
+  // materialize the key list once: dict.keys()/values() build a fresh
+  // Python list of all entries on every call, and the loop evaluated them
+  // per iteration (O(n^2) list constructions per check_input)
+  boost::python::list keys = default_params.keys();
+  int nkeys = len(keys);
+  for(i=0;i<nkeys;i++){
+      key = boost::python::extract<std::string>(keys[i]);
 
       if(!params.has_key(key)){
+        boost::python::object value = default_params[key];
 
         if(verbose){
           std::cout<<"WARNING: Parameter "<< key <<" is not defined in the input parameters! "
                    <<"Using the default value = "
-                   << boost::python::extract<std::string>(boost::python::str(default_params.values()[i]))()
+                   << boost::python::extract<std::string>(boost::python::str(value))()
                    <<"\n";
         }
 
-        params.setdefault(key, default_params.values()[i]);
+        params.setdefault(key, value);
      }
   }
 }
