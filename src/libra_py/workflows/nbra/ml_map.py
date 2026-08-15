@@ -836,12 +836,15 @@ def compute_properties(params, models, input_scalers, output_scalers):
             eigenvectors_prev = eigenvectors
             step_prev = step
             # Writing overlap, and time-overlap files as in .npz file for other steps
-            mo_overlap_sparse = sp.csc_matrix(mo_overlap)
             # a produced MO self-overlap must be a clean identity - anything
             # else means the mapped-eigenvector chain is broken
             orthogonalizations.validate_overlap_matrix(
                 np.asarray(mo_overlap), F"S_ks_{step} (ml_map production)",
                 require_identity=0.05)
+            # the same alpha/beta block layout as St_ks and E_ks (and step2's
+            # S_ks): step3 slices all three with one active_space
+            mo_overlap_sparse = sp.csc_matrix(
+                data_conv.form_block_matrix(mo_overlap, zero_mat, zero_mat, mo_overlap))
             sp.save_npz(params["res_dir"] + F'/S_ks_{step}.npz', mo_overlap_sparse)
             os.system(f'rm {params["path_to_input_mats"]}/{params["prefix"]}_{params["input_property"]}_{step}.npy')
         # Writing the energy files into the res directory
