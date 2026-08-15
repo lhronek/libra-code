@@ -1090,6 +1090,10 @@ def run_cp2k_libint_step2(params):
                     St_beta = np.linalg.multi_dot([beta_eigenvectors_1, AO_St, beta_eigenvectors_2.T])[
                         lowest_orbital - 1:highest_orbital, lowest_orbital - 1:highest_orbital]
 
+                    # its own zero block: the emultipole branch's zero_mat is not
+                    # defined on this path (NameError, or a stale shape from a
+                    # previous iteration)
+                    zero_mat = np.zeros((S_alpha.shape[0], S_beta.shape[1]))
                     S_step = data_conv.form_block_matrix(S_alpha, zero_mat, zero_mat.T, S_beta)
                     St_step = data_conv.form_block_matrix(St_alpha, zero_mat, zero_mat.T, St_beta)
                     S_step_sparse = scipy.sparse.csc_matrix(S_step)
