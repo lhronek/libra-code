@@ -42,6 +42,15 @@ def carried_state_digest(state):
     return hashlib.blake2b(pickle.dumps(state, protocol=4), digest_size=16).digest()
 
 
+def _identity_deviation(S):
+    """max|S - I| without materializing an identity matrix (an N=4000
+    complex S costs ~0.5 GB in eye + temp on the per-step paths)."""
+    d = np.array(S, copy=True)
+    idx = np.arange(d.shape[0])
+    d[idx, idx] -= 1.0
+    return float(np.abs(d).max())
+
+
 def validate_overlap_matrix(S, label="overlap", require_identity=None,
                             sym_tol=1e-8):
     """A valid overlap (Gram) matrix is finite, Hermitian and has a strictly
@@ -66,8 +75,10 @@ def validate_overlap_matrix(S, label="overlap", require_identity=None,
         raise ValueError(F"{label}: the overlap matrix has a non-positive "
                          F"diagonal entry ({dmin:.3e}) - vector norms must be "
                          "positive; corrupted data")
-    dev = float(np.abs(S - np.eye(S.shape[0])).max())
-    if require_identity is not None and dev > require_identity:
+    if require_identity is None:
+        return None
+    dev = _identity_deviation(S)
+    if dev > require_identity:
         raise ValueError(F"{label}: the overlap matrix deviates from identity "
                          F"by {dev:.3f} (limit {require_identity}) - freshly "
                          "produced MO self-overlaps must be orthonormal; the "
@@ -174,17 +185,17 @@ def get_Lowdin_scipy(S):
 
         S_inverse_square_root (numpy array): The inverse square root of S.
     """
-    # a non-PSD input would make the fractional power silently complex
+    # a non-PSD input would make the inverse square root silently complex
     validate_overlap_matrix(S, "get_Lowdin_scipy")
-    neg = float(np.linalg.eigvalsh(0.5 * (np.asarray(S) + np.asarray(S).conj().T)).min())
-    if neg < -1e-8:
+    S_h = 0.5 * (np.asarray(S) + np.asarray(S).conj().T)
+    w, V = np.linalg.eigh(S_h)
+    if float(w.min()) < -1e-8:
         raise ValueError(F"get_Lowdin_scipy: the overlap matrix has a negative "
-                         F"eigenvalue ({neg:.3e}) - not a valid Gram matrix; "
+                         F"eigenvalue ({w.min():.3e}) - not a valid Gram matrix; "
                          "corrupted data")
-    # Return the fractional matrix with the power of -1/2
-    S_inverse_square_root = fractional_matrix_power(S, -1 / 2)
-
-    return S_inverse_square_root
+    # one eigendecomposition serves the guard AND the inverse square root
+    # (exact for Hermitian input; the general Schur route costs ~10x)
+    return (V * (w ** -0.5)) @ V.conj().T
 
 
 def apply_orthonormalization_scipy(S_1, S_2, St):

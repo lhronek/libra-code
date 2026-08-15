@@ -157,10 +157,9 @@ def molden_file_to_libint_shell(molden_filename: str, is_spherical: bool, is_per
                            This is used later to resort the eigenvectors in molden file.
 
     """
-    # Reading the lines of the molden file
-    file = open(molden_filename, 'r')
-    lines = file.readlines()
-    file.close()
+    # stat-keyed cache: the per-step parsers share one read; do not
+    # mutate the returned list
+    lines = data_read.read_lines_cached(molden_filename)
 
     # Derive the file's convention (markers + the [MO] coefficient-count
     # cross-check: molden defaults to cartesian and a cartesian CP2K molden
@@ -383,10 +382,8 @@ def eigenvectors_molden(molden_filename: str, nbasis: int, l_vals: list):
         orbital_energies (numpy array): All orbital energies for the eigenvectors.
 
     """
-    # again reading the molden files and its lines
-    file = open(molden_filename, 'r')
-    lines = file.readlines()
-    file.close()
+    # the same stat-keyed cache as the shell parser - one physical read
+    lines = data_read.read_lines_cached(molden_filename)
 
     # energy lines
     orbital_energies = []

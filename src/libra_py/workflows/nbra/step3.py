@@ -50,6 +50,7 @@ import libra_py.units as units
 import libra_py.data_read as data_read
 import libra_py.data_conv as data_conv
 import libra_py.hungarian as hungarian
+from libra_py import orthogonalizations
 from libra_py.orthogonalizations import (validate_overlap_matrix,
                                          get_Lowdin_scipy,
                                          apply_orthonormalization_scipy,
@@ -2007,7 +2008,7 @@ def _check_input_overlap(S, tag, step, threshold=0.05, allow_dirty=False):
     Structural invalidity (non-finite, non-Hermitian, non-positive
     diagonal) raises unconditionally - nothing can repair it."""
     validate_overlap_matrix(S, F"{tag} at step {step}")
-    dev = float(np.abs(S - np.eye(S.shape[0])).max())
+    dev = orthogonalizations._identity_deviation(S)
     if dev > threshold:
         if not allow_dirty:
             raise ValueError(
