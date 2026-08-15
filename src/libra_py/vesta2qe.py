@@ -13,6 +13,7 @@
 # the fractional occupation atoms and other possibly overlapping atoms are removed (a unique one is left).
 
 
+from libra_py import units
 import re
 import os
 import sys
@@ -120,7 +121,7 @@ def parse_vesta(in_file, out_file, min_dist):
 
     ######### Assume coordinates are given in Angstroms #############
 
-    Angst_to_Bohr = 1.889725989
+    Angst_to_Bohr = units.Angst
 
     # ------- Here are some basic patterns -------------
     INT = '([1-9]([0-9]*))'

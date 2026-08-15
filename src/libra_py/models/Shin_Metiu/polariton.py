@@ -28,7 +28,7 @@ import util.libutil as comn
 # constants
 from dataclasses import dataclass
 
-HARTREE2EV = 27.2116  # constant stays as a constant
+HARTREE2EV = 27.211386245988  # 1 Ha in eV (CODATA 2018, = libra_py.units.au2ev)
 
 
 @dataclass

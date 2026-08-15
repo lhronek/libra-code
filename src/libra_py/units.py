@@ -23,30 +23,31 @@
 # Length units
 Angst = 1.8897261246257702                         # in Bohr (1.0/0.529177210903, CODATA 2018)
 
-# Energy units
-inv_cm2ev = 1.239841870000000847635400992705E-4    # (1.0/8065.54468111324)
+# Energy units (CODATA 2018 primaries; derived values are expressions
+# of the primaries so they cannot drift on the next update)
+inv_cm2ev = 1.0 / 8065.543937                      # 1 eV = 8065.543937 cm^-1 (CODATA 2018)
 ev2Ha = 0.03674932217565499                        # (1.0/27.211386245988, CODATA 2018)
 ev2au = 0.03674932217565499                        # (1.0/27.211386245988, CODATA 2018)
 au2ev = 27.211386245988                            # 1 Ha = 27.211386245988 eV (CODATA 2018)
-inv_cm2Ha = 4.5563995075520960186520193771085E-6   # inv_cm2ev * ev2Ha
-hartree = 627.5094709                              # 1 Ha = 627.5.. kcal/mol
+inv_cm2Ha = inv_cm2ev * ev2Ha
+hartree = 627.509474                               # 1 Ha in kcal/mol (CODATA 2018)
 
 # Time units
-fs2au = 41.339396444811905746176105828855          # (1.0/0.02419)   # 41.34 a.u. is 1 fs
-au2fs = 0.02419                                    # 41.34 a.u. is 1 fs
-ps2au = 41.339396444811905746176105828855E+3       #
-au2ps = 0.02419E-3                                 #
+au2fs = 0.024188843265857                          # 1 a.u. of time in fs (CODATA 2018)
+fs2au = 1.0 / au2fs
+ps2au = fs2au * 1.0E+3
+au2ps = au2fs * 1.0E-3
 
-au2wavn = 219471.53631777237364                    # 27.211 * 8065.54468111324
-wavn2au = 4.5563995075520960186520193771085E-6     # 1/au2wavn
+au2wavn = au2ev / inv_cm2ev                        # 219474.631... cm^-1 per Ha
+wavn2au = 1.0 / au2wavn
 
 # Mass units
-amu = 1836.0                                       # chemical mass unit in masses of electron
-m_e = 9.109383713928e-31                        # electron mass in kg = 1 amu
+amu = 1822.888486209                               # unified atomic mass unit (dalton) in electron masses (CODATA 2018)
+m_e = 9.109383713928e-31                           # electron mass in kg
 
 # Fundamental constants
-boltzmann = 1.9872065E-3                           # in kcal/mol*K
-kB = 3.166815151251607985889922605788E-6           # Ha/mol*K
+boltzmann = 1.987204258641E-3                      # kB in kcal/(mol K) (CODATA 2018)
+kB = 3.166811563E-6                                # kB in Ha/K (CODATA 2018)
 
 
 def length_converter(inp_units, out_units):

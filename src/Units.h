@@ -66,7 +66,7 @@ namespace liblibra{
 */
 
 // Length units
-#define Angst 1.889725989                    // 1 Angstrom in atomic units
+#define Angst 1.8897261246257702           // 1 Angstrom in Bohr (CODATA 2018, = libra_py.units.Angst)
 #define bohr       0.5291772083              // 1 Bohr = bohr Angstrom
 #define nanometers_to_angstrem 10.0
 #define bohrs_to_angstrem      0.5291772083

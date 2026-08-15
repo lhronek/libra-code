@@ -116,7 +116,7 @@ def construct_ao_basis(ao_data, label, R, nGTO, orb_name):
 
     ao_basis = []
 
-    Bohr_to_Angs = 0.529177208
+    Bohr_to_Angs = 0.529177210903  # CODATA 2018 (= 1/libra_py.units.Angst)
     # define atomic orbitals by using the Gaussian basis
     for i in range(0, len(label)):  # all atoms
 

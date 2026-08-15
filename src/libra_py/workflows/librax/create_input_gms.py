@@ -65,7 +65,7 @@ def write_gms_inp(label, Q, params, mol):
     gms_inp_templ = params["gms_inp_templ"]
     gms_inp = params["gms_inp"]
 
-    B_to_A = 0.529177208  # Bohr to Angstrom
+    B_to_A = 0.529177210903  # Bohr to Angstrom (CODATA 2018, = 1/libra_py.units.Angst)
     g = open(gms_inp, "w")
 
     # Print the control section
