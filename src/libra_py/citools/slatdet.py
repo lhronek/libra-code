@@ -331,7 +331,7 @@ def _listed_rows(dets, n_half):
             [n_half + abs(o) - 1 for o in d if o < 0] for d in dets]
 
 
-def slater_overlap_matrix_loop(dets_A, dets_B, S_orb, complex_valued=False, phases_A=None, phases_B=None):
+def slater_overlap_matrix_loop(dets_A, dets_B, S_orb, complex_valued=False, phases_A=None, phases_B=None, two_spinor=None):
     """
     Compute the matrix of overlaps between two possibly distinct sets of
     Slater determinants (α/β spins orthogonal).
@@ -346,7 +346,13 @@ def slater_overlap_matrix_loop(dets_A, dets_B, S_orb, complex_valued=False, phas
         Ket determinants, tuples of signed orbital indices.
 
     S_orb : np.ndarray
-        Spatial orbital overlap matrix (n_orb, n_orb).
+        Spatial orbital overlap matrix (n_orb, n_orb) - one block serves both
+        spins (RKS) - or the two-spinor matrix (2 n_orb, 2 n_orb), whose
+        alpha and beta diagonal blocks may differ (UKS).
+
+    two_spinor : bool or None, optional
+        Whether S_orb is the two-spinor form. None (default) decides by shape:
+        an even dimension whose half exceeds every orbital index used.
 
     complex_valued : bool, optional
         If True, results are complex-valued. Default is False.
@@ -389,6 +395,17 @@ def slater_overlap_matrix_loop(dets_A, dets_B, S_orb, complex_valued=False, phas
     beta_A  = [np.array([abs(o) - 1 for o in d if o < 0], dtype=int) for d in dets_A]
     alpha_B = [np.array([abs(o) - 1 for o in d if o > 0], dtype=int) for d in dets_B]
     beta_B  = [np.array([abs(o) - 1 for o in d if o < 0], dtype=int) for d in dets_B]
+
+    # a two-spinor S_orb (2n x 2n, every index < n): the beta rows read the
+    # beta block - a spatial S_orb serves both spins from its single block
+    n_orb = S_orb.shape[0]
+    if two_spinor is None:
+        max_idx = max([o.max() for o in alpha_A + beta_A + alpha_B + beta_B if o.size] + [-1])
+        two_spinor = (n_orb % 2 == 0 and max_idx < n_orb // 2)
+    if two_spinor:
+        half = n_orb // 2
+        beta_A = [o + half for o in beta_A]
+        beta_B = [o + half for o in beta_B]
 
     for i in range(nA):
         a_i, b_i = alpha_A[i], beta_A[i]
