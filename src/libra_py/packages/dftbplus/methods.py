@@ -1901,7 +1901,14 @@ def run_odin(params):
         link = os.path.join(wd, "skdir")
         if os.path.islink(link):
             os.remove(link)
-        os.symlink(os.path.abspath(target), link)
+        elif os.path.exists(link):
+            raise RuntimeError(F"{link} exists and is not a symlink - remove "
+                               F"it (the driver links the SK prefix there)")
+        # the short branch passes the prefix verbatim and ODIN resolves it
+        # against wd - resolve the link target the same way
+        target_abs = (target if os.path.isabs(target)
+                      else os.path.normpath(os.path.join(wd, target)))
+        os.symlink(target_abs, link)
         params = dict(params)
         params["slakos_prefix"] = F"skdir/{tail}"
 
