@@ -18,6 +18,7 @@
 #define LIBINT2_WRAPPERS_H
 
 
+#include <stdexcept>
 #if defined(USING_PCH)
 #include "../pch.h"
 #else
@@ -71,15 +72,32 @@ namespace liblibint2_wrappers{
 
 
 
-// fires off \c nthreads instances of lambda in parallel
+// fires off \c nthreads instances of lambda in parallel. The kernels
+// partition their shell pairs by (s12 % nthreads == thread_id), so the
+// team MUST have exactly nthreads members: a smaller team (OMP_DYNAMIC,
+// OMP_THREAD_LIMIT, a nested region) would leave whole residue classes
+// uncomputed in a result matrix that is not zero-initialized
 template <typename Lambda>
 void parallel_do(Lambda& lambda, int nthreads) {
 #ifdef _OPENMP
-#pragma omp parallel
+  int team = 0;
+#pragma omp parallel num_threads(nthreads)
 {
-  auto thread_id = omp_get_thread_num();
-  lambda(thread_id);
+#pragma omp master
+  { team = omp_get_num_threads(); }
+#pragma omp barrier
+  if (team == nthreads) {
+    auto thread_id = omp_get_thread_num();
+    lambda(thread_id);
+  }
 }
+  if (team != nthreads) {
+    std::cout << "Error in libint2_wrappers::parallel_do(): the OpenMP runtime gave a team of "
+              << team << " threads for a request of " << nthreads
+              << " - the shell-pair partition needs exactly nthreads (raise OMP_THREAD_LIMIT,"
+                 " disable OMP_DYNAMIC, or lower the requested thread count)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 #else  // use C++11 threads
 std::vector<std::thread> threads;
 for (int thread_id = 0; thread_id != libint2::nthreads; ++thread_id) {
