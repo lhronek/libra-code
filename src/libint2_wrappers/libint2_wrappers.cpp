@@ -692,14 +692,20 @@ double compute_4center_eri(const std::vector<libint2::Shell> &shells_1,
   using libint2::BraKet;
   using libint2::Engine;
   using libint2::Operator;
-  Engine engine(Operator::coulomb, max_n, max_lval, deriv_order);
-  const auto &buf = engine.results();
-  engine.compute(shells_1[0], shells_2[0], shells_3[0], shells_4[0]);
-  const auto *integral_val = buf[0];
+  double value = 0.0;
+  {
+    // the engine (and the buffer its results() point into) must be gone
+    // before finalize(): read the value out inside its scope
+    Engine engine(Operator::coulomb, max_n, max_lval, deriv_order);
+    const auto &buf = engine.results();
+    engine.compute(shells_1[0], shells_2[0], shells_3[0], shells_4[0]);
+    const auto *integral_val = buf[0];
+    // 2-body engines screen negligible quartets to a null batch - the
+    // integral is genuinely zero within the engine precision
+    value = (integral_val == nullptr) ? 0.0 : integral_val[0];
+  }
   libint2::finalize(); // done with libint
-  // 2-body engines screen negligible quartets to a null batch - the
-  // integral is genuinely zero within the engine precision
-  return integral_val == nullptr ? 0.0 : integral_val[0];
+  return value;
 }
 
 /*
