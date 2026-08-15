@@ -1255,7 +1255,10 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
     rep_tdse = dyn_params["rep_tdse"]
     # rep_ham = dyn_params["rep_ham"]
     nsteps = dyn_params["nsteps"]
-    nprint = dyn_params["nprint"]
+    nprint = int(dyn_params["nprint"])
+    if nprint < 1:
+        # ceil(nsteps/nprint) sizes every saver buffer and i/nprint indexes it
+        raise ValueError(F"nprint = {nprint}: the save stride must be a positive integer")
     dt = dyn_params["dt"]
     phase_correction_tol = dyn_params["phase_correction_tol"]
     hdf5_output_level = dyn_params["hdf5_output_level"]
