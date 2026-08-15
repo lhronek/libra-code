@@ -52,7 +52,9 @@ using namespace libthermostat;
 void export_dyn_control_params_objects(){
 
   // Arbitrary wavefunction
-  void (dyn_control_params::*expt_sanity_check_v1)(boost::python::dict params) = &dyn_control_params::set_parameters;
+  // the validator takes no arguments; binding the dict form to set_parameters
+  // made prms.sanity_check(params) OVERWRITE the parameters
+  void (dyn_control_params::*expt_sanity_check_v1)() = &dyn_control_params::sanity_check;
   void (dyn_control_params::*expt_set_parameters_v1)(boost::python::dict params) = &dyn_control_params::set_parameters;
 
 
