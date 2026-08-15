@@ -225,7 +225,10 @@ TARGET_LINK_LIBRARIES(libra_core_stat
                       libint2_wrappers_stat
                       molint_stat
                       linalg_stat meigen_stat specialfunctions_stat symmetry_stat operators_stat random_stat graph_stat data_stat ann_stat timer_stat 
-                      context_stat io_stat calculators_stat ${ext_libs}  )
+                      context_stat io_stat calculators_stat ${ext_libs}
+                      # liblibra_core.cpp resolves the BLAS runtime through dlsym: on
+                      # glibc < 2.34 dl* live in libdl, not libc
+                      ${CMAKE_DL_LIBS} )
 
 
 TARGET_LINK_LIBRARIES(libra_core libra_core_stat)
