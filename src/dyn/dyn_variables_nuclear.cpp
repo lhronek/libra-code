@@ -176,7 +176,7 @@ void dyn_variables::init_nuclear_dyn_var(bp::dict _params, Random& rnd){
     cout<<"ERROR in init_nuclear_dyn_var: \
           the length of input Q is = "<<_Q.size()<<", \
           the length of input P is = "<<_P.size()<<", but they should be equal to each other\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   if(init_type==1 || init_type==2 || init_type==3){
@@ -184,7 +184,7 @@ void dyn_variables::init_nuclear_dyn_var(bp::dict _params, Random& rnd){
       cout<<"ERROR in init_nuclear_dyn_var: \
             the length of input Q is = "<<_Q.size()<<", \
             the length of input M is = "<<_M.size()<<", but they should be equal to each other\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 
@@ -193,7 +193,7 @@ void dyn_variables::init_nuclear_dyn_var(bp::dict _params, Random& rnd){
       cout<<"ERROR in init_nuclear_dyn_var: \
             the length of input Q is = "<<_Q.size()<<", \
             the length of input force_constant is = "<<force_constant.size()<<", but they should be equal to each other\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 
@@ -202,7 +202,7 @@ void dyn_variables::init_nuclear_dyn_var(bp::dict _params, Random& rnd){
       cout<<"ERROR in init_nuclear_dyn_var: \
              the length of input Q is = "<<_Q.size()<<", \
              the length of input q_width is = "<<q_width.size()<<", but they should be equal to each other\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 
@@ -211,7 +211,7 @@ void dyn_variables::init_nuclear_dyn_var(bp::dict _params, Random& rnd){
       cout<<"ERROR in init_nuclear_dyn_var: \
              the length of input Q is = "<<_Q.size()<<", \
              the length of input p_width is = "<<p_width.size()<<", but they should be equal to each other\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
   if(init_type==5){
@@ -220,13 +220,13 @@ void dyn_variables::init_nuclear_dyn_var(bp::dict _params, Random& rnd){
     if(q_init.size() != ndof){ 
       cout<<"ERROR in init_nuclear_dyn_var: \
              the q_init should be a list of ntraj = "<<ndof <<" lists, but the current size is "<<q_init.size()<<"\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     for(int k=0; k<ndof; k++){
       if(q_init[k].size() != ntraj){
         cout<<"ERROR in init_nuclear_dyn_var: \
                the q_init["<<k<<"] should be a list of ntraj = "<<ntraj <<" floats, but the current size is "<<q_init[k].size()<<"\n";
-        throw std::runtime_error("libra C++ error - see the message printed above");
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
     }
 
@@ -234,13 +234,13 @@ void dyn_variables::init_nuclear_dyn_var(bp::dict _params, Random& rnd){
     if(p_init.size() != ndof){
       cout<<"ERROR in init_nuclear_dyn_var: \
              the p_init should be a list of ndof = "<<ndof <<" lists, but the current size is "<<p_init.size()<<"\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     for(int k=0; k<ndof; k++){
       if(p_init[k].size() != ntraj){
       cout<<"ERROR in init_nuclear_dyn_var: \
              the p_init["<<k<<"] should be a list of ntraj = "<<ntraj <<" floats, but the current size is "<<p_init[k].size()<<"\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
     }// for k
 

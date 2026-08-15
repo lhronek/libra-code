@@ -88,9 +88,9 @@ void model_ECWR(CMATRIX& Hdia, CMATRIX& Sdia, vector<CMATRIX>& d1ham_dia, vector
 void ECWR_Ham(double x, MATRIX* H, MATRIX* dH, MATRIX* d2H, vector<double>& params){ 
 // ECWR hamiltonian in diabatic representation
 
-  if(H->n_elts!=4){ std::cout<<"Error in ECWR_Ham: H matrix must be allocated\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
-  if(dH->n_elts!=4){ std::cout<<"Error in ECWR_Ham: dH matrix must be allocated\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
-  if(d2H->n_elts!=4){ std::cout<<"Error in ECWR_Ham: d2H matrix must be allocated\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
+  if(H->n_elts!=4){ std::cout<<"Error in ECWR_Ham: H matrix must be allocated\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");}
+  if(dH->n_elts!=4){ std::cout<<"Error in ECWR_Ham: dH matrix must be allocated\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");}
+  if(d2H->n_elts!=4){ std::cout<<"Error in ECWR_Ham: d2H matrix must be allocated\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");}
 
   // Default parameters
   double A = 0.0006;  double B = 0.100;  double C = 0.900;   

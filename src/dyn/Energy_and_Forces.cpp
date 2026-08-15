@@ -296,7 +296,7 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
     }
     // Adiabatic
     else if(prms.rep_force==1){
-      cout<<"Error in potential_energies(): KC-RPMD works exclusively within diabatic bases\n"; throw std::runtime_error("libra C++ error - see the message printed above");
+      cout<<"Error in potential_energies(): KC-RPMD works exclusively within diabatic bases\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   
   }// KC-RPMD
@@ -441,7 +441,7 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
     }
 
     // Adiabatic 
-    else if(prms.rep_force==1){ cout<<"Error in update_forces(): KC-RPMD works exclusively within diabatic bases\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+    else if(prms.rep_force==1){ cout<<"Error in update_forces(): KC-RPMD works exclusively within diabatic bases\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
   }// KC-RPMD
 
 //  return F;

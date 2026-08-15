@@ -41,7 +41,7 @@ void set_basis_STO_3G_DZ(vector<std::string>& at_type, vector<VECTOR>& R,  Model
   // Size of atomic system setup:
   if(at_type.size()!=R.size()){  
     cout<<"Error: size of the atom names array is not equal to the size of the coordinates array\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   int Nat = at_type.size();
 

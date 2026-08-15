@@ -310,7 +310,7 @@ void dyn_control_params::sanity_check(){
   if(!(lz_target_space==0 || lz_target_space==1)){
     std::cout<<"Error in dyn_control_params::sanity_check: lz_target_space = "
         <<lz_target_space<<" is not allowed (0 - energy-adjacent only, 1 - all pairs)\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   ///=================== Options for state tracking ======================
@@ -322,7 +322,7 @@ void dyn_control_params::sanity_check(){
   else{
     std::cout<<"Error in dyn_control_params::sanity_check: state_tracking_algo = "
         <<state_tracking_algo<<" is not allowed\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   ///============== Integrator vs projector family pairing ==============
@@ -349,7 +349,7 @@ void dyn_control_params::sanity_check(){
           <<", assume_always_consistent = "<<assume_always_consistent
           <<"); a relabel-only or identity projector freezes the electronic"
           <<" subsystem\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     if(hvib_int && rot_proj && assume_always_consistent==0){
       std::cout<<"Error in dyn_control_params::sanity_check: the NAC-carrying"
@@ -359,7 +359,7 @@ void dyn_control_params::sanity_check(){
           <<"); use a relabel projector (state_tracking_algo 0/1/2/21 with"
           <<" do_phase_correction = 1), or assume_always_consistent = 1 with"
           <<" do_nac_phase_correction = 1\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 
@@ -379,7 +379,7 @@ void dyn_control_params::sanity_check(){
           <<" state_tracking_algo -1, 5 or 6 and assume_always_consistent = 0"
           <<" (got state_tracking_algo = "<<state_tracking_algo
           <<", assume_always_consistent = "<<assume_always_consistent<<")\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 
@@ -388,7 +388,7 @@ void dyn_control_params::sanity_check(){
   if(thermally_corrected_nbra==1 && isNBRA==1){
     std::cout<<"Error in dyn_control_params::sanity_check: thermally_corrected_nbra needs "
         <<"per-trajectory child Hamiltonians - run it with isNBRA = 0\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   /// Shall not use DISH with the decoherence correction
@@ -396,7 +396,7 @@ void dyn_control_params::sanity_check(){
   if(tsh_method==5 && decoherence_algo!=-1){
     cout<<"Error in dyn_control_params::sanity_check: Shall not use DISH (tsh_method == 5) with the \
            decoherence correction (any but decoherence_algo == -1)\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   /// Check that we don't constrian the thermostatted DOFs and also quantum DOFs
@@ -409,7 +409,7 @@ void dyn_control_params::sanity_check(){
       for(int i2=0; i2<sz2; i2++){
         if( constrained_dofs[i1] == thermostat_dofs[i2] ){
            cout<<"Error in dyn_control_params::sanity_check: can not constrain the thermostatted DOF "<<thermostat_dofs[i2]<<endl;
-           throw std::runtime_error("libra C++ error - see the message printed above");
+           std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
       }// for i2
     }// for i1
@@ -419,7 +419,7 @@ void dyn_control_params::sanity_check(){
       for(int i2=0; i2<sz2; i2++){
         if( constrained_dofs[i1] == quantum_dofs[i2] ){
            cout<<"Error in dyn_control_params::sanity_check: can not constrain the quantum DOF "<<quantum_dofs[i2]<<endl;
-           throw std::runtime_error("libra C++ error - see the message printed above");
+           std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
       }// for i2
     }// for i1
@@ -430,7 +430,7 @@ void dyn_control_params::sanity_check(){
   if(num_electronic_substeps<=0){
       cout<<"Error in dyn_control_params::sanity_check: num_electronic_substeps = "<<num_electronic_substeps
           <<" should be a positive integer"<<endl;
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
 }

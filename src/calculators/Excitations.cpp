@@ -41,10 +41,10 @@ void excite(int I, int J, vector< pair<int,double> >& occ_ini, vector< pair<int,
 
   int Norb = occ_ini.size();
 
-  if(I<0){ std::cout<<"Error: source orbital index("<<I<<") can not be negative\n";  throw std::runtime_error("libra C++ error - see the message printed above"); }
-  if(J<0){ std::cout<<"Error: target orbital index("<<J<<") can not be negative\n";  throw std::runtime_error("libra C++ error - see the message printed above"); }
-  if(I>=Norb){ std::cout<<"Error: source orbital index("<<I<<") exceeds the number of orbitals in the active space("<<Norb<<")\n";  throw std::runtime_error("libra C++ error - see the message printed above"); }
-  if(J>=Norb){ std::cout<<"Error: target orbital index("<<J<<") exceeds the number of orbitals in the active space("<<Norb<<")\n";  throw std::runtime_error("libra C++ error - see the message printed above"); }
+  if(I<0){ std::cout<<"Error: source orbital index("<<I<<") can not be negative\n";  std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  if(J<0){ std::cout<<"Error: target orbital index("<<J<<") can not be negative\n";  std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  if(I>=Norb){ std::cout<<"Error: source orbital index("<<I<<") exceeds the number of orbitals in the active space("<<Norb<<")\n";  std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  if(J>=Norb){ std::cout<<"Error: target orbital index("<<J<<") exceeds the number of orbitals in the active space("<<Norb<<")\n";  std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
 
   if(occ_fin.size()>0){  occ_fin.clear(); }                    // clean result

@@ -114,7 +114,7 @@ static bool shg_ordering_is_standard() {
                    "probe (s at origin vs pure p at z = 1) has no single "
                    "dominant component (" << a0 << ", " << a1 << ", " << a2
                 << ") - expected p_z first (gaussian) or second (standard)\n";
-      throw std::runtime_error(
+      std::cout << std::flush; throw std::runtime_error(
           "libra C++ error - see the message printed above");
     }
     std::cout << "libint solid-harmonic ordering: "
@@ -241,7 +241,7 @@ static const CartMap &cart_lex_map(int l) {
                    " for l = " << l << " does not factorize as cartesian"
                    " gaussian overlaps (slot " << f << ", relative deviation "
                 << rel << ") - unknown component convention\n";
-      throw std::runtime_error(
+      std::cout << std::flush; throw std::runtime_error(
           "libra C++ error - see the message printed above");
     }
   }
@@ -263,7 +263,7 @@ static const CartMap &cart_lex_map(int l) {
                    " diagonal for l = " << l << " slot " << f << " is "
                 << diag << ", expected the CCA value " << cca
                 << " - unknown normalization convention\n";
-      throw std::runtime_error(
+      std::cout << std::flush; throw std::runtime_error(
           "libra C++ error - see the message printed above");
     }
     cm.scale[f] = 1.0 / std::sqrt(cca);
@@ -469,7 +469,7 @@ MATRIX compute_1body_ints(const std::vector<libint2::Shell>& shells_1,
                      "result batch for shell pair (" << s1 << ", " << s2
                   << ") - 1-body engines must always produce a batch; the "
                      "engine or shell setup is corrupted\n";
-        throw std::runtime_error(
+        std::cout << std::flush; throw std::runtime_error(
             "libra C++ error - see the message printed above");
       }
 
@@ -620,7 +620,7 @@ MATRIX compute_1body_ints_parallel(const std::vector<libint2::Shell> &shells_1,
               << null_pair.load() % 1000000LL
               << ") - 1-body engines must always produce a batch; the "
                  "engine or shell setup is corrupted\n";
-    throw std::runtime_error(
+    std::cout << std::flush; throw std::runtime_error(
         "libra C++ error - see the message printed above");
   }
   for (auto i = 0u; i < n_1; ++i) {
@@ -842,7 +842,7 @@ std::vector<MATRIX> compute_1body_ints_parallel_emultipole3(
               << null_pair.load() % 1000000LL
               << ") - 1-body engines must always produce a batch; the "
                  "engine or shell setup is corrupted\n";
-    throw std::runtime_error(
+    std::cout << std::flush; throw std::runtime_error(
         "libra C++ error - see the message printed above");
   }
   for (int index = 0; index < 20; index++) {

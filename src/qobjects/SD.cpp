@@ -107,7 +107,7 @@ void SD::set(CMATRIX& _mo_pool_alp, CMATRIX& _mo_pool_bet, vector<int>& _orb_ind
   if(_mo_pool_alp.n_rows!=_mo_pool_bet.n_rows){
     std::cout<<"Error in SD::SD : The number of rows in the _mo_pool_alp matrix ("<<_mo_pool_alp.n_rows
              <<") is not equal to the number of rows in the _mo_pool_bet matrix ("<<_mo_pool_bet.n_rows<<" )\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   N_bas = _mo_pool_alp.n_rows;
 
@@ -127,7 +127,7 @@ void SD::set(CMATRIX& _mo_pool_alp, CMATRIX& _mo_pool_bet, vector<int>& _orb_ind
       std::cout<<"Index of an alpha orbital is beyond the range of MO orbital indices available in the pool provided\n";
       std::cout<<"Index of an alpha orbital = "<<orb_indx_alp[i]<<endl;
       std::cout<<"Max index available in the pool provided = "<<_mo_pool_alp.n_cols<<endl;
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     for(j=0;j<N_bas;j++){  mo->set(j,i, _mo_pool_alp.get(j,orb_indx_alp[i]));    }
@@ -138,7 +138,7 @@ void SD::set(CMATRIX& _mo_pool_alp, CMATRIX& _mo_pool_bet, vector<int>& _orb_ind
       std::cout<<"Index of a beta orbital is beyond the range of MO orbital indices available in the pool provided\n";
       std::cout<<"Index of a beta orbital = "<<orb_indx_bet[i]<<endl;
       std::cout<<"Max index available in the pool provided = "<<_mo_pool_bet.n_cols<<endl;
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     for(j=0;j<N_bas;j++){  mo->set(j,N_alp+i, _mo_pool_bet.get(j,orb_indx_bet[i]));    }
@@ -230,7 +230,7 @@ complex<double> overlap_sd(CMATRIX& Smo, vector<int>& SD1, vector<int>& SD2){
 
     if(SD1.size() != SD2.size()){
       std::cout<<"Can not compute an overlap of Slater determinants of different size\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     int sz = SD1.size();

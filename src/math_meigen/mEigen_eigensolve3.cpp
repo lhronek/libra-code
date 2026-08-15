@@ -55,17 +55,17 @@ void solve_eigen_nosort(CMATRIX* H, CMATRIX* E, CMATRIX* C, int symm){
   if(H->n_cols!=C->n_rows){  // N_bas
     std::cout<<"Error in solve_eigen: The # of cols of H and the # of rows of C matrices must be equal\n";
     std::cout<<"Make sure C is allocated \n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if(C->n_cols!=E->n_rows){  // N_mo
     std::cout<<"Error in solve_eigen: The # of cols of C and the # of rows of E matrices must be equal\n";
     std::cout<<"Make sure C and E are allocated \n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if(C->n_cols!=E->n_cols){  // N_mo
     std::cout<<"Error in solve_eigen: The # of cols of C and the # of cols of E matrices must be equal\n";
     std::cout<<"Make sure C and E are allocated \n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   // The above two conditions imply E is square matrix
   int N_bas = H->n_cols;
@@ -96,7 +96,7 @@ void solve_eigen_nosort(CMATRIX* H, CMATRIX* E, CMATRIX* C, int symm){
 
   // Solve eigenvalue problem
   ComplexEigenSolver<MatrixXcd> solution(A);
-  if(solution.info()!=Success){ cout<<"Eigen fails\n";   throw std::runtime_error("libra C++ error - see the message printed above"); }
+  if(solution.info()!=Success){ cout<<"Eigen fails\n";   std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
 
   // Copy results into output matrices
@@ -168,17 +168,17 @@ void solve_eigen_nosort(MATRIX* H, CMATRIX* E, CMATRIX* C, int symm){
   if(H->n_cols!=C->n_rows){  // N_bas
     std::cout<<"Error in solve_eigen: The # of cols of H and the # of rows of C matrices must be equal\n";
     std::cout<<"Make sure C is allocated \n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if(C->n_cols!=E->n_rows){  // N_mo
     std::cout<<"Error in solve_eigen: The # of cols of C and the # of rows of E matrices must be equal\n";
     std::cout<<"Make sure C and E are allocated \n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if(C->n_cols!=E->n_cols){  // N_mo
     std::cout<<"Error in solve_eigen: The # of cols of C and the # of cols of E matrices must be equal\n";
     std::cout<<"Make sure C and E are allocated \n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   // The above two conditions imply E is square matrix
   int N_bas = H->n_cols;
@@ -212,7 +212,7 @@ void solve_eigen_nosort(MATRIX* H, CMATRIX* E, CMATRIX* C, int symm){
 
   // Solve eigenvalue problem
   EigenSolver<MatrixXd> solution(A);
-  if(solution.info()!=Success){ cout<<"Eigen fails\n";   throw std::runtime_error("libra C++ error - see the message printed above"); }
+  if(solution.info()!=Success){ cout<<"Eigen fails\n";   std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
 
   // Copy results into output matrices
@@ -288,17 +288,17 @@ void solve_eigen_nosort(MATRIX* H, MATRIX* E, MATRIX* C, int symm){
   if(H->n_cols!=C->n_rows){  // N_bas
     std::cout<<"Error in solve_eigen: The # of cols of H and the # of rows of C matrices must be equal\n";
     std::cout<<"Make sure C is allocated \n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if(C->n_cols!=E->n_rows){  // N_mo
     std::cout<<"Error in solve_eigen: The # of cols of C and the # of rows of E matrices must be equal\n";
     std::cout<<"Make sure C and E are allocated \n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if(C->n_cols!=E->n_cols){  // N_mo
     std::cout<<"Error in solve_eigen: The # of cols of C and the # of cols of E matrices must be equal\n";
     std::cout<<"Make sure C and E are allocated \n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   // The above two conditions imply E is square matrix
   int N_bas = H->n_cols;
@@ -332,7 +332,7 @@ void solve_eigen_nosort(MATRIX* H, MATRIX* E, MATRIX* C, int symm){
 
   // Solve eigenvalue problem
   EigenSolver<MatrixXd> solution(A);
-  if(solution.info()!=Success){ cout<<"Eigen fails\n";   throw std::runtime_error("libra C++ error - see the message printed above"); }
+  if(solution.info()!=Success){ cout<<"Eigen fails\n";   std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
 
   // Copy results into output matrices

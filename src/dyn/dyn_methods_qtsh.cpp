@@ -57,7 +57,7 @@ MATRIX compute_dkinemat(dyn_variables& dyn_var, nHamiltonian& ham){
       if(ham.child(itraj)->dc1_adi_mem_status[idof]==0){
         cout<<"Error in compute_dkinemat(): the derivative coupling w.r.t. the nuclear \
 DOF "<<idof<<" is not allocated for trajectory "<<itraj<<" but is needed for the calculations \n";
-        throw std::runtime_error("libra C++ error - see the message printed above");
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
 
       CMATRIX T(*dyn_var.proj_adi[itraj]);

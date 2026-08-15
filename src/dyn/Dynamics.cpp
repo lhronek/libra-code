@@ -459,7 +459,7 @@ void apply_thermal_correction(dyn_variables &dyn_var, nHamiltonian &ham,
          << "couplings, but the hierarchy carries " << ham.children.size()
          << " children for " << ntraj << " trajectories - per-trajectory "
          << "child Hamiltonians are required\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   for (int itraj = 0; itraj < ntraj; itraj++) {
@@ -552,7 +552,7 @@ void remove_thermal_correction(dyn_variables &dyn_var, nHamiltonian &ham,
          << "couplings, but the hierarchy carries " << ham.children.size()
          << " children for " << ntraj << " trajectories - per-trajectory "
          << "child Hamiltonians are required\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   for (int itraj = 0; itraj < ntraj; itraj++) {
@@ -1700,7 +1700,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
            << n_therm_dofs << ") must be \
       equal to the number of thermostat dofs set up by the `thermostat_dofs` parameter ( currently "
            << prms.thermostat_dofs.size() << ")\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 
@@ -2061,7 +2061,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
               prms.sdm_norm_tolerance, prms.isNBRA);
     } else {
       cout << "ERROR: SDM/mSDM requires rep_tdse = 1\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else if (prms.decoherence_algo ==
              1) { /* ID-A. Nothing to do here, this is done in the surface
@@ -2078,7 +2078,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
                                *dyn_var.reversal_events);
     } else {
       cout << "ERROR: BCSH requires rep_tdse = 1\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
   // MFSD
@@ -2097,7 +2097,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
                                    params, 1);
     } else {
       cout << "ERROR: MFSD requires rep_tdse = 1\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
   // SHXF
@@ -2106,7 +2106,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       shxf(dyn_var, ham, ham_aux, prms);
     } else {
       cout << "ERROR: SHXF requires rep_tdse = 1\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
   // MQCXF
@@ -2115,7 +2115,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       mqcxf(dyn_var, ham, ham_aux, prms);
     } else {
       cout << "ERROR: MQCXF requires rep_tdse = 1\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 
@@ -2278,7 +2278,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
         } else {
           cout << "ERROR: Instantaneous Decoherence requires rep_tdse = "
                   "1\n";
-          throw std::runtime_error("libra C++ error - see the message printed above");
+          std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
       } else if (prms.decoherence_algo == 2) {
         /// Temporarily commented AVA 11/7/2022
@@ -2298,7 +2298,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
         } else {
           cout << "ERROR: Independent-trajectory XF methods require rep_sh = "
                   "1\n";
-          throw std::runtime_error("libra C++ error - see the message printed above");
+          std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
       } // SHXF or MQCXF
       else if (prms.decoherence_algo == 7) {
@@ -2316,7 +2316,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
         } else {
           cout << "ERROR: Instantaneous Decoherence requires rep_tdse = "
                   "1\n";
-          throw std::runtime_error("libra C++ error - see the message printed above");
+          std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
       } // algo == 8
 
@@ -2333,7 +2333,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       } else {
         cout << "ERROR: DISH method should be used only with decoherence_algo "
                 "= -1\n";
-        throw std::runtime_error("libra C++ error - see the message printed above");
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
       act_states = dish(dyn_var, ham, decoherence_rates, prms, rnd);
     } // DISH
@@ -2379,7 +2379,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   else {
     cout << "tsh_method == " << prms.tsh_method
          << " is undefined.\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   // Update the amplitudes and DM, in response to state hopping and other

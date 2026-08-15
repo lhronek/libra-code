@@ -575,29 +575,29 @@ void dyn_variables::init_amplitudes(bp::dict _params, Random& rnd){
   if(init_type==0 || init_type==1){
     if(istate>=ndia && rep==0){
       cout<<"ERROR in init_amplitudes: the istate is= "<<istate<<", but should be less than "<<ndia<<"\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     if(istate>=nadi && rep==1){
       cout<<"ERROR in init_amplitudes: the istate is= "<<istate<<", but should be less than "<<nadi<<"\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 
   if(init_type==2 || init_type==3){
     if(istates.size()!=ndia && rep==0){
       cout<<"ERROR in init_amplitudes: the istates array is of length = "<<istates.size()<<", but should be of length "<<ndia<<"\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     if(istates.size()!=nadi && rep==1){
       cout<<"ERROR in init_amplitudes: the istates array is of length = "<<istates.size()<<", but should be of length "<<nadi<<"\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     double summ = 0.0;
     for(i=0; i<istates.size(); i++){  summ += istates[i]; }
     if( fabs(summ - 1.0) > 1e-5 ){
       cout<<"ERROR in init_amplitudes: the sum of the entries in the istates array is "<<summ<<", but should be 1.0\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 
@@ -857,29 +857,29 @@ void dyn_variables::init_active_states(bp::dict _params, Random& rnd){
   if(init_type==0 || init_type==1 || init_type==4){
     if(istate>=ndia && rep==0){
       cout<<"ERROR in init_active_states: the istate is= "<<istate<<", but should be less than "<<ndia<<"\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     if(istate>=nadi && rep==1){
       cout<<"ERROR in init_active_states: the istate is= "<<istate<<", but should be less than "<<nadi<<"\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 
   if(init_type==2 || init_type==3){
     if(istates.size()!=ndia && rep==0){
       cout<<"ERROR in init_active_states: the istates array is of length = "<<istates.size()<<", but should be of length "<<ndia<<"\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     if(istates.size()!=nadi && rep==1){
       cout<<"ERROR in init_active_states: the istates array is of length = "<<istates.size()<<", but should be of length "<<nadi<<"\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     double summ = 0.0;
     for(i=0; i<istates.size(); i++){  summ += istates[i]; }
     if( fabs(summ - 1.0) > 1e-5 ){
       cout<<"ERROR in init_active_states: the sum of the entries in the istates array is "<<summ<<", but should be 1.0\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 
@@ -984,29 +984,29 @@ void dyn_variables::init_active_states_dia(bp::dict _params, Random& rnd){
   if(init_type==0 || init_type==1 || init_type==4){
     if(istate>=ndia && rep==0){
       cout<<"ERROR in init_active_states_dia: the istate is= "<<istate<<", but should be less than "<<ndia<<"\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     if(istate>=ndia && rep==1){
       cout<<"ERROR in init_active_states_dia: the istate is= "<<istate<<", but should be less than "<<ndia<<"\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 
   if(init_type==2 || init_type==3){
     if(istates.size()!=ndia && rep==0){
       cout<<"ERROR in init_active_states_dia: the istates array is of length = "<<istates.size()<<", but should be of length "<<ndia<<"\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     if(istates.size()!=ndia && rep==1){
       cout<<"ERROR in init_active_states_dia: the istates array is of length = "<<istates.size()<<", but should be of length "<<ndia<<"\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     double summ = 0.0;
     for(i=0; i<istates.size(); i++){  summ += istates[i]; }
     if( fabs(summ - 1.0) > 1e-5 ){
       cout<<"ERROR in init_active_states_dia: the sum of the entries in the istates array is "<<summ<<", but should be 1.0\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 
@@ -1240,7 +1240,7 @@ void dyn_variables:: set_active_states_diff_rep(int rep_sh, Random& rnd){
   else if(rep_sh==1){ sz = nadi; }
   else{ 
     cout<<"Wrong representation = "<<rep_sh<<"\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   // Transform the active states between representations based on the transformation matrix.
@@ -1359,7 +1359,7 @@ CMATRIX orthogonalized_T(CMATRIX& T){
   CMATRIX id(nst,nst); id.identity();
   if( std::abs( (t2_half * t2_i_half - id).max_elt()) > 1e-5 ){
     cout<<"Error in orthogonlized_T: S^{1/2} * S^{-1/2} is not an identity matrix\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   t2 = T * t2_i_half;
 
@@ -1372,7 +1372,7 @@ CMATRIX dyn_variables::compute_average_dm(int rep){
   int sz;
   if(rep==0 || rep==2){ sz = ndia; }
   else if(rep==1 || rep==3 || rep == 4){ sz = nadi; }
-  else{ cout<<"Error in dyn_variables::compute_average_dm: rep is not allowed. "; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  else{ cout<<"Error in dyn_variables::compute_average_dm: rep is not allowed. "; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
   CMATRIX res(sz, sz);
 
@@ -1392,7 +1392,7 @@ vector<double> dyn_variables::compute_average_se_pop(int rep){
   int sz; 
   if(rep==0 || rep==2){ sz = ndia; }
   else if(rep==1 || rep==3 || rep==4){ sz = nadi; }
-  else{ cout<<"Error in dyn_variables::compute_average_se_pop: rep is not allowed. "; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  else{ cout<<"Error in dyn_variables::compute_average_se_pop: rep is not allowed. "; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
   MATRIX ave(sz, sz);
   ave = compute_average_dm(rep).real();  
@@ -1419,7 +1419,7 @@ vector<double> dyn_variables::compute_average_mash_pop(int rep){
 
   if(rep==0 || rep==2){ sz = ndia; }
   else if(rep==1 || rep==3 || rep == 4){ sz = nadi; }
-  else{ cout<<"Error in dyn_variables::compute_average_mash_pop: rep is not allowed. "; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  else{ cout<<"Error in dyn_variables::compute_average_mash_pop: rep is not allowed. "; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
   MATRIX ave(sz, sz);
   ave = compute_average_dm(rep).real();
@@ -1454,7 +1454,7 @@ vector<double> dyn_variables::compute_average_sh_pop(int rep){
   else if(rep==1){ sz = nadi; }
   else{ 
     cout<<"Can not compute SH population for representation = "<<rep<<"\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   vector<double> res(sz, 0.0);
@@ -1487,7 +1487,7 @@ vector<double> dyn_variables::compute_average_sh_pop_TR(int rep){
   else if(rep==1){ sz = nadi; }
   else{ 
     cout<<"Can not compute SH population for representation = "<<rep<<"\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   vector<double> res(sz, 0.0);
@@ -1545,7 +1545,7 @@ MATRIX dyn_variables::compute_coherence_indicator(int rep){
   int sz;
   if(rep==0 || rep==2){ sz = ndia; }
   else if(rep==1 || rep==3 || rep==4 ){ sz = nadi; }
-  else{ cout<<"Error in dyn_variables::compute_coherence_indicator: rep is not allowed. "; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  else{ cout<<"Error in dyn_variables::compute_coherence_indicator: rep is not allowed. "; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
   MATRIX res(sz, sz);
   

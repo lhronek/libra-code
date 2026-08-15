@@ -37,7 +37,7 @@ double det(MATRIX& A){
  
   if(A.n_cols!=A.n_rows){
     std::cout<<"Error in det(MATRIX): Can not compute a determinant of non-square matrix\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   int N = A.n_cols;
@@ -63,7 +63,7 @@ double FullPivLU_det(MATRIX& A){
 
   if(A.n_cols!=A.n_rows){
     std::cout<<"Error in det(MATRIX): Can not compute a determinant of non-square matrix\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   int N = A.n_cols;
@@ -93,7 +93,7 @@ complex<double> det(CMATRIX& A){
 
   if(A.n_cols!=A.n_rows){
     std::cout<<"Error in det(MATRIX): Can not compute a determinant of non-square matrix\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   int N = A.n_cols;
@@ -118,7 +118,7 @@ complex<double> FullPivLU_det(CMATRIX& A){
 
   if(A.n_cols!=A.n_rows){
     std::cout<<"Error in det(MATRIX): Can not compute a determinant of non-square matrix\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   int N = A.n_cols;

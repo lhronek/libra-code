@@ -112,7 +112,7 @@ void nHamiltonian::show_memory_status(vector<int> &id_) {
     } else {
       cout << "ERROR in nHamiltonian::show_memory_status: No Hamiltonian "
               "matching the requested id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -529,7 +529,7 @@ void nHamiltonian::require_children(int lvl, const char* fn) const {
     cout << "Error in nHamiltonian::" << fn << "(): level " << lvl
          << " requested from a level-" << level
          << " node with no children - the call would silently do nothing\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 }
 
@@ -1776,7 +1776,7 @@ void nHamiltonian::set_ordering_adi_by_ref(vector<int> &ordering_adi_) {
         << nadi << ". The \
           current size is = "
         << ordering_adi_.size() << "\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   ordering_adi = &ordering_adi_;
@@ -1795,7 +1795,7 @@ void nHamiltonian::set_ordering_adi_by_val(vector<int> &ordering_adi_) {
         << nadi << ". The \
           current size is = "
         << ordering_adi_.size() << "\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   *ordering_adi = ordering_adi_;
@@ -1870,7 +1870,7 @@ CMATRIX nHamiltonian::get_ovlp_dia() {
   if (ovlp_dia_mem_status == 0) {
     cout << "Error in get_ovlp_dia: The matrix is not allocated "
             "anywhere\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return *ovlp_dia;
@@ -1886,7 +1886,7 @@ CMATRIX nHamiltonian::get_ovlp_dia(vector<int> &id_) {
     } else {
       cout << "ERROR in get_ovlp_dia: No Hamiltonian matching the requested "
               "id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -1901,7 +1901,7 @@ CMATRIX nHamiltonian::get_dc1_dia(int i) {
   if (dc1_dia_mem_status[i] == 0) {
     cout << "Error in get_dc1_dia: The matrix is not allocated "
             "anywhere\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return *dc1_dia[i];
@@ -1917,7 +1917,7 @@ CMATRIX nHamiltonian::get_dc1_dia(int i, vector<int> &id_) {
     } else {
       cout
           << "ERROR in get_dc1_dia: No Hamiltonian matching the requested id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -1932,7 +1932,7 @@ CMATRIX nHamiltonian::get_ham_dia() {
   if (ham_dia_mem_status == 0) {
     cout << "Error in get_ham_dia: The matrix is not allocated "
             "anywhere\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return *ham_dia;
@@ -1949,7 +1949,7 @@ CMATRIX nHamiltonian::get_ham_dia(vector<int> &id_) {
     } else {
       cout
           << "ERROR in get_ham_dia: No Hamiltonian matching the requested id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -1965,7 +1965,7 @@ CMATRIX nHamiltonian::get_nac_dia() {
   if (nac_dia_mem_status == 0) {
     cout << "Error in get_nac_dia: The matrix is not allocated "
             "anywhere\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return *nac_dia;
@@ -1982,7 +1982,7 @@ CMATRIX nHamiltonian::get_nac_dia(vector<int> &id_) {
     } else {
       cout
           << "ERROR in get_nac_dia: No Hamiltonian matching the requested id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -1997,7 +1997,7 @@ CMATRIX nHamiltonian::get_hvib_dia() {
   if (hvib_dia_mem_status == 0) {
     cout << "Error in get_hvib_dia: The matrix is not allocated "
             "anywhere\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return *hvib_dia;
@@ -2013,7 +2013,7 @@ CMATRIX nHamiltonian::get_hvib_dia(vector<int> &id_) {
     } else {
       cout << "ERROR in get_hvib_dia: No Hamiltonian matching the requested "
               "id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -2029,7 +2029,7 @@ CMATRIX nHamiltonian::get_d1ham_dia(int i) {
   if (d1ham_dia_mem_status[i] == 0) {
     cout << "Error in get_d1ham_dia: The matrix is not allocated "
             "anywhere\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return *d1ham_dia[i];
@@ -2046,7 +2046,7 @@ CMATRIX nHamiltonian::get_d1ham_dia(int i, vector<int> &id_) {
     } else {
       cout << "ERROR in get_d1ham_dia: No Hamiltonian matching the requested "
               "id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -2062,7 +2062,7 @@ CMATRIX nHamiltonian::get_d2ham_dia(int i) {
   if (d2ham_dia_mem_status[i] == 0) {
     cout << "Error in get_d2ham_dia: The matrix is not allocated "
             "anywhere\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return *d2ham_dia[i];
@@ -2079,7 +2079,7 @@ CMATRIX nHamiltonian::get_d2ham_dia(int i, vector<int> &id_) {
     } else {
       cout << "ERROR in get_d2ham_dia: No Hamiltonian matching the requested "
               "id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -2095,7 +2095,7 @@ CMATRIX nHamiltonian::get_d2ham_dia(int i, int j) {
   if (d2ham_dia_mem_status[i * nnucl + j] == 0) {
     cout << "Error in get_d2ham_dia: The matrix is not allocated "
             "anywhere\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return *d2ham_dia[i * nnucl + j];
@@ -2112,7 +2112,7 @@ CMATRIX nHamiltonian::get_d2ham_dia(int i, int j, vector<int> &id_) {
     } else {
       cout << "ERROR in get_d2ham_dia: No Hamiltonian matching the requested "
               "id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -2133,7 +2133,7 @@ CMATRIX nHamiltonian::get_dc1_adi(int i) {
   if (dc1_adi_mem_status[i] == 0) {
     cout << "Error in get_dc1_adi: The matrix is not allocated "
             "anywhere\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return *dc1_adi[i];
@@ -2149,7 +2149,7 @@ CMATRIX nHamiltonian::get_dc1_adi(int i, vector<int> &id_) {
     } else {
       cout
           << "ERROR in get_dc1_adi: No Hamiltonian matching the requested id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -2163,7 +2163,7 @@ const CMATRIX& nHamiltonian::get_ham_adi_ref() const {
 */
   if (ham_adi_mem_status == 0) {
     std::cout << "Error in get_ham_adi_ref: The matrix is not allocated anywhere\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   return *ham_adi;
 }
@@ -2174,7 +2174,7 @@ const CMATRIX& nHamiltonian::get_hvib_adi_ref() const {
 */
   if (hvib_adi_mem_status == 0) {
     std::cout << "Error in get_hvib_adi_ref: The matrix is not allocated anywhere\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   return *hvib_adi;
 }
@@ -2187,7 +2187,7 @@ CMATRIX nHamiltonian::get_ham_adi() {
   if (ham_adi_mem_status == 0) {
     cout << "Error in get_ham_adi: The matrix is not allocated "
             "anywhere\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return *ham_adi;
@@ -2203,7 +2203,7 @@ CMATRIX nHamiltonian::get_ham_adi(vector<int> &id_) {
     } else {
       cout
           << "ERROR in get_ham_adi: No Hamiltonian matching the requested id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -2219,7 +2219,7 @@ CMATRIX nHamiltonian::get_nac_adi() {
   if (nac_adi_mem_status == 0) {
     cout << "Error in get_nac_adi: The matrix is not allocated "
             "anywhere\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return *nac_adi;
@@ -2236,7 +2236,7 @@ CMATRIX nHamiltonian::get_nac_adi(vector<int> &id_) {
     } else {
       cout
           << "ERROR in get_nac_adi: No Hamiltonian matching the requested id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -2251,7 +2251,7 @@ CMATRIX nHamiltonian::get_hvib_adi() {
   if (hvib_adi_mem_status == 0) {
     cout << "Error in get_hvib_adi: The matrix is not allocated "
             "anywhere\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return *hvib_adi;
@@ -2267,7 +2267,7 @@ CMATRIX nHamiltonian::get_hvib_adi(vector<int> &id_) {
     } else {
       cout << "ERROR in get_hvib_adi: No Hamiltonian matching the requested "
               "id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -2283,7 +2283,7 @@ CMATRIX nHamiltonian::get_d1ham_adi(int i) {
   if (d1ham_adi_mem_status[i] == 0) {
     cout << "Error in get_d1ham_adi: The matrix is not allocated "
             "anywhere\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return *d1ham_adi[i];
@@ -2300,7 +2300,7 @@ CMATRIX nHamiltonian::get_d1ham_adi(int i, vector<int> &id_) {
     } else {
       cout << "ERROR in get_d1ham_adi: No Hamiltonian matching the requested "
               "id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -2316,7 +2316,7 @@ CMATRIX nHamiltonian::get_d2ham_adi(int i) {
   if (d2ham_adi_mem_status[i] == 0) {
     cout << "Error in get_d2ham_adi: The matrix is not allocated "
             "anywhere\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return *d2ham_adi[i];
@@ -2333,7 +2333,7 @@ CMATRIX nHamiltonian::get_d2ham_adi(int i, vector<int> &id_) {
     } else {
       cout << "ERROR in get_d2ham_adi: No Hamiltonian matching the requested "
               "id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -2349,7 +2349,7 @@ CMATRIX nHamiltonian::get_d2ham_adi(int i, int j) {
   if (d2ham_adi_mem_status[i * nnucl + j] == 0) {
     cout << "Error in get_d2ham_adi: The matrix is not allocated "
             "anywhere\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return *d2ham_adi[i * nnucl + j];
@@ -2366,7 +2366,7 @@ CMATRIX nHamiltonian::get_d2ham_adi(int i, int j, vector<int> &id_) {
     } else {
       cout << "ERROR in get_d2ham_adi: No Hamiltonian matching the requested "
               "id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -2381,7 +2381,7 @@ CMATRIX nHamiltonian::get_basis_transform() {
   if (basis_transform_mem_status == 0) {
     cout << "Error in get_basis_transform: The matrix is not allocated "
             "anywhere\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return *basis_transform;
@@ -2397,7 +2397,7 @@ CMATRIX nHamiltonian::get_basis_transform(vector<int> &id_) {
     } else {
       cout << "ERROR in get_basis_transform: No Hamiltonian matching the "
               "requested id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -2413,7 +2413,7 @@ CMATRIX nHamiltonian::get_time_overlap_adi() {
   if (time_overlap_adi_mem_status == 0) {
     cout << "Error in get_time_overlap_adi: The matrix is not allocated "
             "anywhere\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return *time_overlap_adi;
@@ -2429,7 +2429,7 @@ CMATRIX nHamiltonian::get_time_overlap_adi(vector<int> &id_) {
     } else {
       cout << "ERROR in get_time_overlap_adi: No Hamiltonian matching the "
               "requested id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -2445,7 +2445,7 @@ CMATRIX nHamiltonian::get_time_overlap_dia() {
   if (time_overlap_dia_mem_status == 0) {
     cout << "Error in get_time_overlap_dia: The matrix is not allocated "
             "anywhere\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return *time_overlap_dia;
@@ -2461,7 +2461,7 @@ CMATRIX nHamiltonian::get_time_overlap_dia(vector<int> &id_) {
     } else {
       cout << "ERROR in get_time_overlap_dia: No Hamiltonian matching the "
               "requested id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -2487,7 +2487,7 @@ vector<int> nHamiltonian::get_ordering_adi(vector<int> &id_) {
       cout
           << "ERROR in vector<int> nHamiltonian::get_ordering_adi(vector<int>& id_): \
                 No Hamiltonian matching the requested id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -2502,7 +2502,7 @@ CMATRIX nHamiltonian::get_cum_phase_corr() {
   if (cum_phase_corr_mem_status == 0) {
     cout << "ERROR in CMATRIX nHamiltonian::get_cum_phase_corr(): The matrix "
             "is not allocated anywhere\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return *cum_phase_corr;
@@ -2519,7 +2519,7 @@ CMATRIX nHamiltonian::get_cum_phase_corr(vector<int> &id_) {
       cout
           << "ERROR in CMATRIX nHamiltonian::get_cum_phase_corr(vector<int>& id_):\
                  No Hamiltonian matching the requested id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());

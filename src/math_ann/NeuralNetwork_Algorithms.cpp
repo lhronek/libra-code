@@ -82,7 +82,7 @@ vector<MATRIX> NeuralNetwork::propagate(MATRIX& input){
 
   if(input.n_rows!=sz_x){
     std::cout<<"Error: Size of the input "<<input.n_rows<<" does not match the ANN architecture "<<sz_x<<std::endl;
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   int sz = input.n_cols; // number of patterns to handle at the same time
 
@@ -144,7 +144,7 @@ vector<MATRIX> NeuralNetwork::derivatives(MATRIX& input){
 
   if(input.n_rows!=sz_x){
     std::cout<<"Error: Size of the input "<<input.n_rows<<" does not match the ANN architecture "<<sz_x<<std::endl;
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   int sz = input.n_cols; // number of patterns to handle at the same time
 
@@ -220,7 +220,7 @@ double NeuralNetwork::back_propagate(vector<MATRIX>& Y, MATRIX& target){
 
   if(target.n_rows!=sz_y){
     std::cout<<"Error: Size of the target output "<<target.n_rows<<" does not match the ANN architecture "<<sz_y<<std::endl;
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   int sz = target.n_cols; // number of patterns to handle at the same time
 
@@ -314,7 +314,7 @@ double NeuralNetwork::error(MATRIX& inputs, MATRIX& target){
 
   if(target.n_cols!=inputs.n_cols){    
     std::cout<<"Error: The number of patterns is different for inputs "<<inputs.n_cols<<" and targets "<<target.n_cols<<std::endl;
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   int sz = target.n_cols; // number of patterns to handle at the same time

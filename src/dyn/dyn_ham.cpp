@@ -138,7 +138,7 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
     } else {
       cout << "ERROR in update_Hamiltonian_q_ethd: The entanglement option = "
            << prms.entanglement_opt << " is not avaialable\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     //============================== Time-overlaps ======================
@@ -166,7 +166,7 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
                   "supplied data would be overwritten. Use time_overlap_method = 0 "
                   "(consume the supplied time-overlaps), or supply basis transforms "
                   "consistent with them\n";
-          throw std::runtime_error("libra C++ error - see the message printed above");
+          std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
         ham.children[traj]->set_time_overlap_adi_by_val(st);
       }
@@ -211,7 +211,7 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
                     "coupling w.r.t. the nuclear DOF " << k << " is not "
                     "allocated for trajectory " << traj << " but is needed "
                     "for its sign correction\n";
-            throw std::runtime_error("libra C++ error - see the message printed above");
+            std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
           }
           for (int i = 0; i < nadi; i++) {
             for (int j = i + 1; j < nadi; j++) {
@@ -294,7 +294,7 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
                   "derivatives - the supplied couplings would be discarded. Use "
                   "nac_update_method = 0 (consume the supplied NACs), or stop "
                   "supplying nac_adi\n";
-          throw std::runtime_error("libra C++ error - see the message printed above");
+          std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
         st = ham.children[traj]->get_time_overlap_adi();
 
@@ -406,7 +406,7 @@ void update_time_overlaps(dyn_control_params &prms, dyn_variables &dyn_var,
                 "supplied data would be overwritten. Use time_overlap_method = 0 "
                 "(consume the supplied time-overlaps), or supply basis transforms "
                 "consistent with them\n";
-        throw std::runtime_error("libra C++ error - see the message printed above");
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
       ham.children[traj]->set_time_overlap_adi_by_val(st);
     }
@@ -466,7 +466,7 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
       if (fabs((P * T_new).tr().real() - P.n_cols) > 0.1) {
         cout << "Problem inverting time-overlap matrix\n";
         P.show_matrix("p_matrix.txt");
-        throw std::runtime_error("libra C++ error - see the message printed above");
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
       T_new = orthogonalized_T(T_new);
     } else if (prms.state_tracking_algo == 0 ||

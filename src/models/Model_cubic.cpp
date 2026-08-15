@@ -48,9 +48,9 @@ void cubic_Ham(double x, MATRIX* H, MATRIX* dH, MATRIX* d2H, vector<double>& par
 */
 
 
-  if(H->n_elts!=1){ std::cout<<"Error in cubic_Ham: H matrix must be allocated\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
-  if(dH->n_elts!=1){ std::cout<<"Error in cubic_Ham: dH matrix must be allocated\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
-  if(d2H->n_elts!=1){ std::cout<<"Error in cubic_Ham: d2H matrix must be allocated\n"; throw std::runtime_error("libra C++ error - see the message printed above");}
+  if(H->n_elts!=1){ std::cout<<"Error in cubic_Ham: H matrix must be allocated\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");}
+  if(dH->n_elts!=1){ std::cout<<"Error in cubic_Ham: dH matrix must be allocated\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");}
+  if(d2H->n_elts!=1){ std::cout<<"Error in cubic_Ham: d2H matrix must be allocated\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");}
 
   double e;
 

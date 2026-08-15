@@ -45,9 +45,9 @@ vector<MATRIX> nHamiltonian::generate_m_matrices(double beta){
 */
 
   if(ham_dia_mem_status==0){ cout<<"Error in generate_m_matrices(): the diabatic Hamiltonian matrix is not allocated \
-  but it is needed for the calculations\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  but it is needed for the calculations\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
-  if(ndia!=2){ cout<<"Error in generate_m_matrices(): implementation only for ndia=2\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  if(ndia!=2){ cout<<"Error in generate_m_matrices(): implementation only for ndia=2\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
   vector<MATRIX> res;
 
@@ -92,9 +92,9 @@ double nHamiltonian::kcrpmd_effective_potential(vector<double>& y_aux_var, const
 */
 
   if(ham_dia_mem_status==0){ cout<<"Error in kcrpmd_effective_potential(): the diabatic Hamiltonian matrix is not allocated \
-  but it is needed for the calculations\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  but it is needed for the calculations\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
-  if(ndia!=2){ cout<<"Error in kcrpmd_effective_potential(): implementation only for ndia=2\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  if(ndia!=2){ cout<<"Error in kcrpmd_effective_potential(): implementation only for ndia=2\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
   int ndof = q.n_rows;
   int ntraj = q.n_cols;
@@ -159,10 +159,10 @@ double nHamiltonian::kcrpmd_effective_potential(vector<double>& y_aux_var, const
     }
   }
   else if(children.size()==ntraj){
-    cout<<"Error in kcrpmd_effective_potential() not implemented for quantum nuclei\n"; throw std::runtime_error("libra C++ error - see the message printed above");
+    cout<<"Error in kcrpmd_effective_potential() not implemented for quantum nuclei\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   else{
-    cout<<"ERROR: the size of the input is different from the number of children\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
+    cout<<"ERROR: the size of the input is different from the number of children\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
   
   double Vshift = min({V0, VKP, V1});
@@ -188,9 +188,9 @@ MATRIX nHamiltonian::kcrpmd_effective_force(vector<double>& y_aux_var, const MAT
 */
 
   if(ham_dia_mem_status==0){ cout<<"Error in kcrpmd_effective_potential(): the diabatic Hamiltonian matrix is not allocated \
-  but it is needed for the calculations\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  but it is needed for the calculations\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
-  if(ndia!=2){ cout<<"Error in kcrpmd_effective_potential(): implementation only for ndia=2\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  if(ndia!=2){ cout<<"Error in kcrpmd_effective_potential(): implementation only for ndia=2\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
   int ndof = q.n_rows;
   int ntraj = q.n_cols;
@@ -231,7 +231,7 @@ MATRIX nHamiltonian::kcrpmd_effective_force(vector<double>& y_aux_var, const MAT
       if(children[0]->d1ham_dia_mem_status[dof]==0){
         cout<<"Error in kcrpmd_effective_force(): the derivative of the Hamiltonian in the diabatic basis w.r.t. \
 the nuclear DOF "<<dof<<" is not allocated but is needed for the calculations \n";
-        throw std::runtime_error("libra C++ error - see the message printed above");
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
       F0.set(dof, 0, -(children[0]->d1ham_dia[dof]->get(0,0)).real());
       F1.set(dof, 0, -(children[0]->d1ham_dia[dof]->get(1,1)).real());
@@ -302,10 +302,10 @@ the nuclear DOF "<<dof<<" is not allocated but is needed for the calculations \n
     }
   }
   else if(children.size()==ntraj){
-    cout<<"Error in kcrpmd_effective_potential() not implemented for quantum nuclei\n"; throw std::runtime_error("libra C++ error - see the message printed above");
+    cout<<"Error in kcrpmd_effective_potential() not implemented for quantum nuclei\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   else{
-    cout<<"ERROR: the size of the input is different from the number of children\n"; throw std::runtime_error("libra C++ error - see the message printed above"); 
+    cout<<"ERROR: the size of the input is different from the number of children\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
   
   double Vshift = min({V0, VKP, V1});
@@ -329,9 +329,9 @@ vector<double> nHamiltonian::kcrpmd_effective_auxiliary_force(vector<double>& y_
 */
 
   if(ham_dia_mem_status==0){ cout<<"Error in kcrpmd_effective_potential(): the diabatic Hamiltonian matrix is not allocated \
-  but it is needed for the calculations\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  but it is needed for the calculations\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
-  if(ndia!=2){ cout<<"Error in kcrpmd_effective_potential(): implementation only for ndia=2\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  if(ndia!=2){ cout<<"Error in kcrpmd_effective_potential(): implementation only for ndia=2\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
   int ntraj = children.size();   
 
@@ -418,7 +418,7 @@ vector<double> nHamiltonian::kcrpmd_effective_auxiliary_force(vector<double>& y_
     }
   }
   else{
-    cout<<"Error in kcrpmd_effective_auxiliary_force() not implemented for quantum nuclei\n"; throw std::runtime_error("libra C++ error - see the message printed above");
+    cout<<"Error in kcrpmd_effective_auxiliary_force() not implemented for quantum nuclei\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
  
   double Vshift = min({V0, VKP, V1});

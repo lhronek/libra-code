@@ -58,7 +58,7 @@ int RigidBody::init(int sz,boost::python::list masses, boost::python::list posit
   if(sz1!=sz2){ 
     std::cout<<"In RigidBody::init function\n";
     std::cout<<"The lenth of masses and positions lists are not equal\n";
-     throw std::runtime_error("libra C++ error - see the message printed above");
+     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
    
   double*  tmp; tmp = new double[sz1];
@@ -322,7 +322,7 @@ int RigidBody::set_angular_velocity(const VECTOR& w){
   MATRIX S(4,4); init_S_matrix(S);
   QUATERNION tmp(0.0, rb_l_e.x, rb_l_e.y, rb_l_e.z);
   rb_p_r = 2.0*S*tmp;  is_rb_p_r = 1;
-  }else{ throw std::runtime_error("libra C++ error - see the message printed above"); }
+  }else{ std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
   return 0;
 }
 

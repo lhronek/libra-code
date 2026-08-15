@@ -51,14 +51,14 @@ void nHamiltonian::ampl_dia2adi(CMATRIX &ampl_dia, CMATRIX &ampl_adi) {
     cout
         << "Error in ampl_dia2adi(): the overlap matrix in the diabatic basis is not allocated \
   but it is needed for the calculations\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   if (basis_transform_mem_status == 0) {
     cout
         << "Error in ampl_dia2adi(): the transformation basis matrix is not allocated \
   but it is needed for the calculations\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   //  if(ampl_dia_mem_status==0){ cout<<"Error in ampl_dia2adi(): the amplitudes of the diabatic states are\
@@ -85,14 +85,14 @@ void nHamiltonian::ampl_dia2adi(CMATRIX *ampl_dia, CMATRIX *ampl_adi) {
     cout
         << "Error in ampl_dia2adi(): the overlap matrix in the diabatic basis is not allocated \
   but it is needed for the calculations\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   if (basis_transform_mem_status == 0) {
     cout
         << "Error in ampl_dia2adi(): the transformation basis matrix is not allocated \
   but it is needed for the calculations\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   //  if(ampl_dia_mem_status==0){ cout<<"Error in ampl_dia2adi(): the amplitudes of the diabatic states are\
@@ -116,7 +116,7 @@ void nHamiltonian::ampl_dia2adi(CMATRIX &ampl_dia, CMATRIX &ampl_adi,
     } else {
       cout << "ERROR in ampl_dia2adi: No Hamiltonian matching the requested "
               "id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -136,7 +136,7 @@ void nHamiltonian::ampl_dia2adi(CMATRIX *ampl_dia, CMATRIX *ampl_adi,
     } else {
       cout << "ERROR in ampl_dia2adi: No Hamiltonian matching the requested "
               "id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -188,7 +188,7 @@ void nHamiltonian::ampl_dia2adi(CMATRIX &ampl_dia, CMATRIX &ampl_adi, int lvl,
              << ")";
         cout << " should be equal to the number of children Hamiltonians ("
              << children.size() << ")\n";
-        throw std::runtime_error("libra C++ error - see the message printed above");
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
       if (children.size() != static_cast<std::size_t>(ampl_adi.n_cols) &&
           children.size() != 1) {
@@ -198,7 +198,7 @@ void nHamiltonian::ampl_dia2adi(CMATRIX &ampl_dia, CMATRIX &ampl_adi, int lvl,
              << ")";
         cout << " should be equal to the number of children Hamiltonians ("
              << children.size() << ")\n";
-        throw std::runtime_error("libra C++ error - see the message printed above");
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
 
       CMATRIX dia_tmp(ampl_dia.n_rows, 1);
@@ -234,7 +234,7 @@ void nHamiltonian::ampl_dia2adi(CMATRIX &ampl_dia, CMATRIX &ampl_adi, int lvl,
       cout << "ERROR in void nHamiltonian::ampl_dia2adi(CMATRIX& ampl_dia, "
               "CMATRIX& ampl_adi, int lvl, int split):\n";
       cout << "The parameters split = " << split << " is not defined\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } // lvl == level
 
@@ -300,7 +300,7 @@ void nHamiltonian::ampl_dia2adi(CMATRIX *ampl_dia, CMATRIX *ampl_adi, int lvl,
              << ")";
         cout << " should be equal to the number of children Hamiltonians ("
              << children.size() << ")\n";
-        throw std::runtime_error("libra C++ error - see the message printed above");
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
       if (children.size() != ampl_adi->n_cols && children.size() != 1) {
         cout << "ERROR in void nHamiltonian::ampl_dia2adi(CMATRIX& ampl_dia, "
@@ -309,7 +309,7 @@ void nHamiltonian::ampl_dia2adi(CMATRIX *ampl_dia, CMATRIX *ampl_adi, int lvl,
              << ")";
         cout << " should be equal to the number of children Hamiltonians ("
              << children.size() << ")\n";
-        throw std::runtime_error("libra C++ error - see the message printed above");
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
 
       CMATRIX dia_tmp(ampl_dia->n_rows, 1);
@@ -345,7 +345,7 @@ void nHamiltonian::ampl_dia2adi(CMATRIX *ampl_dia, CMATRIX *ampl_adi, int lvl,
       cout << "ERROR in void nHamiltonian::ampl_dia2adi(CMATRIX& ampl_dia, "
               "CMATRIX& ampl_adi, int lvl, int split):\n";
       cout << "The parameters split = " << split << " is not defined\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } // lvl == level
 
@@ -380,7 +380,7 @@ void nHamiltonian::ampl_adi2dia(CMATRIX &ampl_dia, CMATRIX &ampl_adi) {
     cout
         << "Error in ampl_dia2adi(): the transformation basis matrix is not allocated \
   but it is needed for the calculations\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   //  if(ampl_dia_mem_status==0){ cout<<"Error in ampl_dia2adi(): the amplitudes of the diabatic states are\
@@ -406,7 +406,7 @@ void nHamiltonian::ampl_adi2dia(CMATRIX *ampl_dia, CMATRIX *ampl_adi) {
     cout
         << "Error in ampl_dia2adi(): the transformation basis matrix is not allocated \
   but it is needed for the calculations\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   //  if(ampl_dia_mem_status==0){ cout<<"Error in ampl_dia2adi(): the amplitudes of the diabatic states are\
@@ -430,7 +430,7 @@ void nHamiltonian::ampl_adi2dia(CMATRIX &ampl_dia, CMATRIX &ampl_adi,
     } else {
       cout << "ERROR in ampl_adi2dia: No Hamiltonian matching the requested "
               "id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -450,7 +450,7 @@ void nHamiltonian::ampl_adi2dia(CMATRIX *ampl_dia, CMATRIX *ampl_adi,
     } else {
       cout << "ERROR in ampl_adi2dia: No Hamiltonian matching the requested "
               "id\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else {
     vector<int> next(id_.begin() + 1, id_.end());
@@ -503,7 +503,7 @@ void nHamiltonian::ampl_adi2dia(CMATRIX &ampl_dia, CMATRIX &ampl_adi, int lvl,
              << ")";
         cout << " should be equal to the number of children Hamiltonians ("
              << children.size() << ")\n";
-        throw std::runtime_error("libra C++ error - see the message printed above");
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
       if (children.size() != ampl_adi.n_cols && children.size() != 1) {
         cout << "ERROR in void nHamiltonian::ampl_adi2dia(CMATRIX& ampl_dia, "
@@ -512,7 +512,7 @@ void nHamiltonian::ampl_adi2dia(CMATRIX &ampl_dia, CMATRIX &ampl_adi, int lvl,
              << ")";
         cout << " should be equal to the number of children Hamiltonians ("
              << children.size() << ")\n";
-        throw std::runtime_error("libra C++ error - see the message printed above");
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
 
       CMATRIX dia_tmp(ampl_dia.n_rows, 1);
@@ -548,7 +548,7 @@ void nHamiltonian::ampl_adi2dia(CMATRIX &ampl_dia, CMATRIX &ampl_adi, int lvl,
       cout << "ERROR in void nHamiltonian::ampl_adi2dia(CMATRIX& ampl_dia, "
               "CMATRIX& ampl_adi, int lvl, int split):\n";
       cout << "The parameters split = " << split << " is not defined\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } // lvl == level
 
@@ -614,7 +614,7 @@ void nHamiltonian::ampl_adi2dia(CMATRIX *ampl_dia, CMATRIX *ampl_adi, int lvl,
              << ")";
         cout << " should be equal to the number of children Hamiltonians ("
              << children.size() << ")\n";
-        throw std::runtime_error("libra C++ error - see the message printed above");
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
       if (children.size() != ampl_adi->n_cols && children.size() != 1) {
         cout << "ERROR in void nHamiltonian::ampl_adi2dia(CMATRIX& ampl_dia, "
@@ -623,7 +623,7 @@ void nHamiltonian::ampl_adi2dia(CMATRIX *ampl_dia, CMATRIX *ampl_adi, int lvl,
              << ")";
         cout << " should be equal to the number of children Hamiltonians ("
              << children.size() << ")\n";
-        throw std::runtime_error("libra C++ error - see the message printed above");
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
 
       CMATRIX dia_tmp(ampl_dia->n_rows, 1);
@@ -659,7 +659,7 @@ void nHamiltonian::ampl_adi2dia(CMATRIX *ampl_dia, CMATRIX *ampl_adi, int lvl,
       cout << "ERROR in void nHamiltonian::ampl_adi2dia(CMATRIX& ampl_dia, "
               "CMATRIX& ampl_adi, int lvl, int split):\n";
       cout << "The parameters split = " << split << " is not defined\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } // lvl == level
 

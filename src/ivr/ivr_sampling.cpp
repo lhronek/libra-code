@@ -58,7 +58,7 @@ MATRIX ivr_Husimi(MATRIX& qIn, MATRIX& pIn, MATRIX& Width0, Random& rnd){
 
   if(qIn.n_rows!=pIn.n_rows){
     cout<<"Error in ivr_Husimi: the input matrices qIn and pIn have different # of rows\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   int Ndof = qIn.n_rows;
@@ -93,7 +93,7 @@ vector<MATRIX> ivr_Husimi(MATRIX& qIn, MATRIX& pIn, MATRIX& Width0, Random& rnd,
 
   if(qIn.n_rows!=pIn.n_rows){
     cout<<"Error in ivr_Husimi: the input matrices qIn and pIn have different # of rows\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   int Ndof = qIn.n_rows;
@@ -174,7 +174,7 @@ MATRIX ivr_DHK(MATRIX& qIn, MATRIX& pIn, MATRIX& Width0, Random& rnd){
 
   if(qIn.n_rows!=pIn.n_rows){
     cout<<"Error in ivr_DHK: the input matrices qIn and pIn have different # of rows\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   int Ndof = qIn.n_rows;
@@ -213,7 +213,7 @@ vector<MATRIX> ivr_DHK(MATRIX& qIn, MATRIX& pIn, MATRIX& Width0, Random& rnd, in
 
   if(qIn.n_rows!=pIn.n_rows){
     cout<<"Error in ivr_DHK: the input matrices qIn and pIn have different # of rows\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   int Ndof = qIn.n_rows;
@@ -266,7 +266,7 @@ MATRIX ivr_FB_MQC(MATRIX& qIn, MATRIX& pIn, MATRIX& Width0, MATRIX& TuningQ, MAT
 
   if(qIn.n_rows!=pIn.n_rows){
     cout<<"Error in ivr_FB_MQC: the input matrices qIn and pIn have different # of rows\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   int Ndof = qIn.n_rows;
@@ -318,7 +318,7 @@ vector<MATRIX> ivr_FB_MQC(MATRIX& qIn, MATRIX& pIn, MATRIX& Width0, MATRIX& Tuni
 
   if(qIn.n_rows!=pIn.n_rows){
     cout<<"Error in ivr_FB_MQC: the input matrices qIn and pIn have different # of rows\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   int Ndof = qIn.n_rows;
@@ -372,7 +372,7 @@ MATRIX ivr_FF_MQC(MATRIX& qIn, MATRIX& pIn, MATRIX& Width0, MATRIX& TuningQ, MAT
 
   if(qIn.n_rows!=pIn.n_rows){
     cout<<"Error in ivr_FF_MQC: the input matrices qIn and pIn have different # of rows\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   int Ndof = qIn.n_rows;
@@ -426,7 +426,7 @@ vector<MATRIX> ivr_FF_MQC(MATRIX& qIn, MATRIX& pIn, MATRIX& Width0, MATRIX& Tuni
 
   if(qIn.n_rows!=pIn.n_rows){
     cout<<"Error in ivr_FF_MQC: the input matrices qIn and pIn have different # of rows\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   int Ndof = qIn.n_rows;

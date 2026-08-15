@@ -85,7 +85,7 @@ vector<MATRIX> edc_rates(vector<CMATRIX> &Hvib, vector<double> &Ekin,
               "Ekin are inconsistent\n";
       cout << "Hvib.size() = " << Hvib.size() << "\n";
       cout << "Ekin.size() = " << Ekin.size() << "\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
   for (int traj = 0; traj < ntraj1; traj++) {
@@ -164,7 +164,7 @@ void dephasing_informed_correction(vector<MATRIX> &decoh_rates,
     decoh_rates and Hvib are inconsistent\n";
       cout << "decoh_rates.size() = " << decoh_rates.size() << "\n";
       cout << "Hvib.size() = " << Hvib.size() << "\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     for (int traj = 0; traj < ntraj; traj++) {
@@ -262,7 +262,7 @@ MATRIX coherence_intervals(CMATRIX &Coeff, vector<MATRIX> &rates) {
             "for Coeff and rates\n";
     cout << "ntraj = " << ntraj << endl;
     cout << "rates.size() = " << rates.size() << endl;
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   MATRIX res(nstates, ntraj);

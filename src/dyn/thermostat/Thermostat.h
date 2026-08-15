@@ -122,9 +122,9 @@ public:
   void set_Nf_r(int nf_r){ Nf_r = nf_r; is_Nf_r = 1; }    ///< Set the number of rotational DOF coupled to thermostat  
   void set_Nf_b(int nf_b){ Nf_b = nf_b; is_Nf_b = 1; }    ///< Set the number of barostat DOF coupled to thermostat    
 
-  double get_Nf_t() const { if(is_Nf_t){ return Nf_t; } else{ std::cout<<"Error: Nf_t is not defined\n"; throw std::runtime_error("libra C++ error - see the message printed above"); } } ///< Return the number of translaional DOF coupled to thermostat
-  double get_Nf_r() const { if(is_Nf_r){ return Nf_r; } else{ std::cout<<"Error: Nf_r is not defined\n"; throw std::runtime_error("libra C++ error - see the message printed above"); } } ///< Return the number of rotational DOF coupled to thermostat  
-  double get_Nf_b() const { if(is_Nf_b){ return Nf_b; } else{ std::cout<<"Error: Nf_b is not defined\n"; throw std::runtime_error("libra C++ error - see the message printed above"); } } ///< Return the number of barostat DOF coupled to thermostat    
+  double get_Nf_t() const { if(is_Nf_t){ return Nf_t; } else{ std::cout<<"Error: Nf_t is not defined\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); } } ///< Return the number of translaional DOF coupled to thermostat
+  double get_Nf_r() const { if(is_Nf_r){ return Nf_r; } else{ std::cout<<"Error: Nf_r is not defined\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); } } ///< Return the number of rotational DOF coupled to thermostat  
+  double get_Nf_b() const { if(is_Nf_b){ return Nf_b; } else{ std::cout<<"Error: Nf_b is not defined\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); } } ///< Return the number of barostat DOF coupled to thermostat    
 
   double get_s_var() const { return s_var; }  ///< Return the time-scaling variable (in Nose and Nose-Poincare thermostats)
 

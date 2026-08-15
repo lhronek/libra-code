@@ -36,7 +36,7 @@ int PrimitiveG::get_x_exp(){
   \brief Returns x exponent (x-projection of angular momentum quantum number)
 */
   if(is_x_exp){ return x_exp; }
-   else{ std::cout<<"Error: x_exp is not set\n"; throw std::runtime_error("libra C++ error - see the message printed above"); } 
+   else{ std::cout<<"Error: x_exp is not set\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); } 
 }
 
 int PrimitiveG::get_y_exp(){
@@ -45,7 +45,7 @@ int PrimitiveG::get_y_exp(){
 */
 
   if(is_y_exp){ return y_exp; }
-  else{ std::cout<<"Error: y_exp is not set\n"; throw std::runtime_error("libra C++ error - see the message printed above"); } 
+  else{ std::cout<<"Error: y_exp is not set\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); } 
 }
 
 int PrimitiveG::get_z_exp(){
@@ -54,7 +54,7 @@ int PrimitiveG::get_z_exp(){
 */
 
   if(is_z_exp){ return z_exp; }
-  else{ std::cout<<"Error: z_exp is not set\n"; throw std::runtime_error("libra C++ error - see the message printed above"); } 
+  else{ std::cout<<"Error: z_exp is not set\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); } 
 }
 
 double PrimitiveG::get_alpha(){
@@ -62,7 +62,7 @@ double PrimitiveG::get_alpha(){
   \brief Returns Gaussian exponent 
 */
 
-  if(is_alpha){ return alpha; } else{ std::cout<<"Error: alpha is not set\n"; throw std::runtime_error("libra C++ error - see the message printed above"); } 
+  if(is_alpha){ return alpha; } else{ std::cout<<"Error: alpha is not set\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); } 
 }
 
 VECTOR PrimitiveG::get_R(){ 
@@ -70,7 +70,7 @@ VECTOR PrimitiveG::get_R(){
   \brief Returns the position of the primitive Gaussian
 */
 
-  if(is_R){ return R; } else{ std::cout<<"Error: R is not set\n"; throw std::runtime_error("libra C++ error - see the message printed above"); } 
+  if(is_R){ return R; } else{ std::cout<<"Error: R is not set\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); } 
 }
 
 double PrimitiveG::get_value(){
@@ -79,7 +79,7 @@ double PrimitiveG::get_value(){
   Note: this functions doesn't do the calculation, only returns the pre-computed value
 */
 
-  if(is_value){ return value; } else{ std::cout<<"Error: value is not set\n"; throw std::runtime_error("libra C++ error - see the message printed above"); } 
+  if(is_value){ return value; } else{ std::cout<<"Error: value is not set\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); } 
 }
 
 

@@ -254,7 +254,7 @@ MATRIX covariance(MATRIX& X, MATRIX& Y){
     cout<<"Error in covariance(MATRIX&, MATRIX&): the sizes of the matrices are incompatible\n";
     cout<<"X is a "<<nx<<" x "<<sz<<" matrix\n";
     cout<<"Y is a "<<ny<<" x "<<Y.n_cols<<" matrix\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   MATRIX res(nx, ny);
@@ -330,7 +330,7 @@ CMATRIX covariance(CMATRIX& X, CMATRIX& Y){
     cout<<"Error in covariance(CMATRIX&, CMATRIX&): the sizes of the matrices are incompatible\n";
     cout<<"X is a "<<nx<<" x "<<sz<<" matrix\n";
     cout<<"Y is a "<<ny<<" x "<<Y.n_cols<<" matrix\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   CMATRIX res(nx, ny);

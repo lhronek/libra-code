@@ -53,10 +53,10 @@ complex<double> nHamiltonian::Ehrenfest_energy_dia(CMATRIX& ampl_dia){
 */
 
   if(ovlp_dia_mem_status==0){ cout<<"Error in Ehrenfest_energy_dia(): the overlap matrix in the diabatic basis is not allocated \
-  but it is needed for the calculations\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  but it is needed for the calculations\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
   if(ham_dia_mem_status==0){ cout<<"Error in Ehrenfest_energy_dia(): the diabatic Hamiltonian matrix is not allocated \
-  but it is needed for the calculations\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  but it is needed for the calculations\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
 //  if(ampl_dia_mem_status==0){ cout<<"Error in Ehrenfest_energy_dia(): the amplitudes of the diabatic states are\
 //  not allocated, but they are needed for the calculations\n"; exit(0); }
@@ -76,7 +76,7 @@ complex<double> nHamiltonian::Ehrenfest_energy_dia(CMATRIX& ampl_dia, vector<int
 */
   if(id_.size()==1){
     if(id_[0]==id){   return Ehrenfest_energy_dia(ampl_dia);    }
-    else{ cout<<"ERROR in force_dia: No Hamiltonian matching the requested id\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+    else{ cout<<"ERROR in force_dia: No Hamiltonian matching the requested id\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
   }
   else{
     vector<int> next(id_.begin()+1,id_.end());
@@ -102,7 +102,7 @@ complex<double> nHamiltonian::Ehrenfest_energy_adi(CMATRIX& ampl_adi, CMATRIX& t
 */
 
   if(ham_adi_mem_status==0){ cout<<"Error in Ehrenfest_energy_adi(): the adiabatic Hamiltonian matrix is not allocated \
-  but it is needed for the calculations\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  but it is needed for the calculations\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
 //  if(ampl_adi_mem_status==0){ cout<<"Error in Ehrenfest_energy_adi(): the amplitudes of the adiabatic states are\
 //  not allocated, but they are needed for the calculations\n"; exit(0); }
@@ -128,7 +128,7 @@ complex<double> nHamiltonian::Ehrenfest_energy_adi(CMATRIX& ampl_adi, vector<int
 */
   if(id_.size()==1){
     if(id_[0]==id){   return Ehrenfest_energy_adi(ampl_adi);    }
-    else{ cout<<"ERROR in force_dia: No Hamiltonian matching the requested id\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+    else{ cout<<"ERROR in force_dia: No Hamiltonian matching the requested id\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
   }
   else{
     vector<int> next(id_.begin()+1,id_.end());
@@ -159,7 +159,7 @@ vector<CMATRIX> nHamiltonian::Ehrenfest_forces_tens_adi(CMATRIX& ampl_adi){
   vector<CMATRIX> res; res = vector<CMATRIX>(nnucl, CMATRIX(nadi,nadi));
 
   if(ham_adi_mem_status==0){ cout<<"Error in Ehrenfest_forces_tens_adi(): the adiabatic Hamiltonian matrix is not allocated \
-  but it is needed for the calculations\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  but it is needed for the calculations\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
 //  if(ampl_adi_mem_status==0){ cout<<"Error in Ehrenfest_forces_tens_adi(): the amplitudes of the adiabatic states are\
 //  not allocated, but they are needed for the calculations\n"; exit(0); }
@@ -174,10 +174,10 @@ vector<CMATRIX> nHamiltonian::Ehrenfest_forces_tens_adi(CMATRIX& ampl_adi){
   for(int n=0;n<nnucl;n++){
 
     if(d1ham_adi_mem_status[n]==0){ cout<<"Error in Ehrenfest_forces_tens_adi(): the derivatives of the Hamiltonian matrix in the \
-    adiabatic basis w.r.t. the nuclear DOF "<<n<<" is not allocated but is needed for the calculations \n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+    adiabatic basis w.r.t. the nuclear DOF "<<n<<" is not allocated but is needed for the calculations \n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
     if(dc1_adi_mem_status[n]==0){ cout<<"Error in Ehrenfest_forces_tens_adi(): the derivatives couplings matrix in the adiabatic \
-    basis w.r.t. the nuclear DOF "<<n<<" is not allocated but is needed for the calculations \n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+    basis w.r.t. the nuclear DOF "<<n<<" is not allocated but is needed for the calculations \n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
     *tmp = (*dc1_adi[n]).H() * (*ham_adi);
     *tmp = (*tmp + (*tmp).H() );
@@ -198,7 +198,7 @@ vector<CMATRIX> nHamiltonian::Ehrenfest_forces_tens_adi(CMATRIX& ampl_adi, vecto
 */
   if(id_.size()==1){
     if(id_[0]==id){   return Ehrenfest_forces_tens_adi(ampl_adi);    }
-    else{ cout<<"ERROR in Ehrenfest_forces_adi: No Hamiltonian matching the requested id\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+    else{ cout<<"ERROR in Ehrenfest_forces_adi: No Hamiltonian matching the requested id\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
   }
   else{
     vector<int> next(id_.begin()+1,id_.end());
@@ -223,10 +223,10 @@ vector<CMATRIX> nHamiltonian::Ehrenfest_forces_tens_dia(CMATRIX& ampl_dia){
   vector<CMATRIX> res; res = vector<CMATRIX>(nnucl, CMATRIX(ndia,ndia));
 
   if(ovlp_dia_mem_status==0){ cout<<"Error in Ehrenfest_forces_tens_dia(): the overlap matrix in the diabatic basis is not allocated \
-  but it is needed for the calculations\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  but it is needed for the calculations\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
   if(ham_dia_mem_status==0){ cout<<"Error in Ehrenfest_forces_tens_dia(): the diabatic Hamiltonian matrix is not allocated \
-  but it is needed for the calculations\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  but it is needed for the calculations\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
 //  if(ampl_dia_mem_status==0){ cout<<"Error in Ehrenfest_forces_tens_dia(): the amplitudes of the diabatic states are\
 //  not allocated, but they are needed for the calculations\n"; exit(0); }
@@ -242,10 +242,10 @@ vector<CMATRIX> nHamiltonian::Ehrenfest_forces_tens_dia(CMATRIX& ampl_dia){
   for(int n=0;n<nnucl;n++){
 
       if(d1ham_dia_mem_status[n]==0){ cout<<"Error in Ehrenfest_forces_tens_dia(): the derivatives of the Hamiltonian matrix in the \
-      diabatic basis w.r.t. the nuclear DOF "<<n<<" is not allocated but is needed for the calculations \n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+      diabatic basis w.r.t. the nuclear DOF "<<n<<" is not allocated but is needed for the calculations \n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
       if(dc1_dia_mem_status[n]==0){ cout<<"Error in Ehrenfest_forces_tens_dia(): the derivatives couplings matrix in the diabatic \
-      basis w.r.t. the nuclear DOF "<<n<<" is not allocated but is needed for the calculations \n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+      basis w.r.t. the nuclear DOF "<<n<<" is not allocated but is needed for the calculations \n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
 
       *dtilda = (*dc1_dia[n]).H() * (*invS) * (*ham_dia);
@@ -269,7 +269,7 @@ vector<CMATRIX> nHamiltonian::Ehrenfest_forces_tens_dia(CMATRIX& ampl_dia, vecto
 */
   if(id_.size()==1){
     if(id_[0]==id){   return Ehrenfest_forces_tens_dia(ampl_dia);    }
-    else{ cout<<"ERROR in Ehrenfest_forces_dia: No Hamiltonian matching the requested id\n"; throw std::runtime_error("libra C++ error - see the message printed above"); }
+    else{ cout<<"ERROR in Ehrenfest_forces_dia: No Hamiltonian matching the requested id\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
   }
   else{
     vector<int> next(id_.begin()+1,id_.end());

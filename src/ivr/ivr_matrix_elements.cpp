@@ -58,12 +58,12 @@ complex<double> CS_overlap(MATRIX& q, MATRIX& p, MATRIX& qIn, MATRIX& pIn, MATRI
 
   if(qIn.n_rows!=pIn.n_rows){
     cout<<"Error in CS_overlap: the input matrices qIn and pIn have different # of rows\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   if(q.n_rows!=p.n_rows){
     cout<<"Error in CS_overlap: the input matrices q and p have different # of rows\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   
@@ -135,12 +135,12 @@ complex<double> mat_elt_FF_B(MATRIX& q, MATRIX& p, MATRIX& qp, MATRIX& pp, MATRI
 
   if(q.n_rows!=p.n_rows){
     cout<<"Error in mat_elt_FF_B: the input matrices q and p have different # of rows\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   if(qp.n_rows!=pp.n_rows){
     cout<<"Error in mat_elt_FF_B: the input matrices qp and pp have different # of rows\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   

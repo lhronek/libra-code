@@ -227,21 +227,21 @@ void propagate_electronic_rot(double dt, CMATRIX& Coeff, CMATRIX& Hvib){
   if(Coeff.n_cols!=1){
     cout<<"ERROR in propagate_electronic_rot_new: The number of columns in the input amplitudes vector\
           should be 1, but "<<Coeff.n_cols<<" is given \n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if(Hvib.n_cols!=Hvib.n_rows){
     cout<<"ERROR in propagate_electronic_rot_new: The number of columns and rows of the input Hamiltonian\
           should be equal to each other, but the numbers are: \n";
     cout<<"num_of_rows = "<<Hvib.n_rows<<"\n";
     cout<<"num_of_cols = "<<Hvib.n_cols<<"\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if(Hvib.n_cols!=Coeff.n_rows){
     cout<<"ERROR in propagate_electronic_rot_new: The number of columns of the input Hamiltonian\
           should be equal to the number of rows of the amplitudes vector, but what is given: \n";
     cout<<"Coeff.num_of_rows = "<<Coeff.n_rows<<"\n";
     cout<<"Hvib.num_of_cols = "<<Hvib.n_cols<<"\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
 
@@ -649,7 +649,7 @@ CMATRIX vectorize_density_matrix(CMATRIX* rho){
   if(rho->n_cols != rho->n_rows){
     cout<<"Error in vectorize_density_matrix: rho matrix should be a square matrix\n";
     cout<<"Current dimensions: "<<rho->n_cols<<" "<<rho->n_rows<<endl;
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   int nst = rho->n_cols; 
@@ -681,7 +681,7 @@ CMATRIX unvectorize_density_matrix(CMATRIX& rho_vec){
   
     cout<<"Error in unvectorize_density_matrix: The number of elements in the input vector should be a full square of an integer\n";
     cout<<"The current size is "<<sz<<endl;
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   CMATRIX res(n, n);
@@ -703,7 +703,7 @@ CMATRIX make_Liouvillian(CMATRIX& ham){
   if(ham.n_cols != ham.n_rows){
     cout<<"Error in make_Liouvillian: Hamiltonian matrix should be a square matrix\n";
     cout<<"Current dimensions: "<<ham.n_cols<<" "<<ham.n_rows<<endl;
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   int nst = ham.n_cols;

@@ -305,7 +305,7 @@ void normalize_tcf(vector< complex<double> >& TCF, vector<int>& MCnum){
   if(TCF.size()!=MCnum.size()){
     cout<<"Error in normalize_tcf: The number of elements in TCF ("<<TCF.size()<<") is not consistent\
     with the number of elements in MCnum ("<<MCnum.size()<<")\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   int Ntime = TCF.size();

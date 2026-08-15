@@ -219,7 +219,7 @@ public:
       std::cout << " matrix (" << n_rows << " , " << n_cols << "), that is "
                 << n_rows * n_cols << " elements\n";
       // the copy loop below would read past the shorter input
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     int indx = 0;
@@ -387,7 +387,7 @@ public:
       std::cout << "You try to muplitpy a " << B.n_rows << " by " << B.n_cols
                 << " matrix and a " << C.n_rows << " by " << C.n_cols
                 << " matrix\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     if (n_rows != B.n_rows) {
@@ -395,14 +395,14 @@ public:
                 << ") doesn't match the number of rows of the first multiplier "
                    "matrix ("
                 << B.n_rows << ")\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     if (n_cols != C.n_cols) {
       std::cout << "The number of cols of the target matrix (" << n_cols
                 << ") doesn't match the number of cols of the second "
                    "multiplier matrix ("
                 << C.n_cols << ")\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     // aliased call (the caller is an operand): the target is zeroed
@@ -462,7 +462,7 @@ public:
                 << " and " << _P << " rows would";
       std::cout << " produce a matrix with " << _M * _P
                 << " rows\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     if (n_cols != _N * _Q) {
@@ -472,7 +472,7 @@ public:
                 << " and " << _Q << " columns would";
       std::cout << " produce a matrix with " << _N * _Q
                 << " columns\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     // aliased call: same hazard as product() - the target is zeroed
@@ -521,26 +521,26 @@ public:
     if (ob1.n_cols != ob2.n_cols) {
       std::cout << "Error in direct CMATRIX multiplication: Number of columns "
                    "of multiplying matrices must be equal\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     if (ob1.n_rows != ob2.n_rows) {
       std::cout << "Error in direct CMATRIX multiplication: Number of rows of "
                    "multiplying matrices must be equal\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     if (n_cols != ob2.n_cols) {
       std::cout
           << "Error in direct CMATRIX multiplication: Number of columns of the "
              "multiplying CMATRIX and target CMATRIX must be equal\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     if (n_rows != ob2.n_rows) {
       std::cout << "Error in direct CMATRIX multiplication: Number of rows of "
                    "the multiplying CMATRIX and target CMATRIX must be equal\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     for (int row = 0; row < n_rows; row++) {
@@ -591,13 +591,13 @@ public:
       cout << "Error in base_matrix<T>::swap_cols\n";
       cout << "The index of one column (" << I
            << ") is larger than the number of columns (" << n_cols << ")\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     if (J >= n_cols) {
       cout << "Error in base_matrix<T>::swap_cols\n";
       cout << "The index of one column (" << J
            << ") is larger than the number of columns (" << n_cols << ")\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     for (int row = 0; row < n_rows; row++) {
@@ -613,13 +613,13 @@ public:
       cout << "Error in base_matrix<T>::swap_rows\n";
       cout << "The index of one row (" << I
            << ") is larger than the number of rows (" << n_rows << ")\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     if (J >= n_rows) {
       cout << "Error in base_matrix<T>::swap_rows\n";
       cout << "The index of one row (" << J
            << ") is larger than the number of row (" << n_rows << ")\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     for (int col = 0; col < n_cols; col++) {
@@ -801,7 +801,7 @@ public:
       f.close();
     } else {
       cout << "File " << filename << " cann't be open\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 
@@ -815,7 +815,7 @@ public:
       f.close();
     } else {
       cout << "File " << filename << " cann't be open\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 
@@ -852,7 +852,7 @@ public:
       ob.close();
     } else {
       cout << "Error: can't open file\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 
@@ -1047,12 +1047,12 @@ void pop_submatrix(base_matrix<T1> *X, base_matrix<T1> *x,
   if (X->n_cols != X->n_rows) {
     cout << "Error in pop_submatrix: The source matrix, X, is not "
             "square!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (x->n_cols != x->n_rows) {
     cout << "Error in pop_submatrix: The target matrix, x, is not "
             "square!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   int N = X->n_cols;
@@ -1061,13 +1061,13 @@ void pop_submatrix(base_matrix<T1> *X, base_matrix<T1> *x,
   if (N < n) {
     cout << "Error in pop_submatrix: The size of the source matrix, X, is "
             "smaller than that of the target matrix, x!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (n != static_cast<int>(subset.size())) {
     cout << "Error in pop_submatrix: the target matrix size (" << n
          << ") is not consistent with the stensil size (";
     cout << subset.size() << ")!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   int i, j, a, b;
@@ -1126,24 +1126,24 @@ void pop_submatrix(base_matrix<T1> *X, base_matrix<T1> *x, vector<int> &subset,
   if (X->n_cols < x->n_cols) {
     cout << "Error in pop_submatrix: The # of cols of the source matrix, X, is "
             "smaller than that of the target matrix, x!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (X->n_rows < x->n_rows) {
     cout << "Error in pop_submatrix: The # of rows of the source matrix, X, is "
             "smaller than that of the target matrix, x!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (x->n_rows != static_cast<int>(subset.size())) {
     cout << "Error in pop_submatrix: # of rows in the target matrix ("
          << x->n_rows << ") is not consistent with the stensil size (";
     cout << subset.size() << ")!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (x->n_cols != static_cast<int>(subset2.size())) {
     cout << "Error in pop_submatrix: # of cols in the target matrix ("
          << x->n_cols << ") is not consistent with the stensil size (";
     cout << subset2.size() << ")!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   int i, j, a, b;
@@ -1205,12 +1205,12 @@ void push_submatrix(base_matrix<T1> *X, base_matrix<T1> *x,
   if (X->n_cols != X->n_rows) {
     cout << "Error in push_submatrix: The target matrix, X, is not "
             "square!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (x->n_cols != x->n_rows) {
     cout << "Error in push_submatrix: The source matrix, x, is not "
             "square!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   int N = X->n_cols;
@@ -1219,13 +1219,13 @@ void push_submatrix(base_matrix<T1> *X, base_matrix<T1> *x,
   if (N < n) {
     cout << "Error in push_submatrix: The size of the target matrix, X, is "
             "smaller than that of the source matrix, x!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (n != static_cast<int>(subset.size())) {
     cout << "Error in pop_submatrix: the source matrix size (" << n
          << ") is not consistent with the stensil size (";
     cout << subset.size() << ")!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   int i, j, a, b;
@@ -1283,24 +1283,24 @@ void push_submatrix(base_matrix<T1> *X, base_matrix<T1> *x, vector<int> &subset,
   if (X->n_cols < x->n_cols) {
     cout << "Error in push_submatrix: The # of cols of the target matrix, X, "
             "is smaller than that of the source matrix, x!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (X->n_rows < x->n_rows) {
     cout << "Error in push_submatrix: The # of rows of the target matrix, X, "
             "is smaller than that of the source matrix, x!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (x->n_rows != static_cast<int>(subset.size())) {
     cout << "Error in push_submatrix: # of rows in the source matrix ("
          << x->n_rows << ") is not consistent with the stensil size (";
     cout << subset.size() << ")!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (x->n_cols != static_cast<int>(subset2.size())) {
     cout << "Error in push_submatrix: # of cols in the source matrix ("
          << x->n_cols << ") is not consistent with the stensil size (";
     cout << subset2.size() << ")!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   int i, j, a, b;
@@ -1367,12 +1367,12 @@ void add_submatrix(base_matrix<T1> *X, base_matrix<T1> *x, vector<int> &subset,
   if (X->n_cols != X->n_rows) {
     cout << "Error in push_submatrix: The target matrix, X, is not "
             "square!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (x->n_cols != x->n_rows) {
     cout << "Error in push_submatrix: The source matrix, x, is not "
             "square!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   int N = X->n_cols;
@@ -1381,13 +1381,13 @@ void add_submatrix(base_matrix<T1> *X, base_matrix<T1> *x, vector<int> &subset,
   if (N < n) {
     cout << "Error in push_submatrix: The size of the target matrix, X, is "
             "smaller than that of the source matrix, x!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (n != static_cast<int>(subset.size())) {
     cout << "Error in pop_submatrix: the source matrix size (" << n
          << ") is not consistent with the stensil size (";
     cout << subset.size() << ")!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   int i, j, a, b;
@@ -1447,24 +1447,24 @@ void add_submatrix(base_matrix<T1> *X, base_matrix<T1> *x, vector<int> &subset,
   if (X->n_cols < x->n_cols) {
     cout << "Error in push_submatrix: The # of cols of the target matrix, X, "
             "is smaller than that of the source matrix, x!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (X->n_rows < x->n_rows) {
     cout << "Error in push_submatrix: The # of rows of the target matrix, X, "
             "is smaller than that of the source matrix, x!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (x->n_rows != static_cast<int>(subset.size())) {
     cout << "Error in push_submatrix: # of rows in the source matrix ("
          << x->n_rows << ") is not consistent with the stensil size (";
     cout << subset.size() << ")!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   if (x->n_cols != static_cast<int>(subset2.size())) {
     cout << "Error in push_submatrix: # of cols in the source matrix ("
          << x->n_cols << ") is not consistent with the stensil size (";
     cout << subset2.size() << ")!\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   int i, j, a, b;
@@ -1586,7 +1586,7 @@ void load(boost::property_tree::ptree &pt, std::string path,
           base_matrix<T1> &vt, int &status) {
   std::cout << "Sorry: the load function for generic matrix object is not "
                "defined yet\n";
-  throw std::runtime_error("libra C++ error - see the message printed above");
+  std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
 }
 
 template <typename T1>
@@ -1594,7 +1594,7 @@ void load(boost::property_tree::ptree &pt, std::string path,
           char path_separator, base_matrix<T1> &vt, int &status) {
   std::cout << "Sorry: the load function for generic matrix object is not "
                "defined yet\n";
-  throw std::runtime_error("libra C++ error - see the message printed above");
+  std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
 }
 
 template <typename T1>
@@ -1602,7 +1602,7 @@ void load(boost::property_tree::ptree &pt, std::string path,
           vector<base_matrix<T1>> &vt, int &status) {
   std::cout << "Sorry: the load function for vector of generic matrices is not "
                "defined yet\n";
-  throw std::runtime_error("libra C++ error - see the message printed above");
+  std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
 }
 
 template <typename T1>
@@ -1610,7 +1610,7 @@ void load(boost::property_tree::ptree &pt, std::string path,
           char path_separator, vector<base_matrix<T1>> &vt, int &status) {
   std::cout << "Sorry: the load function for vector of generic matrices is not "
                "defined yet\n";
-  throw std::runtime_error("libra C++ error - see the message printed above");
+  std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
 }
 
 } // namespace liblinalg

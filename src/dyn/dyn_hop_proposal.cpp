@@ -824,7 +824,7 @@ vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_pre
   else{
     cout<<"Error in hopping_probabilities_lz(): rep can be 0, 1, 2, 3 or 5; the Belyaev-Lebedev \
 gap-minimum probabilities (rep_lz = 4) come from hopping_probabilities_bllz \n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   // reps 0 and 3 pair diabatic crossings with adiabatic state labels
@@ -832,7 +832,7 @@ gap-minimum probabilities (rep_lz = 4) come from hopping_probabilities_bllz \n";
     cout<<"Error in hopping_probabilities_lz(): rep_lz = "<<rep<<" pairs diabatic \
 crossings with adiabatic state labels - it requires ndia == nadi (got ndia = "
         <<ham->ndia<<", nadi = "<<ham->nadi<<"); use rep_lz = 5 or 4 \n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   if(rep==2){
@@ -877,7 +877,7 @@ crossings with adiabatic state labels - it requires ndia == nadi (got ndia = "
       cout<<"Error in hopping_probabilities_lz(): the diabatic Hamiltonian is all-zero at two \
 consecutive steps - the diabatic crossing detection is inoperative. Adiabatic-native models \
 must supply obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     // Get denominator
@@ -974,7 +974,7 @@ must supply obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
         cout<<"Error in hopping_probabilities_lz(): rep_lz = 1 pairs diabatic crossings \
 with adiabatic state labels - it requires ndia == nadi (got ndia = "<<ham->ndia
             <<", nadi = "<<ham->nadi<<"); use rep_lz = 5 or 4 \n";
-        throw std::runtime_error("libra C++ error - see the message printed above");
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
       ham_dia = ham->get_ham_dia().real();
       ham_dia_prev = ham_prev->get_ham_dia().real();
@@ -983,7 +983,7 @@ with adiabatic state labels - it requires ndia == nadi (got ndia = "<<ham->ndia
       cout<<"Error in hopping_probabilities_lz(): rep_lz = 1 detects crossings in the diabatic \
 Hamiltonian, which is all-zero at two consecutive steps. Adiabatic-native models must supply \
 obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     // the same silent-zero-detection class for the NAC-switch detector:
     // NAC matrices are antisymmetric, so an all-zero real part has
@@ -993,7 +993,7 @@ obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
 of nac_adi (sign-switch detection / the Massey exponent), which is all-zero at two \
 consecutive steps. NBRA models must supply \
 obj.nac_adi with the couplings in the real part (obj.nac_ci is not an ingested attribute) \n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     // Off-diagonal elements
@@ -1092,7 +1092,7 @@ obj.nac_adi with the couplings in the real part (obj.nac_ci is not an ingested a
       cout<<"Error in hopping_probabilities_lz(): the diabatic Hamiltonian is all-zero at two \
 consecutive steps - the diabatic crossing detection is inoperative. Adiabatic-native models \
 must supply obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     // the pair-local trace-free vector is v = ( (H_ii - H_jj)/2, H_ij ); its
@@ -1175,7 +1175,7 @@ vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_pre
         <<" hopping_probabilities_lz_gaps (prefill via"
         <<" hopping_probabilities_bllz_gaps) or the engine dispatch"
         <<" (tsh_method 3)\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   vector<double> gap_mins;
   return hopping_probabilities_lz(ham, ham_prev, act_state_indx, rep, p, invM, dt, gap_mins);
@@ -1355,7 +1355,7 @@ vector<double> hopping_probabilities_zn(nHamiltonian* ham, nHamiltonian* ham_pre
     cout<<"Error in hopping_probabilities_zn(): the crossing detection pairs diabatic \
 channels with adiabatic state labels - it requires ndia == nadi (got ndia = "
         <<ham->ndia<<", nadi = "<<ham->nadi<<") \n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   vector<double> g(nstates, 0.0);
@@ -1377,7 +1377,7 @@ channels with adiabatic state labels - it requires ndia == nadi (got ndia = "
     cout<<"Error in hopping_probabilities_zn(): the diabatic Hamiltonian is all-zero at two \
 consecutive steps - the crossing detection and the diabatic coupling are inoperative. \
 Adiabatic-native models must supply obj.ham_dia \n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   MATRIX F(ndof, nstates);
@@ -1602,7 +1602,7 @@ vector<MATRIX> hop_proposal_probabilities(dyn_control_params& prms,
 
     else{
       cout<<"Error in tsh1: tsh_method can be -1, 0, 1, 2, or 3. Other values are not defined\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
   }// for traj
@@ -1867,7 +1867,7 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
 
     else{
       cout<<"Error in tsh1: tsh_method can be -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9. Other values are not defined\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
   }// for traj
@@ -1930,7 +1930,7 @@ int hop(vector<double>& prob, double ksi){
                                   
     if(finstate==-1){
       std::cout<<"Something is wrong in the hop(...) function\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } // else  ksi < 1.0
 
@@ -1977,7 +1977,7 @@ int hop(int initstate, MATRIX& g, double ksi){
                                   
     if(finstate==-1){
       std::cout<<"Something is wrong in the hop(...) function\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } // else  ksi < 1.0
 
@@ -2023,7 +2023,7 @@ int hop(int initstate, vector<double>& g, double ksi){
                                   
     if(finstate==-1){
       std::cout<<"Something is wrong in the hop(...) function\n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } // else  ksi < 1.0
 

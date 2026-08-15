@@ -798,7 +798,7 @@ void nHamiltonian::add_ethd3_dia(const MATRIX& q, const MATRIX& invM, double alp
     if(ham_dia_mem_status==0){
       cout<<"Error in add_ethd3_dia(): the diabatic Hamiltonian matrix is not allocated \
 but is needed for the calculations \n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     *ham_dia = ethd_en; 
 
@@ -813,7 +813,7 @@ but is needed for the calculations \n";
           if(children[traj]->d1ham_dia_mem_status[dof]==0){
             cout<<"Error in add_ethd3_dia(): the derivative of the Hamiltonian in the diabatic basis w.r.t. \
 the nuclear DOF "<<dof<<" is not allocated for trajectory "<<traj<<" but is needed for the calculations \n";
-            throw std::runtime_error("libra C++ error - see the message printed above");
+            std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
           }
 
           for(int st=0; st<ndia; st++){
@@ -846,7 +846,7 @@ void nHamiltonian::add_ethd3_adi(const MATRIX& q, const MATRIX& invM, double alp
     if(ham_adi_mem_status==0){
       cout<<"Error in add_ethd3_adi(): the adiabatic Hamiltonian matrix is not allocated \
 but is needed for the calculations \n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     *ham_adi = ethd_en; 
 
@@ -862,7 +862,7 @@ but is needed for the calculations \n";
           if(children[traj]->d1ham_adi_mem_status[dof]==0){
             cout<<"Error in add_ethd3_adi(): the derivative of the Hamiltonian in the adiabatic basis w.r.t. \
 the nuclear DOF "<<dof<<" is not allocated for trajectory "<<traj<<" but is needed for the calculations \n";
-            throw std::runtime_error("libra C++ error - see the message printed above");
+            std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
           }
 
           for(int st=0; st<nadi; st++){
@@ -896,7 +896,7 @@ void nHamiltonian::add_ethd3_adi(const MATRIX& q, const MATRIX& p, const MATRIX&
     if(ham_adi_mem_status==0){
       cout<<"Error in add_ethd3_adi(): the adiabatic Hamiltonian matrix is not allocated \
 but is needed for the calculations \n";
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     *ham_adi = ethd_en; 
 
@@ -912,7 +912,7 @@ but is needed for the calculations \n";
           if(children[traj]->d1ham_adi_mem_status[dof]==0){
             cout<<"Error in add_ethd3_adi(): the derivative of the Hamiltonian in the adiabatic basis w.r.t. \
 the nuclear DOF "<<dof<<" is not allocated for trajectory "<<traj<<" but is needed for the calculations \n";
-            throw std::runtime_error("libra C++ error - see the message printed above");
+            std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
           }
 
           for(int st=0; st<nadi; st++){

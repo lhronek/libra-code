@@ -117,7 +117,7 @@ void Qeq_Init(std::string idempotential,map<std::string,_GMP>& GMP){
 
   else{
   std::cout<<"Error: Possible options for getting idempotentials are: rappe_goddard, parr_pearson, bakowies_thiel "<<std::endl;
-  throw std::runtime_error("libra C++ error - see the message printed above");
+  std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
 }
@@ -180,17 +180,17 @@ int CQeq_Calculate(ObjectSpace& os){
         mol.GMP.push_back(it->second);
       }else{
         std::cout<<"Error: GMP properties are not defined for atom "<<os.ObjectSpace_Atoms[i].Atom_element<<std::endl;
-        throw std::runtime_error("libra C++ error - see the message printed above");
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
     }
     else{std::cout<<"Error: Atom element is not defined for atom indx = "<<os.ObjectSpace_Atoms[i].globAtom_Index<<std::endl;
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     // Note! Convert Angstroms to atomic units
     if(os.ObjectSpace_Atoms[i].is_Atom_coords_cart){mol.R.push_back(os.ObjectSpace_Atoms[i].Atom_coords_cart/0.52917); }
     else{std::cout<<"Error: Atom coordinates are not defined for atom indx = "<<os.ObjectSpace_Atoms[i].globAtom_Index<<std::endl;
-      throw std::runtime_error("libra C++ error - see the message printed above");
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     if(os.ObjectSpace_Atoms[i].is_Atom_charge){mol.Q.push_back(os.ObjectSpace_Atoms[i].Atom_charge); }
     else{                                      mol.Q.push_back(0.0);    }
@@ -206,19 +206,19 @@ int CQeq_Calculate(ObjectSpace& os){
   if(os.is_ObjectSpace_CQeq_parameters){
     if(os.ObjectSpace_CQeq_parameters.is_threshold){
       threshold = os.ObjectSpace_CQeq_parameters.threshold;
-    }else{ std::cout<<"CQeq threshold is not defined"<<std::endl; throw std::runtime_error("libra C++ error - see the message printed above");  }
+    }else{ std::cout<<"CQeq threshold is not defined"<<std::endl; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");  }
     if(os.ObjectSpace_CQeq_parameters.is_MaxCount){
       MaxCount = os.ObjectSpace_CQeq_parameters.MaxCount;
-    }else{ std::cout<<"CQeq MaxCount is not defined"<<std::endl; throw std::runtime_error("libra C++ error - see the message printed above");  }
+    }else{ std::cout<<"CQeq MaxCount is not defined"<<std::endl; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");  }
     if(os.ObjectSpace_CQeq_parameters.is_solution_method){
       solution_method = os.ObjectSpace_CQeq_parameters.solution_method;
-    }else{ std::cout<<"CQeq solution_method is not defined"<<std::endl; throw std::runtime_error("libra C++ error - see the message printed above");  }
+    }else{ std::cout<<"CQeq solution_method is not defined"<<std::endl; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");  }
     if(os.ObjectSpace_CQeq_parameters.is_integral_method){
       integral_method = os.ObjectSpace_CQeq_parameters.integral_method;
-    }else{ std::cout<<"CQeq integral_method is not defined"<<std::endl; throw std::runtime_error("libra C++ error - see the message printed above");  }
+    }else{ std::cout<<"CQeq integral_method is not defined"<<std::endl; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");  }
   }else{
     std::cout<<"Error: CQeq parameters are not defined!"<<std::endl;
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   double eps;
