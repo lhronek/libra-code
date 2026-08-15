@@ -2954,7 +2954,7 @@ def _compute_sd_overlaps(step, params):
     kernel = params.get('sd_overlap_kernel', 'auto')
     ovlp = {'per_pair': mapping.ovlp_mat_arb,
             'batched': mapping.ovlp_mat_arb_batched,
-            'lemma': mapping.ovlp_mat_arb_lemma,
+            'lemma': mapping.ovlp_mat_arb_lemma_only,
             'auto': mapping.ovlp_mat_arb_auto}[kernel]
 
     #print("active_space = ", active_space)

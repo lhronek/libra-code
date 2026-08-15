@@ -664,6 +664,20 @@ def ovlp_mat_arb_lemma(SD1, SD2, S2, active_space=None, mem_limit_mb=256):
     return res
 
 
+def ovlp_mat_arb_lemma_only(SD1, SD2, S2, active_space=None, mem_limit_mb=256):
+    """ovlp_mat_arb_lemma, or a named error when the lemma declines - the
+    user-facing 'lemma' kernel choice must not surface None into
+    arithmetic."""
+    res = ovlp_mat_arb_lemma(SD1, SD2, S2, active_space, mem_limit_mb)
+    if res is None:
+        raise RuntimeError(
+            "sd_overlap_kernel='lemma': the determinant-lemma kernel declined "
+            "this SD basis (<= 2 electrons, repeated spin-orbitals, excitation "
+            "degree reaching nelec, or a near-singular reference block) - use "
+            "'auto', which falls back to the batched kernel automatically")
+    return res
+
+
 def ovlp_mat_arb_auto(SD1, SD2, S2, active_space=None, mem_limit_mb=256):
     """Determinant-lemma kernel with automatic fallback to the batched one.
     Listed-order determinant convention, like every ovlp kernel here."""

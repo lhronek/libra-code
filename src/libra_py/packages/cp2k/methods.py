@@ -3714,7 +3714,7 @@ def sd_overlaps(sd_states, St_mo, S_mo_prev, S_mo_curr, orthonormalize=True,
         raise ValueError("orthonormalize='lowdin_cached' requires a cache dict")
     ovlp = {"per_pair": mapping.ovlp_mat_arb,
             "batched": mapping.ovlp_mat_arb_batched,
-            "lemma": mapping.ovlp_mat_arb_lemma,
+            "lemma": mapping.ovlp_mat_arb_lemma_only,
             "auto": mapping.ovlp_mat_arb_auto}[kernel]
     if sd_states_prev is None:
         sd_states_prev = sd_states
