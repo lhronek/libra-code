@@ -84,12 +84,15 @@ libint2::Shell unit_shell() {
 //
 // libint emits pure-shell components in one of two compile-time orders:
 // gaussian (m = 0, +1, -1, +2, -2, ...) or standard (m = -l..+l). The
-// molden/molog readers and the step-2 writers all assume gaussian, and
-// the LIBINT_SHGSHELL_ORDERING header macro cannot be trusted (packaged
-// headers are known to disagree with the shipped binary). Probe the
-// runtime once: the overlap of an s shell at the origin with a pure p
-// shell displaced along z is nonzero only in the p_z (m = 0) component,
-// whose position identifies the ordering.
+// molden/molog readers and the step-2 writers all assume gaussian. The
+// LIBINT_SHGSHELL_ORDERING macro describes the headers liblibra was
+// compiled against, not necessarily the libint2 it is linked to at
+// runtime (module libraries, LD_LIBRARY_PATH swaps), and its first
+// definition in a packaged config.h is the generator-time default that
+// config2.h overrides at the tail. Probe the runtime once: the overlap
+// of an s shell at the origin with a pure p shell displaced along z is
+// nonzero only in the p_z (m = 0) component, whose position identifies
+// the ordering.
 static bool shg_ordering_is_standard() {
   static const bool is_standard = [] {
     if (!libint2::initialized()) { libint2::initialize(); }
