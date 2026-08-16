@@ -167,6 +167,12 @@ def molden_file_to_libint_shell(molden_filename: str, is_spherical: bool, is_per
     # caller's flag against it
     _l_pre = _molden_gto_l_vals(lines)
     purity, _expected, _alternate, _file_n = molden_convention(lines, _l_pre)
+    if not any("[MO]" in ln.upper() for ln in lines):
+        # a truncated/incomplete print: without an [MO] section neither the
+        # convention check nor any MO reader can proceed - name it instead of
+        # mis-diagnosing the convention or failing on an index
+        raise ValueError(F"molden_file_to_libint_shell: {molden_filename} has no [MO] "
+                         F"section - truncated or incomplete molden file")
     if _file_n is not None and _file_n != _expected:
         if _file_n == _alternate:
             purity = {k: (not v if k >= 2 else v) for k, v in purity.items()}
