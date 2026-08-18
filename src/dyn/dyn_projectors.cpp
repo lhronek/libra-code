@@ -355,10 +355,13 @@ MATRIX make_cost_mat(CMATRIX& orb_mat_inp, CMATRIX& en_mat_inp, double alpha, in
             double dE = (en_mat_inp.get(a,a) - en_mat_inp.get(b,b)).real();
 
             
+            // the selector numbering is the documented one (0 gaussian [default],
+            // 1 symmetric exponential, 2 one-sided, anything else unscaled) -
+            // the default must keep the historical gaussian penalty
             double val = 1.0; 
-            if(scaling_function==1){ val = exp(-(alpha*dE)*(alpha*dE)); }
-            else if(scaling_function==2){  val = exp(-alpha * fabs(dE)); }  // symmetric scaling
-            else if(scaling_function==3){  val = exp(-alpha * MAX(0.0, dE) ); }
+            if(scaling_function==0){ val = exp(-(alpha*dE)*(alpha*dE)); }
+            else if(scaling_function==1){  val = exp(-alpha * fabs(dE)); }  // symmetric scaling
+            else if(scaling_function==2){  val = exp(-alpha * MAX(0.0, dE) ); }
 
             cost_mat.set(a,b,s2 * val);
 

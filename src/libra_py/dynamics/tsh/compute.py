@@ -497,6 +497,15 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - 1: print details for debugging
 
 
+            * **dyn_params["MK_scaling_function"]** ( int ): energy-aware scaling of the
+                Munkres-Kuhn / Hungarian cost matrix, |S_ij|^2 * f(dE_ij) with dE_ij = E_i - E_j:
+
+                - 0: f = exp(-(MK_alpha * dE_ij)^2) [ default ]
+                - 1: f = exp(-MK_alpha * |dE_ij|)
+                - 2: f = exp(-MK_alpha * max(dE_ij, 0))
+                - anything else: f = 1 (no scaling)
+
+
             * **dyn_params["convergence"]** ( int ):  A swtich for stochastic reordering algorithm 3 (and variants)
                 to choose what happens when an acceptable permutation isn't generated in the set number of attempts:
 
