@@ -975,9 +975,15 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                  1              -  ld, with symmetric splitting, with exp_
                  2              -  ld, original, with exp_
                  3              -  1-point, Hvib integration, with exp_
-                 4              -  2-points, Hvib integration, with exp_
-                 5              -  3-points, Hvib, integration with the second-point correction of Hvib, with exp_
+                 4              -  2-points, Hvib integration, with exp_ (undressed average - loses the coupling at eigenvector flips)
+                 5              -  2-points, Hvib integration with the new point T-dressed, with exp_
                  6              -  same as 4, but without projection matrices (T_new = I)
+                 7              -  split 2-point Hvib: exp(old half), T-dressed exp(new half), one reprojection
+                 8              -  the same propagator as 7 (a historical duplicate once its reprojection was completed)
+              The projector family must match the integrator family (enforced by sanity_check):
+              0-2 and 10-12 need a rotation projector (state_tracking_algo -1/5/6), 3-8 and 13-15 a
+              relabel projector (state_tracking_algo 0/1/2/21). The +100 variants (100-115) share the
+              classification and pin the child Hamiltonian.
 
                 10              -  same as 0, but with rotations
                 11              -  same as 1, but with rotations
