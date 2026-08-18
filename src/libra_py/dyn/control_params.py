@@ -113,10 +113,12 @@ class DynControlParams:
     #: gamma = 0 → Ehrenfest [default]
     sqc_gamma: float = 0.0
 
-    #: Ehrenfest force expression option
-    #: 0 uses the standard mean-field adiabatic force currently implemented
-    #: by the dyn Hamiltonian helpers. 1 includes the off-diagonal/gamma term
-    #: used by MMST/SQC-style force expressions.
+    #: Ehrenfest (mean-field) force expression in the adiabatic representation
+    #: (force_method 2, rep_force 1)
+    #: 0 all terms, including the derivative-coupling contribution - energy-conserving with
+    #: every electronic integrator [ default ]
+    #: 1 drop the derivative-coupling terms - the local-diabatization-consistent variant for
+    #: the bare-energy integrators (0-2, 10-12)
     ehrenfest_force_option: int = 0
 
     #: Enforce nuclear motion on a fixed electronic state
@@ -368,11 +370,8 @@ class DynControlParams:
     #: KC-RPMD Heaviside parameter b [default: 1000]
     kcrpmd_b: float = 1000.0
 
-    #: KC-RPMD kinetic constraint switching parameter c [default: 0.5]
-    kcrpmd_c: float = 0.5
-
-    #: KC-RPMD free energy switching parameter d [default: 3.0]
-    kcrpmd_d: float = 3.0
+    #: KC-RPMD kinetic constraint switching parameter c [default: 1.0]
+    kcrpmd_c: float = 1.0
 
     #: KC-RPMD Langevin frictional coefficient within donor-acceptor basin [default: 0.0]
     kcrpmd_gamma: float = 0.0
