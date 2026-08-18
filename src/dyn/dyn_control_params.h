@@ -170,6 +170,12 @@ class dyn_control_params{
     Options: 
       - 0.0: corresponds to Ehrenfest force [ default ]
 
+    Adds gamma * sum_i dE_i/dR (= gamma * d tr(S^-1 H)/dR in the diabatic
+    representation) to the mean-field force of force_method == 2 in either
+    rep_force. The term rides the Ehrenfest normalization by <c|S|c>: SQC-sampled
+    amplitudes with |c|^2 = 1 + N gamma get a uniformly 1/(1 + N gamma)-scaled
+    force - the un-normalized MMST force, window sampling and binning of a full
+    SQC run are not provided
   */
   double sqc_gamma;
 

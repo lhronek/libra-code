@@ -111,6 +111,10 @@ class DynControlParams:
     #: Gamma parameter in the Meyer-Miller Hamiltonian of form:
     #:  H = sum_{i,j} H_{ij} [ 1/(2 hbar) * (q_i - i * p_j) * (q_j + i * p_i) - gamma * delta_ij ]
     #: gamma = 0 → Ehrenfest [default]
+    #: Adds gamma * sum_i dE_i/dR (= gamma * d tr(S^-1 H)/dR in the diabatic representation) to the
+    #: mean-field force in either rep_force. Rides the Ehrenfest normalization by <c|S|c>: SQC-sampled
+    #: amplitudes with |c|^2 = 1 + N gamma get a uniformly 1/(1 + N gamma)-scaled force - the
+    #: un-normalized MMST force, window sampling and binning of a full SQC run are not provided
     sqc_gamma: float = 0.0
 
     #: Ehrenfest (mean-field) force expression in the adiabatic representation
