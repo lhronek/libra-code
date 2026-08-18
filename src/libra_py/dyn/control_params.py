@@ -79,7 +79,15 @@ class DynControlParams:
     #: crossing point is determined by the sign change of the diabatic gap
     #: 2 adiabatic, Eq. 3 of the Belyaev-Lebedev paper, 
     #: crossing point is determined by the sign change of the NAC
+    #: 3 adiabatic, generalized-linear (coupling-derivative) LZ, gap minimum
+    #: 4 adiabatic, Belyaev-Lebedev Eq. 4 from the adiabatic gap history
+    #: 5 adiabatic, minimum-detected Massey variant
     rep_lz: int = 0
+
+    #: Which states may receive LZ/ZN/BLLZ proposals from the active state
+    #: 0 energy-adjacent only (no third state's energy strictly inside the pair's interval)
+    #: 1 all pairs with detected crossings [ default ]
+    lz_target_space: int = 1
 
     #: Representation for force evaluation
     #: In which representation to compute forces. To clarify - the forces
@@ -194,6 +202,13 @@ class DynControlParams:
     #: 0 no extra output [ default ]
     #: 1 prints extra details on what the algorithm is doing, for debugging
     MK_verbosity: int = 0
+
+    #: Energy-aware scaling of the Munkres–Kuhn / Hungarian cost matrix, |S_ij|^2 * f(dE_ij)
+    #: 0 f = exp(-(MK_alpha * dE_ij)^2) [ default ]
+    #: 1 f = exp(-MK_alpha * |dE_ij|)
+    #: 2 f = exp(-MK_alpha * max(dE_ij, 0))
+    #: anything else: f = 1 (no scaling)
+    MK_scaling_function: int = 0
 
     #: Convergence behavior for stochastic reordering
     #: A swtich for stochastic reordering algorithm 3 to choose what happens when an 
@@ -430,6 +445,11 @@ class DynControlParams:
     #: 1 apply
     dephasing_informed: int = 0
 
+    #: SCOTSH gap correlation time - controls the running-average of the energy-gap
+    #: fluctuations in the decoherence-rate calculation; a multiple of dt
+    #: [units: a.u. of time, default: 41.0 a.u. = 1 fs]
+    gap_correlation_time: float = 41.0
+
     #: Instantaneous decoherence variant
     #: Option to control the instantaneous decoherence methodology, only used with `decoherence_algo == 1`
     #: 0 ID-S (ID at successful hops)
@@ -608,6 +628,17 @@ class DynControlParams:
     #: Electronic substeps
     #: the number of electronic integration substeps per a nuclear step, such that dt_el = dt_nucl / num_electronic_substeps
     num_electronic_substeps: int = 1
+
+    #: Whether to keep the diabatic density matrix dm_dia updated along the dynamics
+    #: (a derived quantity in the adiabatic representations rep_tdse 1 / 3)
+    #: 1 always compute (the legacy behavior)
+    #: 0 never compute
+    #: -1 auto - resolved to 0/1 by dynamics/tsh/compute.py from rep_tdse, rep_sh and the requested outputs [ default ]
+    compute_dm_dia: int = -1
+
+    #: OpenMP threads for the per-trajectory loops of the TSH machinery (deterministic work only -
+    #: results identical for any value; compose with process-level parallelism) [ default: 1 ]
+    omp_num_threads: int = 1
 
     #: Electronic TDSE integrator selector
     #: for `rep_tdse = 0` (diabatic): 1** - with NBRA
