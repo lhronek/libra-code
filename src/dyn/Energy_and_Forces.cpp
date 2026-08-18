@@ -371,16 +371,10 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
 
     // Adiabatic 
     else if(prms.rep_force==1){
-      int option = 0; // default value for NAC-based integrators
-
-      if(prms.electronic_integrator==0 || 
-         prms.electronic_integrator==1 ||
-         prms.electronic_integrator==2 ||
-         prms.electronic_integrator==10 ||
-         prms.electronic_integrator==11 ||
-         prms.electronic_integrator==12 ){ option = 1; } 
-
-      option = 0;
+      // 0 keeps the derivative-coupling terms (energy-conserving with every
+      // integrator), 1 drops them - the local-diabatization-consistent
+      // variant for the bare-energy integrators 0-2, 10-12
+      int option = prms.ehrenfest_force_option;
       //*dyn_vars.f = ham.Ehrenfest_forces_adi(*dyn_vars.ampl_adi, 1, option, dyn_vars.proj_adi).real();
       *dyn_vars.f = ham.Ehrenfest_forces_adi(*dyn_vars.ampl_adi, 1, option).real();
 /*

@@ -185,6 +185,10 @@ def _print_simulation_params(dyn_params, nadi, ntraj, init_params=None, model_pa
         dashes,
         row("force_method:", p["force_method"], "NUCLEAR MOTION"),
         row("rep_force:", p["rep_force"]),
+    ]
+    if int(p["force_method"]) == 2 and int(p["rep_force"]) == 1 and "ehrenfest_force_option" in p:
+        lines.append(row("ehrenfest_force_option:", p["ehrenfest_force_option"]))
+    lines += [
         row("ensemble:", named(p["ensemble"], _ENSEMBLE_NAMES)),
         row("Temperature [K]:", F"{p['Temperature']:.2f}"),
     ]
@@ -396,6 +400,15 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - 2: Ehrenfest
                 - 3: QTSH force
                 - 4: KC-RPMD force
+
+
+            * **dyn_params["ehrenfest_force_option"]** ( int ): the Ehrenfest (mean-field) force expression
+                in the adiabatic representation (force_method == 2, rep_force == 1):
+
+                - 0: all terms, including the derivative-coupling contribution - energy-conserving with
+                     every electronic integrator [ default ]
+                - 1: drop the derivative-coupling terms - the local-diabatization-consistent variant for
+                     the bare-energy integrators (0-2, 10-12)
 
 
             * **dyn_params["sqc_gamma"]** ( double ): Gamma parameter in the Meyer-Miller Hamiltonian of form:

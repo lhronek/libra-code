@@ -45,6 +45,7 @@ dyn_control_params::dyn_control_params(){
   lz_target_space = 1;
   rep_force = 1;
   force_method = 1;
+  ehrenfest_force_option = 0;
   sqc_gamma = 0.0;
   enforce_state_following = 0; 
   enforced_state_index = 0; 
@@ -169,6 +170,7 @@ dyn_control_params::dyn_control_params(const dyn_control_params& x){
   lz_target_space = x.lz_target_space;
   rep_force = x.rep_force;
   force_method = x.force_method;
+  ehrenfest_force_option = x.ehrenfest_force_option;
   sqc_gamma = x.sqc_gamma;
   enforce_state_following = x.enforce_state_following;
   enforced_state_index = x.enforced_state_index; 
@@ -402,6 +404,13 @@ void dyn_control_params::sanity_check(){
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
+  /// the Ehrenfest force unit function computes nothing for any other value
+  if(ehrenfest_force_option!=0 && ehrenfest_force_option!=1){
+    std::cout<<"Error in dyn_control_params::sanity_check: ehrenfest_force_option = "
+        <<ehrenfest_force_option<<" is not allowed (0 - all terms, 1 - no derivative-coupling terms)\n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
   /// Shall not use DISH with the decoherence correction
   /// (tsh_method 3 is Landau-Zener - DISH is 5)
   if(tsh_method==5 && decoherence_algo!=-1){
@@ -467,6 +476,7 @@ void dyn_control_params::set_parameters(bp::dict params){
     else if(key=="lz_target_space") { lz_target_space = bp::extract<int>(params.values()[i]);  }
     else if(key=="rep_force") { rep_force = bp::extract<int>(params.values()[i]);  }
     else if(key=="force_method") { force_method = bp::extract<int>(params.values()[i]);  }
+    else if(key=="ehrenfest_force_option") { ehrenfest_force_option = bp::extract<int>(params.values()[i]);  }
     else if(key=="sqc_gamma") { sqc_gamma = bp::extract<double>(params.values()[i]);  }
     else if(key=="enforce_state_following") { enforce_state_following = bp::extract<int>(params.values()[i]);  }
     else if(key=="enforced_state_index") { enforced_state_index = bp::extract<int>(params.values()[i]);  }

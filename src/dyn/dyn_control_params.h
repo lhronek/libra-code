@@ -148,6 +148,18 @@ class dyn_control_params{
   */
   int force_method;
 
+  /**
+    Ehrenfest (mean-field) force expression in the adiabatic representation,
+    used with force_method == 2 and rep_force == 1
+
+    Options:
+      - 0: all terms, including the derivative-coupling contribution - the
+           energy-conserving form for every electronic integrator [ default ]
+      - 1: drop the derivative-coupling terms - the local-diabatization-
+           consistent variant for the bare-energy integrators (0-2, 10-12)
+  */
+  int ehrenfest_force_option;
+
 
   /**
     Gamma parameter in the Meyer-Miller Hamiltonian of form:
