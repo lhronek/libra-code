@@ -180,6 +180,8 @@ void export_dyn_variables_objects(){
   def("orthogonalized_T", expt_orthogonalized_T_v1);
 
 
+  vector<double> (dyn_variables::*expt_compute_average_sqc_pop_v1)(int rep, int window, double gamma) = &dyn_variables::compute_average_sqc_pop;
+  vector<double> (dyn_variables::*expt_compute_average_sqc_pop_v2)(int rep) = &dyn_variables::compute_average_sqc_pop;
   CMATRIX (dyn_variables::*expt_get_dm_adi_v1)(int i, int prev_steps) = &dyn_variables::get_dm_adi;
   CMATRIX (dyn_variables::*expt_get_dm_adi_v2)(int i) = &dyn_variables::get_dm_adi;
 
@@ -352,6 +354,10 @@ void export_dyn_variables_objects(){
       .def("compute_average_se_pop", &dyn_variables::compute_average_se_pop)
       .def("compute_average_sh_pop", &dyn_variables::compute_average_sh_pop)
       .def("compute_average_mash_pop", &dyn_variables::compute_average_mash_pop)
+      .def("compute_average_sqc_pop", expt_compute_average_sqc_pop_v1)
+      .def("compute_average_sqc_pop", expt_compute_average_sqc_pop_v2)
+      .def_readwrite("sqc_window", &dyn_variables::sqc_window)
+      .def_readwrite("sqc_gamma", &dyn_variables::sqc_gamma)
       .def("compute_average_sh_pop_TR", &dyn_variables::compute_average_sh_pop_TR)
       .def("compute_coherence_indicator", &dyn_variables::compute_coherence_indicator)
 

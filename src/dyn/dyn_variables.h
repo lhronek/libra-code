@@ -807,6 +807,8 @@ class dyn_variables{
   vector<double> compute_average_sh_pop(int rep);
   vector<double> compute_average_sh_pop_TR(int rep);
   vector<double> compute_average_mash_pop(int rep);
+  vector<double> compute_average_sqc_pop(int rep, int window, double gamma);  ///< SQC windowed, renormalized populations
+  vector<double> compute_average_sqc_pop(int rep);   ///< with the window/gamma recorded at initialization
 
   MATRIX compute_coherence_indicator(int rep);
 

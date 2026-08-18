@@ -140,6 +140,10 @@ def _print_simulation_params(dyn_params, nadi, ntraj, init_params=None, model_pa
                 ist = ie.get("istates", [])
                 val = ist if len(ist) <= 6 else F"list({len(ist)})"
                 lines.append(row("init_elec.istates:", val))
+            if int(ie.get("init_type", 0)) in (5, 6):
+                g = ie.get("sqc_gamma", 0.366 if int(ie["init_type"]) == 5 else 1.0 / 3.0)
+                lines.append(row("init_elec.sqc_window:", "square" if int(ie["init_type"]) == 5 else "triangle"))
+                lines.append(row("init_elec.sqc_gamma:", g))
         if inl:
             lines += [row("init_nucl.init_type:", inl.get("init_type", "n/a")),
                       row("init_nucl.ndof:", inl.get("ndof", "n/a"))]
@@ -1068,7 +1072,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                     "Etherm", "E_NHC", "dEkin_ave", "dEpot_ave", "dEtot_ave", "tcnbra_thermostat_energy", "Ekin_ave_qtsh" ]
                 - 2: 2-D info - Relevant variables to request to save: ["states", "states_dia", "se_pop_adi", "se_pop_dia",
                     "sh_pop_adi", "sh_pop_dia", "sh_pop_adi_TR", "sh_pop_dia_TR", "mash_pop_adi", "mash_pop_dia", 
-                    "fssh3_average_errors"]
+                    "sqc_pop_adi", "sqc_pop_dia", "fssh3_average_errors"]
                 - 3: 3-D info - Relevant variables to request to save: [ "SH_pop", "SH_pop_raw", "D_adi", "D_adi_raw", 
                     "D_dia", "D_dia_raw", "q", "p", "f", "Cadi", "Cdia", "coherence_adi", "coherence_dia", "q_mm", "p_mm",
                     "wp_width", "p_quant", "VP", "f_xf", "qtsh_f_nc" ]
@@ -1287,7 +1291,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
         # sh_pop_adi_TR via compute_average_sh_pop_TR(1) - the transformed
         # populations read the OPPOSITE representation's density matrix
         dia_props = {"D_dia", "se_pop_dia", "coherence_dia",
-                     "mash_pop_dia", "sh_pop_adi_TR"}
+                     "mash_pop_dia", "sqc_pop_dia", "sh_pop_adi_TR"}
         need = (dyn_params["rep_tdse"] in (0, 2)) or (dyn_params["rep_sh"] == 0) \
             or bool(dia_props.intersection(dyn_params["properties_to_save"]))
         dyn_params["compute_dm_dia"] = 1 if need else 0
@@ -1587,6 +1591,19 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
     #sys.exit(0)
 
     # Initialize electronic variables
+    # SQC window sampling (init_type 5 square / 6 triangle) fixes the Meyer-Miller
+    # gamma of the whole run: the dynamics must carry the same sqc_gamma and the
+    # un-normalized mean-field force - a silent mismatch would be a different method
+    if int(init_elec.get("init_type", 0)) in (5, 6):
+        g_init = float(init_elec.get("sqc_gamma", -1.0))
+        if g_init < 0.0:
+            g_init = 0.366 if int(init_elec["init_type"]) == 5 else 1.0 / 3.0
+        if abs(float(dyn_params.get("sqc_gamma", 0.0)) - g_init) > 1e-12:
+            raise ValueError(F"SQC window sampling (init_type {init_elec['init_type']}) uses gamma = {g_init}, "
+                             F"but dyn_params['sqc_gamma'] = {dyn_params.get('sqc_gamma', 0.0)} - set them equal")
+        if int(dyn_params.get("force_method", 1)) == 2 and int(dyn_params.get("ehrenfest_normalized", 1)) != 0:
+            raise ValueError("SQC window sampling gives |c|^2 = 1 + N gamma - the mean-field force must be the "
+                             "un-normalized Meyer-Miller form: set dyn_params['ehrenfest_normalized'] = 0")
     dyn_var.init_amplitudes(init_elec, rnd)
     dyn_var.init_density_matrix(init_elec)
     # dyn_var.init_active_states(init_elec, rnd)

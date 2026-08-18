@@ -168,6 +168,12 @@ def init_tsh_data(saver, output_level, _nsteps, _ntraj, _ndof, _nadi, _ndia):
         if "mash_pop_dia" in saver.keywords:  # _has_slot(saver, "mash_pop_dia"):
             saver.add_dataset("mash_pop_dia", (_nsteps, _ndia), "R")
 
+        # SQC windowed, renormalized populations (window/gamma recorded at init)
+        if "sqc_pop_adi" in saver.keywords:
+            saver.add_dataset("sqc_pop_adi", (_nsteps, _nadi), "R")
+        if "sqc_pop_dia" in saver.keywords:
+            saver.add_dataset("sqc_pop_dia", (_nsteps, _ndia), "R")
+
         # Average errors from FSSH3
         if "fssh3_average_errors" in saver.keywords:  # _has_slot(saver, "fssh3_average_errors"):
             saver.add_dataset("fssh3_average_errors", (_nsteps, 5), "R")
@@ -635,6 +641,20 @@ def save_hdf5_2D_new(saver, i, dyn_var, ham, txt_type=0):
         nadi = dyn_var.nadi
         for ist in range(nadi):
             saver.save_multi_scalar(t, ist, "mash_pop_adi", pops_sh1[ist])
+
+    if _has_slot(saver, "sqc_pop_dia"):
+        # SQC populations, diabatic windows
+        pops_sh0 = dyn_var.compute_average_sqc_pop(0)
+        ndia = dyn_var.ndia
+        for ist in range(ndia):
+            saver.save_multi_scalar(t, ist, "sqc_pop_dia", pops_sh0[ist])
+
+    if _has_slot(saver, "sqc_pop_adi"):
+        # SQC populations, adiabatic windows
+        pops_sh1 = dyn_var.compute_average_sqc_pop(1)
+        nadi = dyn_var.nadi
+        for ist in range(nadi):
+            saver.save_multi_scalar(t, ist, "sqc_pop_adi", pops_sh1[ist])
 
     if _has_slot(saver, "fssh3_average_errors"):
         # Average errors in FSSH3

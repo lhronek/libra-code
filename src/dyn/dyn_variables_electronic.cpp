@@ -1532,6 +1532,53 @@ vector<double> dyn_variables::compute_average_mash_pop(int rep){
 
 
 
+vector<double> dyn_variables::compute_average_sqc_pop(int rep, int window, double gamma){
+/**
+  Cotton-Miller SQC populations: each trajectory is binned by its shifted
+  Meyer-Miller actions e_k = |c_k|^2 (= dm_kk) with the window of the
+  requested type, the counts are averaged and renormalized over the states
+  (P_k = <W_k> / sum_m <W_m>). Trajectories inside no window are dropped.
+    window 0 - square: e_k in [1, 1 + 2 gamma], every other e_j in [0, 2 gamma]
+    window 1 - triangle bin: e_k >= 1, every other e_j <= 1
+  Refs: Cotton, Miller JPCA 117, 7190 (2013); JCP 145, 144108 (2016);
+  JCP 150, 104101 (2019)
+*/
+  int sz;
+  if(rep==0 || rep==2){ sz = ndia; }
+  else if(rep==1 || rep==3){ sz = nadi; }
+  else{ cout<<"Error in dyn_variables::compute_average_sqc_pop: rep is not allowed. "; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  if(!(window==0 || window==1)){
+    cout<<"Error in dyn_variables::compute_average_sqc_pop: window = "<<window<<" is not allowed (0 - square, 1 - triangle)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
+  vector<double> res(sz, 0.0);
+  vector<double> e(sz, 0.0);
+  double total = 0.0;
+  for(int traj=0; traj<ntraj; traj++){
+    CMATRIX& dm = (rep==0 || rep==2) ? *dm_dia[traj] : *dm_adi[traj];
+    for(int i=0; i<sz; i++){ e[i] = dm.get(i,i).real(); }
+    for(int k=0; k<sz; k++){
+      int inside = 1;
+      if(window==0){
+        if(e[k] < 1.0 || e[k] > 1.0 + 2.0*gamma){ inside = 0; }
+        for(int j=0; j<sz && inside; j++){ if(j!=k && (e[j] < 0.0 || e[j] > 2.0*gamma)){ inside = 0; } }
+      }
+      else{
+        if(e[k] < 1.0){ inside = 0; }
+        for(int j=0; j<sz && inside; j++){ if(j!=k && e[j] > 1.0){ inside = 0; } }
+      }
+      if(inside){ res[k] += 1.0; total += 1.0; }
+    }
+  }
+  if(total > 0.0){ for(int k=0; k<sz; k++){ res[k] /= total; } }
+  return res;
+}
+
+vector<double> dyn_variables::compute_average_sqc_pop(int rep){
+  return compute_average_sqc_pop(rep, sqc_window, sqc_gamma);
+}
+
 vector<double> dyn_variables::compute_average_sh_pop(int rep){
 /**
   Computing the SH population with the active state of the input rep.

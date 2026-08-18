@@ -12,4 +12,5 @@ __all__ = ["compute",
            "recipes",
            "recipes_Ehrenfest",
            "save",
+           "sqc",
            ]
