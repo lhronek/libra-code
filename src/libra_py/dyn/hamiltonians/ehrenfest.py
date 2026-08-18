@@ -49,6 +49,7 @@ def ehrenfest_force_tensors_adi(
     amplitudes: Any = None,
     option: int = 0,
     transform: Any = None,
+    normalized: bool = True,
 ) -> Any:
     """
     Return adiabatic mean-field force tensors for active TBFs.
@@ -76,11 +77,13 @@ def ehrenfest_force_tensors_adi(
         dc_t = np.einsum("...ij,...djk,...kl->...dil", t_h, dc, t)
         tmp = np.einsum("...dij,...jk->...dik", _h(dc_t), h_t)
         tmp = tmp + _h(tmp)
-        tensors = -(d1_t - tmp) / norm[..., None, None, None]
+        tensors = -(d1_t - tmp)
     elif option == 1:
-        tensors = -d1_t / norm[..., None, None, None]
+        tensors = -d1_t
     else:
         raise ValueError("option must be 0 or 1")
+    if normalized:
+        tensors = tensors / norm[..., None, None, None]
 
     return tensors
 
@@ -90,6 +93,7 @@ def ehrenfest_force_tensors_dia(
     traj: Any,
     amplitudes: Any = None,
     option: int = 0,
+    normalized: bool = True,
 ) -> Any:
     """
     Return diabatic mean-field force tensors for active TBFs.
@@ -110,11 +114,13 @@ def ehrenfest_force_tensors_dia(
     if option == 0:
         tmp = np.einsum("...dij,...jk,...kl->...dil", _h(dc), inv_s, h)
         tmp = tmp + _h(tmp)
-        tensors = -(d1 - tmp) / norm[..., None, None, None]
+        tensors = -(d1 - tmp)
     elif option == 1:
-        tensors = -d1 / norm[..., None, None, None]
+        tensors = -d1
     else:
         raise ValueError("option must be 0 or 1")
+    if normalized:
+        tensors = tensors / norm[..., None, None, None]
 
     return tensors
 
@@ -126,12 +132,14 @@ def ehrenfest_forces_adi(
     option: int = 0,
     transform: Any = None,
     gamma: float | Any = 0.0,
+    normalized: bool = True,
 ) -> Any:
     """
     Compute adiabatic Ehrenfest forces for active TBFs.
 
     The return shape is `(ntbf, ndof)` for a trajectory slice. The optional
-    Meyer-Miller/SQC `gamma` term follows the C++ implementation.
+    Meyer-Miller/SQC `gamma` term follows the C++ implementation;
+    `normalized=False` is the un-normalized Meyer-Miller mapping force.
     """
 
     idx = traj.tbf_ids
@@ -142,6 +150,7 @@ def ehrenfest_forces_adi(
         c,
         option=option,
         transform=transform,
+        normalized=normalized,
     )
     forces = _expectation_by_dof(c, tensors)
 
@@ -149,8 +158,11 @@ def ehrenfest_forces_adi(
     if np.any(gamma_arr != 0.0):
         d1 = np.asarray(storage.d1ham_adi[traj.id, idx])
         trace_grad = np.trace(d1, axis1=-2, axis2=-1)
-        norm = np.einsum("...i,...i->...", np.conjugate(c), c)
-        forces += np.asarray(gamma)[..., None] * trace_grad / norm[..., None]
+        term = np.asarray(gamma)[..., None] * trace_grad
+        if normalized:
+            norm = np.real(np.einsum("...i,...i->...", np.conjugate(c), c))
+            term = term / norm[..., None]
+        forces = forces + term
 
     return forces
 
@@ -161,6 +173,7 @@ def ehrenfest_forces_dia(
     amplitudes: Any = None,
     option: int = 0,
     gamma: float | Any = 0.0,
+    normalized: bool = True,
 ) -> Any:
     """
     Compute diabatic Ehrenfest forces for active TBFs.
@@ -174,7 +187,7 @@ def ehrenfest_forces_dia(
 
     idx = traj.tbf_ids
     c = _as_array(amplitudes, storage.ampl_dia[traj.id, idx])
-    tensors = ehrenfest_force_tensors_dia(storage, traj, c, option=option)
+    tensors = ehrenfest_force_tensors_dia(storage, traj, c, option=option, normalized=normalized)
     forces = _expectation_by_dof(c, tensors)
     gamma_arr = np.asarray(gamma)
     if np.any(gamma_arr != 0.0):
@@ -187,8 +200,11 @@ def ehrenfest_forces_dia(
             dc = np.asarray(storage.dc1_dia[traj.id, idx])
             cross = np.einsum("...ij,...djk,...kl,...li->...d", inv_s, dc, inv_s, h)
             zpe = zpe - 2.0 * np.real(cross)
-        norm = np.real(_expectation(c, s))
-        forces = forces + np.asarray(gamma)[..., None] * zpe / norm[..., None]
+        term = np.asarray(gamma)[..., None] * zpe
+        if normalized:
+            norm = np.real(_expectation(c, s))
+            term = term / norm[..., None]
+        forces = forces + term
     return forces
 
 

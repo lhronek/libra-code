@@ -145,6 +145,7 @@ class DynamicsEngine:
                 rep=self.rep,
                 option=int(_param(self.params, "ehrenfest_force_option", 0)),
                 gamma=_param(self.params, "sqc_gamma", 0.0),
+                normalized=bool(int(_param(self.params, "ehrenfest_normalized", 1))),
             )
         else:
             forces = state_specific_forces(self.storage, self.traj, rep="adiabatic")

@@ -60,9 +60,9 @@ def ehrenfest_forces(
     option: int = 0,
     transform: Any = None,
     gamma: float | Any = 0.0,
+    normalized: bool = True,
 ) -> Any:
     """Return active Ehrenfest mean-field forces."""
-
     if rep == "adiabatic":
         return np.real(ehrenfest_forces_adi(
             storage,
@@ -70,7 +70,9 @@ def ehrenfest_forces(
             option=option,
             transform=transform,
             gamma=gamma,
+            normalized=normalized,
         ))
     if rep == "diabatic":
-        return np.real(ehrenfest_forces_dia(storage, traj, option=option, gamma=gamma))
+        return np.real(ehrenfest_forces_dia(storage, traj, option=option, gamma=gamma,
+                                            normalized=normalized))
     raise ValueError("rep must be 'adiabatic' or 'diabatic'")
