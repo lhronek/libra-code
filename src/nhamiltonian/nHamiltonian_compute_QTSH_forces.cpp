@@ -46,6 +46,12 @@ CMATRIX nHamiltonian::QTSH_forces_dia_unit(CMATRIX &ampl_dia, int option) {
 
   */
 
+  // an unlisted option would leave res at zero - a silent zero force
+  if (!(option == 0 || option == 1)) {
+    cout << "Error in QTSH_forces_dia_unit(): option = " << option
+         << " is not allowed (0 - first-order off-diagonal force, 1 - with the second-order term)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
   if (ovlp_dia_mem_status == 0) {
     cout
         << "Error in QTSH_forces_dia_unit(): the overlap matrix in the diabatic basis is not allocated \
@@ -238,6 +244,12 @@ CMATRIX nHamiltonian::QTSH_forces_adi_unit(CMATRIX &ampl_adi, int option,
 
   */
 
+  // an unlisted option would leave res at zero - a silent zero force
+  if (!(option == 0 || option == 1 || option == 2)) {
+    cout << "Error in QTSH_forces_adi_unit(): option = " << option
+         << " is not allowed (0 - first-order off-diagonal force, 1 - with the second-order term, 2 - no derivative-coupling force)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
   if (ham_adi_mem_status == 0) {
     cout
         << "Error in QTSH_forces_adi(): the adiabatic Hamiltonian matrix is not allocated \

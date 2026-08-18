@@ -60,6 +60,12 @@ CMATRIX nHamiltonian::Ehrenfest_forces_dia_unit(CMATRIX &ampl_dia, int option, d
 
   */
 
+  // an unlisted option would leave res at zero - a silent zero force
+  if (!(option == 0 || option == 1)) {
+    cout << "Error in Ehrenfest_forces_dia_unit(): option = " << option
+         << " is not allowed (0 - all terms, 1 - no derivative-coupling terms)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
   if (ovlp_dia_mem_status == 0) {
     cout
         << "Error in Ehrenfest_forces_dia_unit(): the overlap matrix in the diabatic basis is not allocated \
@@ -283,6 +289,12 @@ CMATRIX nHamiltonian::Ehrenfest_forces_adi_unit(CMATRIX &ampl_adi, int option,
 
   */
 
+  // an unlisted option would leave res at zero - a silent zero force
+  if (!(option == 0 || option == 1)) {
+    cout << "Error in Ehrenfest_forces_adi_unit(): option = " << option
+         << " is not allowed (0 - all terms, 1 - no derivative-coupling terms)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
   if (ham_adi_mem_status == 0) {
     cout
         << "Error in Ehrenfest_forces_adi(): the adiabatic Hamiltonian matrix is not allocated \

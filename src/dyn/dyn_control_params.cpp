@@ -421,6 +421,14 @@ void dyn_control_params::sanity_check(){
     throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
+  /// the QTSH force unit functions compute nothing for any other value
+  if(qtsh_force_option!=0 && qtsh_force_option!=1 && qtsh_force_option!=2){
+    std::cout<<"Error in dyn_control_params::sanity_check: qtsh_force_option = "
+        <<qtsh_force_option<<" is not allowed (0 - first-order off-diagonal force, 1 - with the"
+        <<" second-order term, 2 - no derivative-coupling force, adiabatic only)\n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
   /// Shall not use DISH with the decoherence correction
   /// (tsh_method 3 is Landau-Zener - DISH is 5)
   if(tsh_method==5 && decoherence_algo!=-1){
