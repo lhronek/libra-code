@@ -160,13 +160,36 @@ def ehrenfest_forces_dia(
     traj: Any,
     amplitudes: Any = None,
     option: int = 0,
+    gamma: float | Any = 0.0,
 ) -> Any:
-    """Compute diabatic Ehrenfest forces for active TBFs."""
+    """
+    Compute diabatic Ehrenfest forces for active TBFs.
+
+    The optional Meyer-Miller/SQC `gamma` term is the diabatic twin of the
+    adiabatic gamma * sum_i dE_i/dR: with sum_i E_i = tr(S^-1 H) and
+    dS/dR = dc1 + dc1^H it is gamma * [tr(S^-1 dH) - 2 Re tr(S^-1 dc1 S^-1 H)]
+    over <c|S|c>; `option=1` keeps only the dH part, like the rest of the
+    force. It follows the C++ implementation.
+    """
 
     idx = traj.tbf_ids
     c = _as_array(amplitudes, storage.ampl_dia[traj.id, idx])
     tensors = ehrenfest_force_tensors_dia(storage, traj, c, option=option)
-    return _expectation_by_dof(c, tensors)
+    forces = _expectation_by_dof(c, tensors)
+    gamma_arr = np.asarray(gamma)
+    if np.any(gamma_arr != 0.0):
+        s = np.asarray(storage.ovlp_dia[traj.id, idx])
+        d1 = np.asarray(storage.d1ham_dia[traj.id, idx])
+        inv_s = np.linalg.inv(s)
+        zpe = np.einsum("...ij,...dji->...d", inv_s, d1)
+        if option == 0:
+            h = np.asarray(storage.ham_dia[traj.id, idx])
+            dc = np.asarray(storage.dc1_dia[traj.id, idx])
+            cross = np.einsum("...ij,...djk,...kl,...li->...d", inv_s, dc, inv_s, h)
+            zpe = zpe - 2.0 * np.real(cross)
+        norm = np.real(_expectation(c, s))
+        forces = forces + np.asarray(gamma)[..., None] * zpe / norm[..., None]
+    return forces
 
 
 def _expectation(c: Any, matrix: Any) -> Any:

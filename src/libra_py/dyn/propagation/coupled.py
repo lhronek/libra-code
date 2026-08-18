@@ -72,5 +72,5 @@ def ehrenfest_forces(
             gamma=gamma,
         ))
     if rep == "diabatic":
-        return np.real(ehrenfest_forces_dia(storage, traj, option=option))
+        return np.real(ehrenfest_forces_dia(storage, traj, option=option, gamma=gamma))
     raise ValueError("rep must be 'adiabatic' or 'diabatic'")
