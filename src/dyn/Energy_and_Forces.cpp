@@ -376,7 +376,9 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
       // variant for the bare-energy integrators 0-2, 10-12
       int option = prms.ehrenfest_force_option;
       //*dyn_vars.f = ham.Ehrenfest_forces_adi(*dyn_vars.ampl_adi, 1, option, dyn_vars.proj_adi).real();
-      *dyn_vars.f = ham.Ehrenfest_forces_adi(*dyn_vars.ampl_adi, 1, option).real();
+      // sqc_gamma adds the Meyer-Miller ZPE term gamma * tr(dH/dR) / |c|^2;
+      // 0 is the plain Ehrenfest force
+      *dyn_vars.f = ham.Ehrenfest_forces_adi(*dyn_vars.ampl_adi, 1, option, prms.sqc_gamma).real();
 /*
       CMATRIX& U = *ham.basis_transform;
       CMATRIX& C = *dyn_vars.ampl_adi;

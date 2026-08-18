@@ -272,6 +272,8 @@ void export_nhamiltonian_objects(){
   = &nHamiltonian::Ehrenfest_forces_adi;
   CMATRIX (nHamiltonian::*expt_Ehrenfest_forces_adi_v2)(CMATRIX& ampl_adi, int lvl)
   = &nHamiltonian::Ehrenfest_forces_adi;
+  CMATRIX (nHamiltonian::*expt_Ehrenfest_forces_adi_v3)(CMATRIX& ampl_adi, int lvl, int option, double gamma)
+  = &nHamiltonian::Ehrenfest_forces_adi;
 
 //  CMATRIX (nHamiltonian::*expt_Ehrenfest_forces_adi_v2)(CMATRIX& ampl_adi, vector<int>& id_)
 //  = &nHamiltonian::Ehrenfest_forces_adi;
@@ -580,6 +582,7 @@ void export_nhamiltonian_objects(){
 
       .def("Ehrenfest_forces_adi", expt_Ehrenfest_forces_adi_v1)
       .def("Ehrenfest_forces_adi", expt_Ehrenfest_forces_adi_v2)
+      .def("Ehrenfest_forces_adi", expt_Ehrenfest_forces_adi_v3)
 //      .def("Ehrenfest_forces_adi", expt_Ehrenfest_forces_adi_v3)
 //      .def("Ehrenfest_forces_adi", expt_Ehrenfest_forces_adi_v2)
       .def("Ehrenfest_forces_dia", expt_Ehrenfest_forces_dia_v1)

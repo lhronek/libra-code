@@ -442,10 +442,15 @@ CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl,
 }
 
 CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl,
-                                           int option) {
+                                           int option, double gamma) {
+  /**
+    The uniform-gamma form: one Meyer-Miller ZPE parameter for every
+    trajectory (the sqc_gamma control key) and identity transforms - the
+    amplitudes are already in the current adiabatic basis
+  */
   int ntraj = ampl_adi.n_cols;
   vector<CMATRIX *> I(ntraj);
-  vector<double> gammas(ntraj, 0.0);
+  vector<double> gammas(ntraj, gamma);
 
   for (int itraj = 0; itraj < ntraj; itraj++) {
     I[itraj] = new CMATRIX(nadi, nadi);
@@ -462,6 +467,11 @@ CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl,
   I.clear();
 
   return F;
+}
+
+CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl,
+                                           int option) {
+  return Ehrenfest_forces_adi(ampl_adi, lvl, option, 0.0);
 }
 
 CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl) {

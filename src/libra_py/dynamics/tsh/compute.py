@@ -188,6 +188,8 @@ def _print_simulation_params(dyn_params, nadi, ntraj, init_params=None, model_pa
     ]
     if int(p["force_method"]) == 2 and int(p["rep_force"]) == 1 and "ehrenfest_force_option" in p:
         lines.append(row("ehrenfest_force_option:", p["ehrenfest_force_option"]))
+    if int(p["force_method"]) == 2 and float(p.get("sqc_gamma", 0.0)) != 0.0:
+        lines.append(row("sqc_gamma:", p["sqc_gamma"]))
     lines += [
         row("ensemble:", named(p["ensemble"], _ENSEMBLE_NAMES)),
         row("Temperature [K]:", F"{p['Temperature']:.2f}"),
