@@ -227,6 +227,12 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
         id[1] = (itraj < (int)ham.children.size()) ? itraj : 0;  // NBRA: 1 shared child
         coeff = dyn_vars.ampl_dia->col(itraj);
         res[itraj] = ham.Ehrenfest_energy_dia(coeff, id).real();
+        // the un-normalized Meyer-Miller potential, E = c^H H c - gamma tr(H) -
+        // the quantity conserved together with the ehrenfest_normalized 0 force
+        if(prms.ehrenfest_normalized==0){
+          double nrm = (coeff.H() * ham.get_ovlp_dia(id) * coeff).get(0,0).real();
+          res[itraj] = res[itraj] * nrm - prms.sqc_gamma * ham.get_ham_dia(id).tr().real();
+        }
       }
     }
     // Adiabatic 
@@ -236,6 +242,10 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
         id[1] = (itraj < (int)ham.children.size()) ? itraj : 0;  // NBRA: 1 shared child
         coeff = dyn_vars.ampl_adi->col(itraj);
         res[itraj] = ham.Ehrenfest_energy_adi(coeff, id, *(dyn_vars.proj_adi[itraj]) ).real();
+        if(prms.ehrenfest_normalized==0){
+          double nrm = (coeff.H() * coeff).get(0,0).real();
+          res[itraj] = res[itraj] * nrm - prms.sqc_gamma * ham.get_ham_adi(id).tr().real();
+        }
       }
     }
   
@@ -363,7 +373,7 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
     // Diabatic 
     if(prms.rep_force==0){  
      // sqc_gamma adds the Meyer-Miller ZPE term (see the adiabatic branch)
-     *dyn_vars.f = ham.Ehrenfest_forces_dia(*dyn_vars.ampl_dia, 1, 0, prms.sqc_gamma).real(); 
+     *dyn_vars.f = ham.Ehrenfest_forces_dia(*dyn_vars.ampl_dia, 1, 0, prms.sqc_gamma, prms.ehrenfest_normalized).real(); 
  
 
      //cout<<"dia MF forces\n"; dyn_vars.f->show_matrix();
@@ -379,7 +389,7 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
       //*dyn_vars.f = ham.Ehrenfest_forces_adi(*dyn_vars.ampl_adi, 1, option, dyn_vars.proj_adi).real();
       // sqc_gamma adds the Meyer-Miller ZPE term gamma * tr(dH/dR) / |c|^2;
       // 0 is the plain Ehrenfest force
-      *dyn_vars.f = ham.Ehrenfest_forces_adi(*dyn_vars.ampl_adi, 1, option, prms.sqc_gamma).real();
+      *dyn_vars.f = ham.Ehrenfest_forces_adi(*dyn_vars.ampl_adi, 1, option, prms.sqc_gamma, prms.ehrenfest_normalized).real();
 /*
       CMATRIX& U = *ham.basis_transform;
       CMATRIX& C = *dyn_vars.ampl_adi;

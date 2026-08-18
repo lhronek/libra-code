@@ -125,6 +125,12 @@ class DynControlParams:
     #: the bare-energy integrators (0-2, 10-12)
     ehrenfest_force_option: int = 0
 
+    #: Normalization of the mean-field (force_method 2) force and potential energy
+    #: 1 divide by <c|S|c> - the Ehrenfest form for normalized amplitudes [ default ]
+    #: 0 un-normalized - the Meyer-Miller mapping form F = -Re c^H dH c + gamma tr(dH),
+    #: E = c^H H c - gamma tr(H), for SQC-window-sampled amplitudes (|c|^2 = 1 + N gamma)
+    ehrenfest_normalized: int = 1
+
     #: Enforce nuclear motion on a fixed electronic state
     #: 0 no [default]
     #: 1 yes

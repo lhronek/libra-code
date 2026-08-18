@@ -73,6 +73,7 @@ void export_dyn_control_params_objects(){
       .def_readwrite("rep_force", &dyn_control_params::rep_force)
       .def_readwrite("force_method", &dyn_control_params::force_method)
       .def_readwrite("ehrenfest_force_option", &dyn_control_params::ehrenfest_force_option)
+      .def_readwrite("ehrenfest_normalized", &dyn_control_params::ehrenfest_normalized)
       .def_readwrite("sqc_gamma", &dyn_control_params::sqc_gamma)
       .def_readwrite("time_overlap_method", &dyn_control_params::time_overlap_method)
       .def_readwrite("nac_update_method", &dyn_control_params::nac_update_method)

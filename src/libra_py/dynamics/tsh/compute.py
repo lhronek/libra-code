@@ -190,6 +190,8 @@ def _print_simulation_params(dyn_params, nadi, ntraj, init_params=None, model_pa
         lines.append(row("ehrenfest_force_option:", p["ehrenfest_force_option"]))
     if int(p["force_method"]) == 2 and float(p.get("sqc_gamma", 0.0)) != 0.0:
         lines.append(row("sqc_gamma:", p["sqc_gamma"]))
+    if int(p["force_method"]) == 2 and "ehrenfest_normalized" in p:
+        lines.append(row("ehrenfest_normalized:", p["ehrenfest_normalized"]))
     lines += [
         row("ensemble:", named(p["ensemble"], _ENSEMBLE_NAMES)),
         row("Temperature [K]:", F"{p['Temperature']:.2f}"),
@@ -412,6 +414,15 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                      every electronic integrator [ default ]
                 - 1: drop the derivative-coupling terms - the local-diabatization-consistent variant for
                      the bare-energy integrators (0-2, 10-12)
+
+
+            * **dyn_params["ehrenfest_normalized"]** ( int ): normalization of the mean-field force and
+                potential energy (force_method == 2):
+
+                - 1: divide by <c|S|c> - the Ehrenfest form for normalized amplitudes [ default ]
+                - 0: un-normalized - the Meyer-Miller mapping form F = -Re c^H dH c + gamma tr(dH),
+                     E = c^H H c - gamma tr(H) (with sqc_gamma), for SQC-window-sampled amplitudes
+                     (init_type 5/6) whose |c|^2 = 1 + N gamma is not 1
 
 
             * **dyn_params["sqc_gamma"]** ( double ): Gamma parameter in the Meyer-Miller Hamiltonian of form:

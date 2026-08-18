@@ -33,7 +33,7 @@ namespace libnhamiltonian {
 using namespace liblinalg;
 using namespace libmeigen;
 
-CMATRIX nHamiltonian::Ehrenfest_forces_dia_unit(CMATRIX &ampl_dia, int option, double gamma) {
+CMATRIX nHamiltonian::Ehrenfest_forces_dia_unit(CMATRIX &ampl_dia, int option, double gamma, int normalized) {
   /**
     \param[in] ampl_dia: MATRIX(ndia, 1) diabatic amplitudes for one trajectory
 
@@ -132,7 +132,9 @@ CMATRIX nHamiltonian::Ehrenfest_forces_dia_unit(CMATRIX &ampl_dia, int option, d
 
   } // for n
 
-  res /= norm;
+  // normalized 0 = the un-normalized Meyer-Miller mapping force (SQC-sampled
+  // amplitudes carry |c|^2 = 1 + N gamma)
+  if (normalized) { res /= norm; }
 
   delete dtilda;
   delete invS;
@@ -140,16 +142,20 @@ CMATRIX nHamiltonian::Ehrenfest_forces_dia_unit(CMATRIX &ampl_dia, int option, d
   return res;
 }
 
+CMATRIX nHamiltonian::Ehrenfest_forces_dia_unit(CMATRIX &ampl_dia, int option, double gamma) {
+  return Ehrenfest_forces_dia_unit(ampl_dia, option, gamma, 1);
+}
+
 CMATRIX nHamiltonian::Ehrenfest_forces_dia_unit(CMATRIX &ampl_dia, int option) {
-  return Ehrenfest_forces_dia_unit(ampl_dia, option, 0.0);
+  return Ehrenfest_forces_dia_unit(ampl_dia, option, 0.0, 1);
 }
 
 CMATRIX nHamiltonian::Ehrenfest_forces_dia_unit(CMATRIX &ampl_dia) {
-  return Ehrenfest_forces_dia_unit(ampl_dia, 0, 0.0);
+  return Ehrenfest_forces_dia_unit(ampl_dia, 0, 0.0, 1);
 }
 
 CMATRIX nHamiltonian::Ehrenfest_forces_dia(CMATRIX &ampl_dia, int lvl,
-                                           int option, double gamma) {
+                                           int option, double gamma, int normalized) {
   /**
     \brief Computes the Ehrenfest forces in the diabatic basis
 
@@ -211,10 +217,10 @@ CMATRIX nHamiltonian::Ehrenfest_forces_dia(CMATRIX &ampl_dia, int lvl,
     pop_submatrix(ampl_dia, ampl_tmp, stenc_ampl, stenc_col);
 
     if (lvl == 0) {
-      frc_tmp = Ehrenfest_forces_dia_unit(ampl_tmp, option, gamma);
+      frc_tmp = Ehrenfest_forces_dia_unit(ampl_tmp, option, gamma, normalized);
     }
     if (lvl == 1) {
-      frc_tmp = children[i]->Ehrenfest_forces_dia_unit(ampl_tmp, option, gamma);
+      frc_tmp = children[i]->Ehrenfest_forces_dia_unit(ampl_tmp, option, gamma, normalized);
     }
 
     push_submatrix(F, frc_tmp, stenc_frc, stenc_col);
@@ -225,12 +231,17 @@ CMATRIX nHamiltonian::Ehrenfest_forces_dia(CMATRIX &ampl_dia, int lvl,
 }
 
 CMATRIX nHamiltonian::Ehrenfest_forces_dia(CMATRIX &ampl_dia, int lvl,
+                                           int option, double gamma) {
+  return Ehrenfest_forces_dia(ampl_dia, lvl, option, gamma, 1);
+}
+
+CMATRIX nHamiltonian::Ehrenfest_forces_dia(CMATRIX &ampl_dia, int lvl,
                                            int option) {
-  return Ehrenfest_forces_dia(ampl_dia, lvl, option, 0.0);
+  return Ehrenfest_forces_dia(ampl_dia, lvl, option, 0.0, 1);
 }
 
 CMATRIX nHamiltonian::Ehrenfest_forces_dia(CMATRIX &ampl_dia, int lvl) {
-  return Ehrenfest_forces_dia(ampl_dia, lvl, 0, 0.0);
+  return Ehrenfest_forces_dia(ampl_dia, lvl, 0, 0.0, 1);
 }
 
 /*
@@ -252,7 +263,7 @@ requested id\n"; std::cout << std::flush; throw std::runtime_error("libra C++ er
 
 CMATRIX nHamiltonian::Ehrenfest_forces_adi_unit(CMATRIX &ampl_adi, int option,
                                                 CMATRIX &transform,
-                                                double gamma) {
+                                                double gamma, int normalized) {
   /**
     \param[in] ampl_adi: MATRIX(nadi, 1) diabatic amplitudes for one trajectory
 
@@ -358,33 +369,40 @@ CMATRIX nHamiltonian::Ehrenfest_forces_adi_unit(CMATRIX &ampl_adi, int option,
     } // for i
   } // for n
 
-  res /= norm;
+  // normalized 0 = the un-normalized Meyer-Miller mapping force
+  if (normalized) { res /= norm; }
   // delete tmp;
 
   return res;
 }
 
 CMATRIX nHamiltonian::Ehrenfest_forces_adi_unit(CMATRIX &ampl_adi, int option,
+                                                CMATRIX &transform,
+                                                double gamma) {
+  return Ehrenfest_forces_adi_unit(ampl_adi, option, transform, gamma, 1);
+}
+
+CMATRIX nHamiltonian::Ehrenfest_forces_adi_unit(CMATRIX &ampl_adi, int option,
                                                 CMATRIX &transform) {
-  return Ehrenfest_forces_adi_unit(ampl_adi, option, transform, 0.0);
+  return Ehrenfest_forces_adi_unit(ampl_adi, option, transform, 0.0, 1);
 }
 
 CMATRIX nHamiltonian::Ehrenfest_forces_adi_unit(CMATRIX &ampl_adi, int option) {
   CMATRIX I(nadi, nadi);
   I.identity();
-  return Ehrenfest_forces_adi_unit(ampl_adi, option, I, 0.0);
+  return Ehrenfest_forces_adi_unit(ampl_adi, option, I, 0.0, 1);
 }
 
 CMATRIX nHamiltonian::Ehrenfest_forces_adi_unit(CMATRIX &ampl_adi) {
   CMATRIX I(nadi, nadi);
   I.identity();
-  return Ehrenfest_forces_adi_unit(ampl_adi, 0, I, 0.0);
+  return Ehrenfest_forces_adi_unit(ampl_adi, 0, I, 0.0, 1);
 }
 
 CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl,
                                            int option,
                                            vector<CMATRIX *> &transforms,
-                                           vector<double> &gammas) {
+                                           vector<double> &gammas, int normalized) {
   /**
     \brief Computes the Ehrenfest forces in the adiabatic basis
 
@@ -453,11 +471,11 @@ CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl,
 
     if (lvl == 0) {
       frc_tmp = Ehrenfest_forces_adi_unit(ampl_tmp, option, *transforms[0],
-                                          gammas[0]); // gammas[i]);
+                                          gammas[0], normalized); // gammas[i]);
     }
     if (lvl == 1) {
       frc_tmp = children[i]->Ehrenfest_forces_adi_unit(
-          ampl_tmp, option, *transforms[i], gammas[i]);
+          ampl_tmp, option, *transforms[i], gammas[i], normalized);
     }
 
     push_submatrix(F, frc_tmp, stenc_frc, stenc_col);
@@ -469,15 +487,22 @@ CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl,
 
 CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl,
                                            int option,
+                                           vector<CMATRIX *> &transforms,
+                                           vector<double> &gammas) {
+  return Ehrenfest_forces_adi(ampl_adi, lvl, option, transforms, gammas, 1);
+}
+
+CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl,
+                                           int option,
                                            vector<CMATRIX *> &transforms) {
   int ntraj = ampl_adi.n_cols;
   vector<double> gammas(ntraj, 0.0);
 
-  return Ehrenfest_forces_adi(ampl_adi, lvl, option, transforms, gammas);
+  return Ehrenfest_forces_adi(ampl_adi, lvl, option, transforms, gammas, 1);
 }
 
 CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl,
-                                           int option, double gamma) {
+                                           int option, double gamma, int normalized) {
   /**
     The uniform-gamma form: one Meyer-Miller ZPE parameter for every
     trajectory (the sqc_gamma control key) and identity transforms - the
@@ -494,7 +519,7 @@ CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl,
 
   CMATRIX F(nnucl, ampl_adi.n_cols);
 
-  F = Ehrenfest_forces_adi(ampl_adi, lvl, option, I, gammas);
+  F = Ehrenfest_forces_adi(ampl_adi, lvl, option, I, gammas, normalized);
 
   for (int itraj = 0; itraj < ntraj; itraj++) {
     delete I[itraj];
@@ -505,8 +530,13 @@ CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl,
 }
 
 CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl,
+                                           int option, double gamma) {
+  return Ehrenfest_forces_adi(ampl_adi, lvl, option, gamma, 1);
+}
+
+CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl,
                                            int option) {
-  return Ehrenfest_forces_adi(ampl_adi, lvl, option, 0.0);
+  return Ehrenfest_forces_adi(ampl_adi, lvl, option, 0.0, 1);
 }
 
 CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl) {

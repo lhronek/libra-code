@@ -575,9 +575,11 @@ public:
   ///< In nHamiltonian_compute_Ehrenfest.cpp and nHamiltonian_compute_Ehrenfest_forces.cpp
   complex<double> Ehrenfest_energy_dia(CMATRIX& ampl_dia);
   complex<double> Ehrenfest_energy_dia(CMATRIX& ampl_dia, vector<int>& id_);
+  CMATRIX Ehrenfest_forces_dia_unit(CMATRIX& ampl_dia, int option, double gamma, int normalized);  ///< Ehrenfest forces in diabatic basis, gamma term, normalized 0 = un-normalized Meyer-Miller form
   CMATRIX Ehrenfest_forces_dia_unit(CMATRIX& ampl_dia, int option, double gamma);  ///< Ehrenfest forces in diabatic basis, with the Meyer-Miller gamma term
   CMATRIX Ehrenfest_forces_dia_unit(CMATRIX& ampl_dia, int option);      ///< Ehrenfest forces in diabatic basis
   CMATRIX Ehrenfest_forces_dia_unit(CMATRIX& ampl_dia);                  ///< Ehrenfest forces in diabatic basis
+  CMATRIX Ehrenfest_forces_dia(CMATRIX& ampl_dia, int lvl, int option, double gamma, int normalized);  ///< Ehrenfest forces in diabatic basis, uniform gamma, normalization switch
   CMATRIX Ehrenfest_forces_dia(CMATRIX& ampl_dia, int lvl, int option, double gamma);  ///< Ehrenfest forces in diabatic basis, uniform Meyer-Miller gamma
   CMATRIX Ehrenfest_forces_dia(CMATRIX& ampl_dia, int lvl, int option);  ///< Ehrenfest forces in diabatic basis
   CMATRIX Ehrenfest_forces_dia(CMATRIX& ampl_dia, int lvl);              ///< Ehrenfest forces in diabatic basis
@@ -588,12 +590,15 @@ public:
   complex<double> Ehrenfest_energy_adi(CMATRIX& ampl_adi);
   complex<double> Ehrenfest_energy_adi(CMATRIX& ampl_adi, vector<int>& id_, CMATRIX& transform);
   complex<double> Ehrenfest_energy_adi(CMATRIX& ampl_adi, vector<int>& id_);
+  CMATRIX Ehrenfest_forces_adi_unit(CMATRIX& ampl_adi, int option, CMATRIX& transform, double gamma, int normalized);  ///< Ehrenfest forces in adiabatic basis, normalized 0 = un-normalized Meyer-Miller form
   CMATRIX Ehrenfest_forces_adi_unit(CMATRIX& ampl_adi, int option, CMATRIX& transform, double gamma);  ///< Ehrenfest forces in adiabatic basis
   CMATRIX Ehrenfest_forces_adi_unit(CMATRIX& ampl_adi, int option, CMATRIX& transform);      ///< Ehrenfest forces in adiabatic basis
   CMATRIX Ehrenfest_forces_adi_unit(CMATRIX& ampl_adi, int option);      ///< Ehrenfest forces in adiabatic basis
   CMATRIX Ehrenfest_forces_adi_unit(CMATRIX& ampl_adi);                  ///< Ehrenfest forces in adiabatic basis
+  CMATRIX Ehrenfest_forces_adi(CMATRIX& ampl_adi, int lvl, int option, vector<CMATRIX*>& transforms, vector<double>& gammas, int normalized);  ///< Ehrenfest forces in adiabatic basis, normalization switch
   CMATRIX Ehrenfest_forces_adi(CMATRIX& ampl_adi, int lvl, int option, vector<CMATRIX*>& transforms, vector<double>& gammas);  ///< Ehrenfest forces in adiabatic basis
   CMATRIX Ehrenfest_forces_adi(CMATRIX& ampl_adi, int lvl, int option, vector<CMATRIX*>& transforms);  ///< Ehrenfest forces in adiabatic basis
+  CMATRIX Ehrenfest_forces_adi(CMATRIX& ampl_adi, int lvl, int option, double gamma, int normalized);  ///< Ehrenfest forces in adiabatic basis, uniform gamma, identity transforms, normalization switch
   CMATRIX Ehrenfest_forces_adi(CMATRIX& ampl_adi, int lvl, int option, double gamma);  ///< Ehrenfest forces in adiabatic basis, uniform Meyer-Miller gamma, identity transforms
   CMATRIX Ehrenfest_forces_adi(CMATRIX& ampl_adi, int lvl, int option);  ///< Ehrenfest forces in adiabatic basis
   CMATRIX Ehrenfest_forces_adi(CMATRIX& ampl_adi, int lvl);              ///< Ehrenfest forces in adiabatic basis

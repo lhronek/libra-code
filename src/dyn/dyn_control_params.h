@@ -161,6 +161,17 @@ class dyn_control_params{
   */
   int ehrenfest_force_option;
 
+  /**
+    Normalization of the mean-field (force_method == 2) force and potential energy
+
+    Options:
+      - 1: divide by <c|S|c> - the Ehrenfest form for normalized amplitudes [ default ]
+      - 0: un-normalized - the Meyer-Miller mapping form, F = -Re c^H dH c + gamma tr(dH),
+           E = c^H H c - gamma tr(H) with sqc_gamma, for SQC-window-sampled amplitudes
+           whose |c|^2 = 1 + N gamma is not 1
+  */
+  int ehrenfest_normalized;
+
 
   /**
     Gamma parameter in the Meyer-Miller Hamiltonian of form:
