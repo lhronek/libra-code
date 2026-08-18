@@ -79,6 +79,20 @@ CMATRIX transform_amplitudes(int rep_in, int rep_out, CMATRIX& C, nHamiltonian& 
 }
 
 
+void dyn_variables::update_mm_variables(){
+  /**
+    Meyer-Miller mapping variables from the adiabatic amplitudes, ampl_adi =
+    (q_mm + i p_mm)/sqrt2 - kept in step with every amplitude update
+  */
+  for(int traj=0; traj<ntraj; traj++){
+    for(int i=0; i<nadi; i++){
+      complex<double> c = ampl_adi->get(i, traj);
+      q_mm->set(i, traj, sqrt(2.0) * c.real());
+      p_mm->set(i, traj, sqrt(2.0) * c.imag());
+    }
+  }
+}
+
 void dyn_variables::update_amplitudes(dyn_control_params& dyn_params, nHamiltonian& ham){
 
   // The diabatic rep is the major, so we update the adiabatic amplitudes
@@ -87,6 +101,7 @@ void dyn_variables::update_amplitudes(dyn_control_params& dyn_params, nHamiltoni
   // The adiabatic rep is the major, so we update the diabatic amplitudes
   else if(dyn_params.rep_tdse==1){   ham.ampl_adi2dia(ampl_dia, ampl_adi, 0, 1);  }
 
+  update_mm_variables();
 }
 
 void dyn_variables::update_amplitudes(bp::dict dyn_params, nHamiltonian& ham){
@@ -131,6 +146,7 @@ void dyn_variables::update_amplitudes(dyn_control_params& dyn_params, bp::object
     // The adiabatic rep is the major, so we update the diabatic amplitudes
     else if(dyn_params.rep_tdse==1){   ham.ampl_adi2dia(ampl_dia, ampl_adi, 0, 1);  }
 
+    update_mm_variables();
 }
 
 
@@ -201,6 +217,7 @@ void dyn_variables::update_amplitudes(dyn_control_params& dyn_params){
     }
   }// for traj
   if (omp_eptr) { std::rethrow_exception(omp_eptr); }
+  update_mm_variables();
 
 }
 
@@ -482,6 +499,12 @@ void dyn_variables::init_amplitudes(bp::dict _params, Random& rnd){
                 - 4 : initialize all states according to Voronoi-style sampling 
                     Designed for MASH dynamics
                     Uses "istates" instead of the "istate", similar to the types 2 and 3
+                - 5 : SQC square-window sampling of the Meyer-Miller actions around "istate"
+                    (Cotton-Miller 2013): |c_k|^2 = e_k, occupied e in [1, 1 + 2 gamma], the
+                    others in [0, 2 gamma], random phases; gamma = 0.366 unless "sqc_gamma" is given.
+                    NOT normalized - use with force_method 2, ehrenfest_normalized 0 and the same sqc_gamma
+                - 6 : SQC triangle-window sampling (Cotton-Miller 2016/2019): occupied e in [1, 2],
+                    every other e_k in [0, 2 - e_occ], uniform over the region; gamma = 1/3 unless given
 
             * **params["nstates"]** ( int ): the number of electronic states in the basis
                 [ default: 1 ]
@@ -489,6 +512,9 @@ void dyn_variables::init_amplitudes(bp::dict _params, Random& rnd){
             * **params["istate"]** ( int ): the index of the initial electronic state, used 
                 only when **params["init_type"]** is 0 or 1, in which case it defines on 
                 which state the amplitudes will be initialized [ default: 0]
+
+            * **params["sqc_gamma"]** ( double ): the Meyer-Miller gamma of the SQC windows (init_type 5/6);
+                -1 (default) selects the window's standard value (0.366 square, 1/3 triangle)
 
             * **params["istates"]** ( list of ints ): the list of the populations on all electronic
                 states included in the basis, used only when **params["init_type"]** is 2 or 3, 
@@ -533,6 +559,8 @@ void dyn_variables::init_amplitudes(bp::dict _params, Random& rnd){
   default_params["rep"] = 1;
   default_params["is_nbra"] = 0;
   default_params["verbosity"] = 0;
+  default_params["sqc_window"] = 0;
+  default_params["sqc_gamma"] = -1.0;
 
   check_input(params, default_params, critical_params);
 
@@ -545,6 +573,8 @@ void dyn_variables::init_amplitudes(bp::dict _params, Random& rnd){
   int rep = -1;
   //int is_nbra = -1; 
   int verbosity = 0;
+  int sqc_window = 0;
+  double sqc_gamma = -1.0;
 
   std::string key;
   for(int i=0;i<len(params.values());i++){
@@ -557,6 +587,8 @@ void dyn_variables::init_amplitudes(bp::dict _params, Random& rnd){
     else if(key=="rep") {  rep = bp::extract<int>(params.values()[i]); }
     //else if(key=="is_nbra") {  is_nbra = bp::extract<int>(params.values()[i]); }
     else if(key=="verbosity") {  verbosity = bp::extract<int>(params.values()[i]); }
+    else if(key=="sqc_window") {  sqc_window = bp::extract<int>(params.values()[i]); }
+    else if(key=="sqc_gamma") {  sqc_gamma = bp::extract<double>(params.values()[i]); }
 
   }
 
@@ -567,12 +599,21 @@ void dyn_variables::init_amplitudes(bp::dict _params, Random& rnd){
            the rep = "<<rep<<" is not known. Allowed values are: [0, 1]\n";
   }
 
-  if(! (init_type==0 || init_type==1 || init_type==2 || init_type==3 || init_type==4)){
+  if(! (init_type==0 || init_type==1 || init_type==2 || init_type==3 || init_type==4 ||
+        init_type==5 || init_type==6)){
     cout<<"WARNINIG in init_amplitudes:\
-           the init_type = "<<init_type<<" is not known. Allowed values are: [0, 1, 2, 3, 4]\n";
+           the init_type = "<<init_type<<" is not known. Allowed values are: [0, 1, 2, 3, 4, 5, 6]\n";
   }
-  
-  if(init_type==0 || init_type==1){
+
+  // SQC window sampling: the window fixes gamma unless given explicitly
+  if(init_type==5 || init_type==6){
+    if(sqc_gamma < 0.0){ sqc_gamma = (init_type==5) ? 0.366 : 1.0/3.0; }
+    sqc_window = (init_type==5) ? 0 : 1;
+    this->sqc_window = sqc_window;
+    this->sqc_gamma = sqc_gamma;
+  }
+
+  if(init_type==0 || init_type==1 || init_type==5 || init_type==6){
     if(istate>=ndia && rep==0){
       cout<<"ERROR in init_amplitudes: the istate is= "<<istate<<", but should be less than "<<ndia<<"\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
@@ -683,7 +724,55 @@ void dyn_variables::init_amplitudes(bp::dict _params, Random& rnd){
       }
     }
 
+    else if(init_type==5 || init_type==6){
+      // Cotton-Miller SQC window sampling of the Meyer-Miller actions: the
+      // shifted actions e_k = n_k + gamma = |c_k|^2 (c = (x + i p)/sqrt2), phases
+      // uniform on [0, 2 pi). Square (init_type 5, gamma 0.366): occupied
+      // e in [1, 1 + 2 gamma], the others in [0, 2 gamma]. Triangle (init_type 6,
+      // gamma 1/3): occupied e in [1, 2], every other e_k in [0, 2 - e_occ] -
+      // uniform over the region, sampled by rejection from the box. The
+      // amplitudes are NOT normalized (|c|^2 = 1 + N gamma) - pair with
+      // ehrenfest_normalized 0 and the same sqc_gamma in the dynamics
+      int nst = (rep==0) ? ndia : nadi;
+      if(istate < 0 || istate >= nst){
+        cout<<"ERROR in init_amplitudes: the istate is= "<<istate<<", but should be in [0, "<<nst<<")\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
+      if(verbosity > 0){
+        cout<<"======= Initialization type is "<<init_type<<" ========\n";
+        cout<<"SQC window sampling ("<<(sqc_window==0 ? "square" : "triangle")<<", gamma = "<<sqc_gamma<<") around state "<<istate<<"\n";
+      }
+      vector<double> e(nst, 0.0);
+      if(sqc_window==0){
+        for(i=0; i<nst; i++){
+          double lo = (i==istate) ? 1.0 : 0.0;
+          e[i] = lo + 2.0 * sqc_gamma * rnd.uniform(0.0, 1.0);
+        }
+      }
+      else{
+        int accepted = 0;
+        while(!accepted){
+          e[istate] = 1.0 + rnd.uniform(0.0, 1.0);
+          accepted = 1;
+          for(i=0; i<nst; i++){
+            if(i==istate){ continue; }
+            e[i] = rnd.uniform(0.0, 1.0);
+            if(e[i] > 2.0 - e[istate]){ accepted = 0; }
+          }
+        }
+      }
+      for(i=0; i<nst; i++){
+        ksi = rnd.uniform(0.0, 1.0);
+        complex<double> ampl(cos(2.0*M_PI*ksi), sin(2.0*M_PI*ksi) );
+        ampl = ampl * sqrt( e[i] );
+        if(rep==0){ ampl_dia->set(i, traj, ampl );  }
+        else if(rep==1){ ampl_adi->set(i, traj, ampl);  }
+      }
+    }// init_type==5 || init_type==6
+
   }// for traj
+
+  update_mm_variables();
 
   if(verbosity > 1){
       cout<<"========== ampl_dia ===============\n";
@@ -849,12 +938,12 @@ void dyn_variables::init_active_states(bp::dict _params, Random& rnd){
            the rep = "<<rep<<" is not known. Allowed values are: [0, 1]\n";
   }
 
-  if(! (init_type==0 || init_type==1 || init_type==2 || init_type==3 || init_type==4) ){
+  if(! (init_type==0 || init_type==1 || init_type==2 || init_type==3 || init_type==4 || init_type==5 || init_type==6) ){
     cout<<"WARNINIG in init_active_states:\
            the init_type = "<<init_type<<" is not known. Allowed values are: [0, 1, 2, 3, 4]\n";
   }
   
-  if(init_type==0 || init_type==1 || init_type==4){
+  if(init_type==0 || init_type==1 || init_type==4 || init_type==5 || init_type==6){
     if(istate>=ndia && rep==0){
       cout<<"ERROR in init_active_states: the istate is= "<<istate<<", but should be less than "<<ndia<<"\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
@@ -891,7 +980,7 @@ void dyn_variables::init_active_states(bp::dict _params, Random& rnd){
 
   //================ For adiabatic - set up them directly =================
   for(traj=0; traj<ntraj; traj++){
-    if(init_type==0 || init_type==1 || init_type==4){ 
+    if(init_type==0 || init_type==1 || init_type==4 || init_type==5 || init_type==6){ 
       act_states.push_back(istate);
     }
     else if(init_type==2 || init_type==3){
@@ -976,12 +1065,12 @@ void dyn_variables::init_active_states_dia(bp::dict _params, Random& rnd){
            the rep = "<<rep<<" is not known. Allowed values are: [0, 1]\n";
   }
 
-  if(! (init_type==0 || init_type==1 || init_type==2 || init_type==3 || init_type==4) ){
+  if(! (init_type==0 || init_type==1 || init_type==2 || init_type==3 || init_type==4 || init_type==5 || init_type==6) ){
     cout<<"WARNINIG in init_active_states_dia:\
            the init_type = "<<init_type<<" is not known. Allowed values are: [0, 1, 2, 3, 4]\n";
   }
   
-  if(init_type==0 || init_type==1 || init_type==4){
+  if(init_type==0 || init_type==1 || init_type==4 || init_type==5 || init_type==6){
     if(istate>=ndia && rep==0){
       cout<<"ERROR in init_active_states_dia: the istate is= "<<istate<<", but should be less than "<<ndia<<"\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
@@ -1018,7 +1107,7 @@ void dyn_variables::init_active_states_dia(bp::dict _params, Random& rnd){
 
   //================ For diabatic - set up them directly =================
   for(traj=0; traj<ntraj; traj++){
-    if(init_type==0 || init_type==1 || init_type==4){ 
+    if(init_type==0 || init_type==1 || init_type==4 || init_type==5 || init_type==6){ 
       act_states_dia.push_back(istate);
     }
     else if(init_type==2 || init_type==3){

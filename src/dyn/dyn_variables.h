@@ -106,6 +106,14 @@ class dyn_variables{
   int electronic_vars_status; 
 
   /**
+    SQC window settings recorded at the window-sampled initialization
+    (init_type 5 square / 6 triangle): the window used by the default
+    compute_average_sqc_pop(rep) binning and its Meyer-Miller gamma
+  */
+  int sqc_window;
+  double sqc_gamma;
+
+  /**
     Electronic amplitudes in diabatic representation
     
     Options:
@@ -767,6 +775,7 @@ class dyn_variables{
 
   ///====================== In dyn_variables_electronic.cpp =====================
 
+  void update_mm_variables();  ///< q_mm/p_mm from ampl_adi (ampl_adi = (q_mm + i p_mm)/sqrt2)
   void update_amplitudes(dyn_control_params& dyn_params);
   void update_amplitudes(dyn_control_params& dyn_params, nHamiltonian& ham);
   void update_amplitudes(bp::dict dyn_params, nHamiltonian& ham);

@@ -84,6 +84,8 @@ dyn_variables::dyn_variables(int _ndia, int _nadi, int _ndof, int _ntraj){
   nadi = _nadi;
   ndof = _ndof;
   ntraj = _ntraj;
+  sqc_window = 0;
+  sqc_gamma = 0.366;
 
 
   ///================= Electronic and nuclear variables, for OOP implementation ================
@@ -388,6 +390,8 @@ dyn_variables::dyn_variables(const dyn_variables& x){
   nadi = x.nadi;
   ndof = x.ndof;
   ntraj = x.ntraj;
+  sqc_window = x.sqc_window;
+  sqc_gamma = x.sqc_gamma;
 
   // the conditional copy blocks below and the destructor key on these
   electronic_vars_status = 0;
