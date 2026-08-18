@@ -411,6 +411,16 @@ void dyn_control_params::sanity_check(){
     throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
+  /// the MMST representation is a stub: no propagation branch exists for it,
+  /// the amplitudes would stay frozen through the whole run
+  if(rep_tdse==4){
+    std::cout<<"Error in dyn_control_params::sanity_check: rep_tdse = 4 (MMST adiabatic"
+        <<" wfc) is not implemented - no electronic propagation exists for it;"
+        <<" use rep_tdse = 1 (the MMST electronic EOM is the adiabatic TDSE) with"
+        <<" force_method = 2 and sqc_gamma for the Meyer-Miller force\n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
   /// Shall not use DISH with the decoherence correction
   /// (tsh_method 3 is Landau-Zener - DISH is 5)
   if(tsh_method==5 && decoherence_algo!=-1){

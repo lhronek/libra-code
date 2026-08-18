@@ -49,7 +49,7 @@ class DynControlParams:
     #: 1 adiabatic wfc [default]
     #: 2 diabatic density matrix
     #: 3 adiabatic density matrix
-    #: 4 MMST adiabatic wfc
+    #: 4 MMST adiabatic wfc - reserved, not implemented (rejected by the C++ sanity_check)
     rep_tdse: int = 1
 
     #: Hamiltonian update method

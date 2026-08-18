@@ -337,7 +337,8 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - 1: adiabatic representation, wfc [ default ]
                 - 2: diabatic representation, density matrix (e.g. Liouville's picture)
                 - 3: adiabatic representation, density matrix (e.g. Liouville's picture)
-                - 4: MMST adiabatic representation, wfc
+                - 4: MMST adiabatic representation, wfc - reserved, not implemented (rejected by
+                     sanity_check; use rep_tdse 1 with force_method 2 and sqc_gamma)
 
             * **dyn_params["ham_update_method"]** ( int ): How to update Hamiltonian and which type of
                 Hamiltonian to update
