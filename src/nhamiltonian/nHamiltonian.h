@@ -575,8 +575,10 @@ public:
   ///< In nHamiltonian_compute_Ehrenfest.cpp and nHamiltonian_compute_Ehrenfest_forces.cpp
   complex<double> Ehrenfest_energy_dia(CMATRIX& ampl_dia);
   complex<double> Ehrenfest_energy_dia(CMATRIX& ampl_dia, vector<int>& id_);
+  CMATRIX Ehrenfest_forces_dia_unit(CMATRIX& ampl_dia, int option, double gamma);  ///< Ehrenfest forces in diabatic basis, with the Meyer-Miller gamma term
   CMATRIX Ehrenfest_forces_dia_unit(CMATRIX& ampl_dia, int option);      ///< Ehrenfest forces in diabatic basis
   CMATRIX Ehrenfest_forces_dia_unit(CMATRIX& ampl_dia);                  ///< Ehrenfest forces in diabatic basis
+  CMATRIX Ehrenfest_forces_dia(CMATRIX& ampl_dia, int lvl, int option, double gamma);  ///< Ehrenfest forces in diabatic basis, uniform Meyer-Miller gamma
   CMATRIX Ehrenfest_forces_dia(CMATRIX& ampl_dia, int lvl, int option);  ///< Ehrenfest forces in diabatic basis
   CMATRIX Ehrenfest_forces_dia(CMATRIX& ampl_dia, int lvl);              ///< Ehrenfest forces in diabatic basis
 

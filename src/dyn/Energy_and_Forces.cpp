@@ -362,7 +362,8 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
   else if(prms.force_method==2){  // Ehrenfest forces
     // Diabatic 
     if(prms.rep_force==0){  
-     *dyn_vars.f = ham.Ehrenfest_forces_dia(*dyn_vars.ampl_dia, 1).real(); 
+     // sqc_gamma adds the Meyer-Miller ZPE term (see the adiabatic branch)
+     *dyn_vars.f = ham.Ehrenfest_forces_dia(*dyn_vars.ampl_dia, 1, 0, prms.sqc_gamma).real(); 
  
 
      //cout<<"dia MF forces\n"; dyn_vars.f->show_matrix();

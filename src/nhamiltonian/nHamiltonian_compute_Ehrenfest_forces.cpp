@@ -33,7 +33,7 @@ namespace libnhamiltonian {
 using namespace liblinalg;
 using namespace libmeigen;
 
-CMATRIX nHamiltonian::Ehrenfest_forces_dia_unit(CMATRIX &ampl_dia, int option) {
+CMATRIX nHamiltonian::Ehrenfest_forces_dia_unit(CMATRIX &ampl_dia, int option, double gamma) {
   /**
     \param[in] ampl_dia: MATRIX(ndia, 1) diabatic amplitudes for one trajectory
 
@@ -110,6 +110,20 @@ CMATRIX nHamiltonian::Ehrenfest_forces_dia_unit(CMATRIX &ampl_dia, int option) {
       res.M[n] = -(ampl_dia.H() * (*d1ham_dia[n]) * ampl_dia).M[0];
     }
 
+    // Meyer-Miller ZPE term, the diabatic twin of the adiabatic
+    // gamma * sum_i dE_i/dR: sum_i E_i = tr(S^-1 H) for the generalized
+    // eigenproblem and dS/dR = dc1 + dc1^H (the convention of the
+    // dia->adi transform), so the term is
+    // gamma * [ tr(S^-1 dH) - 2 Re tr(S^-1 dc1 S^-1 H) ]; option 1 keeps
+    // only the dH part, like the rest of the force
+    if (gamma != 0.0) {
+      complex<double> zpe = ((*invS) * (*d1ham_dia[n])).tr();
+      if (option == 0) {
+        zpe -= 2.0 * ((*invS) * (*dc1_dia[n]) * (*invS) * (*ham_dia)).tr().real();
+      }
+      res.M[n] += gamma * zpe;
+    }
+
   } // for n
 
   res /= norm;
@@ -120,12 +134,16 @@ CMATRIX nHamiltonian::Ehrenfest_forces_dia_unit(CMATRIX &ampl_dia, int option) {
   return res;
 }
 
+CMATRIX nHamiltonian::Ehrenfest_forces_dia_unit(CMATRIX &ampl_dia, int option) {
+  return Ehrenfest_forces_dia_unit(ampl_dia, option, 0.0);
+}
+
 CMATRIX nHamiltonian::Ehrenfest_forces_dia_unit(CMATRIX &ampl_dia) {
-  return Ehrenfest_forces_dia_unit(ampl_dia, 0);
+  return Ehrenfest_forces_dia_unit(ampl_dia, 0, 0.0);
 }
 
 CMATRIX nHamiltonian::Ehrenfest_forces_dia(CMATRIX &ampl_dia, int lvl,
-                                           int option) {
+                                           int option, double gamma) {
   /**
     \brief Computes the Ehrenfest forces in the diabatic basis
 
@@ -187,10 +205,10 @@ CMATRIX nHamiltonian::Ehrenfest_forces_dia(CMATRIX &ampl_dia, int lvl,
     pop_submatrix(ampl_dia, ampl_tmp, stenc_ampl, stenc_col);
 
     if (lvl == 0) {
-      frc_tmp = Ehrenfest_forces_dia_unit(ampl_tmp, option);
+      frc_tmp = Ehrenfest_forces_dia_unit(ampl_tmp, option, gamma);
     }
     if (lvl == 1) {
-      frc_tmp = children[i]->Ehrenfest_forces_dia_unit(ampl_tmp, option);
+      frc_tmp = children[i]->Ehrenfest_forces_dia_unit(ampl_tmp, option, gamma);
     }
 
     push_submatrix(F, frc_tmp, stenc_frc, stenc_col);
@@ -200,8 +218,13 @@ CMATRIX nHamiltonian::Ehrenfest_forces_dia(CMATRIX &ampl_dia, int lvl,
   return F;
 }
 
+CMATRIX nHamiltonian::Ehrenfest_forces_dia(CMATRIX &ampl_dia, int lvl,
+                                           int option) {
+  return Ehrenfest_forces_dia(ampl_dia, lvl, option, 0.0);
+}
+
 CMATRIX nHamiltonian::Ehrenfest_forces_dia(CMATRIX &ampl_dia, int lvl) {
-  return Ehrenfest_forces_dia(ampl_dia, lvl, 0);
+  return Ehrenfest_forces_dia(ampl_dia, lvl, 0, 0.0);
 }
 
 /*
