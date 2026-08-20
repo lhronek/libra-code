@@ -722,6 +722,10 @@ def compute_properties(params, models, input_scalers, output_scalers):
             params["write_wfn_file"] = False
     # Now we loop over the indices which are already sorted
     os.system(f'mkdir {params["res_dir"]}')
+    # the stored orbital window, for step-3 consumers to verify their claim
+    with open(os.path.join(params["res_dir"], 'orbital_window.json'), 'w') as f:
+        json.dump({'lowest_orbital': int(lowest_orbital),
+                   'highest_orbital': int(highest_orbital)}, f)
     for i, step in enumerate(indices):
         print("======================== \n Performing calculations for step ", step)
         print("*** Generating guess Hamiltonian for step ", step)
@@ -812,6 +816,11 @@ def compute_properties(params, models, input_scalers, output_scalers):
                 os.system(f"mkdir ../ml_mos")
             np.save(f"../ml_mos/eigenvectors_{step}.npy", eigenvectors)
             np.save(f"../ml_mos/eigenvalues_{step}.npy", eigenvalues)
+        # numpy slicing past the end silently truncates - the saved matrices
+        # would carry a wrong window with no error
+        if not 1 <= lowest_orbital <= highest_orbital <= len(eigenvalues):
+            raise ValueError(F"orbital window [{lowest_orbital}, {highest_orbital}] "
+                             F"does not fit the {len(eigenvalues)} predicted orbitals")
         # Compute the overlaps
         if params["compute_overlap"]:
             mo_overlap = compute_mo_overlaps(params, eigenvectors, eigenvectors, step, step)[

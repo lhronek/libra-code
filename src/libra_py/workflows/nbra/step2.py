@@ -17,6 +17,7 @@
 
 """
 
+import json
 import os
 import sys
 # The sparse matrix library for storing the MO overlaps
@@ -547,6 +548,10 @@ def run_cp2k_libint_step2(params):
     # specific data but we finally move them to all_logfiles
     if not os.path.exists(params['res_dir']):
         os.system(F"mkdir {params['res_dir']}")
+    # the stored orbital window, for step-3 consumers to verify their claim
+    with open(os.path.join(params['res_dir'], 'orbital_window.json'), 'w') as f:
+        json.dump({'lowest_orbital': int(params['lowest_orbital']),
+                   'highest_orbital': int(params['highest_orbital'])}, f)
     if not os.path.exists(params['all_logfiles']):
         os.system(F"mkdir {params['all_logfiles']}")
     if not os.path.exists(params['all_pdosfiles']):
@@ -1201,6 +1206,12 @@ def run_cp2k_libint_step2(params):
                 for c_plot, state_to_plot in enumerate(states_to_plot):
                     if isUKS:
                         state_index = state_to_plot - params['lowest_orbital']
+                        if not 0 <= state_index < num_orbitals // 2:
+                            raise ValueError(
+                                F"states_to_plot entry {state_to_plot} is outside the stored "
+                                F"window [{params['lowest_orbital']}, "
+                                F"{params['lowest_orbital'] + num_orbitals // 2 - 1}] - a "
+                                F"negative index would silently read the wrong phase factor")
                         # Alpha orbitals
                         if isxTB:
                             cube_file_name = F'Diag_{step-1}-WFN_{str(state_to_plot).zfill(5)}_1-1_0.cube'
@@ -1230,6 +1241,12 @@ def run_cp2k_libint_step2(params):
                     else:
                         # Only alpha orbitals
                         state_index = state_to_plot - params['lowest_orbital']
+                        if not 0 <= state_index < num_orbitals // 2:
+                            raise ValueError(
+                                F"states_to_plot entry {state_to_plot} is outside the stored "
+                                F"window [{params['lowest_orbital']}, "
+                                F"{params['lowest_orbital'] + num_orbitals // 2 - 1}] - a "
+                                F"negative index would silently read the wrong phase factor")
                         if isxTB:
                             cube_file_name = F'Diag_{step-1}-WFN_{str(state_to_plot).zfill(5)}_1-1_0.cube'
                         else:

@@ -35,6 +35,7 @@ import math
 import os
 import time
 import glob
+import json
 import numpy as np
 from libra_py.workflows.nbra.mp_context import MP_CTX as _MP_CTX
 import scipy.sparse as sp
@@ -936,6 +937,37 @@ def do_phase_corr(cum_phase1, St, cum_phase2, phase_i):
             St.scale(a, b, fab)
 
 
+def _check_orbital_window(params, data_dim, where):
+    """The step-2 npz supermatrices are 2*(highest_orbital - lowest_orbital
+    + 1) on a side (alpha+beta blocks, both spins share the window), so the
+    claimed window is checked against the stored data; a res-dir
+    orbital_window.json written by the producers additionally pins the
+    absolute window, which the dimension alone cannot (an equal-width
+    shift moves the HOMO row silently).
+    """
+    l = int(params['lowest_orbital'])
+    h = int(params['highest_orbital'])
+    meta_file = os.path.join(params['path_to_npz_files'], 'orbital_window.json')
+    if os.path.exists(meta_file):
+        with open(meta_file) as f:
+            meta = json.load(f)
+        if int(meta['lowest_orbital']) != l or int(meta['highest_orbital']) != h:
+            raise ValueError(
+                F"{where}: lowest_orbital/highest_orbital [{l}, {h}] disagree "
+                F"with the step-2 window [{meta['lowest_orbital']}, "
+                F"{meta['highest_orbital']}] recorded in {meta_file} - the HOMO "
+                F"would be located at the wrong matrix row and the active space "
+                F"silently shifted; pass the stored window and select the "
+                F"physics window via the num_occ/num_unocc counts")
+    nw = 2 * (h - l + 1)
+    if int(data_dim) != nw:
+        raise ValueError(
+            F"{where}: the stored npz matrices are {data_dim} x {data_dim} but "
+            F"lowest_orbital/highest_orbital [{l}, {h}] imply {nw} "
+            F"spin-orbitals - these params must be the step-2 stored window "
+            F"(the physics window is chosen by the num_occ/num_unocc counts)")
+
+
 def limit_active_space(params):
     """
     This function limits the active space of Kohn-Sham matrices
@@ -959,6 +991,9 @@ def limit_active_space(params):
     l1 = params['lowest_orbital']
     h1 = params['highest_orbital']
     sample_logfile = glob.glob(f'{params["logfile_directory"]}/*.log')[0]
+    sample_npz_file = glob.glob(f'{params["path_to_npz_files"]}/*.npz')[0]
+    _check_orbital_window(params, int(sp.load_npz(sample_npz_file).shape[0]),
+                          'limit_active_space')
     os.system(f'mkdir {params["path_to_save_npz_files"]}')
     # currently working only for restricted KS
     homo_index = CP2K_methods.read_homo_index(sample_logfile, isUKS=False)
@@ -990,6 +1025,8 @@ def limit_active_space(params):
             step = int(file.split('/')[-1].replace(prop, '').replace('_',
                        '').replace('ks', '').replace('.', '').replace('npz', ''))
             sp.save_npz(f'{params["path_to_save_npz_files"]}/{prop}_ks_{step}.npz', new_mat_sparse)
+    with open(f'{params["path_to_save_npz_files"]}/orbital_window.json', 'w') as f:
+        json.dump({'lowest_orbital': l2, 'highest_orbital': h2}, f)
     print('Done with limiting the active space')
     print(f'Your new path_to_npz_files is now: {params["path_to_save_npz_files"]}')
     print(f'Use the new lowest_orbital: {l2} and highest_orbital: {h2}')
@@ -2154,6 +2191,7 @@ def run_step3_ks_nacs_libint(params):
         params['npz_file_ks_homo_index'] = params['homo_index'] - params['lowest_orbital'] + 1
     sample_npz_file = glob.glob(params['path_to_npz_files'] + '/*.npz')[0]
     params['data_dim'] = int(sp.load_npz(sample_npz_file).shape[0])
+    _check_orbital_window(params, params['data_dim'], 'run_step3_ks_nacs_libint')
     # Number of occupied states
     num_occ_states = params['num_occ_states']
     # Number of unoccupied states
@@ -2480,6 +2518,7 @@ def run_step3_sd_nacs_libint(params):
         sample_logfile = glob.glob(params['logfile_directory'] + '/*.log')[0]
         sample_npz_file = glob.glob(params['path_to_npz_files'] + '/*.npz')[0]
         params['data_dim'] = int(sp.load_npz(sample_npz_file).shape[0])
+        _check_orbital_window(params, params['data_dim'], 'run_step3_sd_nacs_libint')
         if params['isUKS']:
             params['homo_alpha_index'], params['homo_beta_index'] = CP2K_methods.read_homo_index(
                 sample_logfile, isUKS=True)
