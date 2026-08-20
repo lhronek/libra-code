@@ -590,10 +590,23 @@ void check_input(boost::python::dict params, boost::python::dict default_params,
         boost::python::object value = default_params[key];
 
         if(verbose){
+          std::string sval =
+              boost::python::extract<std::string>(boost::python::str(value))();
+          // wrapped objects without __str__ render as "<... object at 0x...>"
+          // - print the type (and matrix dimensions) instead of a memory address
+          if(!sval.empty() && sval[0] == '<' &&
+             sval.find(" object at 0x") != std::string::npos){
+            sval = boost::python::extract<std::string>(
+                value.attr("__class__").attr("__name__"))();
+            if(PyObject_HasAttrString(value.ptr(), "num_of_rows") &&
+               PyObject_HasAttrString(value.ptr(), "num_of_cols")){
+              int nr = boost::python::extract<int>(value.attr("num_of_rows"))();
+              int nc = boost::python::extract<int>(value.attr("num_of_cols"))();
+              sval += "(" + std::to_string(nr) + " x " + std::to_string(nc) + ")";
+            }
+          }
           std::cout<<"WARNING: Parameter "<< key <<" is not defined in the input parameters! "
-                   <<"Using the default value = "
-                   << boost::python::extract<std::string>(boost::python::str(value))()
-                   <<"\n";
+                   <<"Using the default value = " << sval <<"\n";
         }
 
         params.setdefault(key, value);
