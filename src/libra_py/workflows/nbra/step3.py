@@ -2240,6 +2240,10 @@ def run_step3_ks_nacs_libint(params):
         os.system(F'mkdir {res_dir_2}')
     except BaseException:
         print(F'The directory {res_dir_2} already exists.')
+    # the _im files store Im(Hvib) = -d; files WITHOUT this marker predate
+    # the convention restoration and hold +d (the NAC itself)
+    with open(os.path.join(res_dir_2, 'hvib_convention.json'), 'w') as f:
+        json.dump({'im_file_contains': 'Im(Hvib) = -d'}, f)
     t2 = time.time()
     # If we're using multiprocessing, create a pool of processors
     if params['use_multiprocessing']:
@@ -2305,9 +2309,8 @@ def run_step3_ks_nacs_libint(params):
             St_step_phase_corrected, cum_phase_aa, cum_phase_bb = \
                 apply_phase_correction_scipy(St_step, step, cum_phase_aa, cum_phase_bb, two_spinor_format=True)
             if nac_algo == 0:
-                # HST formula
-                # Adding the factor of -1 for the vibronic Hamiltonian
-                Hvib_ks = -0.5 / dt * (St_step_phase_corrected.todense().T - St_step_phase_corrected.todense())
+                # HST: Im(Hvib) = -d = (St^T - St)/(2 dt), with St_ij = <i(t)|j(t+dt)>
+                Hvib_ks = 0.5 / dt * (St_step_phase_corrected.todense().T - St_step_phase_corrected.todense())
             elif nac_algo == 1:
                 # Meek-Levine approach
                 # scipy sparse to MATRIX so that we can use it in nac_npi
@@ -2327,9 +2330,8 @@ def run_step3_ks_nacs_libint(params):
         for step in range(start_time, finish_time):
             St_step = sp.load_npz(F'{res_dir_2}/St_ks_orthonormalized_{step}.npz')
             if nac_algo == 0:
-                # note - a factor of -1 is added because this is
-                Hvib_ks = -0.5 / dt * (St_step.todense().T - St_step.todense())
-                # what we have in the vibronic Hamiltonian
+                # HST: Im(Hvib) = -d = (St^T - St)/(2 dt), with St_ij = <i(t)|j(t+dt)>
+                Hvib_ks = 0.5 / dt * (St_step.todense().T - St_step.todense())
             elif nac_algo == 1:
                 # Meek-Levine approach
                 # scipy sparse to MATRIX
@@ -2540,6 +2542,10 @@ def run_step3_sd_nacs_libint(params):
         os.system(F'mkdir {res_dir_2}')
     except BaseException:
         print(F'The directory {res_dir_2} already exists.')
+    # the _im files store Im(Hvib) = -d; files WITHOUT this marker predate
+    # the convention restoration and hold +d (the NAC itself)
+    with open(os.path.join(res_dir_2, 'hvib_convention.json'), 'w') as f:
+        json.dump({'im_file_contains': 'Im(Hvib) = -d'}, f)
 
     if params['is_many_body']:
         params['isnap'] = params['start_time']
@@ -2876,9 +2882,8 @@ def run_step3_sd_nacs_libint(params):
             St_step_phase_corrected, cum_phase_aa, cum_phase_bb = apply_phase_correction_scipy(
                 St_sds[step].real, step, cum_phase_aa, cum_phase_bb, two_spinor_format=False)
             if nac_algo == 0:
-                # Using HST formula
-                # -1.0 sign in the vibronic Hamiltonian
-                Hvib_sd = -0.5 / dt * (St_step_phase_corrected.todense().T - St_step_phase_corrected.todense())
+                # HST: Im(Hvib) = -d = (St^T - St)/(2 dt), with St_ij = <i(t)|j(t+dt)>
+                Hvib_sd = 0.5 / dt * (St_step_phase_corrected.todense().T - St_step_phase_corrected.todense())
             elif nac_algo == 1:
                 # Using Meek-Levine approach
                 # turn the overlap matrix from scipy sparse format into MATRIX
@@ -2907,8 +2912,8 @@ def run_step3_sd_nacs_libint(params):
                 St_ci_step_phase_corrected, cum_phase_aa, cum_phase_bb = apply_phase_correction_scipy(
                     St_cis[step].real, step, cum_phase_aa, cum_phase_bb, two_spinor_format=False)
                 if nac_algo == 0:
-                    # Using HST formula
-                    Hvib_ci = -0.5 / dt * (St_ci_step_phase_corrected.todense().T -
+                    # HST: Im(Hvib) = -d = (St^T - St)/(2 dt), with St_ij = <i(t)|j(t+dt)>
+                    Hvib_ci = 0.5 / dt * (St_ci_step_phase_corrected.todense().T -
                                            St_ci_step_phase_corrected.todense())
                 elif nac_algo == 1:
                     # Using Meek-Levine approach
@@ -2932,7 +2937,8 @@ def run_step3_sd_nacs_libint(params):
     else:
         for step in range(len(St_sds)):
             if nac_algo == 0:
-                Hvib_sd = -0.5 / dt * (St_sds[step].todense().real.T - St_sds[step].todense().real)
+                # HST: Im(Hvib) = -d = (St^T - St)/(2 dt), with St_ij = <i(t)|j(t+dt)>
+                Hvib_sd = 0.5 / dt * (St_sds[step].todense().real.T - St_sds[step].todense().real)
             elif nac_algo == 1:
                 # scipy sparse to MATRIX
                 St_sd_step_MATRIX = data_conv.nparray2MATRIX(np.array(St_sds[step].todense().real))
@@ -2947,7 +2953,8 @@ def run_step3_sd_nacs_libint(params):
             for step in range(finish_time - start_time - 2):
                 St_ci_step = St_cis[step].todense().real
                 if nac_algo == 0:
-                    Hvib_ci = -0.5 / dt * (St_ci_step.T - St_ci_step)
+                    # HST: Im(Hvib) = -d = (St^T - St)/(2 dt), with St_ij = <i(t)|j(t+dt)>
+                    Hvib_ci = 0.5 / dt * (St_ci_step.T - St_ci_step)
                 elif nac_algo == 1:
                     # scipy sparse to MATRIX
                     St_ci_step_MATRIX = data_conv.nparray2MATRIX(np.array(St_cis[step].todense().real))
