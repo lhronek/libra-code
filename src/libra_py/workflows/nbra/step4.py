@@ -1184,6 +1184,17 @@ def get_Hvib_scipy(params):
     """
     hvib = []
     for i in range(len(params['data_set_paths'])):
+        # CMATRIX(re, im) below assumes the canonical convention (_im files =
+        # Im(Hvib) = -d, marker written by the current step 3); legacy dirs
+        # hold +d and reconstruct to the complex CONJUGATE - populations and
+        # hop rates are unaffected for real-valued data, signed NAC consumers
+        # and complex-St data are not
+        marker = os.path.join(params['data_set_paths'][i], 'hvib_convention.json')
+        if not os.path.exists(marker):
+            print(F"WARNING: {params['data_set_paths'][i]} carries no "
+                  F"hvib_convention.json - legacy files store +d, so the "
+                  F"reconstructed Hvib is the complex conjugate (harmless for "
+                  F"real-valued data); regenerate with the current step 3")
         hvib.append([])
         for step in range(params['nfiles']):
             step += params['init_times']
