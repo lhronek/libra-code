@@ -226,8 +226,11 @@ def compute_qs_Hvib(Nfreqs, freqs, t,
                     xab = dw_Hvib_im.get(i, j)
                 elif xab > up_Hvib_im.get(i, j):
                     xab = up_Hvib_im.get(i, j)
-                Hvib_stoch_im.set(i, j, -xab)
-                Hvib_stoch_im.set(j, i, xab)
+                # xab is sampled around the INPUT series' Im(Hvib)(i, j)
+                # (upper triangle) - writing it back negated produced the
+                # complex conjugate of the fitted Hamiltonian
+                Hvib_stoch_im.set(i, j, xab)
+                Hvib_stoch_im.set(j, i, -xab)
 
     Hvib_stoch = CMATRIX(Hvib_stoch_re, Hvib_stoch_im)
 
