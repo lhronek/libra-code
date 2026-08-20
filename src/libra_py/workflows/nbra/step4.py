@@ -84,11 +84,13 @@ def get_Hvib(params):
             * **params["nfiles"]** ( int ): how many files to read, starting from index 0 [Required!]
             * **params["Hvib_re_prefix"]** ( string ): prefixes of the files with real part of the Hvib(t) [Required!]
             * **params["Hvib_im_prefix"]** ( string ): prefixes of the files with imaginary part of the Hvib(t) [Required!]
+              (the _im files/values follow the canonical convention Im(Hvib) = -d = -(St - St^T)/(2 dt); directories written by the current step 3 carry hvib_convention.json, markerless directories are legacy and hold +d (the NAC itself))
             * **params["active_space"]** ( list of ints ): the indices of the states we care
                 about. These indices will be used to determine the size of the created CMATRIX objects
                 and only these states will be extracted from the original files [ default: range(nstates) ]
             * **params["Hvib_re_suffix"]** ( string ): suffixes of the files with real part of the Hvib(t) [default: "_re"]
             * **params["Hvib_im_suffix"]** ( string ): suffixes of the files with imaginary part of the Hvib(t) [default: "_im"]
+              (the _im files/values follow the canonical convention Im(Hvib) = -d = -(St - St^T)/(2 dt); directories written by the current step 3 carry hvib_convention.json, markerless directories are legacy and hold +d (the NAC itself))
 
     Returns:
         list of CMATRIX objects: Hvib:
@@ -1189,18 +1191,13 @@ def get_Hvib_scipy(params):
         # hold +d and reconstruct to the complex CONJUGATE - populations and
         # hop rates are unaffected for real-valued data, signed NAC consumers
         # and complex-St data are not
-        marker = os.path.join(params['data_set_paths'][i], 'hvib_convention.json')
-        if not os.path.exists(marker):
-            print(F"WARNING: {params['data_set_paths'][i]} carries no "
-                  F"hvib_convention.json - legacy files store +d, so the "
-                  F"reconstructed Hvib is the complex conjugate (harmless for "
-                  F"real-valued data); regenerate with the current step 3")
+        data_read.warn_legacy_hvib_dir(params['data_set_paths'][i])
         hvib.append([])
         for step in range(params['nfiles']):
             step += params['init_times']
 
             try:
-                file_name = params['data_set_paths'][0] + params['Hvib_re_prefix'] + \
+                file_name = params['data_set_paths'][i] + params['Hvib_re_prefix'] + \
                     str(step) + params['Hvib_re_suffix'] + '.npz'
                 tmp_real = sp.load_npz(file_name).real
             except BaseException:
@@ -1208,7 +1205,7 @@ def get_Hvib_scipy(params):
                 tmp_real = sp.csc_matrix(np.zeros((params['nstates'], params['nstates'])))
 
             try:
-                file_name = params['data_set_paths'][0] + params['Hvib_im_prefix'] + \
+                file_name = params['data_set_paths'][i] + params['Hvib_im_prefix'] + \
                     str(step) + params['Hvib_im_suffix'] + '.npz'
                 tmp_imag = sp.load_npz(file_name).real
             except BaseException:

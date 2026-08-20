@@ -95,6 +95,8 @@ def get_step2_data(_params):
 
         * **params["hvib_data_im_suffix"]** ( string ): suffix of files containing imaginary part of vibronic Hamiltonian [ default: "_im" ]
 
+        Note: the _im files/values follow the canonical convention Im(Hvib) = -d = -(St - St^T)/(2 dt); directories written by the current step 3 carry hvib_convention.json, markerless directories are legacy and hold +d (the NAC itself)
+
         * **params["data_set_paths"]** ( list of strings ): see in :func:`libra_py.data_read.get_data_sets`
 
         * **params["data_dim"]** ( int ): see in :func:`libra_py.data_read.get_data`
@@ -1475,6 +1477,8 @@ def run(S_dia_ks, St_dia_ks, E_dia_ks, params):
             * **params["Hvib_im_suffix"]** ( string ): common suffix of the output files with imaginary part of the vibronic
                 Hamiltonian at all times [default: "_im"]
 
+            Note: the _im files/values follow the canonical convention Im(Hvib) = -d = -(St - St^T)/(2 dt); directories written by the current step 3 carry hvib_convention.json, markerless directories are legacy and hold +d (the NAC itself)
+
     Returns:
         list of lists of CMATRIX(N,N): Hvib, such that:
             Hvib[idata][istep] is a CMATRIX(N,N) containing the vibronic Hamiltonian for the
@@ -2231,6 +2235,9 @@ def run_step3_ks_nacs_libint(params):
     dt = params['time_step'] * units.fs2au
     # Algorithm to compute NACs:
     nac_algo = params["nac_algo"]
+    if nac_algo not in (0, 1):
+        raise ValueError(F"nac_algo = {nac_algo} is not a listed option - "
+                         F"0 (HST) and 1 (Meek-Levine NPI) are supported")
     # The path to raw npz files that are produced in step2
     res_dir_1 = params['path_to_npz_files']
     # The path to save the KS Hvibs that will be calculated in this function
@@ -2242,7 +2249,13 @@ def run_step3_ks_nacs_libint(params):
         print(F'The directory {res_dir_2} already exists.')
     # the _im files store Im(Hvib) = -d; files WITHOUT this marker predate
     # the convention restoration and hold +d (the NAC itself)
-    with open(os.path.join(res_dir_2, 'hvib_convention.json'), 'w') as f:
+    marker_file = os.path.join(res_dir_2, 'hvib_convention.json')
+    if not os.path.exists(marker_file) and glob.glob(os.path.join(res_dir_2, '*_im.npz')):
+        raise ValueError(F"{res_dir_2} already holds *_im.npz files without a "
+                         F"convention marker (legacy +d data) - writing canonical "
+                         F"-d files into it would mix conventions in one directory; "
+                         F"use a fresh output path or move the legacy files away")
+    with open(marker_file, 'w') as f:
         json.dump({'im_file_contains': 'Im(Hvib) = -d'}, f)
     t2 = time.time()
     # If we're using multiprocessing, create a pool of processors
@@ -2536,6 +2549,9 @@ def run_step3_sd_nacs_libint(params):
     finish_time = params['finish_time']
     dt = params['time_step'] * units.fs2au
     nac_algo = params['nac_algo']
+    if nac_algo not in (0, 1):
+        raise ValueError(F"nac_algo = {nac_algo} is not a listed option - "
+                         F"0 (HST) and 1 (Meek-Levine NPI) are supported")
     nprocs = params['nprocs']
 
     try:
@@ -2544,7 +2560,13 @@ def run_step3_sd_nacs_libint(params):
         print(F'The directory {res_dir_2} already exists.')
     # the _im files store Im(Hvib) = -d; files WITHOUT this marker predate
     # the convention restoration and hold +d (the NAC itself)
-    with open(os.path.join(res_dir_2, 'hvib_convention.json'), 'w') as f:
+    marker_file = os.path.join(res_dir_2, 'hvib_convention.json')
+    if not os.path.exists(marker_file) and glob.glob(os.path.join(res_dir_2, '*_im.npz')):
+        raise ValueError(F"{res_dir_2} already holds *_im.npz files without a "
+                         F"convention marker (legacy +d data) - writing canonical "
+                         F"-d files into it would mix conventions in one directory; "
+                         F"use a fresh output path or move the legacy files away")
+    with open(marker_file, 'w') as f:
         json.dump({'im_file_contains': 'Im(Hvib) = -d'}, f)
 
     if params['is_many_body']:

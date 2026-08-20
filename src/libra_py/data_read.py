@@ -35,6 +35,20 @@ from libra_py import data_conv
 import util.libutil as comn
 
 
+def warn_legacy_hvib_dir(path):
+    """Warn once per call when a Hvib npz directory carries no
+    hvib_convention.json: markerless (legacy) dirs store +d (the NAC) in the
+    _im files, so a CMATRIX(re, im) reconstruction yields the complex
+    CONJUGATE of the vibronic Hamiltonian - harmless for real-valued data,
+    wrong for signed NAC consumers; regenerate with the current step 3.
+    """
+    if not os.path.exists(os.path.join(path, 'hvib_convention.json')):
+        print(F"WARNING: {path} carries no hvib_convention.json - legacy files "
+              F"store +d, so the reconstructed Hvib is the complex conjugate "
+              F"(harmless for real-valued data); regenerate with the current "
+              F"step 3")
+
+
 def get_matrix(nrows, ncols, filename_re, filename_im, act_sp, get_real=1, get_imag=1):
     """
 
@@ -111,6 +125,7 @@ def get_data(params):
             * **params["data_im_prefix"]** ( string ): prefixes of the files with imaginary part of the data [Required!]
             * **params["data_re_suffix"]** ( string ): suffixes of the files with real part of the Hvib(t) [default: "_re"]
             * **params["data_im_suffix"]** ( string ): suffixes of the files with imaginary part of the Hvib(t) [default: "_im"]
+              (the _im files/values follow the canonical convention Im(Hvib) = -d = -(St - St^T)/(2 dt); directories written by the current step 3 carry hvib_convention.json, markerless directories are legacy and hold +d (the NAC itself))
             * **params["get_real"]** ( int ): whether we want to read the real component [ default: 1 - Yes ]
             * **params["get_imag"]** ( int ): whether we want to read the imaginary component [ default: 1 - Yes ]
 
@@ -398,6 +413,9 @@ def get_all_data(params):
         tmp_mat = np.loadtxt(F'{path_to_res_files}/{hvib_re_prefix}{istep}{hvib_re_suffix}')
         nstates = tmp_mat.shape[0]
     dummy = MATRIX(nstates, nstates)
+    # the CMATRIX(re, im) reconstructions and the signed nac below assume the
+    # canonical convention (_im = Im(Hvib) = -d)
+    warn_legacy_hvib_dir(path_to_res_files)
     if params['is_sparse']:
         for step in range(istep, fstep):
             print('Reading the data of step', step)
@@ -431,8 +449,10 @@ def get_all_data(params):
 
             # St
             filename_re = F'{path_to_res_files}/{st_re_prefix}{step}{st_re_suffix}'
-            filename_im = F'{path_to_res_files}/{st_im_prefix}{step}{st_im_suffix}'
-            st = data_read.get_matrix(nstates, nstates, filename_re, filename_im, list(range(nstates)), 1, 1)
+            # St is stored real-only in this layout (the sparse branch reads
+            # CMATRIX(st_re, 0) too); the old line referenced never-assigned
+            # st_im_prefix/st_im_suffix and raised NameError
+            st = data_read.get_matrix(nstates, nstates, filename_re, filename_re, list(range(nstates)), 1, 0)
             St.append(st)
 
     return Hadi, Hvib, nac, St, nstates
