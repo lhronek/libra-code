@@ -391,22 +391,17 @@ def sort_hvib_file_names(files):
         files_sorted (list): The list of files which are sorted based on the step.
     """
     steps = []
+    kept = []
     for file in files:
-        digits = []
-        for i in range(len(file)):
-            try:
-                int(file[i])
-                digits.append(file[i])
-            except BaseException:
-                pass
-        number = ''
-        for i in range(len(digits)):
-            number += digits[i]
-
-        number = int(number)
-        steps.append(number)
-    steps = np.argsort(np.array(steps))
+        number = ''.join(ch for ch in file if ch.isdigit())
+        # entries without a step number (e.g. hvib_convention.json swept in
+        # by a broad glob) cannot be sorted - exclude them instead of crashing
+        if number == '':
+            continue
+        steps.append(int(number))
+        kept.append(file)
+    order = np.argsort(np.array(steps))
     files_sorted = []
-    for i in range(len(steps)):
-        files_sorted.append(files[steps[i]])
+    for i in range(len(order)):
+        files_sorted.append(kept[order[i]])
     return files_sorted
