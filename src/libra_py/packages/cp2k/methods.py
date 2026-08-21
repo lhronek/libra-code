@@ -3964,7 +3964,8 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
     cannot produce the doubled-geometry CROSS overlaps.
     """
     with open(params["overlap_template"]) as f:
-        tmpl_methods = set(re.findall(r"^\s*METHOD\s+(\S+)", f.read().upper(), re.M))
+        tmpl_text = f.read()
+    tmpl_methods = set(re.findall(r"^\s*METHOD\s+(\S+)", tmpl_text.upper(), re.M))
     bad = tmpl_methods & {"DFTB", "SE", "AM1", "MNDO", "MNDOD", "PDG", "PDDG",
                           "PM3", "PM6", "PM6-FM", "PNNL", "RM1"}
     if bad:
@@ -3977,6 +3978,30 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
             F"same-copy blocks exact at 1.3e-14, cross diagonals ~0.27 instead of "
             F"~1) and NDDO never materializes basis functions at all - use xTB "
             F"(analytic GTO-fit overlaps, validated end-to-end) or a GTO method")
+
+    # the run must REQUEST an overlap output, or CP2K completes cleanly and
+    # emits nothing (a stock-CP2K template with the patch-only &S_CSR_WRITE
+    # block commented out and no dense print is the observed failure)
+    active = [l.split("#")[0].split("!")[0].strip().upper()
+              for l in tmpl_text.splitlines()]
+    has_csr = any(l.startswith("&S_CSR_WRITE") for l in active)
+    has_dense, in_ao = False, False
+    for l in active:
+        if l.startswith("&AO_MATRICES"):
+            in_ao = True
+        elif l.startswith("&END"):
+            in_ao = False
+        elif in_ao and re.match(r"OVERLAP(\s+(T|TRUE|\.TRUE\.|ON|YES|1))?\s*$", l):
+            has_dense = True
+    if not (has_csr or has_dense):
+        raise ValueError(
+            F"the overlap_template {params['overlap_template']} requests NO "
+            F"overlap output - the OVERLAP_DELTAT run would complete cleanly "
+            F"and emit nothing (neither an active &S_CSR_WRITE block [needs "
+            F"the Libra cp2k patch] nor an active &AO_MATRICES OVERLAP dense "
+            F"print [stock CP2K]). Add one of the two to the template, or "
+            F"drop overlap_template and set overlap_csr_write=False to "
+            F"auto-generate the stock-compatible input")
     for d in (mo_prev, mo_curr):
         for suff in ("", "_b"):
             if F"C{suff}" not in d:
