@@ -18,6 +18,7 @@
 
 
 import os, sys, math, re, copy, time, glob, shlex, subprocess
+from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import scipy.sparse as sp
 import scipy.linalg
@@ -5148,9 +5149,44 @@ def cp2k_compute_adi_impl(q, params, full_id):
     return obj
 
 
+def _cp2k_prefetch_dispatch(q, params, full_id):
+    """One batch per timestep: the first call of a step submits EVERY
+    trajectory's chain (the CP2K runs + the python assembly) to a thread
+    pool held in the carried state and returns its own result; the
+    engine-sequenced calls for the remaining trajectories harvest their
+    futures. subprocess waits release the GIL, so the CP2K chains overlap
+    while the python parts interleave. Rests on what the engine already
+    guarantees: all trajectories' coordinates are final before the step's
+    first model call, act_state is synced from the previous step, and the
+    per-trajectory carried state is keyed by itraj. A failed chain
+    re-raises at its own trajectory's harvest."""
+    Id = Cpp2Py(full_id)
+    itraj = Id[-1]
+    timestep = int(params.get("timestep", -1))
+    state = params.setdefault("_prefetch", {})
+    if state.get("timestep") != timestep:
+        ntraj = q.num_of_cols
+        if "pool" not in state:
+            nprocs = max(1, int(params.get("nprocs", 1)))
+            cap = int(params.get("max_concurrent_chains", 0)) or \
+                max(1, (os.cpu_count() or 1) // nprocs)
+            state["pool"] = ThreadPoolExecutor(max_workers=min(cap, ntraj))
+        state["timestep"] = timestep
+        state["futures"] = {
+            j: state["pool"].submit(cp2k_compute_adi_impl, q, params,
+                                    Py2Cpp_int(list(Id[:-1]) + [j]))
+            for j in range(ntraj)}
+    fut = state["futures"].pop(itraj, None)
+    if fut is None:                     # an unexpected repeat call - run directly
+        return cp2k_compute_adi_impl(q, params, full_id)
+    return fut.result()
+
+
 def cp2k_compute_adi(q, params, full_id):
     """Traceback-printing wrapper: C++ callers swallow Python exceptions."""
     try:
+        if int(params.get("prefetch_trajectories", 0)):
+            return _cp2k_prefetch_dispatch(q, params, full_id)
         return cp2k_compute_adi_impl(q, params, full_id)
     except Exception:
         import traceback, sys
