@@ -453,6 +453,11 @@ def run_cp2k_libint_step2(params):
                                                               the diag template must carry full standalone SCF settings.
                                                               DFT runs never use it. [default: None]
 
+                             ot_first_call_only (bool): with an OT template given, run the OT stage only
+                                                        where the diagonalization chain starts cold (the previous
+                                                        step's Diag restart does not exist - the first frame of a
+                                                        job slice). [default: False]
+
                              cp2k_diag_input_template (string): The CP2K diagonalization input template file name. For
                                                                 DFT calculations, this is the only parameter that we need.
 

@@ -1860,6 +1860,12 @@ def run_cp2k_xtb(params):
             (EPS_SCF, MAX_SCF, mixing if needed) rather than assume a converged
             restart.
 
+          * **ot_first_call_only** (bool): with an OT template given, run the
+            OT stage only where the diagonalization chain starts cold (the
+            previous step's 'Diag_{step-1}-RESTART.wfn' does not exist - the
+            first frame of a job slice); warm frames skip straight to the
+            chained diagonalization [default: False]
+
           * **cp2k_diag_input_template** (string): The CP2K diagonalization input template file name.
 
           * **trajectory_xyz_filename** (string): The trajectory xyz file name.
@@ -1879,6 +1885,12 @@ def run_cp2k_xtb(params):
 
     print('**************** Running CP2K ****************')
     ot_input_template = params.get('cp2k_ot_input_template', None)
+    # OT only where the SCF starts cold: with a warm diagonalization chain
+    # (the previous step's restart exists) the OT warm start adds nothing
+    if (ot_input_template is not None
+            and params.get('ot_first_call_only', False)
+            and os.path.exists('Diag_%d-RESTART.wfn' % (params['step'] - 1))):
+        ot_input_template = None
     diag_input_template = params['cp2k_diag_input_template']
     trajectory_xyz_filename = params['trajectory_xyz_filename']
     step = params['step']
