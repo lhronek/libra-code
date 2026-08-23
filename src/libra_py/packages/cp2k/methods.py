@@ -2995,24 +2995,47 @@ def read_cp2k_ao_overlap_print(logfile):
             F"&AO_MATRICES OVERLAP print, or switch to mo_source='molden' + "
             F"ao_overlap_method='libint'; if the print is still missing, the run "
             F"itself failed - check the log tail")
-    entries, cols = {}, []
+    # blocks: a column-header line (all ints) followed by data rows
+    # "irow iatom element shell v1 ... vk" - parsed without per-token regexes
+    # or an O(n^2) tuple-key dict, whose cost dominated the serial time
+    # between the CP2K runs (8 s for a 651-AO doubled matrix; block-wise
+    # numpy fill runs the same log in well under a second)
+    blocks, cols = [], []
+    rows_i, vals = [], []
     for l in lines[start + 1:]:
         t = l.split()
         if not t:
             continue
-        if all(_re.fullmatch(r"\d+", x) for x in t):      # column-header line
+        # data rows ("irow iatom Element shell v ...") are ~99.9% of the
+        # region - test them first with two cheap predicates; the header
+        # check with its per-token scan runs only on the rare misses
+        if len(t) >= 5 and t[0].isdigit() and t[2][0].isalpha():
+            try:
+                v = [float(x) for x in t[4:]]
+            except ValueError:
+                if blocks or rows_i:                       # left the matrix region
+                    break
+                continue
+            rows_i.append(int(t[0]))
+            vals.append(v)
+            continue
+        if all(x.isdigit() for x in t):                   # column-header line
+            if cols and rows_i:
+                blocks.append((cols, rows_i, vals))
             cols = [int(x) for x in t]
+            rows_i, vals = [], []
             continue
-        if _re.fullmatch(r"\d+", t[0]) and len(t) >= 5 and all(FLOAT.match(x) for x in t[4:]):
-            for c, v in zip(cols, t[4:]):
-                entries[(int(t[0]), c)] = float(v)
-            continue
-        if entries:                                        # left the matrix region
+        if blocks or rows_i:                               # left the matrix region
             break
-    n = max(k[0] for k in entries)
+    if cols and rows_i:
+        blocks.append((cols, rows_i, vals))
+    if not blocks:
+        raise RuntimeError(F"empty AO overlap print in {logfile}")
+    n = max(max(r) for _, r, _ in blocks)
     S = np.zeros((n, n))
-    for (i, j), v in entries.items():
-        S[i - 1, j - 1] = v
+    for cols_b, rows_b, vals_b in blocks:
+        S[np.ix_(np.asarray(rows_b) - 1, np.asarray(cols_b) - 1)] = \
+            np.asarray(vals_b, dtype=float)
     if np.abs(S - S.T).max() > 1e-10:
         raise ValueError(f"parsed overlap not symmetric ({logfile})")
     return S
