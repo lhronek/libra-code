@@ -4849,7 +4849,12 @@ def cp2k_compute_adi_impl(q, params, full_id):
     mo_prev = _carried(params, "mo_prev", itraj, mo_curr, is_first_time)
     if params.get("ao_overlap_method", "cp2k") == "cp2k":
         # CP2K-native AO overlaps (OVERLAP_DELTAT doubled-geometry run)
-        if "overlap_template" not in params:
+        # a user template is shared; the auto-generated one is per working
+        # directory and stays call-local - under prefetch_trajectories the
+        # impl runs concurrently for several trajectories and a shared-params
+        # write would race
+        overlap_template = params.get("overlap_template", None)
+        if overlap_template is None:
             auto = os.path.join(wd, "overlap_deltat_auto.inp")
             if not os.path.exists(auto):
                 with open(auto, "w") as f:
@@ -4857,12 +4862,13 @@ def cp2k_compute_adi_impl(q, params, full_id):
                                                       params.get("overlap_csr_write", True)))
                 print(F"overlap_template not provided - auto-generated from "
                       F"{params['input_template']} -> {auto}")
-            params["overlap_template"] = auto
+            overlap_template = auto
         coords_prev = _carried(params, "coordinates_prev", itraj,
                                coordinates, is_first_time)
         odt = {k: params[k] for k in ("atom_labels", "cp2k_exe", "cp2k_data_dir",
-                                      "omp_num_threads", "mpi_executable", "nprocs",
-                                      "overlap_template") if k in params}
+                                      "omp_num_threads", "mpi_executable", "nprocs")
+               if k in params}
+        odt["overlap_template"] = overlap_template
         odt["working_directory"] = f"{wd}/odt"
         St_mo, S_prev, S_curr = mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev,
                                                      coordinates, LO, HI, odt)
