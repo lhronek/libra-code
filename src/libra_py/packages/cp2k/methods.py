@@ -5177,9 +5177,12 @@ def _cp2k_prefetch_dispatch(q, params, full_id):
     if state.get("timestep") != timestep:
         ntraj = q.num_of_cols
         if "pool" not in state:
+            # one CP2K run occupies nprocs x omp_num_threads cores - the
+            # default cap packs the node with exactly that footprint
             nprocs = max(1, int(params.get("nprocs", 1)))
+            omp = max(1, int(params.get("omp_num_threads", 1)))
             cap = int(params.get("max_concurrent_chains", 0)) or \
-                max(1, (os.cpu_count() or 1) // nprocs)
+                max(1, (os.cpu_count() or 1) // (nprocs * omp))
             state["pool"] = ThreadPoolExecutor(max_workers=min(cap, ntraj))
             # the overlap parses hold the GIL for seconds when run inside a
             # chain thread, stalling every other chain - a fork-context
