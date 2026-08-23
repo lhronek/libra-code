@@ -4637,6 +4637,10 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     fast path needs the cp2k patch, stock CP2K falls back to
                     the dense log print); "libint" = molden+libint in-process
                     (no extra CP2K run, nonperiodic)
+                ot_first_call_only (bool): run the ot_template pre-convergence
+                    only on each trajectory's first call - later calls restart
+                    the diagonalization from their own previous-step wfn
+                    [default: False]
                 force_source (str): what forces CP2K supplies (the engine-side
                     dyn_params["force_method"] decides how they are used):
                     "active_state" [default] - one Z-vector run at the hopping
@@ -4783,6 +4787,11 @@ def cp2k_compute_adi_impl(q, params, full_id):
                    "force_source", "cp2k_exe", "cp2k_data_dir",
                    "omp_num_threads", "mpi_executable", "nprocs", "project")
                   if k in params}
+    # the OT pre-convergence run matters where the SCF starts cold - the
+    # trajectory's first call; later calls restart the diagonalization from
+    # their own previous-step wfn
+    if params.get("ot_first_call_only", False) and not is_first_time:
+        run_params.pop("ot_template", None)
     # force_source="gs": always run at the GS (drops any &EXCITED_STATES
     # section), so the parsed FORCES| block is guaranteed to be the S0 forces
     run_params.update({"act_state": 0 if force_source == "gs" else act_state,
