@@ -2969,51 +2969,59 @@ def read_cp2k_tdfrc(filename):
     return forces, energies, fosc
 
 
-def read_cp2k_ao_overlap_print(logfile):
-    """
-    Parse the AO overlap matrix printed by &DFT &PRINT &AO_MATRICES (OVERLAP T,
-    NDIGITS 12) - the OVERLAP_DELTAT / Newton-X route.
+def _ao_overlap_blocks_fast(lines, start):
+    """Strict single-pass fast path for the regular MOLog block layout:
+    header lines carry ONLY column indices, every block prints the same
+    number of data rows ("irow iatom Element shell v ..."), and the values
+    parse in one C-engine np.loadtxt call per header width. Raises on any
+    structural surprise - the caller falls back to the flexible parser."""
+    import io as _io
+    headers, data = [], []
+    for l in lines[start + 1:]:
+        ls = l.strip()
+        if not ls:
+            continue
+        if ls.strip(" 0123456789") == "":                  # header: int tokens only
+            headers.append([int(x) for x in ls.split()])
+            continue
+        if ls[0].isdigit():
+            if not headers:
+                raise ValueError("data before the first header")
+            data.append(l)
+            continue
+        if headers:
+            break                                          # left the matrix region
+    if not headers or not data:
+        raise ValueError("no matrix blocks")
+    widths = {len(h) for h in headers}
+    if len(widths) > 2:                                    # main width + remainder
+        raise ValueError("irregular header widths")
+    nrow, rem = divmod(len(data), len(headers))
+    if rem:
+        raise ValueError("ragged blocks")
+    n = max(max(h) for h in headers)
+    S = np.zeros((n, n))
+    for k in widths:
+        bidx = [b for b, h in enumerate(headers) if len(h) == k]
+        chunk = []
+        for b in bidx:
+            chunk += data[b * nrow:(b + 1) * nrow]
+        arr = np.loadtxt(_io.StringIO("".join(chunk)),
+                         usecols=(0,) + tuple(range(4, 4 + k)),
+                         dtype=float, ndmin=2)
+        if arr.shape[0] != nrow * len(bidx):
+            raise ValueError("row count mismatch")
+        for j, b in enumerate(bidx):
+            blk = arr[j * nrow:(j + 1) * nrow]
+            S[np.ix_(blk[:, 0].astype(int) - 1, np.asarray(headers[b]) - 1)] = \
+                blk[:, 1:1 + k]
+    return S
 
-    Intended use (CP2K-native alternative to the molden+libint route, exactly
-    the ODIN doubled-geometry trick): run a DOUBLED geometry (atoms at t-dt
-    then atoms at t) with `&DFT &EXCITED_STATES OVERLAP_DELTAT T` - CP2K skips
-    the SCF and all properties, builds and prints S in ~1 s. The doubled
-    template additionally needs CONNECTIVITY OFF (&TOPOLOGY) and no
-    &VDW_POTENTIAL (both die on near-coincident atoms). The matrix is printed
-    in CP2K-internal (MOLog) AO order - apply resort_molog_eigenvectors(l_vals)
-    to both indices to convert to libint order:
 
-        S = read_cp2k_ao_overlap_print("out.log")
-        idx = CP2K_methods.resort_molog_eigenvectors(l_vals)      # one monomer
-        St_ao = S[:nao, nao:][np.ix_(idx, idx)]                   # <chi(t-dt)|chi(t)>
-
-    Validated against libint cross-geometry overlaps to 3.5e-7 (molden print
-    precision - the CP2K matrix is the exact one in the code's own basis).
-
-    Returns:
-        np.ndarray (n, n): the full printed overlap matrix
-    """
-    import re as _re
-    FLOAT = _re.compile(r"-?\d+\.\d+(E[+-]?\d+)?$", _re.I)
-    with open(logfile) as f:
-        lines = f.readlines()
-    # GPW: "OVERLAP MATRIX"; xTB: "XTB OVERLAP MATRIX"
-    start = next((i for i, l in enumerate(lines)
-                  if l.strip().endswith("OVERLAP MATRIX")), None)
-    if start is None:
-        raise RuntimeError(
-            F"no AO overlap print found in {logfile} - the OVERLAP_DELTAT run "
-            F"produced neither the S_CSR_WRITE file nor the dense log print. "
-            F"On stock CP2K (no Libra S_CSR_WRITE patch) set "
-            F"overlap_csr_write=False so the generated input carries the dense "
-            F"&AO_MATRICES OVERLAP print, or switch to mo_source='molden' + "
-            F"ao_overlap_method='libint'; if the print is still missing, the run "
-            F"itself failed - check the log tail")
-    # blocks: a column-header line (all ints) followed by data rows
-    # "irow iatom element shell v1 ... vk" - parsed without per-token regexes
-    # or an O(n^2) tuple-key dict, whose cost dominated the serial time
-    # between the CP2K runs (8 s for a 651-AO doubled matrix; block-wise
-    # numpy fill runs the same log in well under a second)
+def _ao_overlap_blocks_flex(lines, start, logfile):
+    """Flexible line-by-line fallback: tolerates irregular block shapes at
+    python parsing speed (the fast path is ~2x quicker and the original
+    per-token-regex version was another 4x slower)."""
     blocks, cols = [], []
     rows_i, vals = [], []
     for l in lines[start + 1:]:
@@ -3050,6 +3058,51 @@ def read_cp2k_ao_overlap_print(logfile):
     for cols_b, rows_b, vals_b in blocks:
         S[np.ix_(np.asarray(rows_b) - 1, np.asarray(cols_b) - 1)] = \
             np.asarray(vals_b, dtype=float)
+    return S
+
+
+def read_cp2k_ao_overlap_print(logfile):
+    """
+    Parse the AO overlap matrix printed by &DFT &PRINT &AO_MATRICES (OVERLAP T,
+    NDIGITS 12) - the OVERLAP_DELTAT / Newton-X route.
+
+    Intended use (CP2K-native alternative to the molden+libint route, exactly
+    the ODIN doubled-geometry trick): run a DOUBLED geometry (atoms at t-dt
+    then atoms at t) with `&DFT &EXCITED_STATES OVERLAP_DELTAT T` - CP2K skips
+    the SCF and all properties, builds and prints S in ~1 s. The doubled
+    template additionally needs CONNECTIVITY OFF (&TOPOLOGY) and no
+    &VDW_POTENTIAL (both die on near-coincident atoms). The matrix is printed
+    in CP2K-internal (MOLog) AO order - apply resort_molog_eigenvectors(l_vals)
+    to both indices to convert to libint order:
+
+        S = read_cp2k_ao_overlap_print("out.log")
+        idx = CP2K_methods.resort_molog_eigenvectors(l_vals)      # one monomer
+        St_ao = S[:nao, nao:][np.ix_(idx, idx)]                   # <chi(t-dt)|chi(t)>
+
+    Validated against libint cross-geometry overlaps to 3.5e-7 (molden print
+    precision - the CP2K matrix is the exact one in the code's own basis).
+
+    Returns:
+        np.ndarray (n, n): the full printed overlap matrix
+    """
+    with open(logfile) as f:
+        lines = f.readlines()
+    # GPW: "OVERLAP MATRIX"; xTB: "XTB OVERLAP MATRIX"
+    start = next((i for i, l in enumerate(lines)
+                  if l.strip().endswith("OVERLAP MATRIX")), None)
+    if start is None:
+        raise RuntimeError(
+            F"no AO overlap print found in {logfile} - the OVERLAP_DELTAT run "
+            F"produced neither the S_CSR_WRITE file nor the dense log print. "
+            F"On stock CP2K (no Libra S_CSR_WRITE patch) set "
+            F"overlap_csr_write=False so the generated input carries the dense "
+            F"&AO_MATRICES OVERLAP print, or switch to mo_source='molden' + "
+            F"ao_overlap_method='libint'; if the print is still missing, the run "
+            F"itself failed - check the log tail")
+    try:
+        S = _ao_overlap_blocks_fast(lines, start)
+    except (AssertionError, ValueError, IndexError, KeyError):
+        S = _ao_overlap_blocks_flex(lines, start, logfile)
     if np.abs(S - S.T).max() > 1e-10:
         raise ValueError(f"parsed overlap not symmetric ({logfile})")
     return S
