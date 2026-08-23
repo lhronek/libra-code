@@ -244,7 +244,7 @@ void libra_print_banner(){
   if(q && q[0]=='0'){ return; }
 
   static const char* scales[5] = {
-    "   *********   ", "   *   *   *   ", "  ***  *  ***  ",
+    "  **  ***  **  ", "   *   *   *   ", "    *******    ",
     "       *       ", "     *****     " };
   static const char* letters[5] = {
     "*   *** ***  ***   ** ",
