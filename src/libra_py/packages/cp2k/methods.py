@@ -18,7 +18,8 @@
 
 
 import os, sys, math, re, copy, time, glob, shlex, subprocess
-from concurrent.futures import ThreadPoolExecutor
+import multiprocessing
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import numpy as np
 import scipy.sparse as sp
 import scipy.linalg
@@ -4065,10 +4066,16 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
     if os.path.exists(csr):
         os.remove(csr)
     logfile = run_cp2k(q2, run_params)
+    # a supplied process pool runs the parse outside the GIL - in a chain
+    # thread the parse would block every other prefetched chain for its
+    # full duration; .result() releases the GIL while the worker parses
+    pool = params.get("_parse_pool", None)
     if os.path.exists(csr):        # patched CP2K + &S_CSR_WRITE template: O(nnz)
-        S = read_cp2k_s_csr(csr)
+        S = pool.submit(read_cp2k_s_csr, csr).result() if pool else \
+            read_cp2k_s_csr(csr)
     else:                          # fallback: dense &AO_MATRICES log print
-        S = read_cp2k_ao_overlap_print(logfile)
+        S = pool.submit(read_cp2k_ao_overlap_print, logfile).result() if pool \
+            else read_cp2k_ao_overlap_print(logfile)
     idx = mo_curr["resort_idx"]
     if idx is None:                       # MOs already in MOLog AO order
         idx = np.arange(S.shape[0] // 2)
@@ -4871,6 +4878,9 @@ def cp2k_compute_adi_impl(q, params, full_id):
                if k in params}
         odt["overlap_template"] = overlap_template
         odt["working_directory"] = f"{wd}/odt"
+        parse_pool = params.get("_prefetch", {}).get("parse_pool", None)
+        if parse_pool is not None:
+            odt["_parse_pool"] = parse_pool
         St_mo, S_prev, S_curr = mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev,
                                                      coordinates, LO, HI, odt)
     else:
@@ -5171,6 +5181,21 @@ def _cp2k_prefetch_dispatch(q, params, full_id):
             cap = int(params.get("max_concurrent_chains", 0)) or \
                 max(1, (os.cpu_count() or 1) // nprocs)
             state["pool"] = ThreadPoolExecutor(max_workers=min(cap, ntraj))
+            # the overlap parses hold the GIL for seconds when run inside a
+            # chain thread, stalling every other chain - a fork-context
+            # process pool runs them truly in parallel (parse_pool_workers:
+            # 0 disables). Forked and warmed up HERE, in the main thread,
+            # BEFORE any chain thread exists - forking a threaded process
+            # is not safe
+            pworkers = int(params.get("parse_pool_workers", min(cap, ntraj)))
+            if pworkers > 0:
+                state["parse_pool"] = ProcessPoolExecutor(
+                    max_workers=pworkers,
+                    mp_context=multiprocessing.get_context("fork"))
+                warm = [state["parse_pool"].submit(time.sleep, 0.05)
+                        for _ in range(pworkers)]
+                for w in warm:
+                    w.result()
         state["timestep"] = timestep
         state["futures"] = {
             j: state["pool"].submit(cp2k_compute_adi_impl, q, params,
