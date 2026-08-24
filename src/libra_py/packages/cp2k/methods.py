@@ -3172,7 +3172,7 @@ def read_cp2k_ao_overlap_print(logfile):
     return S
 
 
-def read_cp2k_s_csr(filename):
+def read_cp2k_s_csr(filename, n=None, chunk_rows=None):
     """
     Parse the sparse AO overlap written by &DFT &PRINT &S_CSR_WRITE
     (requires the qs_energy.F patch in tools/cp2k-overlap-deltat-csr.patch for
@@ -3181,15 +3181,60 @@ def read_cp2k_s_csr(filename):
     Format: 1-based "row col value" triplets, both triangles, 15-digit
     scientific - more precise AND O(nnz) instead of the O(n^2) dense log print.
 
+    numpy's C reader engages on the filename, on file objects and across
+    max_rows chunks alike, so chunking costs ~20% time while capping the
+    transient at ~chunk size instead of the ~40 bytes per triplet of the
+    whole-file array (never benchmark this under tracemalloc - it taxes the
+    chunked reader ~6x and once misattributed the cost). Default: whole
+    file. chunk_rows (~200000 is a good size) enables chunking; n (the
+    matrix dimension, e.g. 2 x nao on the doubled ODT geometry) preallocates
+    the result - out-of-range triplets then raise - and is otherwise grown
+    on demand.
+
     Returns:
         np.ndarray (n, n)
     """
-    rows = np.loadtxt(filename)
-    if rows.ndim == 1:
-        rows = rows.reshape(1, -1)
-    n = int(max(rows[:, 0].max(), rows[:, 1].max()))
-    S = np.zeros((n, n))
-    S[rows[:, 0].astype(int) - 1, rows[:, 1].astype(int) - 1] = rows[:, 2]
+    if chunk_rows is None:
+        rows = np.loadtxt(filename)
+        if rows.ndim == 1:
+            rows = rows.reshape(1, -1)
+        m = int(max(rows[:, 0].max(), rows[:, 1].max()))
+        if n is None:
+            n = m
+        elif m > n:
+            raise ValueError(
+                f"triplet index {m} exceeds the declared dimension {n} "
+                f"({filename})")
+        S = np.zeros((n, n))
+        S[rows[:, 0].astype(int) - 1, rows[:, 1].astype(int) - 1] = rows[:, 2]
+    else:
+        S = None if n is None else np.zeros((n, n))
+        hi = 0
+        with open(filename) as f:
+            while True:
+                a = np.loadtxt(f, dtype=float, ndmin=2, max_rows=int(chunk_rows))
+                if a.size == 0:
+                    break
+                m = int(a[:, :2].max())
+                hi = max(hi, m)
+                if S is None:
+                    S = np.zeros((m, m))
+                elif m > S.shape[0]:
+                    if n is not None:
+                        raise ValueError(
+                            f"triplet index {m} exceeds the declared "
+                            f"dimension {n} ({filename})")
+                    size = max(m, 2 * S.shape[0])            # grow by doubling
+                    S2 = np.zeros((size, size))
+                    S2[:S.shape[0], :S.shape[1]] = S
+                    S = S2
+                S[a[:, 0].astype(int) - 1, a[:, 1].astype(int) - 1] = a[:, 2]
+                if a.shape[0] < int(chunk_rows):
+                    break
+        if S is None:
+            raise ValueError(f"empty CSR overlap file ({filename})")
+        if n is None and hi < S.shape[0]:                    # trim growth headroom
+            S = np.ascontiguousarray(S[:hi, :hi])
     if np.abs(S - S.T).max() > 1e-10:
         raise ValueError(f"CSR overlap not symmetric ({filename})")
     return S
