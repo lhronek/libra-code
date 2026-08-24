@@ -2969,62 +2969,122 @@ def read_cp2k_tdfrc(filename):
     return forces, energies, fosc
 
 
-def _ao_overlap_blocks_fast(lines, start):
+def _ao_overlap_blocks_fast(it):
     """Strict single-pass fast path for the regular MOLog block layout:
     header lines carry ONLY column indices, every block prints the same
-    number of data rows ("irow iatom Element shell v ..."), and the values
-    parse in one C-engine np.loadtxt call per header width. Raises on any
-    structural surprise - the caller falls back to the flexible parser."""
-    import io as _io
-    headers, data = [], []
-    for l in lines[start + 1:]:
-        ls = l.strip()
-        if not ls:
-            continue
-        if ls.strip(" 0123456789") == "":                  # header: int tokens only
-            headers.append([int(x) for x in ls.split()])
-            continue
-        if ls[0].isdigit():
-            if not headers:
-                raise ValueError("data before the first header")
-            data.append(l)
-            continue
-        if headers:
-            break                                          # left the matrix region
-    if not headers or not data:
+    number of data rows ("irow iatom Element shell v ..."), and the
+    main-width data lines stream from the file iterator STRAIGHT into one
+    C-engine np.loadtxt call - no line list, no joined string, so the
+    transient is the loadtxt array (~n^2(1+1/k) doubles) plus the result.
+    MOLog data lines are fixed-width, so after block 1 establishes the
+    length, a single len() comparison classifies the ~99.9% hot path; the
+    full string predicates run only on headers, blanks and the rare
+    remainder-width block (side-buffered and parsed the same way). A
+    region-end line accidentally matching the length reaches loadtxt and
+    raises there. Raises on any structural surprise - the caller falls
+    back to the flexible parser."""
+    import itertools as _itertools
+    headers = []                     # column-index lists, in print order
+    rem = []                         # data lines of non-main-width blocks
+    state = {"kmain": None, "cur": None, "Lmain": None, "L1": None,
+             "uniform": True}
+
+    def classified():
+        started = False
+        for l in it:
+            L = state["Lmain"]
+            if L is not None and len(l) == L:              # fixed-width data
+                if state["cur"] == state["kmain"]:
+                    yield l
+                else:
+                    rem.append(l)
+                continue
+            ls = l.strip()
+            if not ls:
+                continue
+            if ls.strip(" 0123456789") == "":              # header: int tokens only
+                cols = [int(x) for x in ls.split()]
+                if state["kmain"] is None:
+                    state["kmain"] = len(cols)             # block 1 sets the main width
+                elif state["Lmain"] is None and state["uniform"]:
+                    state["Lmain"] = state["L1"]           # lock after block 1
+                state["cur"] = len(cols)
+                headers.append(cols)
+                started = True
+                continue
+            if ls[0].isdigit():
+                if not started:
+                    raise ValueError("data before the first header")
+                if state["Lmain"] is None:                 # inside block 1
+                    if state["L1"] is None:
+                        state["L1"] = len(l)
+                    elif len(l) != state["L1"]:
+                        state["uniform"] = False           # stay on full predicates
+                if state["cur"] == state["kmain"]:
+                    yield l
+                else:
+                    rem.append(l)
+                continue
+            if started:
+                break                                      # left the matrix region
+
+    g = classified()
+    first = next(g, None)            # the first header fixes kmain for usecols
+    if first is None:
         raise ValueError("no matrix blocks")
-    widths = {len(h) for h in headers}
-    if len(widths) > 2:                                    # main width + remainder
+    kmain = state["kmain"]
+    arr = np.loadtxt(_itertools.chain([first], g),
+                     usecols=(0,) + tuple(range(4, 4 + kmain)),
+                     dtype=float, ndmin=2, comments=None)
+    if len({len(h) for h in headers}) > 2:                 # main width + remainder
         raise ValueError("irregular header widths")
-    nrow, rem = divmod(len(data), len(headers))
-    if rem:
-        raise ValueError("ragged blocks")
     n = max(max(h) for h in headers)
     S = np.zeros((n, n))
-    for k in widths:
-        bidx = [b for b, h in enumerate(headers) if len(h) == k]
-        chunk = []
-        for b in bidx:
-            chunk += data[b * nrow:(b + 1) * nrow]
-        arr = np.loadtxt(_io.StringIO("".join(chunk)),
-                         usecols=(0,) + tuple(range(4, 4 + k)),
-                         dtype=float, ndmin=2)
-        if arr.shape[0] != nrow * len(bidx):
-            raise ValueError("row count mismatch")
-        for j, b in enumerate(bidx):
-            blk = arr[j * nrow:(j + 1) * nrow]
+    main_b = [b for b, h in enumerate(headers) if len(h) == kmain]
+    nrow, ragged = divmod(arr.shape[0], len(main_b))
+    if ragged:
+        raise ValueError("ragged blocks")
+    for j, b in enumerate(main_b):
+        blk = arr[j * nrow:(j + 1) * nrow]
+        S[np.ix_(blk[:, 0].astype(int) - 1, np.asarray(headers[b]) - 1)] = \
+            blk[:, 1:1 + kmain]
+    rem_b = [b for b, h in enumerate(headers) if len(h) != kmain]
+    if rem_b:
+        k2 = len(headers[rem_b[0]])
+        arr2 = np.loadtxt(iter(rem), usecols=(0,) + tuple(range(4, 4 + k2)),
+                          dtype=float, ndmin=2)
+        nrow2, ragged2 = divmod(arr2.shape[0], len(rem_b))
+        if ragged2:
+            raise ValueError("ragged blocks")
+        for j, b in enumerate(rem_b):
+            blk = arr2[j * nrow2:(j + 1) * nrow2]
             S[np.ix_(blk[:, 0].astype(int) - 1, np.asarray(headers[b]) - 1)] = \
-                blk[:, 1:1 + k]
+                blk[:, 1:1 + k2]
     return S
 
 
-def _ao_overlap_blocks_flex(lines, start, logfile):
+def _ao_overlap_blocks_flex(it, logfile):
     """Flexible line-by-line fallback: tolerates irregular block shapes at
-    python parsing speed (the fast path is ~2x quicker and the original
-    per-token-regex version was another 4x slower)."""
-    blocks, cols = [], []
-    rows_i, vals = [], []
-    for l in lines[start + 1:]:
+    python parsing speed. Streams one block at a time into the result
+    (allocated from the first block and grown on demand), instead of
+    buffering every block as python floats - the old all-blocks buffer
+    held ~60x the final matrix."""
+    S = None
+    cols, rows_i, vals = None, [], []
+
+    def flush():
+        nonlocal S
+        m = max(max(rows_i), max(cols))
+        if S is None:
+            S = np.zeros((m, m))
+        elif m > S.shape[0]:                               # irregular log - grow
+            S2 = np.zeros((m, m))
+            S2[:S.shape[0], :S.shape[1]] = S
+            S = S2
+        S[np.ix_(np.asarray(rows_i) - 1, np.asarray(cols) - 1)] = \
+            np.asarray(vals, dtype=float)
+
+    for l in it:
         t = l.split()
         if not t:
             continue
@@ -3035,7 +3095,7 @@ def _ao_overlap_blocks_flex(lines, start, logfile):
             try:
                 v = [float(x) for x in t[4:]]
             except ValueError:
-                if blocks or rows_i:                       # left the matrix region
+                if S is not None or rows_i:                # left the matrix region
                     break
                 continue
             rows_i.append(int(t[0]))
@@ -3043,22 +3103,26 @@ def _ao_overlap_blocks_flex(lines, start, logfile):
             continue
         if all(x.isdigit() for x in t):                   # column-header line
             if cols and rows_i:
-                blocks.append((cols, rows_i, vals))
+                flush()
+                rows_i, vals = [], []
             cols = [int(x) for x in t]
-            rows_i, vals = [], []
             continue
-        if blocks or rows_i:                               # left the matrix region
+        if S is not None or rows_i:                        # left the matrix region
             break
     if cols and rows_i:
-        blocks.append((cols, rows_i, vals))
-    if not blocks:
+        flush()
+    if S is None:
         raise RuntimeError(F"empty AO overlap print in {logfile}")
-    n = max(max(r) for _, r, _ in blocks)
-    S = np.zeros((n, n))
-    for cols_b, rows_b, vals_b in blocks:
-        S[np.ix_(np.asarray(rows_b) - 1, np.asarray(cols_b) - 1)] = \
-            np.asarray(vals_b, dtype=float)
     return S
+
+
+def _skip_to_overlap_banner(f):
+    """Advance a log-file iterator past the AO-overlap banner line.
+    GPW: "OVERLAP MATRIX"; xTB: "XTB OVERLAP MATRIX"."""
+    for l in f:
+        if l.strip().endswith("OVERLAP MATRIX"):
+            return True
+    return False
 
 
 def read_cp2k_ao_overlap_print(logfile):
@@ -3086,23 +3150,23 @@ def read_cp2k_ao_overlap_print(logfile):
         np.ndarray (n, n): the full printed overlap matrix
     """
     with open(logfile) as f:
-        lines = f.readlines()
-    # GPW: "OVERLAP MATRIX"; xTB: "XTB OVERLAP MATRIX"
-    start = next((i for i, l in enumerate(lines)
-                  if l.strip().endswith("OVERLAP MATRIX")), None)
-    if start is None:
-        raise RuntimeError(
-            F"no AO overlap print found in {logfile} - the OVERLAP_DELTAT run "
-            F"produced neither the S_CSR_WRITE file nor the dense log print. "
-            F"On stock CP2K (no Libra S_CSR_WRITE patch) set "
-            F"overlap_csr_write=False so the generated input carries the dense "
-            F"&AO_MATRICES OVERLAP print, or switch to mo_source='molden' + "
-            F"ao_overlap_method='libint'; if the print is still missing, the run "
-            F"itself failed - check the log tail")
-    try:
-        S = _ao_overlap_blocks_fast(lines, start)
-    except (AssertionError, ValueError, IndexError, KeyError):
-        S = _ao_overlap_blocks_flex(lines, start, logfile)
+        if not _skip_to_overlap_banner(f):
+            raise RuntimeError(
+                F"no AO overlap print found in {logfile} - the OVERLAP_DELTAT run "
+                F"produced neither the S_CSR_WRITE file nor the dense log print. "
+                F"On stock CP2K (no Libra S_CSR_WRITE patch) set "
+                F"overlap_csr_write=False so the generated input carries the dense "
+                F"&AO_MATRICES OVERLAP print, or switch to mo_source='molden' + "
+                F"ao_overlap_method='libint'; if the print is still missing, the run "
+                F"itself failed - check the log tail")
+        try:
+            S = _ao_overlap_blocks_fast(f)
+        except (AssertionError, ValueError, IndexError, KeyError):
+            S = None
+    if S is None:                                          # re-read for the fallback
+        with open(logfile) as f:
+            _skip_to_overlap_banner(f)
+            S = _ao_overlap_blocks_flex(f, logfile)
     if np.abs(S - S.T).max() > 1e-10:
         raise ValueError(f"parsed overlap not symmetric ({logfile})")
     return S
