@@ -5244,6 +5244,11 @@ def _cp2k_prefetch_dispatch(q, params, full_id):
             # BEFORE any chain thread exists - forking a threaded process
             # is not safe
             pworkers = int(params.get("parse_pool_workers", min(cap, ntraj)))
+            if pworkers > 0 and multiprocessing.current_process().daemon:
+                # a daemonic worker (mp.Pool batch parallelism) cannot fork
+                # children - parses run inline in the chain threads, and the
+                # outer process pool already covers cross-batch parallelism
+                pworkers = 0
             if pworkers > 0:
                 state["parse_pool"] = ProcessPoolExecutor(
                     max_workers=pworkers,
