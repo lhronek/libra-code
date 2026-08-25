@@ -17,7 +17,7 @@
 """
 
 
-import os, sys, math, re, copy, time, glob, shlex, subprocess
+import os, sys, math, re, copy, time, glob, shlex, subprocess, atexit
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import numpy as np
@@ -5040,7 +5040,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
                if k in params}
         odt["overlap_template"] = overlap_template
         odt["working_directory"] = f"{wd}/odt"
-        parse_pool = params.get("_prefetch", {}).get("parse_pool", None)
+        parse_pool = _prefetch_parse_pool(params)
         if parse_pool is not None:
             odt["_parse_pool"] = parse_pool
         St_mo, S_prev, S_curr = mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev,
@@ -5321,10 +5321,48 @@ def cp2k_compute_adi_impl(q, params, full_id):
     return obj
 
 
+# Live prefetch state (executors, in-flight futures) keyed by
+# working_directory_prefix: model_params is deepcopied at every
+# generic_recipe entry and executors are not picklable, and the rep-0
+# init phase must find the SAME pools as the production loop.
+# Concurrent runs in one process already need distinct prefixes (they
+# would share run directories otherwise).
+_PREFETCH_STATES = {}
+
+
+def _prefetch_key(params):
+    return str(params.get("working_directory_prefix", "wd"))
+
+
+def _prefetch_state(params):
+    """This driver instance's live prefetch state (created empty)."""
+    return _PREFETCH_STATES.setdefault(_prefetch_key(params), {})
+
+
+def _prefetch_parse_pool(params):
+    """The live parse pool, if the dispatcher created one (never creates)."""
+    state = _PREFETCH_STATES.get(_prefetch_key(params))
+    return state.get("parse_pool") if state else None
+
+
+def _shutdown_prefetch_pools():
+    for state in _PREFETCH_STATES.values():
+        for key in ("pool", "parse_pool"):
+            ex = state.pop(key, None)
+            if ex is not None:
+                ex.shutdown(wait=False, cancel_futures=True)
+    _PREFETCH_STATES.clear()
+
+
+atexit.register(_shutdown_prefetch_pools)
+
+
 def _cp2k_prefetch_dispatch(q, params, full_id):
     """One batch per timestep: the first call of a step submits EVERY
     trajectory's chain (the CP2K runs + the python assembly) to a thread
-    pool held in the carried state and returns its own result; the
+    pool held in a module registry keyed by working_directory_prefix
+    (model_params is deepcopied at generic_recipe entry - live executors
+    must stay out of it) and returns its own result; the
     engine-sequenced calls for the remaining trajectories harvest their
     futures. subprocess waits release the GIL, so the CP2K chains overlap
     while the python parts interleave. Rests on what the engine already
@@ -5335,14 +5373,25 @@ def _cp2k_prefetch_dispatch(q, params, full_id):
     Id = Cpp2Py(full_id)
     itraj = Id[-1]
     timestep = int(params.get("timestep", -1))
-    state = params.setdefault("_prefetch", {})
+    state = _prefetch_state(params)
     if state.get("timestep") != timestep:
         ntraj = q.num_of_cols
+        nprocs = max(1, int(params.get("nprocs", 1)))
+        omp = max(1, int(params.get("omp_num_threads", 1)))
+        sig = (ntraj, nprocs, omp,
+               int(params.get("max_concurrent_chains", 0)),
+               int(params.get("parse_pool_workers", -1)))
+        if state.get("sig") != sig:
+            # sizing inputs changed (a new run reuses the prefix):
+            # recycle the executors
+            for key in ("pool", "parse_pool"):
+                ex = state.pop(key, None)
+                if ex is not None:
+                    ex.shutdown(wait=False, cancel_futures=True)
+            state["sig"] = sig
         if "pool" not in state:
             # one CP2K run occupies nprocs x omp_num_threads cores - the
             # default cap packs the node with exactly that footprint
-            nprocs = max(1, int(params.get("nprocs", 1)))
-            omp = max(1, int(params.get("omp_num_threads", 1)))
             cap = int(params.get("max_concurrent_chains", 0)) or \
                 max(1, (os.cpu_count() or 1) // (nprocs * omp))
             state["pool"] = ThreadPoolExecutor(max_workers=min(cap, ntraj))
