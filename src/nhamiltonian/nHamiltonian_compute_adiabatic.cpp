@@ -695,6 +695,8 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
         PyErr_Print();
         throw;
       }
+      // an all-zero supply is the ecosystem's placeholder convention - not data
+      basis_transform_supplied = (abs(basis_transform->max_elt()) != 0.0);
     }
 
     has_attr = 0;

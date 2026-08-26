@@ -237,6 +237,22 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
     }
 
     has_attr=0;
+    has_attr=0;
+    has_attr = (int)hasattr(obj,"basis_transform");
+    basis_transform_supplied = 0;
+    if(has_attr){
+
+      // a diabatic model may supply its own SMOOTH dia->adi
+      // transformation - the stored-U transform (ham_transform_method 2)
+      // consumes it in place of the internal diagonalization, keeping
+      // the model's gauge (no LAPACK branch switches)
+      check_cmatrix(obj, "basis_transform", ndia, nadi);
+      if(basis_transform_mem_status==0){ init_basis_transform(); }
+      *basis_transform = extract<CMATRIX>(obj.attr("basis_transform"));
+      // an all-zero supply is the ecosystem's placeholder convention - not data
+      basis_transform_supplied = (abs(basis_transform->max_elt()) != 0.0);
+    }
+
     has_attr = (int)hasattr(obj,"time_overlap_dia"); 
     if(has_attr){    
 
@@ -251,10 +267,10 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
       static bool warned_adi_ignored = false;
       if(!warned_adi_ignored){
         const char* adi_names[] = {"ham_adi", "hvib_adi", "nac_adi",
-                                   "time_overlap_adi", "basis_transform",
+                                   "time_overlap_adi",
                                    "dc1_adi", "d1ham_adi", "d2ham_adi",
                                    "gs_kinetic_energy"};
-        for(int a=0;a<9;a++){
+        for(int a=0;a<8;a++){
           if((int)hasattr(obj, adi_names[a])){
             cout<<"WARNING in compute_diabatic(): the model supplies obj."
                 <<adi_names[a]<<", which the diabatic harvest"

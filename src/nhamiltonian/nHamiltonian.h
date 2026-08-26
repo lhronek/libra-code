@@ -184,6 +184,10 @@ public:
   int hvib_dia_supplied;
   int nac_adi_supplied;
   int nac_dia_supplied;
+  ///< the model supplied its own dia->adi transformation - the
+  ///< stored-U transforms (ham_transform_method 2) require it: the
+  ///< square identity default must not silently alias dia == adi
+  int basis_transform_supplied;
 
 
   vector<CMATRIX*> d1ham_adi; ///< first order derivatives of the Hamiltonian matrix in the adiabatic basis (diagonal)
