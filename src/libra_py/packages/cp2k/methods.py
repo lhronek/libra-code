@@ -5392,6 +5392,28 @@ def cp2k_compute_adi_impl(q, params, full_id):
 _PREFETCH_STATES = {}
 
 
+def _allocation_cores():
+    """Physical cores available to this process: the affinity mask with
+    SMT siblings collapsed (sysfs topology). Logical count when the
+    topology is unreadable; cpu_count where affinity is absent."""
+    try:
+        cpus = os.sched_getaffinity(0)
+    except AttributeError:
+        return os.cpu_count() or 1
+    cores = set()
+    for c in cpus:
+        try:
+            base = F"/sys/devices/system/cpu/cpu{c}/topology"
+            with open(F"{base}/core_id") as f:
+                cid = f.read().strip()
+            with open(F"{base}/physical_package_id") as f:
+                pid = f.read().strip()
+            cores.add((pid, cid))
+        except OSError:
+            return len(cpus)
+    return max(1, len(cores))
+
+
 def _prefetch_key(params):
     return str(params.get("working_directory_prefix", "wd"))
 
@@ -5472,10 +5494,12 @@ def _cp2k_prefetch_dispatch(q, params, full_id):
                     ex.shutdown(wait=False, cancel_futures=True)
             state["sig"] = sig
         if "pool" not in state:
-            # one CP2K run occupies nprocs x omp_num_threads cores - the
-            # default cap packs the node with exactly that footprint
+            # one CP2K run occupies nprocs x omp_num_threads PHYSICAL
+            # cores - the default cap packs the allocation with exactly
+            # that footprint (affinity-masked, SMT siblings collapsed;
+            # cpu_count would report the whole node's logical CPUs)
             cap = int(params.get("max_concurrent_chains", 0)) or \
-                max(1, (os.cpu_count() or 1) // (nprocs * omp))
+                max(1, _allocation_cores() // (nprocs * omp))
             state["pool"] = ThreadPoolExecutor(max_workers=min(cap, ntraj))
             # the overlap parses hold the GIL for seconds when run inside a
             # chain thread, stalling every other chain - a fork-context
