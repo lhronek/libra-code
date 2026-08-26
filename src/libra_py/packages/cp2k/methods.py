@@ -4967,6 +4967,12 @@ def cp2k_compute_adi_impl(q, params, full_id):
                 cp2k_data_dir, omp_num_threads, mpi_executable, nprocs,
                 number_of_states: passed to the execution layer
                     (number_of_states defaults to nstates-1)
+                dia_basis_hvib (str): "none" [default] or "corrected" -
+                    with dia_basis="sd", also supply obj.hvib_dia =
+                    H_SD - i D_SD (the SD-frame HST drift correction);
+                    consume with hvib_update_method 0 +
+                    ham_transform_method 3
+
 
             Caches (auto-created): mo_prev, ci_prev, E_adi_prev, S_prev,
                 homo, sd_basis, coordinates_prev, is_first_time
@@ -5013,6 +5019,12 @@ def cp2k_compute_adi_impl(q, params, full_id):
         raise ValueError('dia_basis="sd" declares the SD basis as the diabatic basis '
                          'via the sd2ci matrix - it requires overlap_backend="sd"')
     dia_max_drop = float(params.get("dia_basis_max_drop", 0.5))
+    dia_hvib = params.get("dia_basis_hvib", "none")
+    if dia_hvib not in ("none", "corrected"):
+        raise ValueError(F"dia_basis_hvib must be 'none' or 'corrected', got {dia_hvib!r}")
+    if dia_hvib == "corrected" and dia_basis != "sd":
+        raise ValueError('dia_basis_hvib="corrected" needs dia_basis="sd"')
+    st_sd = None
     if not 0.0 <= dia_max_drop <= 1.0:
         raise ValueError(F"dia_basis_max_drop must be in [0, 1], got {dia_max_drop}")
     # tblite runs (&XTB &TBLITE): CP2K's TDDFPT excited-state force assembly
@@ -5353,6 +5365,23 @@ def cp2k_compute_adi_impl(q, params, full_id):
         obj.ovlp_dia = CMATRIX(ndia_sd, ndia_sd)
         for i in range(ndia_sd):
             obj.ovlp_dia.set(i, i, 1.0 + 0.0j)
+        # frame-corrected diabatic vibronic Hamiltonian: H_SD - i D_SD,
+        # with the HST drift D_SD = (St_SD - St_SD^T)/(2 dt) from the SD
+        # time-overlaps - removes the SD-frame-drift part of the
+        # quasi-diabatic model error (the span part is irreducible for a
+        # CI-projected Hamiltonian). Consumed by the engine under
+        # hvib_update_method 0 + ham_transform_method 3; a
+        # hvib_update_method 1 rebuild (ham_dia - i*nac_dia, nac_dia = 0)
+        # disagrees by construction and fail-louds
+        if dia_hvib == "corrected":
+            if st_sd is None:
+                raise ValueError('dia_basis_hvib="corrected" needs the SD '
+                                 'time-overlap path (overlap_backend="sd" '
+                                 'with TDDFPT states)')
+            dt_c = float(params.get("dt", 41.0))
+            H_sd = T_dia @ np.diag(np.asarray(E_mid[:nstates], dtype=float)) @ T_dia.T
+            D_sd = (np.asarray(st_sd) - np.asarray(st_sd).T) / (2.0 * dt_c)
+            obj.hvib_dia = data_conv.nparray2CMATRIX(H_sd - 1j * D_sd)
     else:
         obj.basis_transform = CMATRIX(nstates, nstates)
         for i in range(nstates):
