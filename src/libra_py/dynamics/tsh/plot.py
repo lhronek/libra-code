@@ -995,7 +995,10 @@ def plot_dynamics(plot_params_):
     ylim = plot_params["ylim"]
     Lw = plot_params["linewidth"]
     do_show = plot_params["do_show"]
-    fmt = plot_params.get("figure_format", "png")  # figure file format, e.g. "png" or "pdf"
+    fmt = plot_params["figure_format"]  # merged - common_defaults is the authority
+
+    def _save(name):
+        plt.savefig(F"{out_prefix}/{name}.{fmt}", dpi=plot_params["dpi"])
 
     with h5py.File(F"{prefix}/{filename}", 'r') as f:
 
@@ -1006,7 +1009,7 @@ def plot_dynamics(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_energies(plt, f, plot_params, "energies")
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/average_energies-vs-t.{fmt}", dpi=plot_params["dpi"])
+                _save("average_energies-vs-t")
 
         # ===== Energy Components Fluctuations vs. Time =========
         if "energy_fluctuations" in what_to_plot:
@@ -1015,7 +1018,7 @@ def plot_dynamics(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_energies(plt, f, plot_params, "energy_fluctuations")
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/average_energy_fluctuations-vs-t.{fmt}", dpi=plot_params["dpi"])
+                _save("average_energy_fluctuations-vs-t")
 
         # ===== Coordinates vs Time  =========
         if "coordinates" in what_to_plot:
@@ -1024,7 +1027,7 @@ def plot_dynamics(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_cooordinates_vs_t(plt, f, plot_params)
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/q-vs-t.{fmt}", dpi=plot_params["dpi"])
+                _save("q-vs-t")
 
         # ===== Momenta vs Time  =========
         if "momenta" in what_to_plot:
@@ -1033,7 +1036,7 @@ def plot_dynamics(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_momenta_vs_t(plt, f, plot_params)
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/p-vs-t.{fmt}", dpi=plot_params["dpi"])
+                _save("p-vs-t")
 
         # ===== Forces vs Time  =========
         if "forces" in what_to_plot:
@@ -1042,7 +1045,7 @@ def plot_dynamics(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_forces_vs_t(plt, f, plot_params)
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/f-vs-t.{fmt}", dpi=plot_params["dpi"])
+                _save("f-vs-t")
 
         # ===== Phase space  =========
         if "phase_space" in what_to_plot:
@@ -1051,7 +1054,7 @@ def plot_dynamics(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_phase_space(plt, f, plot_params)
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/phase_space.{fmt}", dpi=plot_params["dpi"])
+                _save("phase_space")
 
         # ====== Populations of all kinds ================
         if "se_pop_adi" in what_to_plot:
@@ -1060,7 +1063,7 @@ def plot_dynamics(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_populations(plt, f, plot_params_, "se_pop_adi")
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/se_pop_adi.{fmt}", dpi=plot_params["dpi"])
+                _save("se_pop_adi")
 
         if "se_pop_dia" in what_to_plot:
             plt.figure(num=8, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
@@ -1068,7 +1071,7 @@ def plot_dynamics(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_populations(plt, f, plot_params_, "se_pop_dia")
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/se_pop_dia.{fmt}", dpi=plot_params["dpi"])
+                _save("se_pop_dia")
 
         if "sh_pop_adi" in what_to_plot:
             plt.figure(num=9, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
@@ -1076,7 +1079,7 @@ def plot_dynamics(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_populations(plt, f, plot_params_, "sh_pop_adi")
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/sh_pop_adi.{fmt}", dpi=plot_params["dpi"])
+                _save("sh_pop_adi")
 
         if "sh_pop_dia" in what_to_plot:
             plt.figure(num=10, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
@@ -1084,7 +1087,7 @@ def plot_dynamics(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_populations(plt, f, plot_params_, "sh_pop_dia")
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/sh_pop_dia.{fmt}", dpi=plot_params["dpi"])
+                _save("sh_pop_dia")
 
         if "mash_pop_adi" in what_to_plot:
             plt.figure(num=11, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
@@ -1092,7 +1095,7 @@ def plot_dynamics(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_populations(plt, f, plot_params_, "mash_pop_adi")
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/mash_pop_adi.{fmt}", dpi=plot_params["dpi"])
+                _save("mash_pop_adi")
 
         if "mash_pop_dia" in what_to_plot:
             plt.figure(num=12, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
@@ -1100,7 +1103,7 @@ def plot_dynamics(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_populations(plt, f, plot_params_, "mash_pop_dia")
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/mash_pop_dia.{fmt}", dpi=plot_params["dpi"])
+                _save("mash_pop_dia")
 
         if "sh_pop_adi_TR" in what_to_plot:
             plt.figure(num=13, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
@@ -1108,7 +1111,7 @@ def plot_dynamics(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_populations(plt, f, plot_params_, "sh_pop_adi_TR")
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/sh_pop_adi_TR.{fmt}", dpi=plot_params["dpi"])
+                _save("sh_pop_adi_TR")
 
         if "sh_pop_dia_TR" in what_to_plot:
             plt.figure(num=14, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
@@ -1116,7 +1119,7 @@ def plot_dynamics(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_populations(plt, f, plot_params_, "sh_pop_dia_TR")
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/sh_pop_dia_TR.{fmt}", dpi=plot_params["dpi"])
+                _save("sh_pop_dia_TR")
 
         # ====== Coherences ================
         if "coherence_adi" in what_to_plot:
@@ -1125,7 +1128,7 @@ def plot_dynamics(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_coherence_indicators(plt, f, plot_params_, "coherence_adi")
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/coherence_adi.{fmt}", dpi=plot_params["dpi"])
+                _save("coherence_adi")
 
         if "coherence_dia" in what_to_plot:
             plt.figure(num=16, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
@@ -1133,7 +1136,7 @@ def plot_dynamics(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_coherence_indicators(plt, f, plot_params_, "coherence_dia")
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/coherence_dia.{fmt}", dpi=plot_params["dpi"])
+                _save("coherence_dia")
 
         # ===== Trajectory-resolved adiabatic energies =========
         if "traj_resolved_adiabatic_ham" in what_to_plot:
@@ -1142,7 +1145,7 @@ def plot_dynamics(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_trajectory_resolved_ham_property(plt, f, plot_params, "hvib_adi")
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/hvib_adi.{fmt}", dpi=plot_params["dpi"])
+                _save("hvib_adi")
 
         if "traj_resolved_adiabatic_ham" in what_to_plot:
             plt.figure(num=18, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
@@ -1150,7 +1153,7 @@ def plot_dynamics(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_trajectory_resolved_ham_property(plt, f, plot_params, "hvib_dia")
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/hvib_dia.{fmt}", dpi=plot_params["dpi"])
+                _save("hvib_dia")
 
         # ===== Time-overlaps and projectors =========
         if "time_overlaps" in what_to_plot:
@@ -1159,7 +1162,7 @@ def plot_dynamics(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_time_overlaps_projectors(plt, f, plot_params, "St")
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/time_overlaps.{fmt}", dpi=plot_params["dpi"])
+                _save("time_overlaps")
 
         if "projector" in what_to_plot:
             plt.figure(num=20, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
@@ -1167,7 +1170,7 @@ def plot_dynamics(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_time_overlaps_projectors(plt, f, plot_params, "projector")
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/projectors.{fmt}", dpi=plot_params["dpi"])
+                _save("projectors")
 
         # ===== Basis transforms =========
         if "basis_transform" in what_to_plot:
@@ -1176,7 +1179,7 @@ def plot_dynamics(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_basis_transform(plt, f, plot_params)
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/basist_transform-vs-t.{fmt}", dpi=plot_params["dpi"])
+                _save("basist_transform-vs-t")
 
         if do_show:
             plt.show()
@@ -1201,7 +1204,7 @@ def plot_dyn(plot_params):
     See in the ```dynamics_hdf5.py``` file for the data sets available
 
     """
-    fmt = plot_params.get("figure_format", "png")  # figure file format, e.g. "png" or "pdf"
+    fmt = plot_params.get("figure_format", common_defaults({})["figure_format"])  # figure file format, e.g. "png" or "pdf"
 
     colors = {}
 
@@ -1242,6 +1245,9 @@ def plot_dyn(plot_params):
     clrs_index = plot_params["clrs_index"]
 
     out_prefix = prefix
+
+    def _save(name):
+        plt.savefig(F"{out_prefix}/{name}.{fmt}", dpi=300)
 
     with h5py.File(F"{prefix}/{filename}", 'r') as f:
 
@@ -1286,7 +1292,7 @@ def plot_dyn(plot_params):
                 color=colors["21"])
             plt.plot(f["time/data"][:], f["dEtot_ave/data"][:], label="Total energy", linewidth=2, color=colors["31"])
 
-            plt.savefig(F"{out_prefix}/t-en.{fmt}", dpi=300)
+            _save("t-en")
             plt.show()
 
         if output_level >= 2:
@@ -1306,7 +1312,7 @@ def plot_dyn(plot_params):
                 if tr in which_trajectories:
                     plt.plot(f["time/data"][:], f["states/data"][:, tr], label="", linewidth=2, color=colors["11"])
 
-            plt.savefig(F"{out_prefix}/t-state_indices.{fmt}", dpi=300)
+            _save("t-state_indices")
             plt.show()
 
         if output_level >= 3:
@@ -1356,7 +1362,7 @@ def plot_dyn(plot_params):
                     plt.plot(f["time/data"][:], f["D_dia/data"][:, istate, istate],
                              label=F"state {istate}", linewidth=2, color=colors[clrs_index[indx]])
 
-            plt.savefig(F"{out_prefix}/t-pops.{fmt}", dpi=300)
+            _save("t-pops")
             plt.show()
 
         if output_level >= 3:
@@ -1406,7 +1412,7 @@ def plot_dyn(plot_params):
                     plt.plot(f["time/data"][:], f["D_dia_raw/data"][:, istate, istate],
                              label=F"state {istate}", linewidth=2, color=colors[clrs_index[indx]])
 
-            plt.savefig(F"{out_prefix}/t-pops_raw.{fmt}", dpi=300)
+            _save("t-pops_raw")
             plt.show()
 
         if output_level >= 3:
@@ -1445,7 +1451,7 @@ def plot_dyn(plot_params):
                             plt.plot(f["q/data"][:, tr, idof], f["p/data"][:, tr, idof],
                                      label="", linewidth=2, color=colors[clrs_index[indx]])
 
-            plt.savefig(F"{out_prefix}/t-q-p.{fmt}", dpi=300)
+            _save("t-q-p")
             plt.show()
 
         if output_level >= 4:
@@ -1485,7 +1491,7 @@ def plot_dyn(plot_params):
                             plt.plot(f["time/data"][:], f["hvib_dia/data"][:, tr, istate, istate],
                                      label="", linewidth=2, color=colors[clrs_index[indx]])
 
-            plt.savefig(F"{out_prefix}/t-hvib.{fmt}", dpi=300)
+            _save("t-hvib")
             plt.show()
 
         if output_level >= 4:
@@ -1524,7 +1530,7 @@ def plot_dyn(plot_params):
                             plt.plot(f["time/data"][:], f["projector/data"][:, tr, istate, istate],
                                      label="", linewidth=2, color=colors[clrs_index[indx]])
 
-            plt.savefig(F"{out_prefix}/St-projector.{fmt}", dpi=300)
+            _save("St-projector")
             plt.show()
 
         if output_level >= 4:
@@ -1552,7 +1558,7 @@ def plot_dyn(plot_params):
                                     plt.plot(f["time/data"][:], f["basis_transform/data"][:, tr, istate2,
                                              istate], label="", linewidth=2, color=colors[clrs_index[indx]])
 
-            plt.savefig(F"{out_prefix}/basis_transform.{fmt}", dpi=300)
+            _save("basis_transform")
             plt.show()
 
         plt.close()
@@ -2291,7 +2297,10 @@ def plot_dynamics_xf(plot_params_):
     ylim = plot_params["ylim"]
     Lw = plot_params["linewidth"]
     do_show = plot_params["do_show"]
-    fmt = plot_params.get("figure_format", "png")  # figure file format, e.g. "png" or "pdf"
+    fmt = plot_params["figure_format"]  # merged - common_defaults is the authority
+
+    def _save(name):
+        plt.savefig(F"{out_prefix}/{name}.{fmt}", dpi=plot_params["dpi"])
 
     with h5py.File(F"{prefix}/{filename}", 'r') as f:
 
@@ -2302,7 +2311,7 @@ def plot_dynamics_xf(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_cooordinates_aux_vs_t(plt, f, plot_params)
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/q_aux-vs-t.{fmt}", dpi=plot_params["dpi"])
+                _save("q_aux-vs-t")
 
         # ===== Momenta vs Time  =========
         if "p_aux" in what_to_plot:
@@ -2311,7 +2320,7 @@ def plot_dynamics_xf(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_momenta_aux_vs_t(plt, f, plot_params)
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/p_aux-vs-t.{fmt}", dpi=plot_params["dpi"])
+                _save("p_aux-vs-t")
 
         # ===== Spatial derivaties of the Phase vs Time  =========
         if "nab_phase" in what_to_plot:
@@ -2320,7 +2329,7 @@ def plot_dynamics_xf(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_nab_phase_vs_t(plt, f, plot_params)
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/nab_phase-vs-t.{fmt}", dpi=plot_params["dpi"])
+                _save("nab_phase-vs-t")
 
         # ===== Phase space  =========
         if "phase_space_aux" in what_to_plot:
@@ -2329,7 +2338,7 @@ def plot_dynamics_xf(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_phase_space_aux(plt, f, plot_params)
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/phase_space_aux.{fmt}", dpi=plot_params["dpi"])
+                _save("phase_space_aux")
 
         # ===== Quantum momenta vs Time  =========
         if "p_quant" in what_to_plot:
@@ -2338,7 +2347,7 @@ def plot_dynamics_xf(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_p_quant_vs_t(plt, f, plot_params)
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/p_quant-vs-t.{fmt}", dpi=plot_params["dpi"])
+                _save("p_quant-vs-t")
 
         # ===== Vector potential vs Time  =========
         if "VP" in what_to_plot:
@@ -2347,7 +2356,7 @@ def plot_dynamics_xf(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_VP_vs_t(plt, f, plot_params)
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/VP-vs-t.{fmt}", dpi=plot_params["dpi"])
+                _save("VP-vs-t")
 
         # ===== Vector potential vs Time  =========
         if "f_xf" in what_to_plot:
@@ -2356,7 +2365,7 @@ def plot_dynamics_xf(plot_params_):
             plt.subplot(1, 1, 1)
             res = add_f_xf_vs_t(plt, f, plot_params)
             if plot_params["save_figures"] == 1 and res == 1:
-                plt.savefig(F"{out_prefix}/f_xf-vs-t.{fmt}", dpi=plot_params["dpi"])
+                _save("f_xf-vs-t")
 
         if do_show:
             plt.show()
