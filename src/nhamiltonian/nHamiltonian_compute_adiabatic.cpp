@@ -663,6 +663,21 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
     }
 
     has_attr = 0;
+    has_attr = (int)hasattr(obj, "hvib_dia");
+    hvib_dia_supplied = 0;
+    if (has_attr) {
+
+      // an adiabatic-native model may supply the DIABATIC vibronic
+      // Hamiltonian (e.g. the frame-corrected H_SD - i D_SD) to be
+      // consumed under hvib_update_method 0 with transform 3
+      check_cmatrix(obj, "hvib_dia", ndia, ndia);
+      if (hvib_dia_mem_status == 0) { init_hvib_dia(); }
+      *hvib_dia = extract<CMATRIX>(obj.attr("hvib_dia"));
+      // an all-zero supply is the ecosystem's placeholder convention - not data
+      hvib_dia_supplied = (abs(hvib_dia->max_elt()) != 0.0);
+    }
+
+    has_attr = 0;
     has_attr = (int)hasattr(obj, "basis_transform");
     if (has_attr) {
 
