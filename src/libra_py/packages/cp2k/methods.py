@@ -3207,6 +3207,8 @@ def read_cp2k_s_csr(filename, n=None, chunk_rows=None):
     """
     if chunk_rows is None:
         rows = np.loadtxt(filename)
+        if rows.size == 0:
+            raise ValueError(f"empty CSR overlap file ({filename})")
         if rows.ndim == 1:
             rows = rows.reshape(1, -1)
         m = int(max(rows[:, 0].max(), rows[:, 1].max()))
@@ -3221,11 +3223,13 @@ def read_cp2k_s_csr(filename, n=None, chunk_rows=None):
     else:
         S = None if n is None else np.zeros((n, n))
         hi = 0
+        seen = False
         with open(filename) as f:
             while True:
                 a = np.loadtxt(f, dtype=float, ndmin=2, max_rows=int(chunk_rows))
                 if a.size == 0:
                     break
+                seen = True
                 m = int(a[:, :2].max())
                 hi = max(hi, m)
                 if S is None:
@@ -3242,7 +3246,7 @@ def read_cp2k_s_csr(filename, n=None, chunk_rows=None):
                 S[a[:, 0].astype(int) - 1, a[:, 1].astype(int) - 1] = a[:, 2]
                 if a.shape[0] < int(chunk_rows):
                     break
-        if S is None:
+        if not seen:
             raise ValueError(f"empty CSR overlap file ({filename})")
         if n is None and hi < S.shape[0]:                    # trim growth headroom
             S = np.ascontiguousarray(S[:hi, :hi])
@@ -4263,8 +4267,13 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
     # full duration; .result() releases the GIL while the worker parses
     pool = params.get("_parse_pool", None)
     if os.path.exists(csr):        # patched CP2K + &S_CSR_WRITE template: O(nnz)
-        S = pool.submit(read_cp2k_s_csr, csr).result() if pool else \
-            read_cp2k_s_csr(csr)
+        # the doubled-geometry overlap is (2 nao)^2 - declaring it makes
+        # out-of-range triplets raise at parse time; csr_chunk_rows caps
+        # the parse transient (whole-file when unset)
+        n2 = 2 * mo_curr["C"].shape[1]
+        crows = params.get("csr_chunk_rows", None)
+        S = pool.submit(read_cp2k_s_csr, csr, n2, crows).result() if pool \
+            else read_cp2k_s_csr(csr, n2, crows)
     else:                          # fallback: dense &AO_MATRICES log print
         S = pool.submit(read_cp2k_ao_overlap_print, logfile).result() if pool \
             else read_cp2k_ao_overlap_print(logfile)
@@ -5066,7 +5075,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
         coords_prev = _carried(params, "coordinates_prev", itraj,
                                coordinates, is_first_time)
         odt = {k: params[k] for k in ("atom_labels", "cp2k_exe", "cp2k_data_dir",
-                                      "omp_num_threads", "mpi_executable", "nprocs")
+                                      "omp_num_threads", "mpi_executable", "nprocs",
+                                      "csr_chunk_rows")
                if k in params}
         odt["overlap_template"] = overlap_template
         odt["working_directory"] = f"{wd}/odt"
