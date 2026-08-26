@@ -3021,6 +3021,14 @@ def dftb_compute_adi(q, params, full_id):
     if dia_basis not in ("none", "sd"):
         raise ValueError(F"dia_basis must be 'none' or 'sd', got {dia_basis!r}")
     dia_max_drop = float(params.get("dia_basis_max_drop", 0.5))
+    dia_hvib = params.get("dia_basis_hvib", "none")
+    if dia_hvib not in ("none", "corrected"):
+        raise ValueError(F"dia_basis_hvib must be 'none' or 'corrected', got {dia_hvib!r}")
+    if dia_hvib == "corrected":
+        raise ValueError('dia_basis_hvib="corrected" is not implemented for the '
+                         'DFTB+ driver - st_ci comes from the CI kernels with no '
+                         'materialized SD time-overlap; use the uncorrected engine '
+                         'route (ham_transform_method = 3, hvib_update_method = 0)')
     if not 0.0 <= dia_max_drop <= 1.0:
         raise ValueError(F"dia_basis_max_drop must be in [0, 1], got {dia_max_drop}")
 
