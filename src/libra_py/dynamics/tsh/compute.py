@@ -1654,14 +1654,31 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
         # (ham_dia, hvib_dia, d1ham_dia, time_overlap_dia stay zero) - any
         # diabatic-representation request would consume them silently: the
         # local-diabatization integrator annihilates the amplitudes, hops see
-        # zero couplings, forces come out zero
+        # zero couplings, forces come out zero. ham_transform_method 3
+        # rotates ham_adi into ham_dia every step (hvib_dia follows), which
+        # legitimizes diabatic propagation and hopping for SQUARE
+        # transformations; the rectangular projected dynamics is exact for
+        # amplitudes in range(U) but uncertified, and diabatic forces would
+        # need dU/dR, which no driver supplies
+        transform3 = int(dyn_params.get("ham_transform_method", 1)) == 3
+        square_u = dyn_var.ndia == dyn_var.nadi
         for key, what in (("rep_tdse", "TDSE propagation"),
                           ("rep_sh", "surface hopping"),
                           ("rep_force", "force evaluation")):
             if dyn_params.get(key, 1) == 0:
+                if key != "rep_force" and transform3 and square_u:
+                    continue
+                if key == "rep_force":
+                    hint = "diabatic forces need dU/dR - keep rep_force = 1"
+                elif transform3:
+                    hint = ("the rectangular projected dynamics is uncertified - "
+                            F"keep {key} = 1")
+                else:
+                    hint = ("use ham_transform_method = 3 with a square basis "
+                            F"transform, or {key} = 1")
                 raise ValueError(F"{key} = 0 requests diabatic-representation {what}, "
                                  F"but adiabatic-native models (ham_update_method = 2) "
-                                 F"never populate the diabatic matrices - use {key} = 1")
+                                 F"do not build the needed diabatic matrices here - {hint}")
         # Adiabatic-native models (on-the-fly drivers, file-fed NBRA) are not
         # called at init by default, so basis_transform keeps its all-zero
         # allocation. Harmless for adiabatic initialization (rep = 1), but for
@@ -1670,7 +1687,11 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
         # (one extra model call at the initial geometry). The model must
         # supply obj.basis_transform and obj.ovlp_dia (identity for
         # orthonormal diabats) for the diabatic side to be meaningful.
-        if init_elec.get("rep", 1) == 0:
+        # the t0 amplitude conversion also needs the model's U when the
+        # diabatic side is PROPAGATED (rep_tdse/rep_sh = 0 under transform 3)
+        dia_consumed = (dyn_params.get("rep_tdse", 1) == 0
+                        or dyn_params.get("rep_sh", 1) == 0)
+        if init_elec.get("rep", 1) == 0 or dia_consumed:
             update_Hamiltonian_variables(dyn_params1, dyn_var, ham, ham, compute_model, model_params1, 0)
             update_Hamiltonian_variables(dyn_params1, dyn_var, ham, ham, compute_model, model_params1, 1)
             # the model call above fills the CHILDREN Hamiltonians. A square

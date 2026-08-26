@@ -119,8 +119,11 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
       // TO DO: Add dia->adi transformation according to the basis_transform
       // matrix
     } else if (prms.ham_transform_method == 3) {
-      // TO DO: Add adi->dia transformation according to the basis_transform
-      // matrix
+      // adiabatic -> diabatic by the stored basis transformation:
+      // ham_dia = S U ham_adi U^H S (transform_adi2dia); runs before the
+      // time-overlap/NAC/Hvib updates so every diabatic consumer of this
+      // step sees the rotated Hamiltonian
+      ham.transform_adi2dia(1);
     } else if (prms.ham_transform_method == 4) {
       // TO DO: Add adi->dia transformation according to local diabatization
       // method
@@ -382,8 +385,10 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
     // Explicitly update Hvib
     else if (prms.hvib_update_method == 1) {
       // the diabatic Hvib of an adiabatic-native model would be built from
-      // the never-populated ham_dia/nac_dia - all-zero dead output
-      if (prms.ham_update_method != 2) {
+      // the never-populated ham_dia/nac_dia - all-zero dead output -
+      // unless transform 3 rotates ham_adi into ham_dia (nac_dia stays
+      // zero: hvib_dia = ham_dia is the strictly-diabatic contract)
+      if (prms.ham_update_method != 2 || prms.ham_transform_method == 3) {
         ham.compute_hvib_dia(1);
       }
       ham.compute_hvib_adi(1);
