@@ -5062,6 +5062,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
                if k in params}
         odt["overlap_template"] = overlap_template
         odt["working_directory"] = f"{wd}/odt"
+        _prefetch_abort_check(params)
         parse_pool = _prefetch_parse_pool(params)
         if parse_pool is not None:
             odt["_parse_pool"] = parse_pool
@@ -5367,6 +5368,13 @@ def _prefetch_parse_pool(params):
     return state.get("parse_pool") if state else None
 
 
+def _prefetch_abort_check(params):
+    """Between chain stages: stop promptly once a sibling chain failed."""
+    st = _PREFETCH_STATES.get(_prefetch_key(params))
+    if st is not None and st.get("abort"):
+        raise RuntimeError("prefetch batch aborted after a failed chain")
+
+
 def _shutdown_prefetch_pools():
     for state in _PREFETCH_STATES.values():
         for key in ("pool", "parse_pool"):
@@ -5451,6 +5459,7 @@ def _cp2k_prefetch_dispatch(q, params, full_id):
                 for w in warm:
                     w.result()
         state["timestep"] = timestep
+        state["abort"] = False
         state["futures"] = {
             j: state["pool"].submit(cp2k_compute_adi_impl, q, params,
                                     Py2Cpp_int(list(Id[:-1]) + [j]))
@@ -5458,7 +5467,16 @@ def _cp2k_prefetch_dispatch(q, params, full_id):
     fut = state["futures"].pop(itraj, None)
     if fut is None:                     # an unexpected repeat call - run directly
         return cp2k_compute_adi_impl(q, params, full_id)
-    return fut.result()
+    try:
+        return fut.result()
+    except BaseException:
+        # the failed chain aborts the run - cancel the queued sibling
+        # chains and flag the running ones to stop between stages
+        state["abort"] = True
+        for f in state["futures"].values():
+            f.cancel()
+        state["futures"] = {}
+        raise
 
 
 def cp2k_compute_adi(q, params, full_id):
