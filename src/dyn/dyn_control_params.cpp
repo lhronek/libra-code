@@ -329,6 +329,20 @@ void dyn_control_params::sanity_check(){
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
+  /// transforms 2 (dia->adi by the stored U), 3 (adi->dia by the stored
+  /// U) and 4 (adi->dia by local diabatization) are declared but not
+  /// implemented - their dispatch branches are empty, so selecting them
+  /// is silently identical to 0
+  if(ham_transform_method==2 || ham_transform_method==3 ||
+     ham_transform_method==4){
+    std::cout<<"Error in dyn_control_params::sanity_check: ham_transform_method = "
+        <<ham_transform_method<<" is declared but not implemented (its transform"
+        <<" dispatch branch is empty - it would run as ham_transform_method = 0,"
+        <<" building no Hamiltonian in the target representation); use 1"
+        <<" (internal diagonalization)\n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
   ///============== Integrator vs projector family pairing ==============
   /// rep_tdse == 1: the bare-energy local-diabatization integrators carry
   /// the whole electronic coupling through the rotation projector
