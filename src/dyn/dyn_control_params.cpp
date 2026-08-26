@@ -329,16 +329,28 @@ void dyn_control_params::sanity_check(){
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
-  /// transforms 2 (dia->adi by the stored U) and 4 (adi->dia by local
-  /// diabatization) are declared but not implemented - their dispatch
-  /// branches are empty, so selecting them is silently identical to 0
-  if(ham_transform_method==2 || ham_transform_method==4){
+  /// transform 4 (adi->dia by local diabatization) is declared but not
+  /// implemented - its dispatch branch is empty, so selecting it is
+  /// silently identical to 0
+  if(ham_transform_method==4){
     std::cout<<"Error in dyn_control_params::sanity_check: ham_transform_method = "
         <<ham_transform_method<<" is declared but not implemented (its transform"
         <<" dispatch branch is empty - it would run as ham_transform_method = 0,"
         <<" building no Hamiltonian in the target representation); use 1"
-        <<" (internal diagonalization) or 3 (adiabatic->diabatic by the stored"
-        <<" basis transform)\n";
+        <<" (internal diagonalization), 2 (diabatic->adiabatic by the stored"
+        <<" basis transform) or 3 (adiabatic->diabatic by it)\n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
+  /// the stored-U forward transform reads ham_dia, which only a diabatic
+  /// model keeps current - and consumes the model-supplied transformation,
+  /// which an adiabatic-native model applies through ham_update_method 2
+  /// directly
+  if(ham_transform_method==2 && ham_update_method!=1){
+    std::cout<<"Error in dyn_control_params::sanity_check: ham_transform_method = 2"
+        <<" (diabatic->adiabatic by the stored basis transform) requires a diabatic"
+        <<" model (ham_update_method = 1, got "<<ham_update_method<<") - nothing"
+        <<" else populates ham_dia for it to transform\n";
     throw std::runtime_error("libra C++ error - see the message printed above");
   }
 

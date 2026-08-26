@@ -152,6 +152,8 @@ void export_nhamiltonian_objects(){
   = &nHamiltonian::compute_adiabatic;
   void (nHamiltonian::*expt_transform_adi2dia_v1)(int lvl)
   = &nHamiltonian::transform_adi2dia;
+  void (nHamiltonian::*expt_transform_dia2adi_v1)(int der_lvl, int lvl)
+  = &nHamiltonian::transform_dia2adi;
   void (nHamiltonian::*expt_compute_adiabatic_v2)(int der_lvl)
   = &nHamiltonian::compute_adiabatic;
   void (nHamiltonian::*expt_compute_adiabatic_v3)(bp::object py_funct, MATRIX& q, bp::object params, int lvl)
@@ -523,6 +525,7 @@ void export_nhamiltonian_objects(){
 
       .def("compute_adiabatic", expt_compute_adiabatic_v1)
       .def("transform_adi2dia", expt_transform_adi2dia_v1)
+      .def("transform_dia2adi", expt_transform_dia2adi_v1)
       .def("compute_adiabatic", expt_compute_adiabatic_v2)
       .def("compute_adiabatic", expt_compute_adiabatic_v3)
       .def("compute_adiabatic", expt_compute_adiabatic_v4)

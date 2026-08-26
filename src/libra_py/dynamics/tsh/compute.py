@@ -359,7 +359,9 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - 0: don't do any transforms
                 - 1: diabatic->adiabatic according to internal diagonalization [ default ]
                 - 2: diabatic->adiabatic according to internally stored basis transformation
-                  matrix [ not implemented - sanity_check rejects it ]
+                  matrix [ requires ham_update_method = 1 and a model-supplied
+                  obj.basis_transform; the model's smooth gauge replaces the internal
+                  diagonalization - no eigenvector branch switches ]
                 - 3: adiabatic->diabatic according to internally stored basis transformation
                   matrix [ requires ham_update_method = 2; materializes ham_dia =
                   S U ham_adi U^H S every step - the H_SD readout and the diabatic
@@ -1717,7 +1719,11 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
             print(F"generic_recipe: rep = 0 init through the model basis_transform "
                   F"({U.num_of_rows}, {U.num_of_cols}); max|U^H S_dia U - 1| = {dev:.2e}")
     else:
-        dyn_params1.update({"ham_update_method": 1, "ham_transform_method": 1})
+        # a model-supplied smooth gauge (transform 2) must also govern the t0
+        # basis_transform - hardcoding 1 here would stamp the LAPACK gauge at
+        # the init point and put a spurious flip into the first time-overlap
+        _tm0 = 2 if int(dyn_params.get("ham_transform_method", 1)) == 2 else 1
+        dyn_params1.update({"ham_update_method": 1, "ham_transform_method": _tm0})
         # update_Hamiltonian_q( dyn_params1, dyn_var, ham, compute_model, model_params1)
         # print( dyn_params1 )
         # print(model_params1)

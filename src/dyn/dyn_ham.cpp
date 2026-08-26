@@ -57,7 +57,9 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
        - 1: diabatic->adiabatic according to internal diagonalization [ default
     ]
        - 2: diabatic->adiabatic according to internally stored basis
-    transformation matrix [ not implemented - sanity_check rejects it ]
+    transformation matrix [ requires ham_update_method == 1 and a
+    model-supplied obj.basis_transform - the model's gauge replaces the
+    internal diagonalization ]
        - 3: adiabatic->diabatic according to internally stored basis
     transformation matrix [ requires ham_update_method == 2: the loop
     never re-diagonalizes under this option, so a diabatic model's
@@ -119,8 +121,11 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
         ham.compute_adiabatic(1, 1); // do internal diagonalization
       }
     } else if (prms.ham_transform_method == 2) {
-      // TO DO: Add dia->adi transformation according to the basis_transform
-      // matrix
+      // diabatic -> adiabatic by the MODEL-SUPPLIED transformation: the
+      // model's own gauge replaces the internal diagonalization (no
+      // LAPACK branch switches); values + the shared Hellmann-Feynman
+      // derivative tier
+      ham.transform_dia2adi(1, 1);
     } else if (prms.ham_transform_method == 3) {
       // adiabatic -> diabatic by the stored basis transformation:
       // ham_dia = S U ham_adi U^H S (transform_adi2dia); runs before the

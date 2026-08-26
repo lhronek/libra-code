@@ -501,6 +501,80 @@ void nHamiltonian::compute_adiabatic(int der_lvl, int lvl) {
   }
 }
 
+void nHamiltonian::transform_dia2adi(int der_lvl, int lvl) {
+  /**
+    Diabatic-to-adiabatic transform by the MODEL-SUPPLIED basis
+    transformation (ham_transform_method == 2): ham_adi = U^H ham_dia U
+    in the model's own gauge - no internal diagonalization, so no LAPACK
+    eigenvector branch switches. der_lvl >= 1 adds the shared
+    Hellmann-Feynman derivative tier (exact when U diagonalizes ham_dia;
+    a warning names the residual otherwise).
+  */
+  if (level == lvl) {
+    if (ham_dia_mem_status == 0) {
+      cout << "Error in transform_dia2adi(): the diabatic Hamiltonian matrix is not \
+  allocated but is needed for the calculations\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if (basis_transform_mem_status == 0) {
+      cout << "Error in transform_dia2adi(): the basis_transform matrix is not \
+  allocated but is needed for the calculations\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if (ham_adi_mem_status == 0) {
+      cout << "Error in transform_dia2adi(): the adiabatic Hamiltonian matrix is not \
+  allocated but is used to collect the results of the calculations\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    // the square identity DEFAULT must not silently alias dia == adi: the
+    // stored-U transform is meaningful only for a transformation the model
+    // actually supplied (an explicit identity supply passes)
+    if (!basis_transform_supplied) {
+      cout << "Error in transform_dia2adi(): ham_transform_method = 2 consumes the \
+  model-supplied basis transformation, but obj.basis_transform was never supplied\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    // chained in-place product - CBLAS zgemm-backed, no per-call temporaries
+    ham_adi->product(adjoint(*basis_transform), *ham_dia, *basis_transform);
+    if (der_lvl >= 1) {
+      compute_adiabatic_derivatives();
+      // the Hellmann-Feynman tier is exact only in the eigenbasis - a U that
+      // does not diagonalize ham_dia leaves off-diagonals in U^H H U
+      static int warned_offdiag = 0;
+      if (!warned_offdiag) {
+        double offmax = 0.0;
+        for (int i = 0; i < nadi; i++) {
+          for (int j = 0; j < nadi; j++) {
+            if (i != j) {
+              double a = abs(ham_adi->get(i, j));
+              if (a > offmax) { offmax = a; }
+            }
+          } // for j
+        } // for i
+        if (offmax > 1e-8) {
+          cout << "WARNING in transform_dia2adi(): the supplied basis_transform does not \
+  diagonalize ham_dia (max off-diagonal " << offmax << ") - the propagation basis is \
+  quasi-diabatic and the Hellmann-Feynman derivative tier is approximate\n";
+          warned_offdiag = 1;
+        }
+      }
+    } // der_lvl >= 1
+  } // level == lvl
+
+  else if (lvl > level) {
+    for (auto i = 0u; i < children.size(); i++) {
+      children[i]->transform_dia2adi(der_lvl, lvl);
+    }
+  } // lvl > level
+
+  else {
+    cout << "WARNING in nHamiltonian::transform_dia2adi\n";
+    cout
+        << "Can not run evaluation of function in the parent Hamiltonian from the\
+     child node\n";
+  }
+}
+
 void nHamiltonian::transform_adi2dia(int lvl) {
   /**
     Back-transform the adiabatic Hamiltonian into the diabatic basis
