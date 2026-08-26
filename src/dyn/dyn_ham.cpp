@@ -491,6 +491,38 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
   // NBRA runs (isNBRA==1) carry a single child Hamiltonian shared by all
   // trajectories - never index children beyond what actually exists
   int nchildren = Ham.children.size();
+  // an eigenvector branch switch (negative time-overlap diagonal) with the
+  // phase correction opted out leaves the sign flip uncorrected in every
+  // adiabatic-representation consumer - the run would complete with
+  // silently wrong populations; whether a flip occurs is a property of the
+  // data, so this is detectable only at runtime - say so once. The
+  // opt-out stays legitimate for flip-free sources (driver-side sign
+  // alignment, a model-supplied smooth transformation, the rotation
+  // projectors, which fold the flip into T)
+  if (prms.do_phase_correction == 0 && prms.state_tracking_algo != -1 &&
+      prms.state_tracking_algo != 5 && prms.state_tracking_algo != 6) {
+    static int warned_flip_nopc = 0;
+    if (!warned_flip_nopc) {
+      for (int itraj = 0; itraj < ntraj && !warned_flip_nopc; itraj++) {
+        nHamiltonian *ch = Ham.children[(itraj < nchildren) ? itraj : 0];
+        if (ch->time_overlap_adi_mem_status != 0) {
+          for (int i = 0; i < ch->nadi; i++) {
+            if (ch->time_overlap_adi->get(i, i).real() < 0.0) {
+              cout << "WARNING in update_proj_adi(): the adiabatic time-overlap \
+  diagonal went negative (an eigenvector branch switch) while \
+  do_phase_correction = 0 - the relabel projector will not fold the sign \
+  flip into the amplitudes, and adiabatic-representation consumers \
+  (Hvib-family integrators, hop proposals) will mishandle this crossing. \
+  Use do_phase_correction = 1, or supply a smooth gauge (driver-side sign \
+  alignment, or a model basis_transform with ham_transform_method = 2)\n";
+              warned_flip_nopc = 1;
+              break;
+            }
+          } // for i
+        }
+      } // for itraj
+    }
+  }
   // Deterministic per-trajectory projector updates - parallel-safe (each
   // iteration writes only proj_adi[itraj]); identical for any thread count
   // exceptions cannot leave an OMP-outlined region (even a serialized
