@@ -378,8 +378,19 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
     //===============================
     // Don't update Hvib - perhaps because they are read from files in step 1
     if (prms.hvib_update_method == 0) {
-      ;
-      ;
+      // the supplied/precomputed data covers the ADI side only; under
+      // transform 3 the diabatic picture (H_SD readout, rep-0
+      // propagation) needs hvib_dia built from the rotated ham_dia -
+      // unless the model supplied obj.hvib_dia itself (e.g. the
+      // frame-corrected H_SD - i D_SD), which is consumed as-is
+      if (prms.ham_transform_method == 3) {
+        int ntraj_h = ham.children.size();
+        for (int traj = 0; traj < ntraj_h; traj++) {
+          if (!ham.children[traj]->hvib_dia_supplied) {
+            ham.children[traj]->compute_hvib_dia();
+          }
+        }
+      }
     }
 
     // Explicitly update Hvib
