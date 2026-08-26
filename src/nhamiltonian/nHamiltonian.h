@@ -494,6 +494,7 @@ public:
 */
 
   void compute_adiabatic(int der_lvl, int lvl);
+  void transform_adi2dia(int lvl);
   void compute_adiabatic(int der_lvl);
 //  void compute_adiabatic(bp::object py_funct, bp::object q, bp::object params, int lvl); // for models defined in Python
 //  void compute_adiabatic(bp::object py_funct, bp::object q, bp::object params); // for models defined in Python

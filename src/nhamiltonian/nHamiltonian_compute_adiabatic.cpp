@@ -488,6 +488,61 @@ void nHamiltonian::compute_adiabatic(int der_lvl, int lvl) {
   }
 }
 
+void nHamiltonian::transform_adi2dia(int lvl) {
+  /**
+    Back-transform the adiabatic Hamiltonian into the diabatic basis
+    using the stored basis transformation (ham_transform_method == 3).
+    From H_dia U = S U E with U^H S U = I follows U^{-1} = U^H S, so
+    ham_dia = S U ham_adi U^H S
+    The derivative tier is NOT transformed - that would need dU/dR.
+  */
+  if (level == lvl) {
+    if (ham_adi_mem_status == 0) {
+      cout << "Error in transform_adi2dia(): the adiabatic Hamiltonian matrix is not \
+  allocated but is needed for the calculations\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if (basis_transform_mem_status == 0) {
+      cout << "Error in transform_adi2dia(): the basis_transform matrix is not \
+  allocated but is needed for the calculations\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if (ovlp_dia_mem_status == 0) {
+      cout << "Error in transform_adi2dia(): the overlap matrix of the diabatic states is not \
+  allocated but is needed for the calculations\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if (ham_dia_mem_status == 0) {
+      cout << "Error in transform_adi2dia(): the diabatic Hamiltonian matrix is not \
+  allocated but is used to collect the results of the calculations\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    // an all-zero transformation cannot define the diabatic picture -
+    // the model never supplied obj.basis_transform
+    if (abs(basis_transform->max_elt()) == 0.0) {
+      cout << "Error in transform_adi2dia(): the basis_transform matrix is all-zero - \
+  the model must supply obj.basis_transform for the adiabatic->diabatic transform\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    // chained in-place product - CBLAS zgemm-backed, no per-call temporaries
+    ham_dia->product(*ovlp_dia, *basis_transform, *ham_adi,
+                     adjoint(*basis_transform), *ovlp_dia);
+  } // level == lvl
+
+  else if (lvl > level) {
+    for (auto i = 0u; i < children.size(); i++) {
+      children[i]->transform_adi2dia(lvl);
+    }
+  } // lvl > level
+
+  else {
+    cout << "WARNING in nHamiltonian::transform_adi2dia\n";
+    cout
+        << "Can not run evaluation of function in the parent Hamiltonian from the\
+     child node\n";
+  }
+}
+
 // void nHamiltonian::compute_adiabatic(bp::object py_funct, bp::object q,
 // bp::object params){
 void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
