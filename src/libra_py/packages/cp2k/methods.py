@@ -5397,6 +5397,19 @@ def _cp2k_prefetch_dispatch(q, params, full_id):
     timestep = int(params.get("timestep", -1))
     state = _prefetch_state(params)
     if state.get("timestep") != timestep:
+        leftovers = state.get("futures") or {}
+        if leftovers:
+            # the engine harvested only part of the batch - it is not
+            # calling the model once per trajectory (isNBRA shares one
+            # child Hamiltonian): every step would submit ntraj chains
+            # and run ~ntraj-fold CP2K work
+            for f in leftovers.values():
+                f.cancel()
+            raise RuntimeError(
+                F"prefetch step {state['timestep']}: {len(leftovers)} of the "
+                F"submitted chains were never harvested - the engine does "
+                F"not call the model per trajectory here; set "
+                F"prefetch_trajectories=0")
         ntraj = q.num_of_cols
         nprocs = max(1, int(params.get("nprocs", 1)))
         omp = max(1, int(params.get("omp_num_threads", 1)))
