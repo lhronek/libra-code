@@ -287,80 +287,16 @@ void nHamiltonian::compute_adiabatic(int der_lvl) {
   compute_adiabatic(der_lvl, 0);
 }
 
-void nHamiltonian::compute_adiabatic(int der_lvl, int lvl) {
+void nHamiltonian::compute_adiabatic_derivatives() {
   /**
-    Compute the adiabatic Hamiltonian
-
-    |psi_adi> = |psi_dia> * U
-
-    Stationary SE:  H |psi_adi> =  |psi_adi> * E
-
-    project on <psi_adi|, keeping in mind that <psi_adi|psi_adi> = I
-
-    <psi_dia| H |psi_adi> =  <psi_dia|psi_adi> E
-
-    <psi_dia| H |psi_dia> * U =  <psi_dia|psi_dia> * U * E
-
-    H_dia * U = ovlp_dia * U * H_adi
-
-    Here, U = basis_transform
-
-    Assume: H does not depend on U
-
-    der_lvl >= 0 - only diabatic - to - adiabatic transform
-    der_lvl >= 1 - forces and derivative couplings
-    der_lvl >= 2 - Hessian
-
+    The Hellmann-Feynman derivative tier shared by the internal
+    diagonalization (compute_adiabatic) and the stored-transformation
+    path (transform_dia2adia): adiabatic gradients and derivative
+    couplings from (basis_transform, ham_adi, d1ham_dia, dc1_dia) -
+    exact when basis_transform diagonalizes ham_dia. Extracted verbatim;
+    int i, j locals replace the member-function scope of the caller.
   */
-
   int i, j;
-
-  if (level == lvl) {
-
-    if (der_lvl >= 0) {
-
-      if (ham_dia_mem_status == 0) {
-        cout
-            << "Error in compute_adiabatic(): the diabatic Hamiltonian matrix is not allocated \
-    but it is needed for the calculations\n";
-        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-      }
-      if (ovlp_dia_mem_status == 0) {
-        cout
-            << "Error in compute_adiabatic(): the overlap matrix of the diabatic states is not allocated \
-    but it is needed for the calculations\n";
-        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-      }
-
-      if (ham_adi_mem_status == 0) {
-        cout
-            << "Error in compute_adiabatic(): the adiabatic Hamiltonian matrix is not allocated \
-    but it is used to collect the results of the calculations\n";
-        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-      }
-      if (basis_transform_mem_status == 0) {
-        cout
-            << "Error in compute_adiabatic(): the basis_transform (eigenvector) matrix is\
-    not allocated but it is used to collect the results of the calculations\n";
-        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-      }
-
-      eigen_algo = 0; /// Should be this option, otherwise the static
-                      /// calculations are incorrect
-
-      if (nadi == 1 && ndia == 1) {
-        *ham_adi = *ham_dia;
-        basis_transform->set(0, 0, 1.0, 0.0);
-      } else {
-        if (eigen_algo == 0) {
-          solve_eigen(ham_dia, ovlp_dia, ham_adi, basis_transform, 1);
-        } else if (eigen_algo == 1) {
-          solve_eigen_nosort(ham_dia, ham_adi, basis_transform,
-                             1); ///< references
-        }
-      }
-
-      if (der_lvl >= 1) {
 
         // Now compute the derivative couplings (off-diagonal, multiplied by
         // energy difference) and adiabatic gradients (diagonal)
@@ -466,6 +402,83 @@ void nHamiltonian::compute_adiabatic(int der_lvl, int lvl) {
         delete tmp;
         delete dtilda;
 
+}
+
+void nHamiltonian::compute_adiabatic(int der_lvl, int lvl) {
+  /**
+    Compute the adiabatic Hamiltonian
+
+    |psi_adi> = |psi_dia> * U
+
+    Stationary SE:  H |psi_adi> =  |psi_adi> * E
+
+    project on <psi_adi|, keeping in mind that <psi_adi|psi_adi> = I
+
+    <psi_dia| H |psi_adi> =  <psi_dia|psi_adi> E
+
+    <psi_dia| H |psi_dia> * U =  <psi_dia|psi_dia> * U * E
+
+    H_dia * U = ovlp_dia * U * H_adi
+
+    Here, U = basis_transform
+
+    Assume: H does not depend on U
+
+    der_lvl >= 0 - only diabatic - to - adiabatic transform
+    der_lvl >= 1 - forces and derivative couplings
+    der_lvl >= 2 - Hessian
+
+  */
+
+  int i, j;
+
+  if (level == lvl) {
+
+    if (der_lvl >= 0) {
+
+      if (ham_dia_mem_status == 0) {
+        cout
+            << "Error in compute_adiabatic(): the diabatic Hamiltonian matrix is not allocated \
+    but it is needed for the calculations\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
+      if (ovlp_dia_mem_status == 0) {
+        cout
+            << "Error in compute_adiabatic(): the overlap matrix of the diabatic states is not allocated \
+    but it is needed for the calculations\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
+
+      if (ham_adi_mem_status == 0) {
+        cout
+            << "Error in compute_adiabatic(): the adiabatic Hamiltonian matrix is not allocated \
+    but it is used to collect the results of the calculations\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
+      if (basis_transform_mem_status == 0) {
+        cout
+            << "Error in compute_adiabatic(): the basis_transform (eigenvector) matrix is\
+    not allocated but it is used to collect the results of the calculations\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
+
+      eigen_algo = 0; /// Should be this option, otherwise the static
+                      /// calculations are incorrect
+
+      if (nadi == 1 && ndia == 1) {
+        *ham_adi = *ham_dia;
+        basis_transform->set(0, 0, 1.0, 0.0);
+      } else {
+        if (eigen_algo == 0) {
+          solve_eigen(ham_dia, ovlp_dia, ham_adi, basis_transform, 1);
+        } else if (eigen_algo == 1) {
+          solve_eigen_nosort(ham_dia, ham_adi, basis_transform,
+                             1); ///< references
+        }
+      }
+
+      if (der_lvl >= 1) {
+        compute_adiabatic_derivatives();
       } // der_lvl>=1
     } // der_lvl>=0
 
