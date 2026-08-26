@@ -4131,6 +4131,27 @@ def make_overlap_deltat_input(template_file, csr_write=True):
     return "\n".join(fixed) + "\n"
 
 
+
+def _scan_overlap_template(text):
+    """Comment-stripped scan of a CP2K input: does it request an overlap
+    output - an active &S_CSR_WRITE block, or an OVERLAP keyword directly
+    inside &AO_MATRICES (nested subsections like &EACH tracked by depth,
+    so a keyword after them still counts)."""
+    active = [l.split("#")[0].split("!")[0].strip().upper()
+              for l in text.splitlines()]
+    has_csr = any(l.startswith("&S_CSR_WRITE") for l in active)
+    has_dense, ao_depth = False, 0
+    for l in active:
+        if l.startswith("&AO_MATRICES"):
+            ao_depth = 1
+        elif l.startswith("&END"):
+            ao_depth = max(0, ao_depth - 1)
+        elif l.startswith("&") and ao_depth:
+            ao_depth += 1
+        elif ao_depth == 1 and re.match(r"OVERLAP(\s+(T|TRUE|\.TRUE\.|ON|YES|1))?\s*$", l):
+            has_dense = True
+    return has_csr, has_dense
+
 def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
                          lowest_orbital, highest_orbital, params):
     """
@@ -4181,17 +4202,7 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
     # the run must REQUEST an overlap output, or CP2K completes cleanly and
     # emits nothing (a stock-CP2K template with the patch-only &S_CSR_WRITE
     # block commented out and no dense print is the observed failure)
-    active = [l.split("#")[0].split("!")[0].strip().upper()
-              for l in tmpl_text.splitlines()]
-    has_csr = any(l.startswith("&S_CSR_WRITE") for l in active)
-    has_dense, in_ao = False, False
-    for l in active:
-        if l.startswith("&AO_MATRICES"):
-            in_ao = True
-        elif l.startswith("&END"):
-            in_ao = False
-        elif in_ao and re.match(r"OVERLAP(\s+(T|TRUE|\.TRUE\.|ON|YES|1))?\s*$", l):
-            has_dense = True
+    has_csr, has_dense = _scan_overlap_template(tmpl_text)
     if not (has_csr or has_dense):
         raise ValueError(
             F"the overlap_template {params['overlap_template']} requests NO "
