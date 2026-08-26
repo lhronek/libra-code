@@ -4147,19 +4147,27 @@ def _scan_overlap_template(text):
     """Comment-stripped scan of a CP2K input: does it request an overlap
     output - an active &S_CSR_WRITE block, or an OVERLAP keyword directly
     inside &AO_MATRICES (nested subsections like &EACH tracked by depth,
-    so a keyword after them still counts)."""
+    so a keyword after them still counts). A print-key section argument
+    OFF disables the section - it must not count as a request."""
     active = [l.split("#")[0].split("!")[0].strip().upper()
               for l in text.splitlines()]
-    has_csr = any(l.startswith("&S_CSR_WRITE") for l in active)
-    has_dense, ao_depth = False, 0
+
+    def sect_off(l):
+        t = l.split()
+        return len(t) > 1 and t[1] == "OFF"
+
+    has_csr = any(l.startswith("&S_CSR_WRITE") and not sect_off(l)
+                  for l in active)
+    has_dense, ao_depth, ao_off = False, 0, False
     for l in active:
         if l.startswith("&AO_MATRICES"):
             ao_depth = 1
+            ao_off = sect_off(l)
         elif l.startswith("&END"):
             ao_depth = max(0, ao_depth - 1)
         elif l.startswith("&") and ao_depth:
             ao_depth += 1
-        elif ao_depth == 1 and re.match(r"OVERLAP(\s+(T|TRUE|\.TRUE\.|ON|YES|1))?\s*$", l):
+        elif ao_depth == 1 and not ao_off and re.match(r"OVERLAP(\s+(T|TRUE|\.TRUE\.|ON|YES|1))?\s*$", l):
             has_dense = True
     return has_csr, has_dense
 
