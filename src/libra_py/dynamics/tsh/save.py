@@ -36,6 +36,7 @@ import os
 import sys
 import math
 import copy
+import re
 
 if sys.platform == "cygwin":
     from cyglibra_core import *
@@ -341,6 +342,30 @@ def init_tsh_data(saver, output_level, _nsteps, _ntraj, _ndof, _nadi, _ndia):
         # Trajectory-resolved derivative coupling vectors
         if "dc1_adi" in saver.keywords:  # _has_slot(saver, "dc1_adi"):
             saver.add_dataset("dc1_adi", (_nsteps, _ntraj, _ndof, _nadi, _nadi), "R")
+
+
+def read_params_record(path):
+    """Scalars out of a _dyn_params.txt / _model_params.txt record (the
+    str(dict) dump written by init_tsh_savers below): int, float, bool and
+    quoted-string values keyed by 'name'. Nested containers and objects
+    are skipped - the record is not a full python literal (it may embed
+    MATRIX reprs)."""
+    out = {}
+    with open(path) as f:
+        txt = f.read()
+    pat = (r"'(\w+)': (-?\d+\.?\d*(?:[eE][+-]?\d+)?|True|False|'[^']*')"
+           r"(?=[,}])")
+    for m in re.finditer(pat, txt):
+        k, v = m.group(1), m.group(2)
+        if v in ("True", "False"):
+            out[k] = v == "True"
+        elif v.startswith("'"):
+            out[k] = v[1:-1]
+        elif any(c in v for c in ".eE"):
+            out[k] = float(v)
+        else:
+            out[k] = int(v)
+    return out
 
 
 def init_tsh_savers(params, model_params, nsteps, ntraj, nnucl, nadi, ndia):
