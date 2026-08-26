@@ -4147,6 +4147,16 @@ def make_overlap_deltat_input(template_file, csr_write=True):
 
 
 
+def _template_has_section(text, name):
+    """Comment-stripped scan: an active &NAME section (argument not OFF)."""
+    for l in text.splitlines():
+        ls = l.split("#")[0].split("!")[0].strip().upper()
+        if ls.startswith(F"&{name}"):
+            t = ls.split()
+            return not (len(t) > 1 and t[1] == "OFF")
+    return False
+
+
 def _scan_overlap_template(text):
     """Comment-stripped scan of a CP2K input: does it request an overlap
     output - an active &S_CSR_WRITE block, or an OVERLAP keyword directly
@@ -4992,6 +5002,18 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     "populate - segfault, verified (qs_tddfpt2_forces.F:1358 -> "
                     "xtb_ehess.F:146). Use force_source='gs'/'none' (spectrum + GS "
                     "forces work), time_dependent=False, or native xTB")
+    # the file-fed MO sources need their print in the template - the run
+    # would otherwise complete and leave no MO file (a commented-out
+    # &MO_MOLDEN block is the observed case)
+    mo_source = params.get("mo_source", "wfn")
+    if mo_source in ("molden", "namd_print"):
+        need = "MO_MOLDEN" if mo_source == "molden" else "NAMD_PRINT"
+        with open(params["input_template"]) as f:
+            if not _template_has_section(f.read(), need):
+                raise ValueError(
+                    F"mo_source='{mo_source}' needs an active &{need} print in "
+                    F"{params['input_template']} - the run would complete and "
+                    F"leave no MO file")
     wd = f"{params.get('working_directory_prefix', 'wd')}_itraj{itraj}"
 
     # ---------------- run CP2K (execution layer) ----------------
@@ -5024,7 +5046,6 @@ def cp2k_compute_adi_impl(q, params, full_id):
 
     # ---------------- MO overlaps ----------------
     project = run_params.get("project", "libra")
-    mo_source = params.get("mo_source", "wfn")
     if mo_source == "wfn":
         # zero-cost binary-precision MOs from the restart file (GS and TD modes)
         if params.get("ao_overlap_method", "cp2k") != "cp2k":
