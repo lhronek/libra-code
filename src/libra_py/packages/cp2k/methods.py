@@ -2987,7 +2987,7 @@ def _ao_overlap_blocks_fast(it):
     headers = []                     # column-index lists, in print order
     rem = []                         # data lines of non-main-width blocks
     state = {"kmain": None, "cur": None, "Lmain": None, "L1": None,
-             "uniform": True}
+             "uniform": True, "prev_max": 0}
 
     def classified():
         started = False
@@ -3004,6 +3004,13 @@ def _ao_overlap_blocks_fast(it):
                 continue
             if ls.strip(" 0123456789") == "":              # header: int tokens only
                 cols = [int(x) for x in ls.split()]
+                # MOLog headers are one contiguous column run continuing the
+                # previous one - a stray integer line after the region (a
+                # count print) would otherwise inflate the matrix silently
+                start = 1 if state["kmain"] is None else state["prev_max"] + 1
+                if cols != list(range(start, start + len(cols))):
+                    raise ValueError("non-contiguous column header")
+                state["prev_max"] = cols[-1]
                 if state["kmain"] is None:
                     state["kmain"] = len(cols)             # block 1 sets the main width
                 elif state["Lmain"] is None and state["uniform"]:
@@ -3044,6 +3051,8 @@ def _ao_overlap_blocks_fast(it):
     nrow, ragged = divmod(arr.shape[0], len(main_b))
     if ragged:
         raise ValueError("ragged blocks")
+    if nrow == 0:
+        raise ValueError("header without data rows")
     for j, b in enumerate(main_b):
         blk = arr[j * nrow:(j + 1) * nrow]
         S[np.ix_(blk[:, 0].astype(int) - 1, np.asarray(headers[b]) - 1)] = \
@@ -3056,6 +3065,8 @@ def _ao_overlap_blocks_fast(it):
         nrow2, ragged2 = divmod(arr2.shape[0], len(rem_b))
         if ragged2:
             raise ValueError("ragged blocks")
+        if nrow2 == 0:
+            raise ValueError("header without data rows")
         for j, b in enumerate(rem_b):
             blk = arr2[j * nrow2:(j + 1) * nrow2]
             S[np.ix_(blk[:, 0].astype(int) - 1, np.asarray(headers[b]) - 1)] = \
