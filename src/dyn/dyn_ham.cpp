@@ -57,13 +57,16 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
        - 1: diabatic->adiabatic according to internal diagonalization [ default
     ]
        - 2: diabatic->adiabatic according to internally stored basis
-    transformation matrix
+    transformation matrix [ not implemented - sanity_check rejects it ]
        - 3: adiabatic->diabatic according to internally stored basis
-    transformation matrix
+    transformation matrix [ requires ham_update_method == 2: the loop
+    never re-diagonalizes under this option, so a diabatic model's
+    adiabatic side would stay frozen at its initial values -
+    sanity_check rejects the combination ]
        - 4: adiabatic->diabatic according to local diabatization method
-    The dia->adi options are skipped when ham_update_method == 2: an
-    adiabatic-native model never populates ham_dia, so there is nothing
-    to transform from.
+    [ not implemented - sanity_check rejects it ]
+    Option 1 is skipped when ham_update_method == 2: an adiabatic-native
+    model never populates ham_dia, so there is nothing to transform from.
 
 
     nac_update_method:

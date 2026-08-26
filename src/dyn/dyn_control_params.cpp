@@ -342,6 +342,19 @@ void dyn_control_params::sanity_check(){
     throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
+  /// the back-transform reads ham_adi, which only an adiabatic-native
+  /// model keeps current - under ham_update_method 1 the propagation loop
+  /// never re-diagonalizes (the transform dispatch is exclusive), so the
+  /// dynamics would silently run on the stale initial-step Hamiltonian
+  if(ham_transform_method==3 && ham_update_method!=2){
+    std::cout<<"Error in dyn_control_params::sanity_check: ham_transform_method = 3"
+        <<" (adiabatic->diabatic back-transform) requires an adiabatic-native"
+        <<" model (ham_update_method = 2, got "<<ham_update_method<<") - with a"
+        <<" diabatic model the loop never re-diagonalizes under this option and"
+        <<" the adiabatic side stays frozen at its initial values\n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
   ///============== Integrator vs projector family pairing ==============
   /// rep_tdse == 1: the bare-energy local-diabatization integrators carry
   /// the whole electronic coupling through the rotation projector

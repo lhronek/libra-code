@@ -358,14 +358,19 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
 
                 - 0: don't do any transforms
                 - 1: diabatic->adiabatic according to internal diagonalization [ default ]
-                - 2: diabatic->adiabatic according to internally stored basis transformation matrix
-                - 3: adiabatic->diabatic according to internally stored basis transformation matrix
+                - 2: diabatic->adiabatic according to internally stored basis transformation
+                  matrix [ not implemented - sanity_check rejects it ]
+                - 3: adiabatic->diabatic according to internally stored basis transformation
+                  matrix [ requires ham_update_method = 2; materializes ham_dia =
+                  S U ham_adi U^H S every step - the H_SD readout and the diabatic
+                  propagation/hopping unlock ]
                 - 4: adiabatic->diabatic according to local diabatization method
+                  [ not implemented - sanity_check rejects it ]
 
-                With ham_update_method = 2 (adiabatic-native models) the dia->adi
-                options are skipped: such a model never populates the diabatic
-                Hamiltonian, so there is nothing to transform from - the default 1
-                is therefore safe for every model type
+                With ham_update_method = 2 (adiabatic-native models) option 1 is
+                skipped: such a model never populates the diabatic Hamiltonian, so
+                there is nothing to transform from - the default 1 is therefore
+                safe for every model type
 
 
             * **dyn_params["rep_sh"]** ( int ): selects the representation which is

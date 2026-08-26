@@ -82,8 +82,11 @@ class dyn_control_params{
      - 0: don't do any transforms
      - 1: diabatic->adiabatic according to internal diagonalization [ default ]
      - 2: diabatic->adiabatic according to internally stored basis transformation matrix
+          [ not implemented - sanity_check rejects it ]
      - 3: adiabatic->diabatic according to internally stored basis transformation matrix
+          [ requires ham_update_method == 2 ]
      - 4: adiabatic->diabatic according to local diabatization method
+          [ not implemented - sanity_check rejects it ]
 
   */
   int ham_transform_method;
