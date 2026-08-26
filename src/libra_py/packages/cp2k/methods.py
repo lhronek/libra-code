@@ -4147,6 +4147,22 @@ def make_overlap_deltat_input(template_file, csr_write=True):
 
 
 
+_TEMPLATE_TEXTS = {}
+
+
+def _template_text(path):
+    """The template file's text, cached per (mtime, size): the pre-run
+    validators run every trajectory-step and the file rarely changes."""
+    st = os.stat(path)
+    key = (st.st_mtime_ns, st.st_size)
+    hit = _TEMPLATE_TEXTS.get(path)
+    if hit is None or hit[0] != key:
+        with open(path) as f:
+            hit = (key, f.read())
+        _TEMPLATE_TEXTS[path] = hit
+    return hit[1]
+
+
 def _template_has_section(text, name):
     """Comment-stripped scan: an active &NAME section (argument not OFF)."""
     for l in text.splitlines():
@@ -4216,8 +4232,7 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
     electronic structures (DFTB, NDDO semi-empirics), whose parameterization
     cannot produce the doubled-geometry CROSS overlaps.
     """
-    with open(params["overlap_template"]) as f:
-        tmpl_text = f.read()
+    tmpl_text = _template_text(params["overlap_template"])
     tmpl_methods = set(re.findall(r"^\s*METHOD\s+(\S+)", tmpl_text.upper(), re.M))
     bad = tmpl_methods & {"DFTB", "SE", "AM1", "MNDO", "MNDOD", "PDG", "PDDG",
                           "PM3", "PM6", "PM6-FM", "PNNL", "RM1"}
@@ -5008,23 +5023,21 @@ def cp2k_compute_adi_impl(q, params, full_id):
     # tddfpt_oecorr - fixed by the local CP2K patch dispatching to
     # build_tblite_ks_matrix, so it is not guarded here.)
     if params.get("time_dependent", True) and force_source in ("active_state", "all_states"):
-        with open(params["input_template"]) as f:
-            if "&TBLITE" in f.read().upper():
-                raise ValueError(
-                    "CP2K's TDDFPT excited-state forces call the native-xTB Coulomb "
-                    "Hessian (xtb_ehess), whose neighbor lists tblite runs never "
-                    "populate - segfault, verified (qs_tddfpt2_forces.F:1358 -> "
-                    "xtb_ehess.F:146). Use force_source='gs'/'none' (spectrum + GS "
-                    "forces work), time_dependent=False, or native xTB")
+        if "&TBLITE" in _template_text(params["input_template"]).upper():
+            raise ValueError(
+                "CP2K's TDDFPT excited-state forces call the native-xTB Coulomb "
+                "Hessian (xtb_ehess), whose neighbor lists tblite runs never "
+                "populate - segfault, verified (qs_tddfpt2_forces.F:1358 -> "
+                "xtb_ehess.F:146). Use force_source='gs'/'none' (spectrum + GS "
+                "forces work), time_dependent=False, or native xTB")
     # the file-fed MO sources need their print in the template - the run
     # would otherwise complete and leave no MO file (a commented-out
     # &MO_MOLDEN block is the observed case)
     mo_source = params.get("mo_source", "wfn")
     if mo_source in ("molden", "namd_print"):
         need = "MO_MOLDEN" if mo_source == "molden" else "NAMD_PRINT"
-        with open(params["input_template"]) as f:
-            if not _template_has_section(f.read(), need):
-                raise ValueError(
+        if not _template_has_section(_template_text(params["input_template"]), need):
+            raise ValueError(
                     F"mo_source='{mo_source}' needs an active &{need} print in "
                     F"{params['input_template']} - the run would complete and "
                     F"leave no MO file")
