@@ -4872,6 +4872,20 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     only on each trajectory's first call - later calls restart
                     the diagonalization from their own previous-step wfn
                     [default: False]
+                prefetch_trajectories (int): 1 = submit every trajectory's
+                    chain to a thread pool on the step's first model call and
+                    harvest per engine call, overlapping the CP2K runs
+                    [default: 0]. Needs per-trajectory engine calls (raises
+                    under isNBRA); the pools live in a module registry keyed
+                    by working_directory_prefix
+                max_concurrent_chains (int): concurrent chain cap; 0 [default]
+                    = allocated physical cores // (nprocs * omp_num_threads)
+                parse_pool_workers (int): fork-process pool size for the
+                    overlap parses under prefetch; 0 disables
+                    [default: the chain cap]
+                csr_chunk_rows (int): parse the ODT CSR overlap in chunks of
+                    this many triplet rows, capping the parse transient
+                    [default: None = whole file]
                 force_source (str): what forces CP2K supplies (the engine-side
                     dyn_params["force_method"] decides how they are used):
                     "active_state" [default] - one Z-vector run at the hopping
