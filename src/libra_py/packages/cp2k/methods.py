@@ -5524,7 +5524,11 @@ def _cp2k_prefetch_dispatch(q, params, full_id):
             # one CP2K run occupies nprocs x omp_num_threads PHYSICAL
             # cores - the default cap packs the allocation with exactly
             # that footprint (affinity-masked, SMT siblings collapsed;
-            # cpu_count would report the whole node's logical CPUs)
+            # cpu_count would report the whole node's logical CPUs).
+            # Riding on top, uncounted: the parse workers (a full core
+            # each, ~1-2 s bursts when chains finish together) and the
+            # ~1-core GIL-serial python tail - brief time-sharing beats
+            # reserving cores that would idle between bursts
             cap = int(params.get("max_concurrent_chains", 0)) or \
                 max(1, _allocation_cores() // (nprocs * omp))
             state["pool"] = ThreadPoolExecutor(max_workers=min(cap, ntraj))
