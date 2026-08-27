@@ -66,9 +66,13 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
     adiabatic side would stay frozen at its initial values -
     sanity_check rejects the combination ]
        - 4: adiabatic->diabatic according to local diabatization method
-    [ requires ham_update_method == 2 and ndia == nadi: ham_dia =
-    V^H ham_adi V in the cumulative trajectory frame V(t_n) =
-    T_n V(t_n-1) - applied on the type-1 pass, once per step ]
+    [ requires ham_update_method == 2, ndia == nadi and supplied
+    time-overlaps: ham_dia = V^H ham_adi V in the cumulative trajectory
+    frame V(t_n) = T_n V(t_n-1). The frame OWNS the diabatic slot:
+    basis_transform becomes V^H (also in the saved dataset - analysis
+    scripts read the frame, not a model transform), and the frame is
+    not persisted across restarts - a restarted run re-anchors its
+    diabatic basis at its own first step ]
     Option 1 is skipped when ham_update_method == 2: an adiabatic-native
     model never populates ham_dia, so there is nothing to transform from.
 

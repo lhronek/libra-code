@@ -367,9 +367,12 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                   S U ham_adi U^H S every step - the H_SD readout and the diabatic
                   propagation/hopping unlock ]
                 - 4: adiabatic->diabatic according to local diabatization method
-                  [ requires ham_update_method = 2 and ndia = nadi; ham_dia =
-                  V^H ham_adi V in the cumulative trajectory frame - smooth by
-                  construction, the materialized local-diabatization picture ]
+                  [ requires ham_update_method = 2, ndia = nadi and supplied
+                  time-overlaps; ham_dia = V^H ham_adi V in the cumulative
+                  trajectory frame - smooth by construction, the materialized
+                  local-diabatization picture. The frame OWNS the diabatic slot:
+                  the saved basis_transform is V^H (the frame, not a model
+                  transform), and the frame is not persisted across restarts ]
 
                 With ham_update_method = 2 (adiabatic-native models) option 1 is
                 skipped: such a model never populates the diabatic Hamiltonian, so
