@@ -367,7 +367,9 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                   S U ham_adi U^H S every step - the H_SD readout and the diabatic
                   propagation/hopping unlock ]
                 - 4: adiabatic->diabatic according to local diabatization method
-                  [ not implemented - sanity_check rejects it ]
+                  [ requires ham_update_method = 2 and ndia = nadi; ham_dia =
+                  V^H ham_adi V in the cumulative trajectory frame - smooth by
+                  construction, the materialized local-diabatization picture ]
 
                 With ham_update_method = 2 (adiabatic-native models) option 1 is
                 skipped: such a model never populates the diabatic Hamiltonian, so
@@ -1669,17 +1671,22 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
         # quasi-diabatic model error - quantified in the dia-init stage-2
         # study). Diabatic forces would need dU/dR, which no driver
         # supplies
-        transform3 = int(dyn_params.get("ham_transform_method", 1)) == 3
+        transform34 = int(dyn_params.get("ham_transform_method", 1)) in (3, 4)
+        if (int(dyn_params.get("ham_transform_method", 1)) == 4
+                and dyn_var.ndia != dyn_var.nadi):
+            raise ValueError("ham_transform_method = 4 builds the square "
+                             "local-diabatization frame - ndia must equal nadi "
+                             F"(got {dyn_var.ndia} and {dyn_var.nadi})")
         for key, what in (("rep_tdse", "TDSE propagation"),
                           ("rep_sh", "surface hopping"),
                           ("rep_force", "force evaluation")):
             if dyn_params.get(key, 1) == 0:
-                if key != "rep_force" and transform3:
+                if key != "rep_force" and transform34:
                     continue
                 if key == "rep_force":
                     hint = "diabatic forces need dU/dR - keep rep_force = 1"
                 else:
-                    hint = F"use ham_transform_method = 3, or {key} = 1"
+                    hint = F"use ham_transform_method = 3 or 4, or {key} = 1"
                 raise ValueError(F"{key} = 0 requests diabatic-representation {what}, "
                                  F"but adiabatic-native models (ham_update_method = 2) "
                                  F"do not build the needed diabatic matrices here - {hint}")

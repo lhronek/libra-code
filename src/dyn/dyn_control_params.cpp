@@ -329,16 +329,27 @@ void dyn_control_params::sanity_check(){
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
-  /// transform 4 (adi->dia by local diabatization) is declared but not
-  /// implemented - its dispatch branch is empty, so selecting it is
-  /// silently identical to 0
-  if(ham_transform_method==4){
-    std::cout<<"Error in dyn_control_params::sanity_check: ham_transform_method = "
-        <<ham_transform_method<<" is declared but not implemented (its transform"
-        <<" dispatch branch is empty - it would run as ham_transform_method = 0,"
-        <<" building no Hamiltonian in the target representation); use 1"
-        <<" (internal diagonalization), 2 (diabatic->adiabatic by the stored"
-        <<" basis transform) or 3 (adiabatic->diabatic by it)\n";
+  /// the local-diabatization transform accumulates the per-step projector
+  /// into the trajectory frame and rotates ham_adi - it needs an
+  /// adiabatic-native source (the exclusive dispatch never re-diagonalizes
+  /// a diabatic model under this option) and a square frame
+  if(ham_transform_method==4 && ham_update_method!=2){
+    std::cout<<"Error in dyn_control_params::sanity_check: ham_transform_method = 4"
+        <<" (adiabatic->diabatic by local diabatization) requires an adiabatic-native"
+        <<" model (ham_update_method = 2, got "<<ham_update_method<<") - with a"
+        <<" diabatic model the loop never re-diagonalizes under this option and"
+        <<" the adiabatic side stays frozen at its initial values\n";
+    throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
+  /// the frame accumulates the per-step projector, which must come from a
+  /// genuine raw-basis time-overlap - a basis-transform-derived St (method
+  /// 1) reads the very matrix the frame overwrites
+  if(ham_transform_method==4 && time_overlap_method!=0){
+    std::cout<<"Error in dyn_control_params::sanity_check: ham_transform_method = 4"
+        <<" requires supplied time-overlaps (time_overlap_method = 0, got "
+        <<time_overlap_method<<") - the frame owns basis_transform, so the"
+        <<" method-1 rebuild from basis transforms would read the frame itself\n";
     throw std::runtime_error("libra C++ error - see the message printed above");
   }
 

@@ -66,7 +66,9 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
     adiabatic side would stay frozen at its initial values -
     sanity_check rejects the combination ]
        - 4: adiabatic->diabatic according to local diabatization method
-    [ not implemented - sanity_check rejects it ]
+    [ requires ham_update_method == 2 and ndia == nadi: ham_dia =
+    V^H ham_adi V in the cumulative trajectory frame V(t_n) =
+    T_n V(t_n-1) - applied on the type-1 pass, once per step ]
     Option 1 is skipped when ham_update_method == 2: an adiabatic-native
     model never populates ham_dia, so there is nothing to transform from.
 
@@ -191,6 +193,58 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
   // exit(0);
 
   if (update_type == 0 || update_type == 1) {
+
+    // Local-diabatization frame (ham_transform_method == 4): the
+    // t0-anchored transported basis V(t_n) = T_n V(t_n-1), ham_dia =
+    // V^H ham_adi V. Runs on the type-1 passes - update_proj_adi sits
+    // between the type-0 and the first type-1 call, so T_n and hence V
+    // are fresh here (the type-0 dispatch would see the previous
+    // step's frame); the Hvib update below consumes the rotated ham_dia
+    if (update_type == 1 && prms.ham_transform_method == 4) {
+      // the frame accumulation lives in update_proj_adi (exactly once
+      // per step); this rotation is IDEMPOTENT - the loop makes several
+      // type-1 calls per step (post-half-step, post-rescaling) and each
+      // redoes the same product from the unchanged V and ham_adi
+      int nchildren = ham.children.size();
+      for (int traj = 0; traj < nchildren; traj++) {
+        nHamiltonian *ch = ham.children[traj];
+        if (ch->ham_adi_mem_status == 0 || ch->ham_dia_mem_status == 0) {
+          cout << "Error in the local-diabatization transform: ham_adi or ham_dia \
+  is not allocated for trajectory " << traj << "\n";
+          std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+        }
+        // the frame OWNS the diabatic slot: a model-supplied
+        // basis_transform or ham_dia would define a SECOND diabatic
+        // basis (model diabats vs the trajectory frame) and the
+        // amplitude machinery can serve only one
+        if (ch->basis_transform_supplied) {
+          cout << "Error in the local-diabatization transform: the model supplies \
+  obj.basis_transform, but ham_transform_method = 4 defines the diabatic basis as \
+  the trajectory frame - the two conventions cannot coexist. Drop \
+  obj.basis_transform (the square identity default is the correct t0 frame), or \
+  use ham_transform_method = 3 for a model-defined diabatic basis\n";
+          std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+        }
+        if (ch->ham_dia_supplied) {
+          cout << "Error in the local-diabatization transform: the model supplies \
+  obj.ham_dia, which the frame rotation would overwrite every step - the two are \
+  different diabatic bases. Drop obj.ham_dia, or run without ham_transform_method = 4\n";
+          std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+        }
+        // chained in-place product - CBLAS zgemm-backed
+        ch->ham_dia->product(adjoint(*dyn_var.ld_frame[traj]),
+                             *ch->ham_adi, *dyn_var.ld_frame[traj]);
+        // the frame is the engine's diabatic basis: c_dia = V^H c_adi
+        // means basis_transform = V^H on BOTH sides - the child (the
+        // init-time conversions) and dyn_var (the in-loop amplitude
+        // and density readouts, copied before this hook runs)
+        *ch->basis_transform = (*dyn_var.ld_frame[traj]).H();
+      }
+      for (int traj = 0; traj < dyn_var.ntraj; traj++) {
+        *dyn_var.basis_transform[traj] =
+            (*dyn_var.ld_frame[traj]).H();
+      }
+    }
 
     // Derivative NAC correction option:
     if (prms.do_nac_phase_correction ==
@@ -391,7 +445,7 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
       // propagation) needs hvib_dia built from the rotated ham_dia -
       // unless the model supplied obj.hvib_dia itself (e.g. the
       // frame-corrected H_SD - i D_SD), which is consumed as-is
-      if (prms.ham_transform_method == 3) {
+      if (prms.ham_transform_method == 3 || prms.ham_transform_method == 4) {
         int ntraj_h = ham.children.size();
         for (int traj = 0; traj < ntraj_h; traj++) {
           if (!ham.children[traj]->hvib_dia_supplied) {
@@ -407,7 +461,8 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
       // the never-populated ham_dia/nac_dia - all-zero dead output -
       // unless transform 3 rotates ham_adi into ham_dia (nac_dia stays
       // zero: hvib_dia = ham_dia is the strictly-diabatic contract)
-      if (prms.ham_update_method != 2 || prms.ham_transform_method == 3) {
+      if (prms.ham_update_method != 2 || prms.ham_transform_method == 3 ||
+          prms.ham_transform_method == 4) {
         ham.compute_hvib_dia(1);
       }
       ham.compute_hvib_adi(1);
@@ -651,6 +706,17 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
 
   } // for ntraj
   if (omp_eptr) { std::rethrow_exception(omp_eptr); }
+
+  // the local-diabatization frame accumulates the per-step projector
+  // HERE - this function runs exactly once per nuclear step, while the
+  // type-1 Hamiltonian update (which rotates ham_dia by the frame) can
+  // run several times per step
+  if (prms.ham_transform_method == 4) {
+    for (int itraj = 0; itraj < ntraj; itraj++) {
+      dyn_var.ld_frame[itraj]->product(*dyn_var.proj_adi[itraj],
+                                       *dyn_var.ld_frame[itraj]);
+    }
+  }
 
 } // reproject_basis
 
