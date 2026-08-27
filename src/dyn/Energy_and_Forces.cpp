@@ -359,8 +359,23 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
       for(int itraj=0; itraj<ntraj; itraj++){ effective_states[itraj] = prms.enforced_state_index; }
     }
 
+    if(prms.isNBRA==1 && (int)ham.children.size()==1 && ntraj>1){
+      // the shared child: one force column serves every trajectory -
+      // valid only while the forces are trajectory-invariant (the
+      // update_Hamiltonian_variables funnel admits exactly the
+      // state-enforced, rescaling-free combination)
+      vector<int> one_state(1, effective_states[0]);
+      MATRIX f1(ndof, 1);
+      if(prms.rep_force==0){ f1 = ham.forces_dia(one_state).real(); }
+      else if(prms.rep_force==1){ f1 = ham.forces_adi(one_state).real(); }
+      for(int itraj=0; itraj<ntraj; itraj++){
+        for(int idof=0; idof<ndof; idof++){
+          dyn_vars.f->set(idof, itraj, f1.get(idof, 0));
+        }
+      }
+    }
     // Diabatic 
-    if(prms.rep_force==0){  *dyn_vars.f = ham.forces_dia(effective_states).real();   }
+    else if(prms.rep_force==0){  *dyn_vars.f = ham.forces_dia(effective_states).real();   }
 
     // Adiabatic 
     else if(prms.rep_force==1){  

@@ -113,13 +113,24 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
               "run with isNBRA = 0 for per-trajectory children\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
-    if (prms.force_method != 0) {
+    // the shared-child peninsula: state-enforced, rescaling-free live
+    // forces are trajectory-invariant, so one force column serves all
+    // trajectories (classical-path on-the-fly NBRA; the cp2k driver's
+    // force_source "gs" pairs with it)
+    int nbra_live_forces = (prms.force_method == 1 &&
+                            prms.enforce_state_following == 1 &&
+                            prms.momenta_rescaling_algo == 0 &&
+                            prms.ensemble == 0);
+    if (prms.force_method != 0 && !nbra_live_forces) {
       cout << "Error in update_Hamiltonian_variables(): force_method = "
            << prms.force_method
            << " computes per-trajectory forces, but isNBRA keeps a single "
-              "child Hamiltonian. NBRA propagates on a precomputed nuclear "
-              "trajectory - use force_method = 0 (the NBRA convention), or "
-              "run with isNBRA = 0 for per-trajectory children\n";
+              "child Hamiltonian. Use force_method = 0 (precomputed "
+              "trajectory, the file-based NBRA convention), the "
+              "state-enforced live-force combination force_method = 1 + "
+              "enforce_state_following = 1 + momenta_rescaling_algo = 0 + "
+              "ensemble = 0 (classical-path on-the-fly NBRA), or run with "
+              "isNBRA = 0 for per-trajectory children\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     if (prms.decoherence_times_type == 2 ||
@@ -131,6 +142,31 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
               "decoherence_times_type = 1 (energy-based EDC, the NBRA "
               "convention) or 0 (given rates), or run with isNBRA = 0\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    // the shared child evaluates the Hamiltonian at trajectory 0's
+    // geometry - live-force runs stay valid only while every trajectory
+    // rides the same nuclear path (identical initial conditions, no
+    // per-trajectory momentum edits); any spread across the q columns
+    // means the shared Hamiltonian is wrong for the divergent
+    // trajectories
+    if (prms.force_method != 0) {
+      double q_spread = 0.0;
+      for (int idof = 0; idof < dyn_var.ndof; idof++) {
+        double q0 = dyn_var.q->get(idof, 0);
+        for (int itraj = 1; itraj < dyn_var.ntraj; itraj++) {
+          double dq = fabs(dyn_var.q->get(idof, itraj) - q0);
+          if (dq > q_spread) { q_spread = dq; }
+        }
+      }
+      if (q_spread > 1e-8) {
+        cout << "Error in update_Hamiltonian_variables(): the trajectories "
+                "diverged under the shared child Hamiltonian (max coordinate "
+                "spread " << q_spread << ") - isNBRA = 1 with live forces "
+                "requires identical initial conditions (no q/p sampling) and "
+                "trajectory-invariant propagation. Sample initial conditions "
+                "with isNBRA = 0\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
     }
   }
 
