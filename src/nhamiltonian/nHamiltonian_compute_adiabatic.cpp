@@ -604,21 +604,28 @@ void nHamiltonian::transform_adi2dia(int lvl) {
   allocated but is used to collect the results of the calculations\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
-    // a model-supplied obj.ham_dia (the diabatic-hop/LZ route) is a
-    // DIFFERENT diabatic basis than the transform frame - overwriting it
-    // every step would silently discard the model's data
-    if (ham_dia_supplied) {
-      cout << "Error in transform_adi2dia(): the model supplies obj.ham_dia, which \
-  the adiabatic->diabatic transform would overwrite every step - the two are \
-  different diabatic bases. Drop obj.ham_dia, or run without the transform\n";
-      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-    }
     // an all-zero transformation cannot define the diabatic picture -
     // the model never supplied obj.basis_transform
     if (abs(basis_transform->max_elt()) == 0.0) {
       cout << "Error in transform_adi2dia(): the basis_transform matrix is all-zero - \
   the model must supply obj.basis_transform for the adiabatic->diabatic transform\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    // a model-supplied obj.ham_dia lives in the SAME U-basis the
+    // back-transform rebuilds into - consistent redundancy passes, a
+    // disagreeing supply would be silently overwritten every step
+    // (the temporary exists only on this rare supplied path)
+    if (ham_dia_supplied) {
+      CMATRIX rebuilt(ndia, ndia);
+      rebuilt.product(*ovlp_dia, *basis_transform, *ham_adi,
+                      adjoint(*basis_transform), *ovlp_dia);
+      if (abs((rebuilt - *ham_dia).max_elt()) > 1e-8) {
+        cout << "Error in transform_adi2dia(): the model supplies obj.ham_dia, but \
+  the adiabatic->diabatic transform rebuilds it as S U ham_adi U^H S and the two \
+  disagree - the supplied data would be overwritten. Supply consistent data, or \
+  drop obj.ham_dia\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
     }
     // chained in-place product - CBLAS zgemm-backed, no per-call temporaries
     ham_dia->product(*ovlp_dia, *basis_transform, *ham_adi,
