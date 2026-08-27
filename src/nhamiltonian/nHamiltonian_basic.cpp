@@ -219,6 +219,7 @@ void nHamiltonian::init_mem_status(int ndia_, int nadi_, int nnucl_) {
   nac_adi_supplied = 0;
   nac_dia_supplied = 0;
   basis_transform_supplied = 0;
+  ham_dia_supplied = 0;
   time_overlap_dia = nullptr;
   time_overlap_dia_mem_status = 0;
 
@@ -520,6 +521,7 @@ void nHamiltonian::copy_level_content(nHamiltonian *src) {
   nac_adi_supplied = src->nac_adi_supplied;
   nac_dia_supplied = src->nac_dia_supplied;
   basis_transform_supplied = src->basis_transform_supplied;
+  ham_dia_supplied = src->ham_dia_supplied;
   time_overlap_adi_supplied = src->time_overlap_adi_supplied;
 
 } // copy_level_content

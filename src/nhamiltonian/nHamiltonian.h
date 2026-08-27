@@ -188,6 +188,10 @@ public:
   ///< stored-U transforms (ham_transform_method 2) require it: the
   ///< square identity default must not silently alias dia == adi
   int basis_transform_supplied;
+  ///< the model supplied obj.ham_dia (the diabatic-hop/LZ route) -
+  ///< the adi->dia transforms would overwrite a DIFFERENT basis
+  ///< (model diabats vs the transform frame): conflict, raise
+  int ham_dia_supplied;
 
 
   vector<CMATRIX*> d1ham_adi; ///< first order derivatives of the Hamiltonian matrix in the adiabatic basis (diagonal)

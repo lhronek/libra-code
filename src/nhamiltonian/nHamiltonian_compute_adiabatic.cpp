@@ -604,6 +604,15 @@ void nHamiltonian::transform_adi2dia(int lvl) {
   allocated but is used to collect the results of the calculations\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
+    // a model-supplied obj.ham_dia (the diabatic-hop/LZ route) is a
+    // DIFFERENT diabatic basis than the transform frame - overwriting it
+    // every step would silently discard the model's data
+    if (ham_dia_supplied) {
+      cout << "Error in transform_adi2dia(): the model supplies obj.ham_dia, which \
+  the adiabatic->diabatic transform would overwrite every step - the two are \
+  different diabatic bases. Drop obj.ham_dia, or run without the transform\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
     // an all-zero transformation cannot define the diabatic picture -
     // the model never supplied obj.basis_transform
     if (abs(basis_transform->max_elt()) == 0.0) {
@@ -804,6 +813,8 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
         PyErr_Print();
         throw;
       }
+      // an all-zero supply is the ecosystem's placeholder convention - not data
+      ham_dia_supplied = (abs(ham_dia->max_elt()) != 0.0);
     }
 
     has_attr = 0;
