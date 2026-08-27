@@ -422,6 +422,11 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - 3: QTSH force
                 - 4: KC-RPMD force
 
+                With isNBRA == 1 and ntraj > 1 only option 0 runs - the nonzero
+                options need per-trajectory forces, which the single shared child
+                Hamiltonian cannot supply (rejected at the head of
+                update_Hamiltonian_variables)
+
 
             * **dyn_params["ehrenfest_force_option"]** ( int ): the Ehrenfest (mean-field) force expression
                 in the adiabatic representation (force_method == 2, rep_force == 1):
@@ -481,6 +486,11 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - 0: don't update them (e.g. for simplest NAC)
                 - 1: update according to changed momentum and existing derivative couplings [ default ]
                 - 2: update according to time-overlaps (only time-derivative NACs)
+
+                With isNBRA == 1 and ntraj > 1 option 1 is rejected - it rebuilds
+                couplings from per-trajectory momenta on the single shared child;
+                use 0 (supplied couplings, the NBRA convention) or 2 (HST/NPI
+                from the shared time-overlap)
 
 
             * **dyn_params["nac_algo"]** ( int ): How to compute time-derivative NACs
@@ -759,6 +769,10 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - 4: Schwartz - mean-field Force-based decoherence with `schwartz_interaction_width`
                 - 5: Gu-Franco 
 
+                With isNBRA == 1 and ntraj > 1 options 2 and 4 are rejected -
+                Schwartz 1 builds per-trajectory mean-field forces on the single
+                shared child; use 1 (EDC, the NBRA convention) or 0
+
 
             * **dyn_params["schwartz_decoherence_inv_alpha"]** ( MATRIX(ndof, 1) ): a matrix of 1/alpha - the parameters
                 used in GWP in computing decoherence rates [ default: NULL ]
@@ -887,6 +901,13 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
               - 0: no NBRA - Hamiltonians for all trajectories are computed explicitly [ default ]
               - 1: the NBRA is involved - the calculations of the Hamiltonian are conducted for only 1 trajectory,
                    and re-used by all other SH trajectories.
+
+              With ntraj > 1 this admits only the file-based-NBRA parameter
+              island: force_method 0, nac_update_method 0 or 2, and
+              decoherence_times_type other than 2 or 4 - off-island
+              combinations need per-trajectory quantities the shared child
+              cannot supply and are rejected at the head of
+              update_Hamiltonian_variables
 
 
             ///===============================================================================
