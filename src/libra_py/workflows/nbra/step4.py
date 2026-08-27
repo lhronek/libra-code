@@ -784,7 +784,11 @@ def _set_method(params, ham_rep=0, is_nbra=0, method=0):
             available directly
 
         is_nbra ( int ): -1 - custom (leave the keys alone); 0 - non-NBRA;
-            1 - file-based NBRA; 2 - on-the-fly NBRA
+            1 - file-based NBRA; 2 - on-the-fly NBRA. Rows 0/1/2 also pin
+            the engine isNBRA flag they require (0/1/0 - file-based runs
+            on the single shared child Hamiltonian, the other rows need
+            per-trajectory children for their forces/NACs); -1 leaves the
+            flag alone
 
         method ( int ): -1 - custom; 0 - FSSH; 1 - IDA; 2 - mSDM; 5 - DISH
             (the engine's tsh_method id; 3 = legacy alias); 21 - mSDM,
@@ -797,18 +801,21 @@ def _set_method(params, ham_rep=0, is_nbra=0, method=0):
     if is_nbra == -1:    # custom
         pass
     elif is_nbra == 0:   # non-NBRA
+        params.update({"isNBRA": 0, "is_nbra": 0})            # per-trajectory children
         params.update({"force_method": 1, "rep_force": 1})    # state-specific forces, in the adiabatic rep
         params.update({"nac_update_method": 1})               # NACs from derivative couplings and momenta
         params.update({"time_overlap_method": 1})             # compute from basis_transform pairs
         params.update({"hop_acceptance_algo": 20, "momenta_rescaling_algo": 200})  # Tully-style rescaling
     elif is_nbra == 1:   # file-based NBRA
+        params.update({"isNBRA": 1, "is_nbra": 1})            # single shared child Hamiltonian (the parameter island)
         params.update({"force_method": 0})                    # don't compute forces
         params.update({"nac_update_method": 0})               # NACs defined directly
         params.update({"time_overlap_method": 0})             # supplied externally, don't recompute
         params.update({"hop_acceptance_algo": 31, "momenta_rescaling_algo": 0})  # Boltzmann acceptance, no rescaling
     elif is_nbra == 2:   # on-the-fly NBRA
+        params.update({"isNBRA": 0, "is_nbra": 0})            # live per-trajectory children
         params.update({"force_method": 1, "rep_force": 1})    # state-specific forces
-        params.update({"enforce_state_following": 0})
+        params.update({"enforce_state_following": 1})         # nuclei follow enforced_state_index (default 0) regardless of hops - the NBRA premise
         params.update({"nac_update_method": 1})
         params.update({"time_overlap_method": 1})   # compute from basis_transform pairs
         params.update({"hop_acceptance_algo": 31, "momenta_rescaling_algo": 0})
