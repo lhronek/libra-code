@@ -97,6 +97,43 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
   MATRIX &p = *dyn_var.p;
   MATRIX &iM = *dyn_var.iM;
 
+  // isNBRA carries ONE child Hamiltonian shared by all trajectories - only
+  // parameter combinations that never demand per-trajectory children can
+  // run: force_method 0, nac_update_method 0 or 2, decoherence rates from
+  // given/EDC/schwartz_2/Gu_Franco. Every combination rejected here dies
+  // deeper in the engine anyway, with a dimension error that never names
+  // isNBRA - this funnel names the convention instead
+  if (prms.isNBRA == 1 && dyn_var.ntraj > 1 && ham.children.size() == 1) {
+    if (prms.nac_update_method == 1) {
+      cout << "Error in update_Hamiltonian_variables(): nac_update_method = "
+              "1 rebuilds couplings from per-trajectory momenta, but isNBRA "
+              "keeps a single child Hamiltonian with one NAC slot. Use "
+              "nac_update_method = 0 (consume supplied couplings, the NBRA "
+              "convention) or 2 (HST/NPI from the shared time-overlap), or "
+              "run with isNBRA = 0 for per-trajectory children\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if (prms.force_method != 0) {
+      cout << "Error in update_Hamiltonian_variables(): force_method = "
+           << prms.force_method
+           << " computes per-trajectory forces, but isNBRA keeps a single "
+              "child Hamiltonian. NBRA propagates on a precomputed nuclear "
+              "trajectory - use force_method = 0 (the NBRA convention), or "
+              "run with isNBRA = 0 for per-trajectory children\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if (prms.decoherence_times_type == 2 ||
+        prms.decoherence_times_type == 4) {
+      cout << "Error in update_Hamiltonian_variables(): "
+              "decoherence_times_type = " << prms.decoherence_times_type
+           << " (Schwartz) builds per-trajectory mean-field forces, but "
+              "isNBRA keeps a single child Hamiltonian. Use "
+              "decoherence_times_type = 1 (energy-based EDC, the NBRA "
+              "convention) or 0 (given rates), or run with isNBRA = 0\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+  }
+
   if (update_type == 0) {
     //============================= Energies =========================
     // How to compute electronic Hamiltonian - this may already read a lot of
