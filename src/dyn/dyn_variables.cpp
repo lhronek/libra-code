@@ -35,6 +35,7 @@ void dyn_variables::allocate_electronic_vars(){
     p_mm = new MATRIX(nadi, ntraj);
     ave_decoherence_rates = new MATRIX(nadi, nadi);
     proj_adi = vector<CMATRIX*>(ntraj);
+    ld_frame = vector<CMATRIX*>(ntraj);
     dm_dia = vector<CMATRIX*>(ntraj);
     dm_adi = vector<CMATRIX*>(ntraj);
     basis_transform = vector<CMATRIX*>(ntraj);
@@ -42,6 +43,8 @@ void dyn_variables::allocate_electronic_vars(){
     for(int itraj=0; itraj<ntraj; itraj++){
       proj_adi[itraj] = new CMATRIX(nadi, nadi);
       proj_adi[itraj]->load_identity();
+      ld_frame[itraj] = new CMATRIX(nadi, nadi);
+      ld_frame[itraj]->load_identity();
       dm_dia[itraj] = new CMATRIX(ndia, ndia);
       dm_adi[itraj] = new CMATRIX(nadi, nadi);
       basis_transform[itraj] = new CMATRIX(ndia, nadi);
@@ -422,6 +425,7 @@ dyn_variables::dyn_variables(const dyn_variables& x){
     *ave_decoherence_rates = *x.ave_decoherence_rates;
     for(itraj=0; itraj<ntraj; itraj++){
       *proj_adi[itraj] = *x.proj_adi[itraj];
+      *ld_frame[itraj] = *x.ld_frame[itraj];
       *dm_dia[itraj] = *x.dm_dia[itraj];
       *dm_adi[itraj] = *x.dm_adi[itraj];
       *basis_transform[itraj] = *x.basis_transform[itraj];
@@ -614,11 +618,13 @@ dyn_variables::~dyn_variables(){
   if(electronic_vars_status==1){ 
     for(int itraj=0; itraj<ntraj; itraj++){
       delete proj_adi[itraj];
+      delete ld_frame[itraj];
       delete dm_dia[itraj];
       delete dm_adi[itraj];
       delete basis_transform[itraj];
     }
     proj_adi.clear();
+    ld_frame.clear();
     dm_dia.clear();
     dm_adi.clear();
     basis_transform.clear();

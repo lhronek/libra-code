@@ -161,6 +161,15 @@ class dyn_variables{
   */
   vector<CMATRIX*> proj_adi;
 
+  /**
+    The cumulative local-diabatization frame V(t_n) = T_n V(t_n-1),
+    V(0) = I (ham_transform_method == 4): ham_dia = V^H ham_adi V is
+    the t0-anchored transported basis. Identity until transform 4 runs;
+    like proj_adi it is NOT persisted across restarts.
+    Options: CMATRIX(nadi, nadi) x ntraj
+  */
+  vector<CMATRIX*> ld_frame;
+
 
   /**
     Electronic density matrix in diabatic representation
@@ -718,6 +727,7 @@ class dyn_variables{
   MATRIX get_q_mm(){ return *q_mm; }
   MATRIX get_p_mm(){ return *p_mm; }
   CMATRIX get_proj_adi(int i){ return *proj_adi[i]; } 
+  CMATRIX get_ld_frame(int i){ return *ld_frame[i]; }
   CMATRIX get_dm_adi(int i){  return *dm_adi[i]; }
   CMATRIX get_dm_dia(int i){  return *dm_dia[i]; }
   CMATRIX get_dm_adi(int i, int prev_steps);
