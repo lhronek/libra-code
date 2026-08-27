@@ -150,10 +150,13 @@ class dyn_control_params{
       - 3: QTSH force
       - 4: KC-RPMD force
 
-    With isNBRA == 1 and ntraj > 1 only option 0 runs - the nonzero
-    options need per-trajectory forces, which the single shared child
-    Hamiltonian cannot supply (rejected at the head of
-    update_Hamiltonian_variables)
+    With isNBRA == 1 and ntraj > 1 option 0 runs, and option 1 is
+    admitted when combined with enforce_state_following = 1,
+    momenta_rescaling_algo = 0 and ensemble = 0 (classical-path
+    on-the-fly NBRA - the forces are trajectory-invariant, one column
+    serves all trajectories); anything else needs per-trajectory
+    forces, which the single shared child Hamiltonian cannot supply
+    (rejected at the head of update_Hamiltonian_variables)
   */
   int force_method;
 
@@ -876,9 +879,12 @@ class dyn_control_params{
 
     With ntraj > 1 this admits only the file-based-NBRA parameter
     island: force_method 0, nac_update_method 0 or 2, and
-    decoherence_times_type other than 2 or 4 - off-island combinations
-    need per-trajectory quantities the shared child cannot supply and
-    are rejected at the head of update_Hamiltonian_variables
+    decoherence_times_type other than 2 or 4 - plus the state-enforced
+    live-force peninsula (force_method 1 + enforce_state_following 1 +
+    momenta_rescaling_algo 0 + ensemble 0, classical-path on-the-fly
+    NBRA). Off-island combinations need per-trajectory quantities the
+    shared child cannot supply and are rejected at the head of
+    update_Hamiltonian_variables
   */
   int isNBRA;
 
