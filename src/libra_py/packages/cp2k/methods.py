@@ -762,6 +762,45 @@ def read_trajectory_xyz_file(file_name: str, step: int):
     return labels, q
 
 
+def read_velocity_xyz_file(file_name: str, step: int):
+    """
+    The velocity counterpart of read_trajectory_xyz_file: extracts the
+    'step' th frame of a CP2K velocity trajectory (*-vel-1.xyz). CP2K
+    writes velocities in ATOMIC UNITS, so no unit conversion is applied
+    (the position reader converts Angstrom to Bohr), and no side file is
+    written.
+
+    Args:
+
+        file_name (string): The velocity trajectory .xyz file name.
+            step (integer): The desired frame, starting from zero.
+
+    Returns:
+
+        (list, MATRIX(ndof, 1)): labels of all atoms, and their
+            velocities in atomic units, ndof = 3 * natoms
+
+    """
+
+    f = open(file_name, 'r')
+    lines = f.readlines()
+    f.close()
+
+    number_of_atoms = int(lines[0].split()[0])
+    v = MATRIX(3 * number_of_atoms, 1)
+    n = number_of_atoms + 2
+
+    labels = []
+    for i in range(number_of_atoms):
+        tmp = lines[n * step + 2 + i].split()
+        labels.append(tmp[0])
+        v.set(3 * i + 0, 0, float(tmp[1]))
+        v.set(3 * i + 1, 0, float(tmp[2]))
+        v.set(3 * i + 2, 0, float(tmp[3]))
+
+    return labels, v
+
+
 def CP2K_input_static(cp2k_sample_energy_input: str, project_name: str,
                       trajectory_file: str, time_step: int):
     """
