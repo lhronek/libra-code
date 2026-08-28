@@ -606,6 +606,23 @@ dyn_variables::dyn_variables(const dyn_variables& x){
 
 
 
+void dyn_variables::reset_ld_frame(){
+/**
+  Re-anchor the local-diabatization frame at the CURRENT point:
+  V = I on every trajectory and the transform-4 rotation marked stale.
+  The init-time update_proj_adi call builds its projector from the
+  supplied time-overlap at icond, which spans the PREVIOUS interval -
+  without the reset the frame starts at V0 = T0 instead of the
+  documented V(0) = I
+*/
+  int ntraj = ld_frame.size();
+  for(int itraj = 0; itraj < ntraj; itraj++){
+    ld_frame[itraj]->load_identity();
+  }
+  ld_frame_stale = 1;
+}
+
+
 dyn_variables::~dyn_variables(){  
   //cout<<"dyn_variables destructor!!!\n";
 

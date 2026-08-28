@@ -735,6 +735,7 @@ class dyn_variables{
   MATRIX get_p_mm(){ return *p_mm; }
   CMATRIX get_proj_adi(int i){ return *proj_adi[i]; } 
   CMATRIX get_ld_frame(int i){ return *ld_frame[i]; }
+  void reset_ld_frame();  ///< re-anchor the transform-4 frame: V = I on every trajectory, rotation marked stale
   CMATRIX get_dm_adi(int i){  return *dm_adi[i]; }
   CMATRIX get_dm_dia(int i){  return *dm_dia[i]; }
   CMATRIX get_dm_adi(int i, int prev_steps);

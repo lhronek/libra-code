@@ -1489,6 +1489,12 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
     # dyn_var.proj_adi this calculaitons used ham.children[i].time_overlap
     # matrix, updated in the previous step
     update_proj_adi(prms, dyn_var, ham, ham_aux)
+    # the init projector spans the PREVIOUS interval (the supplied
+    # time-overlap at icond is <t_-1|t_0>) - under transform 4 the call
+    # above accumulated it into the frame, anchoring V one interval
+    # early; re-anchor at t0 (the documented V(0) = I)
+    if int(dyn_params.get("ham_transform_method", 1)) == 4:
+        dyn_var.reset_ld_frame()
     update_forces(prms, dyn_var, ham)
 
     # Do the propagation
