@@ -5012,6 +5012,20 @@ def cp2k_compute_adi_impl(q, params, full_id):
     if force_source not in ("active_state", "all_states", "gs", "none"):
         raise ValueError(F"force_source must be 'active_state', 'all_states', 'gs' or 'none', "
                          F"got {force_source!r}")
+    # the KS-SD mode has no excited-state machinery: the frozen-orbital SD
+    # energies are orbital-energy differences whose state forces would need
+    # orbital-energy gradients CP2K does not provide, the template carries
+    # no &EXCITED_STATES block (the rewriter only rewrites, never injects)
+    # and every run returns GROUND-state forces regardless of the hopping
+    # state - "active_state"/"all_states" would silently mislabel a
+    # classical-path run
+    if not params.get("time_dependent", True) and force_source in ("active_state", "all_states"):
+        raise ValueError(
+            F'force_source="{force_source}" needs TDDFPT excited states, but '
+            'time_dependent=False (the KS-SD mode) computes GROUND-state '
+            'forces for every state. Use force_source="gs" (the same forces, '
+            'declared honestly as classical-path) or "none", or '
+            'time_dependent=True for real state-dependent forces')
     dia_basis = params.get("dia_basis", "none")
     if dia_basis not in ("none", "sd"):
         raise ValueError(F"dia_basis must be 'none' or 'sd', got {dia_basis!r}")
