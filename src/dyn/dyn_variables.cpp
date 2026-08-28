@@ -36,6 +36,7 @@ void dyn_variables::allocate_electronic_vars(){
     ave_decoherence_rates = new MATRIX(nadi, nadi);
     proj_adi = vector<CMATRIX*>(ntraj);
     ld_frame = vector<CMATRIX*>(ntraj);
+    ld_frame_stale = 1;   // the init-call rotation must run
     dm_dia = vector<CMATRIX*>(ntraj);
     dm_adi = vector<CMATRIX*>(ntraj);
     basis_transform = vector<CMATRIX*>(ntraj);
@@ -423,6 +424,7 @@ dyn_variables::dyn_variables(const dyn_variables& x){
     *q_mm = *x.q_mm;
     *p_mm = *x.p_mm;
     *ave_decoherence_rates = *x.ave_decoherence_rates;
+    ld_frame_stale = x.ld_frame_stale;
     for(itraj=0; itraj<ntraj; itraj++){
       *proj_adi[itraj] = *x.proj_adi[itraj];
       *ld_frame[itraj] = *x.ld_frame[itraj];

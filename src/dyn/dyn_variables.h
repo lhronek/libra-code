@@ -170,6 +170,13 @@ class dyn_variables{
   */
   vector<CMATRIX*> ld_frame;
 
+  /**
+    Nonzero when ham_adi or ld_frame changed since the last transform-4
+    rotation - the type-1 hook rotates only then. Any new mutator of
+    ham_adi or ld_frame under ham_transform_method == 4 must set it
+  */
+  int ld_frame_stale;
+
 
   /**
     Electronic density matrix in diabatic representation

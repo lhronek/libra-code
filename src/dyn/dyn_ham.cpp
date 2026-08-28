@@ -212,8 +212,11 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
       // step sees the rotated Hamiltonian
       ham.transform_adi2dia(1);
     } else if (prms.ham_transform_method == 4) {
-      // TO DO: Add adi->dia transformation according to local diabatization
-      // method
+      // the adi->dia local-diabatization rotation itself lives in the
+      // type-1 hook below (update_proj_adi refreshes the frame between
+      // the type-0 and the first type-1 call); ham_adi was just
+      // harvested - mark the frame rotation stale
+      dyn_var.ld_frame_stale = 1;
     }
 
     // Also add entanglement options - this is done in the adiabatic rep, so
@@ -277,11 +280,12 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
     // between the type-0 and the first type-1 call, so T_n and hence V
     // are fresh here (the type-0 dispatch would see the previous
     // step's frame); the Hvib update below consumes the rotated ham_dia
-    if (update_type == 1 && prms.ham_transform_method == 4) {
+    if (update_type == 1 && prms.ham_transform_method == 4 &&
+        dyn_var.ld_frame_stale) {
       // the frame accumulation lives in update_proj_adi (exactly once
-      // per step); this rotation is IDEMPOTENT - the loop makes several
-      // type-1 calls per step (post-half-step, post-rescaling) and each
-      // redoes the same product from the unchanged V and ham_adi
+      // per step); the loop makes several type-1 calls per step
+      // (post-half-step, post-rescaling) - the stale flag limits the
+      // rotation to the passes where V or ham_adi actually changed
       int nchildren = ham.children.size();
       for (int traj = 0; traj < nchildren; traj++) {
         nHamiltonian *ch = ham.children[traj];
@@ -321,6 +325,7 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
         *dyn_var.basis_transform[traj] =
             (*dyn_var.ld_frame[traj]).H();
       }
+      dyn_var.ld_frame_stale = 0;
     }
 
     // Derivative NAC correction option:
@@ -793,6 +798,7 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
       dyn_var.ld_frame[itraj]->product(*dyn_var.proj_adi[itraj],
                                        *dyn_var.ld_frame[itraj]);
     }
+    dyn_var.ld_frame_stale = 1;
   }
 
 } // reproject_basis
