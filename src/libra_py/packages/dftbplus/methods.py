@@ -2259,7 +2259,11 @@ def make_dftb_input(params, ground_state=True, working_directory="."):
     WriteAutotestTag = params.get("WriteAutotestTag", "Yes")
     WriteHS = params.get("WriteHS", "No")
     WriteEigenvectors = params.get("WriteEigenvectors", "Yes")
+    # EigenvectorsAsText is legal only under WriteEigenvectors = Yes -
+    # DFTB+ rejects the input otherwise, so the line is omitted
     EigenvectorsAsText = params.get("EigenvectorsAsText", "Yes")
+    eigtext_line = ("" if str(WriteEigenvectors).strip().lower() == "no"
+                    else F"  EigenvectorsAsText = {EigenvectorsAsText}\n")
     PrintForces = params.get("PrintForces", "Yes")
 
     # verbatim extra lines for the Hamiltonian block (e.g. SpinPolarisation
@@ -2310,8 +2314,7 @@ Options {{
 }}
 Analysis {{
   WriteEigenvectors = {WriteEigenvectors}
-  EigenvectorsAsText = {EigenvectorsAsText}
-  PrintForces = {PrintForces}
+{eigtext_line}  PrintForces = {PrintForces}
 }}
 """
 
@@ -2338,8 +2341,7 @@ Options {{
 }}
 Analysis {{
   WriteEigenvectors = {WriteEigenvectors}
-  EigenvectorsAsText = {EigenvectorsAsText}
-  PrintForces = {PrintForces}
+{eigtext_line}  PrintForces = {PrintForces}
 }}
 """
 
