@@ -3110,6 +3110,13 @@ def dftb_compute_adi(q, params, full_id):
                          "carries StateCouplings, which DFTB+ rejects "
                          "without a nonzero StateOfInterest)")
 
+    # the Niehaus writeAllExcitedForces parser rejects StateOfInterest
+    # together with StateCouplings (FRC.DAT replaces the single-state force
+    # channel) - once detected, the exclusion is remembered in the carried
+    # params so later steps skip the failing input outright
+    if params.get("_soi_excluded_by_couplings", False):
+        dftb_params.pop("StateOfInterest", None)
+
     #make_dftb_input(dftb_params)
     prms1 = {
         "labels": atom_labels,
@@ -3118,7 +3125,17 @@ def dftb_compute_adi(q, params, full_id):
         "working_directory": wd,
         "gen_file": dftb_run_params.get("gen_file", "x1.gen"),
     }
-    run_dftb(coordinates, prms1)
+    try:
+        run_dftb(coordinates, prms1)
+    except subprocess.CalledProcessError as e:
+        err = ((e.stderr or b"") + (e.output or b"")).decode(errors="replace")
+        if "StateOfInterest must not be set with StateCouplings" not in err:
+            raise
+        params["_soi_excluded_by_couplings"] = True
+        dftb_params.pop("StateOfInterest", None)
+        prms_retry = dict(prms1)
+        prms_retry["what_calculation"] = "ex"
+        run_dftb(coordinates, prms_retry)
 
     # ================= All-state forces =================
     # stock DFTB+ computes excited forces for ONE StateOfInterest per run -
