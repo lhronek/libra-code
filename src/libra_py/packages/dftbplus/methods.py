@@ -3237,6 +3237,11 @@ def dftb_compute_adi(q, params, full_id):
     else:
         align_ci_state_signs(st_ci, ci_adapter)
 
+    im_max = max(np.abs(np.imag(st_ci)).max(), np.abs(np.imag(s_ci)).max())
+    if im_max > 1e-8:
+        raise RuntimeError(F"dftb_compute_adi: complex CI overlaps (max |Im| = {im_max:.2e}) - "
+                           "the real-part ingestion below would discard them")
+
     # ================= Populate Hamiltonian =================
     for i in range(nstates):
         #energy = 0.0 if i == 0 else 0.5 * (
@@ -3249,8 +3254,8 @@ def dftb_compute_adi(q, params, full_id):
         obj.basis_transform.set(i, i, 1.0)
 
         for j in range(nstates):
-            obj.time_overlap_adi.set(i, j, float(st_ci[i, j]))
-            obj.overlap_adi.set(i,  j, float(s_ci[i,j]) )
+            obj.time_overlap_adi.set(i, j, float(st_ci[i, j].real))
+            obj.overlap_adi.set(i,  j, float(s_ci[i,j].real) )
 
     if dia_basis == "sd":
         # the SD basis is the DIABATIC basis: U[dia, adi] = <SD_i|state_j>,
