@@ -20,7 +20,7 @@
 """
 
 
-import os, sys, math, re, struct, copy, subprocess
+import os, sys, math, re, shutil, struct, copy, subprocess
 import numpy as np
 
 from liblibra_core import *
@@ -2254,7 +2254,10 @@ def make_dftb_input(params, ground_state=True, working_directory="."):
     WriteSPTransitions = params.get("WriteSPTransitions", "Yes")
     WriteXplusY = params.get("WriteXplusY", "Yes")
     WriteXplusYAscii = params.get("WriteXplusYAscii", "Yes")
+    # None omits the line (the per-state force reruns of force_source
+    # "all_states" have no couplings to recompute)
     StateCouplings = params.get("StateCouplings", "{0 2}")
+    coupl_line = "" if StateCouplings is None else F"       StateCouplings = {StateCouplings}\n"
 
     WriteAutotestTag = params.get("WriteAutotestTag", "Yes")
     WriteHS = params.get("WriteHS", "No")
@@ -2304,8 +2307,7 @@ ExcitedState {{
 {soi_line}       WriteSPTransitions = {WriteSPTransitions}
        WriteXplusY = {WriteXplusY}
        #WriteXplusYAscii = {WriteXplusYAscii}
-       StateCouplings = {StateCouplings}
-       Diagonaliser = Stratmann{{}}
+{coupl_line}       Diagonaliser = Stratmann{{}}
     }}
 }}
 Options {{
@@ -2973,6 +2975,16 @@ def dftb_compute_adi(q, params, full_id):
             (checked at every step).
         odin_max_ang_mom : dict, optional
             Maximum angular momentum per element for ODIN.
+        force_source : str, optional
+            "active_state" [default]: d1ham_adi diagonals carry gradients for
+            the ground and active states only (one excited-forces run).
+            "all_states": the excited calculation is rerun per remaining
+            state (SCC restarted from the converged charges, couplings and
+            spectroscopy outputs off) so EVERY diagonal carries its gradient
+            - required by the default Jasper-Truhlar reversal criterion and
+            the force-difference hop machinery (hop_acceptance_algo 21,
+            momenta_rescaling_algo 210/211), which read the proposed state's
+            force. Needs read_forces.
 
     full_id : int or object
         Encoded trajectory identifier (decoded to extract `itraj`).
@@ -3107,6 +3119,44 @@ def dftb_compute_adi(q, params, full_id):
         "gen_file": dftb_run_params.get("gen_file", "x1.gen"),
     }
     run_dftb(coordinates, prms1)
+
+    # ================= All-state forces =================
+    # stock DFTB+ computes excited forces for ONE StateOfInterest per run -
+    # "all_states" reruns the excited calculation per remaining state in a
+    # subdirectory (SCC restarted from the converged charges, couplings and
+    # spectroscopy outputs off) so every d1ham_adi diagonal gets its gradient
+    force_source = params.get("force_source", "active_state")
+    if force_source not in ("active_state", "all_states"):
+        raise ValueError(F"dftb_compute_adi: unknown force_source "
+                         F"'{force_source}' - use 'active_state' or "
+                         F"'all_states'")
+    forces_all = {}
+    if params.get("read_forces", False) and force_source == "all_states":
+        fs_wd = os.path.join(wd, "fstates")
+        os.makedirs(fs_wd, exist_ok=True)
+        shutil.copy(os.path.join(wd, "charges.bin"), fs_wd)
+        fs_params = dict(dftb_params)
+        fs_params.update({
+            "StateCouplings": None,
+            "WriteSPTransitions": "No",
+            "WriteXplusY": "No",
+            "WriteEigenvectors": "No",
+            "EigenvectorsAsText": "No",
+            "HamiltonianExtras": (lambda x: x + "\n" if x and not x.endswith("\n") else x)(
+                dftb_params.get("HamiltonianExtras", ""))
+            + "    ReadInitialCharges = Yes\n",
+        })
+        for s in range(1, dftb_run_params.get("NrOfExcitations", 1) + 1):
+            if s == dftb_params["StateOfInterest"]:
+                continue
+            fs_params["StateOfInterest"] = s
+            prms_s = dict(prms1)
+            prms_s.update({"dftb_run_params": fs_params,
+                           "working_directory": fs_wd,
+                           "what_calculation": "ex"})
+            run_dftb(coordinates, prms_s)
+            forces_all[s] = np.asarray(
+                parse_tagged_file(F"{fs_wd}/autotest.tag")["forces"])
 
     # ================= Previous coordinates =================
     if is_first_time:
@@ -3367,7 +3417,8 @@ def dftb_compute_adi(q, params, full_id):
         f_ex = np.asarray(results_ex["forces"]) if "forces" in results_ex else None
         soi_row = max(int(act_state), 1)
         global _warned_partial_forces
-        if not _warned_partial_forces:
+        if (not _warned_partial_forces and force_source != "all_states"
+                and params.get("read_forces", False)):
             _warned_partial_forces = True
             print(F"WARNING in dftb_compute_adi: no FRC.DAT - d1ham_adi "
                   F"carries gradients on rows 0 and {soi_row} only; "
@@ -3379,6 +3430,8 @@ def dftb_compute_adi(q, params, full_id):
                     obj.d1ham_adi[3 * iatom + k].set(0, 0, -f_gs[k, iatom] * (1.0 + 0.0j))
                 if f_ex is not None:
                     obj.d1ham_adi[3 * iatom + k].set(soi_row, soi_row, -f_ex[k, iatom] * (1.0 + 0.0j))
+                for s, f_s in forces_all.items():
+                    obj.d1ham_adi[3 * iatom + k].set(s, s, -f_s[k, iatom] * (1.0 + 0.0j))
 
     # ================= Derivative couplings ====================
     obj.dc1_adi = CMATRIXList()
