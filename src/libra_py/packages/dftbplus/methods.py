@@ -811,6 +811,49 @@ def dftb_traj2xyz_traj(in_filename, out_filename):
         f.write(res)
     f.close()
 
+def read_dftb_md_xyz_file(file_name, step):
+    """
+    Extracts one frame of a DFTB+ MD trajectory (geo_end.xyz): each atom
+    line carries "label x y z charge vx vy vz" with positions in Angstrom
+    and velocities in Angstrom/ps. Returns positions in Bohr and
+    velocities in atomic units. The file velocities are the ones to use
+    with a stochastic thermostat (Andersen re-selections make finite
+    differences of the positions inconsistent at collision frames).
+
+    Args:
+
+        file_name (string): The DFTB+ MD trajectory file name.
+        step (integer): The desired frame, starting from zero.
+
+    Returns:
+
+        (list, MATRIX(ndof, 1), MATRIX(ndof, 1)): labels of all atoms,
+            their positions (Bohr) and velocities (atomic units),
+            ndof = 3 * natoms
+
+    """
+
+    f = open(file_name, 'r')
+    lines = f.readlines()
+    f.close()
+
+    number_of_atoms = int(lines[0].split()[0])
+    q = MATRIX(3 * number_of_atoms, 1)
+    v = MATRIX(3 * number_of_atoms, 1)
+    n = number_of_atoms + 2
+    vel2au = units.Angst / (1000.0 * units.fs2au)  # Angstrom/ps -> a.u.
+
+    labels = []
+    for i in range(number_of_atoms):
+        tmp = lines[n * step + 2 + i].split()
+        labels.append(tmp[0])
+        for a in range(3):
+            q.set(3 * i + a, 0, float(tmp[1 + a]) * units.Angst)
+            v.set(3 * i + a, 0, float(tmp[5 + a]) * vel2au)
+
+    return labels, q, v
+
+
 def read_spx_mappings(filename):
     """
     Parse an SPX.DAT file and construct forward and reverse mappings
