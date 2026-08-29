@@ -785,11 +785,11 @@ def read_dftbplus_TRA_file(params):
 def dftb_traj2xyz_traj(in_filename, out_filename):
     """
     This is an auxiliary function to convert the DFTB+-generated extended xyz trajectory file
-    to a more coomon xyz trajectory file format
+    to a more common xyz trajectory file format
 
     Args:
         in_filename ( string ):  the name of the input file
-        out_filename ( string ):  the name of the putput file
+        out_filename ( string ):  the name of the output file
 
     Example:
         dftb_traj2xyz_traj("md.xyz", "md_reduced.xyz")
