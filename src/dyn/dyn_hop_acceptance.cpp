@@ -1101,6 +1101,23 @@ vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms){
         p_tr = p.col(traj);       
         for(dof = 0; dof<ndof; dof++){ vel.set(dof, 0,   p_tr.get(dof, 0) * invM.get(dof, 0) ); }
 
+        if(prms.use_Jasper_Truhlar_criterion==1){
+          // the criterion needs the PROPOSED state's force - a driver that
+          // fills only the ground and active diagonals leaves this row zero
+          // and the products below silently disable the reversal
+          int f_new_zero = 1;
+          for(idof = 0; idof < n_active_dof; idof++){
+            if(F_new.get(which_dofs[idof], 0) != 0.0){ f_new_zero = 0; break; }
+          }
+          static int warned_zero_f_new = 0;
+          if(f_new_zero==1 && warned_zero_f_new==0){
+            warned_zero_f_new = 1;
+            std::cout<<"WARNING in handle_hops_nuclear: the Jasper-Truhlar criterion sees an"
+                     <<" all-zero proposed-state force - reversal on frustrated hops stays off."
+                     <<" Supply all-state forces or set use_Jasper_Truhlar_criterion = 0\n";
+          }
+        }
+
         int do_reverse_actual = do_reverse;
         if(prms.use_Jasper_Truhlar_criterion==1){
           if( (F_old.T() * dNAC).get(0,0) * (F_new.T() * dNAC).get(0,0) < 0 ){
