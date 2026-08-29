@@ -2263,8 +2263,12 @@ def make_dftb_input(params, ground_state=True, working_directory="."):
     PrintForces = params.get("PrintForces", "Yes")
 
     # verbatim extra lines for the Hamiltonian block (e.g. SpinPolarisation
-    # and SpinConstants for open-shell runs); must be newline-terminated
+    # and SpinConstants for open-shell runs); a missing final newline is
+    # appended - without it the closing brace or an appended line lands on
+    # the last extras line and DFTB+ rejects the input
     HamiltonianExtras = params.get("HamiltonianExtras", "")
+    if HamiltonianExtras and not HamiltonianExtras.endswith("\n"):
+        HamiltonianExtras += "\n"
 
     Filling = params.get("Filling",
                          """Fermi {
