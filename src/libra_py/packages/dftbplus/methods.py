@@ -3131,7 +3131,11 @@ def dftb_compute_adi(q, params, full_id):
                          F"'{force_source}' - use 'active_state' or "
                          F"'all_states'")
     forces_all = {}
-    if params.get("read_forces", False) and force_source == "all_states":
+    if (params.get("read_forces", False) and force_source == "all_states"
+            and not os.path.exists(F"{wd}/FRC.DAT")):
+        # a Niehaus-branch DFTB+ (writeAllExcitedForces) already wrote every
+        # StateCouplings state's forces to FRC.DAT - the reruns would be
+        # redundant, the fill below consumes the file directly
         fs_wd = os.path.join(wd, "fstates")
         os.makedirs(fs_wd, exist_ok=True)
         shutil.copy(os.path.join(wd, "charges.bin"), fs_wd)
