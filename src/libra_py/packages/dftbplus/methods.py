@@ -3150,6 +3150,10 @@ def dftb_compute_adi(q, params, full_id):
             if s == dftb_params["StateOfInterest"]:
                 continue
             fs_params["StateOfInterest"] = s
+            # root s is the same variational solution whether or not the
+            # roots above it are converged - solving only s roots trims the
+            # dominant Casida cost of the rerun
+            fs_params["NrOfExcitations"] = s
             prms_s = dict(prms1)
             prms_s.update({"dftb_run_params": fs_params,
                            "working_directory": fs_wd,
