@@ -871,7 +871,10 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
 
         Hvib += Hvib_old;
 
-        exp_(A, Hvib_old, complex<double>(0.0, -0.5 * dt));
+        // the 2-point propagator exponentiates the SUM (dt/2 x the sum =
+        // dt x the midpoint average) - exponentiating Hvib_old advanced
+        // only half a step with the stale Hamiltonian
+        exp_(A, Hvib, complex<double>(0.0, -0.5 * dt));
         C.product(A, C);
 
         // dyn_var.proj_adi[itraj]->load_identity();
