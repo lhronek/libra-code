@@ -311,6 +311,36 @@ dyn_control_params::~dyn_control_params() {
 
 void dyn_control_params::sanity_check(){
 
+  /// hop acceptance/rescaling FAMILIES are representation-bound: the
+  /// dia-energy options (acceptance 11, rescaling 110/111) index ham_dia
+  /// with the DIABATIC hop states, every other option indexes adiabatic
+  /// quantities - crossing them with the other rep_sh mis-gaps every hop
+  /// (energy jumps by the dia-adi gap difference, silently non-conserving)
+  if(tsh_method >= 0){
+    int acc = hop_acceptance_algo;
+    int res = momenta_rescaling_algo;
+    int acc_dia = (acc==11);
+    int acc_adi = (acc==10 || acc==20 || acc==21 || acc==31 || acc==32 ||
+                   acc==33 || acc==40);
+    int res_dia = (res==110 || res==111);
+    int res_adi = (res==100 || res==101 || res==200 || res==201 ||
+                   res==210 || res==211 || res==40);
+    if(rep_sh==0 && (acc_adi || res_adi)){
+      std::cout<<"Error in dyn_control_params::sanity_check: rep_sh = 0 hops between"
+          <<" DIABATIC states, but hop_acceptance_algo = "<<acc
+          <<" / momenta_rescaling_algo = "<<res<<" read ADIABATIC quantities -"
+          <<" use the diabatic family (acceptance 0 or 11, rescaling 0, 110 or 111)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if(rep_sh==1 && (acc_dia || res_dia)){
+      std::cout<<"Error in dyn_control_params::sanity_check: rep_sh = 1 hops between"
+          <<" ADIABATIC states, but hop_acceptance_algo = "<<acc
+          <<" / momenta_rescaling_algo = "<<res<<" read DIABATIC energies -"
+          <<" use the adiabatic family (e.g. acceptance 10/20/21, rescaling 100/101/200/201/210/211)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+  }
+
   if(!(lz_target_space==0 || lz_target_space==1)){
     std::cout<<"Error in dyn_control_params::sanity_check: lz_target_space = "
         <<lz_target_space<<" is not allowed (0 - energy-adjacent only, 1 - all pairs)\n";
