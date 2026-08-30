@@ -2471,7 +2471,7 @@ def run_step3_sd_nacs_libint(params):
             * **params['isUKS']** (integer): if this value is set to `1`, the unrestricted spin calculations are considered.
             * **params['logfile_directory']** (string): the full path to logfile directory
             * **params['es_software']** (string): software name - values that it can take are 'cp2k', 'gaussian', and 'dftb+'
-            * **params['tolerance']** (float): a value to select SDs that the square value of their CI is more than tolerance
+            * **params['ci_threshold']** (float): a value to select SDs that the square value of their CI is more than ci_threshold
             * **params['number_of_states']** (integer): the number of TD-DFT excited states to be considered
             * **params['homo_index']** (integer): the HOMO index specified by user (starts from 1)
             * **params['num_occ_states']** (integer): the number of occupied states to be considered for single-particle basis. (isUKS=False)

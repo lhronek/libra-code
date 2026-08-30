@@ -55,14 +55,17 @@ def read_gaussian_tddft_log_file(params):
     # Critical parmeters
     critical_params = ["logfile_name"]
     # Default parameters
-    default_params = {"tolerance": 0.05, "number_of_states": 5, "isUKS": 0}
+    default_params = {"ci_threshold": 0.05, "number_of_states": 5, "isUKS": 0}
     # Check input
     comn.check_input(params, default_params, critical_params)
 
     # Gaussian log file name
     gaussian_log_file_name = params["logfile_name"]
     # tolerance factor
-    tolerance = params["tolerance"]
+    if "tolerance" in params:
+        raise ValueError('tolerance was unified into "ci_threshold" (the same '
+                         "|C|^2 cut) - rename the key, the value is unchanged")
+    tolerance = params["ci_threshold"]
     # The unrestricted spin calculations flag
     isUKS = params["isUKS"]
     # The number of states

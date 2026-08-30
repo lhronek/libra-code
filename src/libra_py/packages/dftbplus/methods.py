@@ -719,13 +719,16 @@ def read_dftbplus_TRA_file(params):
     # Critical parameters
     critical_params = ["logfile_name", "number_of_states"]
     # Default parameters
-    default_params = {"tolerance": 0.001, "isUKS": 0}
+    default_params = {"ci_threshold": 0.001, "isUKS": 0}
     # Check input
     comn.check_input(params, default_params, critical_params)
 
     logfile_name = params["logfile_name"]
     number_of_states = int(params["number_of_states"])
-    tolerance = float(params["tolerance"])
+    if "tolerance" in params:
+        raise ValueError('tolerance was unified into "ci_threshold" (the same '
+                         "|C|^2 cut) - rename the key, the value is unchanged")
+    tolerance = float(params["ci_threshold"])
     isUKS = int(params["isUKS"])
 
     f = open(logfile_name, 'r')
@@ -2574,8 +2577,8 @@ def read_dftb_orbital_info(params_):
             this function reads at most (nstates - 1) excited states.
 
         ci_threshold : float, optional, default=0.0
-            Defines the minimial magnitude of CI amplitudes to be included in
-            definition of TD-DFT excited states
+            Only configurations with |C|^2 > ci_threshold enter the
+            TD-DFT excited states
 
     Returns
     -------
@@ -2667,6 +2670,9 @@ def read_dftb_orbital_info(params_):
     nstates = params.get("nstates", 2)
     orbital_space = params.get("orbital_space", None)
     wd = params.get("source_directory", "calc")
+    if "tolerance" in params:
+        raise ValueError('tolerance was unified into "ci_threshold" (the same '
+                         "|C|^2 cut) - rename the key, the value is unchanged")
     ci_threshold = params.get("ci_threshold", 0.0)
 
     # ================= SPX: excitation mappings =================
@@ -2751,7 +2757,7 @@ def read_dftb_orbital_info(params_):
         conf_arr = np.array(all_confs, dtype=int)           # shape (nconf, 2)
 
         # Find important configurations
-        mask = np.abs(vec) > ci_threshold
+        mask = vec ** 2 > ci_threshold
 
         filtered_vec = vec[mask]
         filtered_confs = conf_arr[mask]
@@ -2954,9 +2960,9 @@ def dftb_compute_adi(q, params, full_id):
             Previous CI data per trajectory (updated in-place).
         coordinates_prev : dict
             Previous nuclear coordinates per trajectory (updated in-place).
-        ci_threshold : float, default=0.001
-            Threshold for CI truncation (the cp2k-driver default - the
-            drivers share the keyword and its meaning).
+        ci_threshold : float, default=1e-6
+            CI truncation, |C|^2 > ci_threshold (the drivers share the
+            keyword and its meaning).
         dia_basis : str, default="none"
             "none" or "sd". With "sd" the fixed single-particle SD basis of
             the FULL active orbital window (o-major enumeration; requires a
@@ -3040,6 +3046,9 @@ def dftb_compute_adi(q, params, full_id):
     >>> print(obj.ham_adi)
     >>> print(obj.dc1_adi[0])
     """
+    if "tolerance" in params:
+        raise ValueError('tolerance was unified into "ci_threshold" (the same '
+                         "|C|^2 cut) - rename the key, the value is unchanged")
     # ================= Decode trajectory index =================
     Id = Cpp2Py(full_id)
     itraj = Id[-1]
@@ -3220,7 +3229,7 @@ def dftb_compute_adi(q, params, full_id):
         "nstates": nstates,
         "orbital_space": params["orbital_space"],
         "source_directory": wd,
-        "ci_threshold": params.get("ci_threshold", 0.001),
+        "ci_threshold": params.get("ci_threshold", 1e-6),
     }
 
     info, MO_curr, data_curr = read_dftb_orbital_info(read_params)

@@ -64,7 +64,7 @@ def get_step2_mb_sp_properties(_params):
             params["es_software"] (string): software used for calculations. Options: "cp2k", "dftb+" [default: "cp2k"]
             params["isUKS"] (int): 0 for spin-unpolarized, 1 for spin-polarized [ default: 0]
             params["number_of_states"] (int): number of ci states to extract [ default: 1]
-            params["tolerance"] (float): cutoff for SD contribution [default: 0.01]
+            params["ci_threshold"] (float): cutoff for SD contribution [default: 0.01]
             params["isnap"] (int): file index to start reading from [default: 0]
             params["fsnap"] (int): file index to stop  reading from [default: 1]
 
@@ -89,7 +89,7 @@ def get_step2_mb_sp_properties(_params):
     # Default parameters
     default_params = {"orbital_indices": [0], "logfile_directory": "all_logfiles",
                       "es_software": "cp2k", "isUKS": 0, "number_of_states": 1,
-                      "tolerance": 0.01, "isnap": 0, "fsnap": 1}
+                      "ci_threshold": 0.01, "isnap": 0, "fsnap": 1}
     # Check input
     comn.check_input(params, default_params, critical_params)
 
@@ -527,7 +527,7 @@ def run(_params):
                       "hvib_data_im_prefix": "E_ks_", "hvib_data_im_suffix": "_im",
                       "isnap": 0, "fsnap": 1,
                       "data_dim": 1, "active_space": [0], "orbital_indices": [0], "homo_index": 0,
-                      "es_software": "dftb+", "isUKS": 0, "tolerance": 0.01, "number_of_states": 1,
+                      "es_software": "dftb+", "isUKS": 0, "ci_threshold": 0.01, "number_of_states": 1,
                       "orbital_normalization": False, "orbital_phase_correction": False,
                       "state_normalization": True, "state_phase_correction": True,
                       "do_state_reordering": 2, "state_reordering_alpha": 0,

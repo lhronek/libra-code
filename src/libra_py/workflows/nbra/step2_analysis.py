@@ -153,7 +153,7 @@ def get_step2_mb_sp_properties(params):
             * **params["es_software"]**       (string) - "cp2k" or "dftb+", etc
             * **params["isUKS"]**             (int)    - 0 for spin-unpolarized, 1 for spin-polarized
             * **params["number_of_states"]**  (int)    - number of ci states to extract
-            * **params["tolerance"]**         (float)  - cutoff for SD contribution
+            * **params["ci_threshold"]**         (float)  - cutoff for SD contribution
             * **params["start_time"]**        (int)    - file index to start reading from
             * **params["finish_time"]**       (int)    - file index to stop  reading from
 
@@ -173,7 +173,7 @@ def get_step2_mb_sp_properties(params):
     """
 
     critical_params = ["logfile_directory", "es_software", "number_of_states", "start_time", "finish_time"]
-    default_params = {"isUKS": 0, "tolerance": 0.01}
+    default_params = {"isUKS": 0, "ci_threshold": 0.01}
     comn.check_input(params, default_params, critical_params)
 
     start_time = params["start_time"]

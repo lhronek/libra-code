@@ -219,7 +219,7 @@ def read_cp2k_tddfpt_log_file(params):
 
     Only configurations with coefficient magnitude satisfying:
 
-        |C_{i→a}|^2 > tolerance
+        |C_{i→a}|^2 > ci_threshold
 
     are retained.
 
@@ -238,8 +238,8 @@ def read_cp2k_tddfpt_log_file(params):
 
             ci_threshold (float, optional):
                 Threshold for filtering CI coefficients.
-                Only configurations with |C|^2 > tolerance are kept.
-                Default: 0.001
+                Only configurations with |C|^2 > ci_threshold are kept.
+                Default: 1e-6
 
             isUKS (bool or int, optional):
                 Flag indicating whether the calculation is spin-polarized.
@@ -342,9 +342,10 @@ def read_cp2k_tddfpt_log_file(params):
     # ===================== Parameters =====================
     logfile_name = params.get("logfile_name", "output.log")
     nstates_req = params.get("number_of_states", 1)
-    # "tolerance" is the legacy step3/step2_analysis spelling of this knob -
-    # without the fallback it is silently dead against this parser
-    tol = params.get("ci_threshold", params.get("tolerance", 0.001))
+    if "tolerance" in params:
+        raise ValueError('tolerance was unified into "ci_threshold" (the same '
+                         "|C|^2 cut) - rename the key, the value is unchanged")
+    tol = params.get("ci_threshold", 1e-6)
     isUKS = bool(params.get("isUKS", False))
     orbital_space = params.get("orbital_space", None)
 
@@ -546,13 +547,16 @@ def read_cp2k_tddfpt_log_file_old(params):
     # Critical parameters
     critical_params = ["logfile_name", "number_of_states"]
     # Default parameters
-    default_params = {"tolerance": 0.05, "isUKS": 0, "lowest_orbital": 1, "highest_orbital": int(1e10)}
+    default_params = {"ci_threshold": 0.05, "isUKS": 0, "lowest_orbital": 1, "highest_orbital": int(1e10)}
     # Check input
     comn.check_input(params, default_params, critical_params)
 
     logfile_name = params["logfile_name"]
     number_of_states = int(params["number_of_states"])
-    tolerance = float(params["tolerance"])
+    if "tolerance" in params:
+        raise ValueError('tolerance was unified into "ci_threshold" (the same '
+                         "|C|^2 cut) - rename the key, the value is unchanged")
+    tolerance = float(params["ci_threshold"])
     isUKS = int(params["isUKS"])
 
     f = open(logfile_name, 'r')
@@ -2357,7 +2361,7 @@ def exc_analysis(params):
     # Critical parameters
     critical_params = ["path_to_logfiles", "number_of_states"]
     # Default parameters
-    default_params = {"isUKS": 0, "tolerance": 0.01, "nsds": 2}
+    default_params = {"isUKS": 0, "ci_threshold": 0.01, "nsds": 2}
     # Check input
     comn.check_input(params, default_params, critical_params)
 
@@ -3886,16 +3890,14 @@ def align_mo_phases(C_prev_aligned, data_curr, St_mo):
 # ========================= TDDFPT CI data ==================================
 
 
-def read_ci_data(logfile, nstates, tolerance=0.01, lowest_orbital=1, highest_orbital=int(1e10),
+def read_ci_data(logfile, nstates, ci_threshold=0.01, lowest_orbital=1, highest_orbital=int(1e10),
                  isUKS=False):
     """
     Parse TDDFPT excitation energies + CI expansions from a CP2K log.
 
-    Thin wrapper around read_cp2k_tddfpt_log_file (master format). NOTE the
-    tolerance semantics: the underlying parser retains configs by
-    |C|^2 > tolerance (SQUARED - 0.01 keeps |C| > 0.1), unlike the
-    namd_print route's ci_threshold, which cuts linearly on |C|; the log
-    itself only prints |C| >= 5e-2, the floor of any log-based read.
+    Thin wrapper around read_cp2k_tddfpt_log_file (master format). The cut
+    retains configs by |C|^2 > ci_threshold; the log itself only prints
+    |C| >= 5e-2, the floor of any log-based read.
 
     Returns:
         dict: E (np.ndarray nexc, Hartree), configs (list per state of [occ, vir]
@@ -3915,7 +3917,7 @@ def read_ci_data(logfile, nstates, tolerance=0.01, lowest_orbital=1, highest_orb
     all amplitudes/energies are fine) - prefer the NAMD_PRINT vectors for UKS.
     """
     pp = {"logfile_name": logfile, "number_of_states": nstates,
-          "tolerance": tolerance, "ci_threshold": tolerance,   # master / devel keyword
+          "ci_threshold": ci_threshold,
           "isUKS": bool(isUKS), "lowest_orbital": lowest_orbital, "highest_orbital": highest_orbital}
     out = read_cp2k_tddfpt_log_file(pp)
     if len(out) == 2:
@@ -4469,7 +4471,7 @@ def load_wfn_mo_data(filename):
     return out
 
 
-def ci_data_from_newtonx(newtonx, omegas_Ha, ci_threshold=0.001,
+def ci_data_from_newtonx(newtonx, omegas_Ha, ci_threshold=1e-6,
                          occ_min=None, vir_max=None):
     """
     Convert NAMD_PRINT excitation matrices into the read_ci_data dict layout
@@ -4483,8 +4485,8 @@ def ci_data_from_newtonx(newtonx, omegas_Ha, ci_threshold=0.001,
     Args:
         newtonx: read_cp2k_newtonx_output result
         omegas_Ha (array): excitation energies, Hartree (from the log table)
-        ci_threshold: |amplitude| cutoff (applied to the exact vectors;
-            linear - unlike the log parser's squared cut)
+        ci_threshold: weight cutoff |C|^2 > ci_threshold, applied to
+            the exact vectors
         occ_min, vir_max: clip configs to the MO window [occ_min, vir_max]
             (absolute 1-based; out-of-window amplitudes are dropped before
             renormalization - they cannot be represented in the windowed
@@ -4504,7 +4506,7 @@ def ci_data_from_newtonx(newtonx, omegas_Ha, ci_threshold=0.001,
         for Mc, tag in channels:
             nvirt, nocc = Mc.shape
             total2 += float(np.sum(Mc ** 2))
-            sel = np.argwhere(np.abs(Mc) > ci_threshold)
+            sel = np.argwhere(Mc ** 2 > ci_threshold)
             if occ_min is not None:
                 sel = sel[sel[:, 1] + 1 >= occ_min]
             if vir_max is not None:
@@ -4590,8 +4592,8 @@ def cp2k_compute_adi_nbra(q, params, full_id):
         dt : float, default=41.0
             Nuclear time step (atomic units).
 
-        ci_threshold : float, default=1e-3
-            Threshold for CI coefficient truncation.
+        ci_threshold : float, default=1e-6
+            CI truncation, |C|^2 > ci_threshold.
 
         nelec_act_space : int, optional
             Number of electrons in the active space. If not provided,
@@ -4748,7 +4750,7 @@ def cp2k_compute_adi_nbra(q, params, full_id):
     read_params = {
         "number_of_states": nstates,
         "logfile_name": logfile_name,
-        "ci_threshold": params.get("ci_threshold", 0.001),
+        "ci_threshold": params.get("ci_threshold", 1e-6),
         "isUKS": False,
     }
 
@@ -4964,9 +4966,9 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     sequence) corresponds to the DYNAMICS-level
                     dyn_params["do_phase_correction"], NOT to this flag;
                     step3's do_state_reordering corresponds to the dynamics
-                    dyn_params["state_tracking_algo"]; step3's tolerance
-                    corresponds to ci_threshold here (driver-family name,
-                    shared with dftb_compute_adi and cp2k_compute_adi_nbra)
+                    dyn_params["state_tracking_algo"]; step3's ci_threshold
+                    is the same keyword here (unified weight cut, shared
+                    with dftb_compute_adi and cp2k_compute_adi_nbra)
                 time_dependent (bool): True (default) = TDDFPT CI states with
                     per-state forces. False = ground-state-only mode: states are
                     the fixed KS-SD basis, energies E_gs + orbital gaps, GS
@@ -5068,12 +5070,10 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     poisons st_ci and the driver raises; widen
                     num_occ_states/num_unocc_states (and the MO window) or
                     reduce nstates to satisfy the contract    [default 0.5]
-                ci_threshold (float): config retention cut. Route-split
-                    semantics (legacy): |amp| > ci_threshold on the
-                    namd_print route (linear, exact vectors) but
-                    |amp|^2 > ci_threshold on the log route (squared -
-                    0.01 keeps |amp| > 0.1; the log prints only
-                    |amp| >= 5e-2 anyway)                    [default 0.001]
+                ci_threshold (float): config retention cut,
+                    |amp|^2 > ci_threshold on every route (the log route
+                    additionally sits on the 5e-2 print floor)
+                                                             [default 1e-6]
                 act_state (dict itraj->int): synced by run_dynamics each step
                 working_directory_prefix (str)                   [default "wd"]
                 cp2k_data_dir, omp_num_threads, mpi_executable, nprocs,
@@ -5098,6 +5098,9 @@ def cp2k_compute_adi_impl(q, params, full_id):
         -force at the active-state diagonal), dc1_adi (zeros - CP2K TDDFPT has
         no NACVs; use energy-based hop acceptance/rescaling).
     """
+    if "tolerance" in params:
+        raise ValueError('tolerance was unified into "ci_threshold" (the same '
+                         "|C|^2 cut) - rename the key, the value is unchanged")
     # ---------------- trajectory index and coordinates ----------------
     Id = Cpp2Py(full_id)
     itraj = Id[-1]
@@ -5119,7 +5122,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
     LO = int(params["lowest_orbital"])
     HI = int(params["highest_orbital"])
     backend = params.get("overlap_backend", "sd")
-    ci_threshold = params.get("ci_threshold", 0.001)
+    ci_threshold = params.get("ci_threshold", 1e-6)
     force_source = params.get("force_source", "active_state")
     if force_source not in ("active_state", "all_states", "gs", "none"):
         raise ValueError(F"force_source must be 'active_state', 'all_states', 'gs' or 'none', "
