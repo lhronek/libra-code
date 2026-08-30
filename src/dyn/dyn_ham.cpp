@@ -520,6 +520,24 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
 
     //========================== Vibronic Hamiltonian
     //===============================
+    // a diabatic vibronic supply has consumers only under the adi->dia
+    // transforms (consumed as-is at hvib_update_method 0, validated against
+    // the rebuild at 1) - anywhere else on the adiabatic-native route it
+    // would sit ingested and unread
+    if (prms.ham_update_method == 2 && prms.ham_transform_method != 3 &&
+        prms.ham_transform_method != 4) {
+      int ntraj_h = ham.children.size();
+      for (int traj = 0; traj < ntraj_h; traj++) {
+        if (ham.children[traj]->hvib_dia_supplied) {
+          cout << "Error in update_Hamiltonian_variables(): the model supplies "
+                  "obj.hvib_dia, but with ham_update_method = 2 and no adi->dia "
+                  "transform (ham_transform_method 3 or 4) nothing consumes it - "
+                  "the supplied vibronic Hamiltonian would be silently unused. "
+                  "Use ham_transform_method = 3, or drop the attribute\n";
+          std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+        }
+      }
+    }
     // Don't update Hvib - perhaps because they are read from files in step 1
     if (prms.hvib_update_method == 0) {
       // the supplied/precomputed data covers the ADI side only; under
