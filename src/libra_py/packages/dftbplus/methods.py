@@ -2954,8 +2954,9 @@ def dftb_compute_adi(q, params, full_id):
             Previous CI data per trajectory (updated in-place).
         coordinates_prev : dict
             Previous nuclear coordinates per trajectory (updated in-place).
-        ci_threshold : float, default=0.01
-            Threshold for CI truncation.
+        ci_threshold : float, default=0.001
+            Threshold for CI truncation (the cp2k-driver default - the
+            drivers share the keyword and its meaning).
         dia_basis : str, default="none"
             "none" or "sd". With "sd" the fixed single-particle SD basis of
             the FULL active orbital window (o-major enumeration; requires a
@@ -3219,7 +3220,7 @@ def dftb_compute_adi(q, params, full_id):
         "nstates": nstates,
         "orbital_space": params["orbital_space"],
         "source_directory": wd,
-        "ci_threshold": params.get("ci_threshold", 0.01),
+        "ci_threshold": params.get("ci_threshold", 0.001),
     }
 
     info, MO_curr, data_curr = read_dftb_orbital_info(read_params)
