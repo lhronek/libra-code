@@ -261,23 +261,22 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
       *time_overlap_dia = extract<CMATRIX>(obj.attr("time_overlap_dia"));    
     }
 
-    // attributes of the OTHER representation are silently dropped by this
-    // harvest - say so once
+    // attributes of the OTHER representation are NOT read by this harvest -
+    // silently dropping a supplied channel hides wrong models (basis_transform
+    // is dual-harvested and exempt), so fail loud instead
     {
-      static bool warned_adi_ignored = false;
-      if(!warned_adi_ignored){
-        const char* adi_names[] = {"ham_adi", "hvib_adi", "nac_adi",
-                                   "time_overlap_adi",
-                                   "dc1_adi", "d1ham_adi", "d2ham_adi",
-                                   "gs_kinetic_energy"};
-        for(int a=0;a<8;a++){
-          if((int)hasattr(obj, adi_names[a])){
-            cout<<"WARNING in compute_diabatic(): the model supplies obj."
-                <<adi_names[a]<<", which the diabatic harvest"
-                <<" (ham_update_method = 1) IGNORES - adiabatic attributes are"
-                <<" ingested only under ham_update_method = 2\n";
-            warned_adi_ignored = true;
-          }
+      const char* adi_names[] = {"ham_adi", "hvib_adi", "nac_adi",
+                                 "time_overlap_adi",
+                                 "dc1_adi", "d1ham_adi", "d2ham_adi",
+                                 "gs_kinetic_energy"};
+      for(int a=0;a<8;a++){
+        if((int)hasattr(obj, adi_names[a])){
+          cout<<"Error in compute_diabatic(): the model supplies obj."
+              <<adi_names[a]<<", which the diabatic harvest"
+              <<" (ham_update_method = 1) does not read - the supplied data"
+              <<" would be silently dropped. Use ham_update_method = 2"
+              <<" (adiabatic-native harvest) or drop the attribute\n";
+          std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
       }
     }

@@ -930,23 +930,24 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       gs_kinetic_energy = extract<double>(obj.attr("gs_kinetic_energy"));
     }
 
-    // attributes of the OTHER representation are silently dropped by this
-    // harvest - say so once (ham_dia and ovlp_dia are the exceptions,
-    // harvested above for the crossing detectors)
+    // attributes of the OTHER representation are NOT read by this harvest -
+    // silently dropping a supplied channel hides wrong models (ham_dia and
+    // ovlp_dia are exempt, harvested above for the crossing detectors;
+    // basis_transform is dual-harvested), so fail loud instead
     {
-      static bool warned_dia_ignored = false;
-      if (!warned_dia_ignored) {
-        const char* dia_names[] = {"nac_dia", "hvib_dia", "dc1_dia",
-                                   "d1ham_dia", "d2ham_dia",
-                                   "time_overlap_dia"};
-        for (int a = 0; a < 6; a++) {
-          if ((int)hasattr(obj, dia_names[a])) {
-            cout << "WARNING in compute_adiabatic(): the model supplies obj."
-                 << dia_names[a] << ", which the adiabatic harvest"
-                 << " (ham_update_method = 2) IGNORES - diabatic attributes are"
-                 << " ingested only under ham_update_method = 1\n";
-            warned_dia_ignored = true;
-          }
+      // hvib_dia is NOT in this list - the supplied-hvib workflows ingest
+      // it on this harvest (dia_basis_hvib and the transform-3 route)
+      const char* dia_names[] = {"nac_dia", "dc1_dia",
+                                 "d1ham_dia", "d2ham_dia",
+                                 "time_overlap_dia"};
+      for (int a = 0; a < 5; a++) {
+        if ((int)hasattr(obj, dia_names[a])) {
+          cout << "Error in compute_adiabatic(): the model supplies obj."
+               << dia_names[a] << ", which the adiabatic harvest"
+               << " (ham_update_method = 2) does not read - the supplied data"
+               << " would be silently dropped. Use ham_update_method = 1"
+               << " (diabatic harvest) or drop the attribute\n";
+          std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
       }
     }
