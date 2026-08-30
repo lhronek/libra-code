@@ -3880,7 +3880,10 @@ def read_ci_data(logfile, nstates, tolerance=0.01, lowest_orbital=1, highest_orb
               ABSOLUTE 1-based orbital pairs, per spin channel), amps (list per
               state of np.ndarray, NORMALIZED after tolerance truncation),
               spins (list per state, 'alp'/'bet' - beta appears for isUKS logs,
-              whose excitation analysis labels every config with its spin)
+              whose excitation analysis labels every config with its spin),
+              window_drops (np.ndarray nexc, the CI weight each state loses to
+              the [lowest_orbital, highest_orbital] clip relative to the parsed
+              vector - the renormalization below hides it from any later norm)
 
     UKS caveat: the CP2K analysis print (2026.1-dev) decodes the alpha-channel
     flat indices with the beta-channel dimensions, so the alpha [occ, vir]
@@ -3911,18 +3914,25 @@ def read_ci_data(logfile, nstates, tolerance=0.01, lowest_orbital=1, highest_orb
     # amplitudes cannot be represented in the windowed overlap machinery)
     lo_w, hi_w = int(lowest_orbital), int(highest_orbital)
     amps = []
+    drops = np.zeros(len(basis))
     for k in range(len(basis)):
         keep = [j for j, c in enumerate(basis[k])
                 if lo_w <= int(c[0]) and int(c[1]) <= hi_w]
         if not keep:
             raise ValueError(F"read_ci_data: state {k + 1} retains no configs "
                              F"inside orbitals [{lo_w}, {hi_w}] of {logfile}")
+        total2 = float(np.sum(np.asarray(coeff[k], dtype=float) ** 2))
         if len(keep) < len(basis[k]):
             basis[k] = [basis[k][j] for j in keep]
             spin[k] = [spin[k][j] for j in keep]
         a = np.array([coeff[k][j] for j in keep], dtype=float)
+        drops[k] = 1.0 - float(np.sum(a ** 2)) / total2
+        if drops[k] > 1e-6:
+            print(F"read_ci_data: state {k + 1}: dropped CI weight {drops[k]:.2e} to "
+                  F"the orbital window [{lo_w}, {hi_w}] (vector renormalized)")
         amps.append(a / np.linalg.norm(a))
-    return {"E": E, "configs": basis, "amps": amps, "spins": spin}
+    return {"E": E, "configs": basis, "amps": amps, "spins": spin,
+            "window_drops": drops}
 
 
 # ===================== Backend A: Slater determinants ======================
@@ -4450,14 +4460,21 @@ def ci_data_from_newtonx(newtonx, omegas_Ha, ci_threshold=0.001,
             (absolute 1-based; out-of-window amplitudes are dropped before
             renormalization - they cannot be represented in the windowed
             overlap machinery anyway)
+
+    The returned dict also carries window_drops (np.ndarray, per state): the
+    CI weight lost to the threshold + window clip relative to the full exact
+    vector - the renormalization hides it from any later norm.
     """
     configs, amps, spins = [], [], []
+    drops = np.zeros(len(newtonx["X"]))
     X_b = newtonx.get("X_b")
     for ist, M in enumerate(newtonx["X"]):
         channels = [(M, "alp")] + ([(X_b[ist], "bet")] if X_b is not None else [])
         conf, a, sp = [], [], []
+        total2 = 0.0
         for Mc, tag in channels:
             nvirt, nocc = Mc.shape
+            total2 += float(np.sum(Mc ** 2))
             sel = np.argwhere(np.abs(Mc) > ci_threshold)
             if occ_min is not None:
                 sel = sel[sel[:, 1] + 1 >= occ_min]
@@ -4470,12 +4487,18 @@ def ci_data_from_newtonx(newtonx, omegas_Ha, ci_threshold=0.001,
         if a.size == 0:
             raise ValueError(F"ci_data_from_newtonx: state {ist + 1} retains no "
                              F"configs above the threshold inside the window")
+        drops[ist] = 1.0 - float(np.sum(a ** 2)) / total2
+        if drops[ist] > 1e-6:
+            print(F"ci_data_from_newtonx: state {ist + 1}: dropped CI weight "
+                  F"{drops[ist]:.2e} to the threshold/MO-window clip "
+                  F"(vector renormalized)")
         a /= np.linalg.norm(a)
         configs.append(conf)
         amps.append(a)
         spins.append(sp)
     return {"E": np.asarray(omegas_Ha)[:len(configs)],
-            "configs": configs, "amps": amps, "spins": spins}
+            "configs": configs, "amps": amps, "spins": spins,
+            "window_drops": drops}
 
 
 class tmp:
@@ -5007,13 +5030,15 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     beyond it the renormalized T column is noise and the
                     driver raises; widen num_occ_states/num_unocc_states or
                     reduce nstates to satisfy the contract    [default 0.5]
-                sd_capture_max_drop (float): with overlap_backend="sd", the
-                    largest CI weight a PROPAGATED state may carry outside
-                    the SD basis the CI overlaps are built from (the sd2ci
-                    dropped weight, checked at every step) - beyond it the
-                    renormalized column poisons st_ci and the driver raises;
-                    widen num_occ_states/num_unocc_states or reduce nstates
-                    to satisfy the contract                   [default 0.5]
+                sd_capture_max_drop (float): the largest total CI weight a
+                    PROPAGATED state may lose to the truncation chain the CI
+                    overlaps are built from (the read-stage threshold/
+                    MO-window clip combined with the sd2ci dropped weight;
+                    read-stage only for overlap_backend="citools"; checked
+                    at every step) - beyond it the renormalized state
+                    poisons st_ci and the driver raises; widen
+                    num_occ_states/num_unocc_states (and the MO window) or
+                    reduce nstates to satisfy the contract    [default 0.5]
                 ci_threshold (float): amplitude truncation       [default 0.001]
                 act_state (dict itraj->int): synced by run_dynamics each step
                 working_directory_prefix (str)                   [default "wd"]
@@ -5360,6 +5385,12 @@ def cp2k_compute_adi_impl(q, params, full_id):
                                    cache=sd_cache)
             T_prev, _ = sd2ci_matrix(ci_prev, sd_unique, LO)
             T_curr, ci_drops = sd2ci_matrix(ci_curr, sd_unique, LO)
+            # fold in the read-stage clip loss - the readers renormalize
+            # after the threshold/MO-window cut, so sd2ci alone undercounts
+            rd = ci_curr.get("window_drops")
+            if rd is not None:
+                n = min(len(rd), len(ci_drops) - 1)
+                ci_drops[1:1 + n] = 1.0 - (1.0 - ci_drops[1:1 + n]) * (1.0 - rd[:n])
             # every propagated state's overlaps are built from its window
             # remnant - a mostly-dropped state yields well-formed but
             # meaningless couplings, so fail here rather than propagate them
@@ -5378,6 +5409,12 @@ def cp2k_compute_adi_impl(q, params, full_id):
                 raise ValueError('overlap_backend="citools" builds spin-adapted '
                                  'singlet CSFs - restricted-only; use '
                                  'overlap_backend="sd" for UKS')
+            # the CSF overlaps consume the read-clipped renormalized vectors -
+            # the read-stage loss is the whole capture metric on this backend
+            rd = ci_curr.get("window_drops")
+            if rd is not None:
+                check_sd_capture(np.concatenate(([0.0], rd)), nstates,
+                                 cap_max_drop, knob="sd_capture_max_drop")
             st_ci = ci_overlap_citools(St_mo, ci_prev, ci_curr, homo, LO, HI, nstates)
             align_ci_state_signs(st_ci, ci_curr)
         else:
