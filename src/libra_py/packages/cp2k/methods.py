@@ -3715,9 +3715,16 @@ def compute_state_energy_and_force(coords_bohr, params):
         E_gs = E_total
     else:
         info = read_cp2k_excited_state_info(logfile)
-        # prefer the 10-decimal omega from the excited-state block
-        omega_act = info["omega"] if info is not None else omegas[act_state - 1]
-        E_gs = E_total - omega_act
+        if info is not None:
+            # &EXCITED_STATES template: the FORCE_EVAL total includes the
+            # active state's omega (10-decimal in the excited-state block)
+            E_gs = E_total - info["omega"]
+        else:
+            # no Excited State Energy block (all_states / forces-free
+            # templates run the ground state): the total IS E_gs -
+            # subtracting omegas[act_state-1] here shifted every diagonal
+            # by the geometry-dependent omega_act
+            E_gs = E_total
 
     E_adi = np.concatenate(([E_gs], E_gs + omegas))
     return {"E_total": E_total, "E_gs": E_gs, "forces": forces,
