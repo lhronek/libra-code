@@ -3891,7 +3891,11 @@ def read_ci_data(logfile, nstates, tolerance=0.01, lowest_orbital=1, highest_orb
     """
     Parse TDDFPT excitation energies + CI expansions from a CP2K log.
 
-    Thin wrapper around read_cp2k_tddfpt_log_file (master format).
+    Thin wrapper around read_cp2k_tddfpt_log_file (master format). NOTE the
+    tolerance semantics: the underlying parser retains configs by
+    |C|^2 > tolerance (SQUARED - 0.01 keeps |C| > 0.1), unlike the
+    namd_print route's ci_threshold, which cuts linearly on |C|; the log
+    itself only prints |C| >= 5e-2, the floor of any log-based read.
 
     Returns:
         dict: E (np.ndarray nexc, Hartree), configs (list per state of [occ, vir]
@@ -4479,7 +4483,8 @@ def ci_data_from_newtonx(newtonx, omegas_Ha, ci_threshold=0.001,
     Args:
         newtonx: read_cp2k_newtonx_output result
         omegas_Ha (array): excitation energies, Hartree (from the log table)
-        ci_threshold: |amplitude| cutoff (applied to the exact vectors)
+        ci_threshold: |amplitude| cutoff (applied to the exact vectors;
+            linear - unlike the log parser's squared cut)
         occ_min, vir_max: clip configs to the MO window [occ_min, vir_max]
             (absolute 1-based; out-of-window amplitudes are dropped before
             renormalization - they cannot be represented in the windowed
@@ -5063,7 +5068,12 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     poisons st_ci and the driver raises; widen
                     num_occ_states/num_unocc_states (and the MO window) or
                     reduce nstates to satisfy the contract    [default 0.5]
-                ci_threshold (float): amplitude truncation       [default 0.001]
+                ci_threshold (float): config retention cut. Route-split
+                    semantics (legacy): |amp| > ci_threshold on the
+                    namd_print route (linear, exact vectors) but
+                    |amp|^2 > ci_threshold on the log route (squared -
+                    0.01 keeps |amp| > 0.1; the log prints only
+                    |amp| >= 5e-2 anyway)                    [default 0.001]
                 act_state (dict itraj->int): synced by run_dynamics each step
                 working_directory_prefix (str)                   [default "wd"]
                 cp2k_data_dir, omp_num_threads, mpi_executable, nprocs,
