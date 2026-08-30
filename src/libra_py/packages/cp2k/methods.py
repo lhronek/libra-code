@@ -342,7 +342,9 @@ def read_cp2k_tddfpt_log_file(params):
     # ===================== Parameters =====================
     logfile_name = params.get("logfile_name", "output.log")
     nstates_req = params.get("number_of_states", 1)
-    tol = params.get("ci_threshold", 0.001)
+    # "tolerance" is the legacy step3/step2_analysis spelling of this knob -
+    # without the fallback it is silently dead against this parser
+    tol = params.get("ci_threshold", params.get("tolerance", 0.001))
     isUKS = bool(params.get("isUKS", False))
     orbital_space = params.get("orbital_space", None)
 
