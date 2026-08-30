@@ -592,7 +592,12 @@ void update_time_overlaps(dyn_control_params &prms, dyn_variables &dyn_var,
 
     CMATRIX st(nadi, nadi);
     for (int traj = 0; traj < ntraj; traj++) {
+      // the adiabatic bra-ket runs through the diabatic metric: a static
+      // diabatic basis has <dia(t)|dia(t+dt)> = ovlp_dia (identity for
+      // orthonormal diabats); time-dependent diabats supply their own
+      // overlaps through time_overlap_method 0
       st = ham_prev.children[traj]->get_basis_transform().H() *
+           ham.children[traj]->get_ovlp_dia() *
            ham.children[traj]->get_basis_transform();
       // a model that supplies its own time-overlaps must not have them
       // silently overwritten by a DISAGREEING recomputation (identity

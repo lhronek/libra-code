@@ -260,8 +260,11 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params){
   // requested outputs ("D_dia")
   int skip_dia = (dyn_params.compute_dm_dia == 0) && (rep == 1 || rep == 3);
 
-  // Assuming that in the diabatic representation, the overlap 
-  // matrix is identity S = I
+  // dm_dia is the PLAIN-coefficient density C C^H and its diagonal the
+  // plain |C_i|^2 - exact populations for orthonormal diabats; with
+  // ovlp_dia != I the S-metric variants derive in post (Re diag(dm S)),
+  // and the dia->adi directions here (rep 0/2) assume S = I, guarded at
+  // setup (diabatic propagation/hopping raises for non-identity ovlp_dia)
   // Deterministic per-trajectory updates - parallel-safe (each iteration
   // writes only its own dm slots); results identical for any thread count
   // exceptions cannot leave an OMP-outlined region (even serialized) -
@@ -378,7 +381,7 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params, nHamil
   if(shared && !skip_dia){
     S = ham.get_ovlp_dia(indx);
     U = ham.get_basis_transform(indx);
-    if(rep == 1 || rep == 3){ su = S * U; }
+    su = S * U;
   }
 
   for(int traj=0; traj<ntraj; traj++){
@@ -388,31 +391,36 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params, nHamil
       if(lvl==1){  indx[1] = (traj < nchildren) ? traj : 0; }
       S = ham.get_ovlp_dia(indx);
       U = ham.get_basis_transform(indx);
-      if(rep == 1 || rep == 3){ su = S * U; }
+      su = S * U;
     }
 
     /// Diabatic wfc representation
+    // dm_dia is the PLAIN-coefficient density C C^H in every branch (its
+    // diagonal = |C_i|^2, exact populations for orthonormal diabats; the
+    // S-metric variants derive in post) - S enters only FUNCTIONALLY in
+    // the dia<->adi conversions: C_adi = (S U)^H C_dia, C_dia = U C_adi
     if(rep==0){
       cd = ampl_dia->col(traj);
-      *dm_dia[traj] = S * (cd * cd.H()) * S;
-      dm_adi[traj]->product(adjoint(U), *dm_dia[traj], U);
+      dm_dia[traj]->product(cd, adjoint(cd));
+      ca.product(adjoint(su), cd);
+      dm_adi[traj]->product(ca, adjoint(ca));
     }
     /// Adiabatic wfc representation
     else if(rep==1){
       ca = ampl_adi->col(traj);
       dm_adi[traj]->product(ca, adjoint(ca));
       if(!skip_dia){
-        *dm_dia[traj] =  su * (*dm_adi[traj]) * su.H();
+        dm_dia[traj]->product(U, *dm_adi[traj], adjoint(U));
       }
     }
     /// Diabatic DM representation
     else if(rep==2){
-      dm_adi[traj]->product(adjoint(U), *dm_dia[traj], U);
+      dm_adi[traj]->product(adjoint(su), *dm_dia[traj], su);
     }
     /// Adiabatic DM representation
     else if(rep==3){
       if(!skip_dia){
-        *dm_dia[traj] =  su * (*dm_adi[traj]) * su.H();
+        dm_dia[traj]->product(U, *dm_adi[traj], adjoint(U));
       }
     }
 

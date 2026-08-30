@@ -1737,7 +1737,7 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
         # orthonormal diabats) for the diabatic side to be meaningful.
         # the t0 amplitude conversion also needs the model's U when the
         # diabatic side is PROPAGATED (rep_tdse/rep_sh = 0 under transform 3)
-        dia_consumed = (dyn_params.get("rep_tdse", 1) == 0
+        dia_consumed = (dyn_params.get("rep_tdse", 1) in (0, 2)
                         or dyn_params.get("rep_sh", 1) == 0)
         if init_elec.get("rep", 1) == 0 or dia_consumed:
             update_Hamiltonian_variables(dyn_params1, dyn_var, ham, ham, compute_model, model_params1, 0)
@@ -1778,6 +1778,22 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
 
     #sys.exit(0)
 
+    # diabatic propagation/hopping and the per-step amplitude/density
+    # synchronization between the representations assume orthonormal
+    # diabats - fail loud instead of drifting on a non-identity metric
+    if (int(dyn_params.get("rep_tdse", 1)) in (0, 2)
+            or int(dyn_params.get("rep_sh", 1)) == 0):
+        S0 = ham.get_ovlp_dia(Py2Cpp_int([0, 0]))
+        s_dev = max(abs(S0.get(i, j) - (1.0 if i == j else 0.0))
+                    for i in range(S0.num_of_rows) for j in range(S0.num_of_cols))
+        if s_dev > 1e-8:
+            raise ValueError(F"rep_tdse = 0/2 and rep_sh = 0 run in the diabatic basis "
+                             F"assuming orthonormal diabats, but ovlp_dia deviates from "
+                             F"identity by {s_dev:.2e} - the per-step amplitude/density "
+                             F"synchronization between the representations does not carry "
+                             F"the S metric; use the adiabatic representations (fully "
+                             F"S-aware) or orthonormalize the diabatic basis")
+
     # Update internal dynamical variables using the computed properties of the Hamiltonian objects
     # Set up the "rep_tdse" variable here to the representation that coinsides with the initial representation
     # of electronic variables - this will convert the amplitudes to the proper representation
@@ -1786,9 +1802,9 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
     #sys.exit(0)
     if int(dyn_params["rep_tdse"]) in (2, 3) and int(init_elec.get("init_dm_type", 0)) == 0:
         # the density-matrix representations propagate the DM itself: seed the
-        # propagated side from the t0-synchronized amplitudes WITH the full
-        # S metric (init_density_matrix builds the bare C C^H, wrong for
-        # ovlp_dia != I)
+        # propagated side from the t0-synchronized amplitudes through the
+        # amplitude-representation branches (dm_dia is the plain-coefficient
+        # C C^H in every branch, S enters only the dia<->adi conversions)
         seed_prms = dict(dyn_params)
         seed_prms["rep_tdse"] = 0 if int(dyn_params["rep_tdse"]) == 2 else 1
         dyn_var.update_density_matrix(seed_prms, ham, 1)
