@@ -425,11 +425,13 @@ def read_cp2k_tddfpt_log_file(params):
     ci_basis = []
     ci_coefficients = []
     spin_components = []
+    read_drops = np.zeros(nci)
 
     for i in range(nci):
         tmp_basis = []
         tmp_coeffs = []
         tmp_spin = []
+        kept2 = 0.0
 
         for j in range(state_num_lines[i] + 1, state_num_lines[i + 1]):
             tokens = lines[j].split()
@@ -456,9 +458,19 @@ def read_cp2k_tddfpt_log_file(params):
                     tmp_basis.append([occ, vir])
                     tmp_coeffs.append(coeff)
                     tmp_spin.append(spin)
+                    kept2 += coeff ** 2
 
             except (IndexError, ValueError):
                 continue
+
+        # TDA/sTDA vectors are unit-norm, so 1 - kept2 is the exact CI weight
+        # this state loses to the log's 5e-2 print floor plus the tolerance
+        # cut - downstream normalization hides it from every later norm
+        read_drops[i] = max(0.0, 1.0 - kept2)
+        if read_drops[i] > 1e-6:
+            print(F"read_cp2k_tddfpt_log_file: state {i + 1}: dropped CI weight "
+                  F"{read_drops[i]:.2e} to the print floor + ci_threshold cut "
+                  F"(vs the TDA unit norm)")
 
         ci_basis.append(tmp_basis)
         ci_coefficients.append(tmp_coeffs)
@@ -491,6 +503,10 @@ def read_cp2k_tddfpt_log_file(params):
     }
 
     data = [excitation_energies[:nci], ci_basis, ci_coefficients, spin_components]
+
+    # capture metric for the callers - the returned coefficients are raw, but
+    # every consumer normalizes them, so the loss is only knowable here
+    params["ci_read_drops"] = read_drops
 
     return info, data
 
@@ -3883,19 +3899,21 @@ def read_ci_data(logfile, nstates, tolerance=0.01, lowest_orbital=1, highest_orb
               state of np.ndarray, NORMALIZED after tolerance truncation),
               spins (list per state, 'alp'/'bet' - beta appears for isUKS logs,
               whose excitation analysis labels every config with its spin),
-              window_drops (np.ndarray nexc, the CI weight each state loses to
-              the [lowest_orbital, highest_orbital] clip relative to the parsed
-              vector - the renormalization below hides it from any later norm)
+              window_drops (np.ndarray nexc, the TOTAL CI weight each state
+              loses to the read chain - the log's print floor, the tolerance
+              cut and the [lowest_orbital, highest_orbital] clip, composed
+              against the TDA unit norm - the renormalization below hides it
+              from any later norm)
 
     UKS caveat: the CP2K analysis print (2026.1-dev) decodes the alpha-channel
     flat indices with the beta-channel dimensions, so the alpha [occ, vir]
     labels come out corrupted whenever the channels differ (beta labels and
     all amplitudes/energies are fine) - prefer the NAMD_PRINT vectors for UKS.
     """
-    out = read_cp2k_tddfpt_log_file(
-        {"logfile_name": logfile, "number_of_states": nstates,
-         "tolerance": tolerance, "ci_threshold": tolerance,   # master / devel keyword
-         "isUKS": bool(isUKS), "lowest_orbital": lowest_orbital, "highest_orbital": highest_orbital})
+    pp = {"logfile_name": logfile, "number_of_states": nstates,
+          "tolerance": tolerance, "ci_threshold": tolerance,   # master / devel keyword
+          "isUKS": bool(isUKS), "lowest_orbital": lowest_orbital, "highest_orbital": highest_orbital}
+    out = read_cp2k_tddfpt_log_file(pp)
     if len(out) == 2:
         # devel branch: (info, [E_Ha, configs, amplitudes, spins])
         info, data = out
@@ -3933,6 +3951,10 @@ def read_ci_data(logfile, nstates, tolerance=0.01, lowest_orbital=1, highest_orb
             print(F"read_ci_data: state {k + 1}: dropped CI weight {drops[k]:.2e} to "
                   F"the orbital window [{lo_w}, {hi_w}] (vector renormalized)")
         amps.append(a / np.linalg.norm(a))
+    rd = pp.get("ci_read_drops")
+    if rd is not None:
+        n = min(len(rd), len(drops))
+        drops[:n] = 1.0 - (1.0 - rd[:n]) * (1.0 - drops[:n])
     return {"E": E, "configs": basis, "amps": amps, "spins": spin,
             "window_drops": drops}
 
