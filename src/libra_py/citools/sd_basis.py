@@ -94,6 +94,9 @@ def make_sd_basis(homo_w, num_occ_states, num_unocc_states, norb_w,
     return sd_unique, sd_states
 
 
+_severe_drop_warned = set()
+
+
 def sd2ci_matrix(ci_data, sd_unique, lowest_orbital):
     """
     SD -> CI transformation matrix T (nSD+1 x nstates+1) on the FIXED SD basis.
@@ -139,7 +142,21 @@ def sd2ci_matrix(ci_data, sd_unique, lowest_orbital):
                              f"increase num_occ_states/num_unocc_states (and the MO window)")
         dropped = max(0.0, 1.0 - nrm2)
         T[:, i + 1] /= np.sqrt(nrm2)
-        if dropped > 1e-6:
+        if dropped > 0.5:
+            # the state is MOSTLY outside the basis - the quiet one-liner
+            # below was easy to read past at 99% drops, and everything built
+            # from this column (overlaps, couplings) uses only the remnant
+            if (i + 1) not in _severe_drop_warned:
+                _severe_drop_warned.add(i + 1)
+                bar = "!" * 78
+                print(bar)
+                print(F"!!! WARNING sd2ci_matrix: CI state {i+1} lies MOSTLY OUTSIDE the SD basis")
+                print(F"!!! dropped CI weight = {dropped:.1%} - only {1.0 - dropped:.1%} of the state is")
+                print(F"!!! representable, and its overlaps and couplings are built from that")
+                print(F"!!! remnant. Widen num_occ_states/num_unocc_states (and the MO window).")
+                print(F"!!! Further occurrences for this state are muted.")
+                print(bar)
+        elif dropped > 1e-6:
             print(F"sd2ci_matrix: state {i+1}: dropped CI weight {dropped:.2e} "
                   F"outside the SD basis (column renormalized) - widen "
                   F"num_occ_states/num_unocc_states or the MO window to capture it")
