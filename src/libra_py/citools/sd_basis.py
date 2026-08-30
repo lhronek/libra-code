@@ -208,27 +208,28 @@ def align_ci_state_signs(st_ci, ci_curr, T_curr=None):
 
 
 
-def check_sd_capture(ci_drops, nstates, max_drop):
+def check_sd_capture(ci_drops, nstates, max_drop, knob="dia_basis_max_drop"):
     """
-    Enforce the SD-window capture contract of a diabatic (SD) basis: a
-    renormalized T column that lost most of its CI weight to the window
-    truncation is noise, and every propagated state feeds the diabatic
-    transform. Call at every step - the CI coefficients evolve along a
-    trajectory, so a window adequate at t = 0 can degrade.
+    Enforce the SD-window capture contract: a renormalized T column that
+    lost most of its CI weight to the window truncation is noise, and
+    every propagated state feeds the consumer - the diabatic (SD)
+    transform, or the SD-projected CI overlaps. Call at every step - the
+    CI coefficients evolve along a trajectory, so a window adequate at
+    t = 0 can degrade.
 
     Args:
         ci_drops (np.ndarray): per-state dropped CI weights from sd2ci_matrix
         nstates (int): number of propagated states (leading T columns)
-        max_drop (float): largest tolerated dropped weight (the drivers'
-                          dia_basis_max_drop)
+        max_drop (float): largest tolerated dropped weight
+        knob (str): name of the driver keyword that carries max_drop,
+                    quoted in the error message
     """
     bad = [(j, d) for j, d in enumerate(ci_drops[:nstates]) if d > max_drop]
     if bad:
         detail = ", ".join(F"state {j}: {d:.1%}" for j, d in bad)
         raise ValueError(
-            F'dia_basis="sd": the SD basis captures too little of '
-            F"propagated states ({detail}; limit dia_basis_max_drop "
-            F"= {max_drop:.1%}) - the renormalized T columns "
-            F"would be meaningless. Widen num_occ_states/"
-            F"num_unocc_states (and the MO window), reduce nstates, "
-            F"or raise dia_basis_max_drop deliberately")
+            F"the SD basis captures too little of propagated states "
+            F"({detail}; limit {knob} = {max_drop:.1%}) - the "
+            F"renormalized T columns would be meaningless. Widen "
+            F"num_occ_states/num_unocc_states (and the MO window), "
+            F"reduce nstates, or raise {knob} deliberately")

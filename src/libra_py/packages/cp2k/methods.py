@@ -5007,6 +5007,13 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     beyond it the renormalized T column is noise and the
                     driver raises; widen num_occ_states/num_unocc_states or
                     reduce nstates to satisfy the contract    [default 0.5]
+                sd_capture_max_drop (float): with overlap_backend="sd", the
+                    largest CI weight a PROPAGATED state may carry outside
+                    the SD basis the CI overlaps are built from (the sd2ci
+                    dropped weight, checked at every step) - beyond it the
+                    renormalized column poisons st_ci and the driver raises;
+                    widen num_occ_states/num_unocc_states or reduce nstates
+                    to satisfy the contract                   [default 0.5]
                 ci_threshold (float): amplitude truncation       [default 0.001]
                 act_state (dict itraj->int): synced by run_dynamics each step
                 working_directory_prefix (str)                   [default "wd"]
@@ -5079,6 +5086,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
         raise ValueError('dia_basis="sd" declares the SD basis as the diabatic basis '
                          'via the sd2ci matrix - it requires overlap_backend="sd"')
     dia_max_drop = float(params.get("dia_basis_max_drop", 0.5))
+    cap_max_drop = float(params.get("sd_capture_max_drop", 0.5))
     dia_hvib = params.get("dia_basis_hvib", "none")
     if dia_hvib not in ("none", "corrected"):
         raise ValueError(F"dia_basis_hvib must be 'none' or 'corrected', got {dia_hvib!r}")
@@ -5087,6 +5095,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
     st_sd = None
     if not 0.0 <= dia_max_drop <= 1.0:
         raise ValueError(F"dia_basis_max_drop must be in [0, 1], got {dia_max_drop}")
+    if not 0.0 <= cap_max_drop <= 1.0:
+        raise ValueError(F"sd_capture_max_drop must be in [0, 1], got {cap_max_drop}")
     # tblite runs (&XTB &TBLITE): CP2K's TDDFPT excited-state force assembly
     # calls the native-xTB Coulomb Hessian (xtb_ehess), whose neighbor lists a
     # tblite run never populates - hard segfault, verified
@@ -5350,6 +5360,11 @@ def cp2k_compute_adi_impl(q, params, full_id):
                                    cache=sd_cache)
             T_prev, _ = sd2ci_matrix(ci_prev, sd_unique, LO)
             T_curr, ci_drops = sd2ci_matrix(ci_curr, sd_unique, LO)
+            # every propagated state's overlaps are built from its window
+            # remnant - a mostly-dropped state yields well-formed but
+            # meaningless couplings, so fail here rather than propagate them
+            check_sd_capture(ci_drops, nstates, cap_max_drop,
+                             knob="sd_capture_max_drop")
             st_ci = T_prev.T @ st_sd @ T_curr
             align_ci_state_signs(st_ci, ci_curr, T_curr)
             # the CI data may carry more excitations than the propagated
