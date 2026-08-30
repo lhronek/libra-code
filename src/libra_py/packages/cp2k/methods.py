@@ -5346,17 +5346,32 @@ def cp2k_compute_adi_impl(q, params, full_id):
                 # dropped rows reference MOs the wfn route cannot overlap);
                 # per spin channel for UKS (independent MO sets and counts)
                 nx = dict(nx)
+                trunc2 = 0.0
+                total2 = 0.0
                 for ck, xk, ok, vk in (("C", "X", "C_occ", "C_virt"),
                                        ("C_b", "X_b", "C_occ_b", "C_virt_b"))[:len(C_keys)]:
                     nocc = nx[ok].shape[1]
                     nmo = mo_curr[ck].shape[0]
                     C_namd = np.vstack([nx[ok].T, nx[vk].T])[:nmo]
                     s = np.sign(np.sum(mo_curr[ck] * C_namd, axis=1))
+                    trunc2 = trunc2 + np.array([np.sum(M[nmo - nocc:] ** 2)
+                                                for M in nx[xk]])
+                    total2 = total2 + np.array([np.sum(M ** 2) for M in nx[xk]])
                     nx[xk] = [M[:nmo - nocc] * s[np.newaxis, :nocc] * s[nocc:, np.newaxis]
                               for M in nx[xk]]
                 amps_prealigned = True
             ci_curr = ci_data_from_newtonx(nx, res["omegas"][:nexc], ci_threshold,
                                            occ_min=LO, vir_max=HI)
+            if amps_prealigned:
+                # fold the wfn-virtual-range truncation into the capture
+                # metric - those X rows were cut before ci_data_from_newtonx
+                # could count them, and the renormalization hides the loss
+                tw = (trunc2 / total2)[:len(ci_curr["window_drops"])]
+                for k in np.nonzero(tw > 1e-6)[0]:
+                    print(F"cp2k_compute_adi: state {k + 1}: dropped CI weight "
+                          F"{tw[k]:.2e} to the wfn virtual range (fewer wfn MOs "
+                          F"than NAMD-print rows)")
+                ci_curr["window_drops"] = 1.0 - (1.0 - tw) * (1.0 - ci_curr["window_drops"])
         else:
             amps_prealigned = False
             if isUKS:
