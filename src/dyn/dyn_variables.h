@@ -221,6 +221,8 @@ class dyn_variables{
     vector<ntraj, CMATRIX(ndia, nadi)>
   */
   vector<CMATRIX*> basis_transform; // same as in the Hamiltonian class
+  vector<CMATRIX*> ovlp_dia; // the diabatic metric, cached beside basis_transform
+                             // so the ham-less rep-sync stays exact for S != I
 
 
   ///================= Nuclear variables, for OOP implementation ===================
@@ -743,6 +745,7 @@ class dyn_variables{
   vector< vector<double> > get_fssh3_errors();
   vector<double> get_fssh3_average_errors();
   CMATRIX get_basis_transform(int itraj){ return *basis_transform[itraj]; }
+  CMATRIX get_ovlp_dia(int itraj){ return *ovlp_dia[itraj]; }
   MATRIX get_imass(){ return *iM; }
   MATRIX get_coords(){ return *q; }
   MATRIX get_momenta(){ return *p; }

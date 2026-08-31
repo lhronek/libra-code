@@ -40,6 +40,7 @@ void dyn_variables::allocate_electronic_vars(){
     dm_dia = vector<CMATRIX*>(ntraj);
     dm_adi = vector<CMATRIX*>(ntraj);
     basis_transform = vector<CMATRIX*>(ntraj);
+    ovlp_dia = vector<CMATRIX*>(ntraj);
 
     for(int itraj=0; itraj<ntraj; itraj++){
       proj_adi[itraj] = new CMATRIX(nadi, nadi);
@@ -49,6 +50,8 @@ void dyn_variables::allocate_electronic_vars(){
       dm_dia[itraj] = new CMATRIX(ndia, ndia);
       dm_adi[itraj] = new CMATRIX(nadi, nadi);
       basis_transform[itraj] = new CMATRIX(ndia, nadi);
+      ovlp_dia[itraj] = new CMATRIX(ndia, ndia);
+      ovlp_dia[itraj]->load_identity();
     }
 
     act_states = vector<int>(ntraj, 0);
@@ -431,6 +434,7 @@ dyn_variables::dyn_variables(const dyn_variables& x){
       *dm_dia[itraj] = *x.dm_dia[itraj];
       *dm_adi[itraj] = *x.dm_adi[itraj];
       *basis_transform[itraj] = *x.basis_transform[itraj];
+      *ovlp_dia[itraj] = *x.ovlp_dia[itraj];
     }
     act_states = x.act_states;
     act_states_dia = x.act_states_dia;
@@ -641,12 +645,14 @@ dyn_variables::~dyn_variables(){
       delete dm_dia[itraj];
       delete dm_adi[itraj];
       delete basis_transform[itraj];
+      delete ovlp_dia[itraj];
     }
     proj_adi.clear();
     ld_frame.clear();
     dm_dia.clear();
     dm_adi.clear();
     basis_transform.clear();
+    ovlp_dia.clear();
     
     delete ampl_dia;
     delete ampl_adi;

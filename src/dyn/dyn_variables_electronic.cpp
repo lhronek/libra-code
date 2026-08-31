@@ -169,20 +169,22 @@ void dyn_variables::update_basis_transform(nHamiltonian& Ham){
   for(int itraj=0; itraj<ntraj; itraj++){
     nHamiltonian* ham = Ham.children[ (itraj < nchildren) ? itraj : 0 ];
     *basis_transform[itraj] = *(ham->basis_transform);
-
+    if(ham->ovlp_dia_mem_status){ *ovlp_dia[itraj] = *(ham->ovlp_dia); }
+    else{ ovlp_dia[itraj]->load_identity(); }
   }// for itraj
 }
 
 
 void dyn_variables::update_amplitudes(dyn_control_params& dyn_params){
 /**
-           |\psi_adi > = | \psi_dia > U
+           |\psi_adi > = | \psi_dia > U,  U^H S U = I
 
    |\Psi> = |\psi_adi > C_adi = |\psi_dia> U C_adi = |\psi_dia> C_dia, so:
 
    C_dia = U C_adi
 
-   C_adi = U.H() C_dia
+   C_adi = U.H() S C_dia   (S = the cached diabatic metric; identity for
+                            orthonormal diabats)
 */
   // Deterministic per-trajectory transforms - parallel-safe (each iteration
   // reads/writes only its own column); results identical for any thread count
@@ -201,7 +203,7 @@ void dyn_variables::update_amplitudes(dyn_control_params& dyn_params){
     /// Diabatic wfc representation
     if(dyn_params.rep_tdse==0){
       cd = ampl_dia->col(traj);
-      ca.product(adjoint(U), cd);
+      ca.product(adjoint(U), (*ovlp_dia[traj]) * cd);
       for(int i=0;i<nadi;i++){ ampl_adi->set(i, traj, ca.get(i,0) ); }
     }
     /// Adiabatic wfc representation
@@ -280,10 +282,14 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params){
     CMATRIX& U = (*basis_transform[traj]); // * (*proj_adi[indx]); // U_eff - let's wait with this
 
     /// Diabatic wfc representation
+    // dm_dia is the PLAIN-coefficient density C C^H in every branch; the
+    // cached diabatic metric makes the dia->adi directions exact for
+    // S != I (identity metric = the historical bare-U form)
     if(rep==0){
       cd = ampl_dia->col(traj);
       dm_dia[traj]->product(cd, adjoint(cd));
-      dm_adi[traj]->product(adjoint(U), *dm_dia[traj], U);
+      ca.product(adjoint(U), (*ovlp_dia[traj]) * cd);
+      dm_adi[traj]->product(ca, adjoint(ca));
     }
     /// Adiabatic wfc representation
     else if(rep==1){
@@ -295,7 +301,8 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params){
     }
     /// Diabatic DM representation
     else if(rep==2){
-      dm_adi[traj]->product(adjoint(U), *dm_dia[traj], U);
+      CMATRIX su0((*ovlp_dia[traj]) * U);
+      dm_adi[traj]->product(adjoint(su0), *dm_dia[traj], su0);
     }
     /// Adiabatic DM representation
     else if(rep==3){

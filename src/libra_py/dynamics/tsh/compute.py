@@ -1778,21 +1778,23 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
 
     #sys.exit(0)
 
-    # diabatic propagation/hopping and the per-step amplitude/density
-    # synchronization between the representations assume orthonormal
-    # diabats - fail loud instead of drifting on a non-identity metric
-    if (int(dyn_params.get("rep_tdse", 1)) in (0, 2)
+    # the diabatic DM propagator (the rep-2 Liouvillian) and the diabatic
+    # hop machinery (state energies, acceptance/rescaling) assume orthonormal
+    # diabats - fail loud instead of drifting on a non-identity metric.
+    # rep_tdse 0 is fully S-aware (generalized-eigenproblem propagators plus
+    # the metric-cached rep-sync layer) and stays allowed
+    if (int(dyn_params.get("rep_tdse", 1)) == 2
             or int(dyn_params.get("rep_sh", 1)) == 0):
         S0 = ham.get_ovlp_dia(Py2Cpp_int([0, 0]))
         s_dev = max(abs(S0.get(i, j) - (1.0 if i == j else 0.0))
                     for i in range(S0.num_of_rows) for j in range(S0.num_of_cols))
         if s_dev > 1e-8:
-            raise ValueError(F"rep_tdse = 0/2 and rep_sh = 0 run in the diabatic basis "
+            raise ValueError(F"rep_tdse = 2 and rep_sh = 0 run in the diabatic basis "
                              F"assuming orthonormal diabats, but ovlp_dia deviates from "
-                             F"identity by {s_dev:.2e} - the per-step amplitude/density "
-                             F"synchronization between the representations does not carry "
-                             F"the S metric; use the adiabatic representations (fully "
-                             F"S-aware) or orthonormalize the diabatic basis")
+                             F"identity by {s_dev:.2e} - the diabatic DM propagator and "
+                             F"the diabatic hop machinery do not carry the S metric; use "
+                             F"rep_tdse 0/1/3 (S-aware) or orthonormalize the diabatic "
+                             F"basis")
 
     # Update internal dynamical variables using the computed properties of the Hamiltonian objects
     # Set up the "rep_tdse" variable here to the representation that coinsides with the initial representation
