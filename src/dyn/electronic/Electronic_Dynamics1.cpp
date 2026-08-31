@@ -390,12 +390,13 @@ void propagate_electronic_nonHermitian(double dt, CMATRIX& Coeff, CMATRIX& Hvib)
   CMATRIX HvibH(sz,sz); HvibH = Hvib.H(); 
   CMATRIX expH(sz, sz);  
 
-  // Solve the right eigenvalue problem
-  libmeigen::solve_eigen(Hvib, I, Heig, R, 0);  // Hvib * R = R * Heig  
+  // a genuinely non-Hermitian Hvib (e.g. S^-1 * Hvib_dia) needs the
+  // general solver
+  libmeigen::solve_eigen_nosort(Hvib, Heig, R, 0);  // Hvib * R = R * Heig
 
-  // Solve the left eigenvalue problem
-  libmeigen::solve_eigen(HvibH, I, Heig, L, 0);  // Hvib.H() * L.H() = L.H() * Heig  
-  L = L.H();
+  // L = R^-1 replaces the separate left-eigen solve, whose A^H problem
+  // returned CONJUGATED eigenvalues in an unpaired order
+  FullPivLU_inverse(R, L);
 
 
   // Diagonal form expH
