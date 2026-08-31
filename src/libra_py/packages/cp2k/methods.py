@@ -3528,6 +3528,10 @@ def run_cp2k(coords_bohr, params):
                 template stalls: give a template with a different mixing or
                 MAX_SCF, since re-running the same input only repeats the
                 failure                                                [default []]
+            allow_unconverged_scf (int): 1 accepts a step whose log reports an
+                unconverged SCF (only reachable with CP2K's
+                IGNORE_CONVERGENCE_FAILURE, which downgrades the abort to a
+                warning); 0 raises on it                                [default 0]
             project (str), coord_file (str), number_of_states (int): see make_cp2k_input
 
     Returns:
@@ -3535,7 +3539,8 @@ def run_cp2k(coords_bohr, params):
 
     Raises:
         RuntimeError: if CP2K exits non-zero (tail of the log is included) with
-            the main template and every retry_templates entry
+            the main template and every retry_templates entry, or if the run
+            that succeeded reports an unconverged SCF
     """
     atom_labels = params["atom_labels"]
     exe = params.get("cp2k_exe", "cp2k.psmp")
@@ -3603,6 +3608,17 @@ def run_cp2k(coords_bohr, params):
             continue
         break
 
+    # CP2K aborts on an unconverged SCF, but IGNORE_CONVERGENCE_FAILURE turns
+    # that abort into a warning - the run then exits 0 carrying a density, an
+    # energy and forces that never converged
+    if int(params.get("allow_unconverged_scf", 0)) == 0:
+        with open(logfile) as fp:
+            if any("SCF run NOT converged" in line for line in fp):
+                raise RuntimeError(
+                    f"CP2K reported an unconverged SCF in {wd} ({logfile}) - its "
+                    f"energy and forces are not usable. Fix the SCF (density "
+                    f"mixing, MAX_SCF) or add a retry_templates entry that does; "
+                    f"allow_unconverged_scf = 1 accepts the step regardless")
     return logfile
 
 
@@ -5234,7 +5250,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
                   ("atom_labels", "input_template", "ot_template", "time_dependent",
                    "force_source", "cp2k_exe", "cp2k_data_dir",
                    "omp_num_threads", "mpi_executable", "nprocs", "project",
-                   "retry_templates")
+                   "retry_templates", "allow_unconverged_scf")
                   if k in params}
     # the OT pre-convergence run matters where the SCF starts cold - the
     # trajectory's first call; later calls restart the diagonalization from
