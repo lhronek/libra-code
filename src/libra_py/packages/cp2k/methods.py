@@ -3522,13 +3522,20 @@ def run_cp2k(coords_bohr, params):
                 {project}_ot, restart chained across steps) and the main run
                 restarts from its wavefunction - the two-run scheme of the
                 NBRA step2 xTB workflow, for large/hard-SCF systems [default None]
+            retry_templates (list of str): templates to fall back to, in order,
+                when the run fails - each retries the whole step (OT run
+                included). Meant for the geometries where the SCF of the main
+                template stalls: give a template with a different mixing or
+                MAX_SCF, since re-running the same input only repeats the
+                failure                                                [default []]
             project (str), coord_file (str), number_of_states (int): see make_cp2k_input
 
     Returns:
         str: path to the output log file
 
     Raises:
-        RuntimeError: if CP2K exits non-zero (tail of the log is included)
+        RuntimeError: if CP2K exits non-zero (tail of the log is included) with
+            the main template and every retry_templates entry
     """
     atom_labels = params["atom_labels"]
     exe = params.get("cp2k_exe", "cp2k.psmp")
@@ -3556,20 +3563,47 @@ def run_cp2k(coords_bohr, params):
     # converges the density robustly ({project}_ot-RESTART.wfn, chained across
     # steps), then the main diagonalization run restarts from it.
     project = params.get("project", "libra")
-    main_params = params
-    if params.get("ot_template", None):
-        ot_params = dict(params)
-        ot_params.update({"input_template": params["ot_template"],
-                          "project": f"{project}_ot",
-                          "input_name": "ot_input.inp",
-                          "act_state": 0})
-        make_cp2k_input(ot_params, working_directory=wd)
-        _execute("ot_input.inp", "ot.log")
-        main_params = dict(params)
-        main_params["wfn_restart_file"] = f"{project}_ot-RESTART.wfn"
 
-    make_cp2k_input(main_params, working_directory=wd)
-    return _execute(main_params.get("input_name", "input.inp"), "out.log")
+    def _attempt(template):
+        """one whole step: the OT pre-convergence run (where configured) and
+        then the main run from `template` - a retry repeats both, so it does
+        not inherit the density a failed attempt left in the restart files"""
+        main_params = dict(params)
+        main_params["input_template"] = template
+        if params.get("ot_template", None):
+            ot_params = dict(params)
+            ot_params.update({"input_template": params["ot_template"],
+                              "project": f"{project}_ot",
+                              "input_name": "ot_input.inp",
+                              "act_state": 0})
+            make_cp2k_input(ot_params, working_directory=wd)
+            _execute("ot_input.inp", "ot.log")
+            main_params["wfn_restart_file"] = f"{project}_ot-RESTART.wfn"
+        make_cp2k_input(main_params, working_directory=wd)
+        return _execute(main_params.get("input_name", "input.inp"), "out.log")
+
+    # a stalled SCF is a property of the geometry, not of the starting density:
+    # distorted excited-state geometries carry near-degenerate solutions the
+    # mixing ping-pongs between, and every guess falls into the same cycle - so
+    # a retry pays only with a template that changes the SCF itself
+    templates = [params["input_template"]] + list(params.get("retry_templates", []) or [])
+    for itry, template in enumerate(templates):
+        try:
+            logfile = _attempt(template)
+        except RuntimeError as err:
+            if itry + 1 == len(templates):
+                if len(templates) > 1:
+                    raise RuntimeError(
+                        f"CP2K failed in {wd} with the main template and all "
+                        f"{len(templates) - 1} retry_templates {templates[1:]}\n"
+                        f"last error: {err}")
+                raise
+            print(f"WARNING in run_cp2k: CP2K failed in {wd} with {template} - "
+                  f"retrying this step with {templates[itry + 1]}")
+            continue
+        break
+
+    return logfile
 
 
 def read_cp2k_forces(logfile):
@@ -5199,7 +5233,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
     run_params = {k: params[k] for k in
                   ("atom_labels", "input_template", "ot_template", "time_dependent",
                    "force_source", "cp2k_exe", "cp2k_data_dir",
-                   "omp_num_threads", "mpi_executable", "nprocs", "project")
+                   "omp_num_threads", "mpi_executable", "nprocs", "project",
+                   "retry_templates")
                   if k in params}
     # the OT pre-convergence run matters where the SCF starts cold - the
     # trajectory's first call; later calls restart the diagonalization from
