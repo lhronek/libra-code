@@ -5417,6 +5417,25 @@ def cp2k_compute_adi_impl(q, params, full_id):
                                  'T) in the input template; set ci_source="log" to '
                                  'parse the excitation-analysis block instead')
             nx = mo_curr.get("newtonx") or read_cp2k_newtonx_output(nx_file)
+            # the SD basis and the cached homo are built ONCE, for one reference
+            # occupation - fractional occupations (&SMEAR) make CP2K count a
+            # partly filled LUMO as occupied, so the printed vectors switch
+            # layout mid-trajectory, every absolute orbital index shifts and the
+            # excitations land outside the basis. CP2K's own symptom is an
+            # "Incompatible number of electrons" abort on the TD restart
+            nocc_print = [np.array(nx["C_occ"]).shape[1]]
+            if isUKS and nx.get("C_occ_b") is not None:
+                nocc_print.append(np.array(nx["C_occ_b"]).shape[1])
+            for ch, (seen, expected) in enumerate(zip(nocc_print, homos)):
+                if seen != expected:
+                    raise ValueError(
+                        F"the reference occupation changed: the NAMD_PRINT vectors "
+                        F"in {nx_file} carry {seen} occupied orbitals"
+                        F"{' (spin ' + 'ab'[ch] + ')' if isUKS else ''}, the SD basis "
+                        F"and the MO window were built for {expected}. A fixed SD "
+                        F"basis cannot represent a moving reference - drop &SMEAR "
+                        F"(fractional occupations do this whenever a gap closes) or "
+                        F"fix the charge/multiplicity of the template")
             if isUKS and nx.get("nspin", 1) != 2:
                 raise ValueError("the run is UKS but the NAMD_PRINT file has no "
                                  "per-spin MO blocks - set PRINT_VIRTUALS T (the "
