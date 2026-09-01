@@ -219,6 +219,43 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
       dyn_var.ld_frame_stale = 1;
     }
 
+    // The adiabatic representation assumes an ASCENDING energy ladder: hop
+    // proposals, the Boltzmann factor and the momentum rescaling all read
+    // E_j - E_i with that sign, so an inverted pair makes a downhill hop
+    // look uphill. Internal diagonalization always sorts - only a supplied
+    // or externally transformed ladder can arrive unsorted, and whether it
+    // does is a property of the model's output at this geometry, so this is
+    // detectable only at runtime. Checked before the entanglement options,
+    // which add their own terms to the diagonal
+    {
+      static int warned_unsorted_adi = 0;
+      int nchildren = ham.children.size();
+      for (int itraj = 0; itraj < nchildren && !warned_unsorted_adi; itraj++) {
+        nHamiltonian *ch = ham.children[itraj];
+        if (ch->ham_adi_mem_status == 0) { continue; }
+        for (int i = 0; i + 1 < ch->nadi; i++) {
+          double gap = ch->ham_adi->get(i + 1, i + 1).real() -
+                       ch->ham_adi->get(i, i).real();
+          if (gap < -1e-10) {
+            cout << "WARNING in update_Hamiltonian_variables(): the adiabatic "
+                 << "energies are not in ascending order - state " << i + 1
+                 << " lies " << -gap << " Ha (" << -gap * evolt
+                 << " eV) BELOW state " << i << " for trajectory " << itraj
+                 << ". Every adiabatic consumer reads the gap with this sign: a "
+                 << "hop across this pair is bookkept as uphill and the "
+                 << "rescaling drains kinetic energy instead of releasing it. A "
+                 << "linear-response excited-state method returns this where its "
+                 << "reference breaks down - a negative excitation energy "
+                 << "inverts the two lowest states near an S1/S0 conical "
+                 << "intersection - so check the excitation energies the driver "
+                 << "reports at this geometry. Warned once per process\n";
+            warned_unsorted_adi = 1;
+            break;
+          }
+        } // for i
+      } // for itraj
+    }
+
     // Also add entanglement options - this is done in the adiabatic rep, so
     // we'd need to compute all the adiabatic energies first
     if (prms.entanglement_opt == 0) { /* Nothing to do */
