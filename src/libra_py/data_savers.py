@@ -68,6 +68,32 @@ import util.libutil as comn
 from . import units
 from . import data_read
 
+_warned_locking = False
+
+
+def _open_hdf5(filename, mode):
+    """Open an HDF5 file without taking the HDF5 file lock.
+
+    The savers are the file's only writer and re-open it on every saved step, so
+    a concurrent reader that holds the default lock (any h5py.File(f, "r") without
+    locking=False, e.g. a monitoring script) would abort the run with
+    BlockingIOError on the next save. Not locking removes that failure mode -
+    correctness of a reader that races the writer is the reader's concern.
+    """
+    global _warned_locking
+    try:
+        return h5py.File(filename, mode, locking=False)
+    except TypeError:
+        # h5py below 3.5 has no locking argument - only the environment can
+        # protect the run there
+        if not _warned_locking:
+            print("WARNING in data_savers: this h5py cannot disable HDF5 file locking "
+                  "(needs h5py >= 3.5) - a concurrent reader holding the lock can abort "
+                  "the run. Export HDF5_USE_FILE_LOCKING=FALSE before starting python")
+            _warned_locking = True
+        return h5py.File(filename, mode)
+
+
 
 class mem_saver:
     """
@@ -240,7 +266,7 @@ class mem_saver:
         # for key in self.np_data.keys():
         #    print(key, self.np_data[key] )
 
-        with h5py.File(filename, mode) as f:
+        with _open_hdf5(filename, mode) as f:
 
             for data_name in data_names:
                 if data_name in self.np_data.keys():
@@ -374,7 +400,7 @@ class hdf5_saver:
         self.r_compression_level = 4
         self.i_compression_level = 9
 
-        with h5py.File(self.filename, "w") as f:
+        with _open_hdf5(self.filename, "w") as f:
             g = f.create_group("default")
             g.create_dataset("data", data=[])
 
@@ -421,7 +447,7 @@ class hdf5_saver:
 
         """
 
-        with h5py.File(self.filename, "a") as f:
+        with _open_hdf5(self.filename, "a") as f:
             g = f.create_group(data_set_name)
             g.attrs["dim"] = dim
             g.attrs["data_type"] = data_type
@@ -464,13 +490,13 @@ class hdf5_saver:
     def save_scalar(self, istep, data_name, data):
 
         if data_name in self.keywords:
-            with h5py.File(self.filename, "a") as f:
+            with _open_hdf5(self.filename, "a") as f:
                 f[F"{data_name}/data"][istep] = data
 
     def save_multi_scalar(self, istep, iscal, data_name, data):
 
         if data_name in self.keywords:
-            with h5py.File(self.filename, "a") as f:
+            with _open_hdf5(self.filename, "a") as f:
                 f[F"{data_name}/data"][istep, iscal] = data
 
     def save_matrix(self, istep, data_name, data):
@@ -487,7 +513,7 @@ class hdf5_saver:
 
             nx, ny = data.num_of_rows, data.num_of_cols
 
-            with h5py.File(self.filename, "a") as f:
+            with _open_hdf5(self.filename, "a") as f:
 
                 for i in range(nx):
                     for j in range(ny):
@@ -507,7 +533,7 @@ class hdf5_saver:
 
             nx, ny = data.num_of_rows, data.num_of_cols
 
-            with h5py.File(self.filename, "a") as f:
+            with _open_hdf5(self.filename, "a") as f:
 
                 for i in range(nx):
                     for j in range(ny):
@@ -527,7 +553,7 @@ class hdf5_saver:
 
             nx, ny = data.num_of_rows, data.num_of_cols
 
-            with h5py.File(self.filename, "a") as f:
+            with _open_hdf5(self.filename, "a") as f:
 
                 for i in range(nx):
                     for j in range(ny):
