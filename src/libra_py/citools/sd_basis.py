@@ -107,8 +107,11 @@ def sd2ci_matrix(ci_data, sd_unique, lowest_orbital):
     through ci_data["spins"] against the 'alp'/'bet' tags of sd_unique);
     sd_unique is window-relative.
 
-    Components outside the SD basis cannot be represented there: they are
-    dropped and the column is renormalized over the kept part (the same
+    Components outside the SD WINDOW (hole below or particle above it) cannot be
+    represented there: they are dropped, NAMED in the report, and the column is
+    renormalized over the kept part. A component that is not an excitation of the
+    reference at all (hole above the reference HOMO, particle at or below it)
+    raises - it means the vectors came from a different occupation (the same
     truncate-then-renormalize convention the log reader and
     normalize_ci_coefficients apply upstream; bit-identical when nothing is
     dropped). The lost weight is printed per state when it exceeds 1e-6 -
@@ -127,13 +130,43 @@ def sd2ci_matrix(ci_data, sd_unique, lowest_orbital):
     T = np.zeros((nsd, nstates))
     drops = np.zeros(nstates)
     T[0, 0] = 1.0
+    # the reference occupation the basis was built for, per spin channel: the
+    # basis holds holes in [occ_lo, homo_w] and particles in [homo_w+1, vir_hi]
+    # (window-relative), so a config's hole above homo_w or particle at or
+    # below it is NOT an excitation of this reference at all - a different
+    # occupation produced the vectors (a smeared LUMO counted as occupied, a
+    # changed charge or multiplicity). That is a mismatch to stop on, not a
+    # truncation to renormalize away
+    ref = {}
+    for [o, v], sp in sd_unique:
+        lo_o, hi_o, lo_v, hi_v = ref.get(sp, (o, o, v, v))
+        ref[sp] = (min(lo_o, o), max(hi_o, o), min(lo_v, v), max(hi_v, v))
     for i, (confs, amps) in enumerate(zip(ci_data["configs"], ci_data["amps"])):
         spins = ci_data["spins"][i] if "spins" in ci_data else ["alp"] * len(confs)
+        truncated = []
         for c, a, sp in zip(confs, amps, spins):
             cw = [c[0] - lowest_orbital + 1, c[1] - lowest_orbital + 1]
             try:
                 j = sd_unique.index([cw, sp])
             except ValueError:
+                if sp not in ref:
+                    raise ValueError(
+                        F"CI state {i+1} carries a '{sp}' configuration {c[0]}->{c[1]} "
+                        F"but the SD basis has no '{sp}' channel - the vectors come "
+                        F"from a different spin treatment than the basis") from None
+                occ_lo, homo_w, vir_lo, vir_hi = ref[sp]
+                if cw[0] > homo_w or cw[1] < vir_lo:
+                    homo_abs = homo_w + lowest_orbital - 1
+                    raise ValueError(
+                        F"CI state {i+1} excites {c[0]}->{c[1]}"
+                        F"{' (' + sp + ')' if sp != 'alp' else ''}, which is not an "
+                        F"excitation of the reference the SD basis was built for "
+                        F"(occupied through orbital {homo_abs}): the vectors were "
+                        F"produced with a different occupation - a fractionally "
+                        F"filled orbital counted as occupied (&SMEAR), or a changed "
+                        F"charge or multiplicity. A fixed SD basis cannot represent "
+                        F"a moving reference") from None
+                truncated.append((c[0], c[1], sp, float(a) ** 2))
                 continue
             T[j + 1, i + 1] = a
         nrm2 = float(T[:, i + 1] @ T[:, i + 1])
@@ -142,6 +175,11 @@ def sd2ci_matrix(ci_data, sd_unique, lowest_orbital):
                              f"increase num_occ_states/num_unocc_states (and the MO window)")
         dropped = max(0.0, 1.0 - nrm2)
         T[:, i + 1] /= np.sqrt(nrm2)
+        # name what was dropped - a total alone hides which orbitals the
+        # window is missing
+        truncated.sort(key=lambda x: -x[3])
+        named = ", ".join(F"{o}->{v}{'' if sp == 'alp' else ' ' + sp} ({w:.1%})"
+                          for o, v, sp, w in truncated[:4])
         if dropped > 0.5:
             # the state is MOSTLY outside the basis - the quiet one-liner
             # below was easy to read past at 99% drops, and everything built
@@ -153,12 +191,13 @@ def sd2ci_matrix(ci_data, sd_unique, lowest_orbital):
                 print(F"!!! WARNING sd2ci_matrix: CI state {i+1} lies MOSTLY OUTSIDE the SD basis")
                 print(F"!!! dropped CI weight = {dropped:.1%} - only {1.0 - dropped:.1%} of the state is")
                 print(F"!!! representable, and its overlaps and couplings are built from that")
-                print(F"!!! remnant. Widen num_occ_states/num_unocc_states (and the MO window).")
+                print(F"!!! remnant. Configurations outside the window: {named}")
+                print(F"!!! Widen num_occ_states/num_unocc_states (and the MO window).")
                 print(F"!!! Further occurrences for this state are muted.")
                 print(bar)
         elif dropped > 1e-6:
             print(F"sd2ci_matrix: state {i+1}: dropped CI weight {dropped:.2e} "
-                  F"outside the SD basis (column renormalized) - widen "
+                  F"outside the SD basis (column renormalized): {named} - widen "
                   F"num_occ_states/num_unocc_states or the MO window to capture it")
         drops[i + 1] = dropped
     return T, drops
