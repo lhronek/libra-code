@@ -4544,7 +4544,7 @@ def _scan_overlap_template(text):
     return has_csr, has_dense
 
 def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
-                         lowest_orbital, highest_orbital, params):
+                         lowest_orbital, highest_orbital, params, fragment_atom_lists=None):
     """
     All three windowed MO overlap matrices from ONE CP2K-native OVERLAP_DELTAT
     run on the doubled geometry (prev atoms + curr atoms) - no libint needed.
@@ -4561,13 +4561,21 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
         params (dict): atom_labels, overlap_template (an es_overlap_deltat_* input
             with CONNECTIVITY OFF and no VDW section), working_directory,
             cp2k_exe / cp2k_data_dir / omp_num_threads / mpi_executable / nprocs
+        fragment_atom_lists (list of lists of int, optional): 1-based atom indices
+            of disjoint fragments. When given, the Mulliken fragment operators of
+            the current geometry are returned as well: P_f(k,l) = sum_{mu in f}
+            C_k,mu (S C)_l,mu, symmetrized, over the MO window - their
+            eigenvectors are the MOs localized on fragment f, and the fragments
+            covering all atoms sum to S_mo_curr. Needs mo_curr["ao_atom"] (the
+            wfn loader supplies it).
 
     Returns:
         St_mo, S_mo_prev, S_mo_curr  (each (norb_w, norb_w)). When the mo
         dicts carry a beta channel (C_b, from the UKS loaders), each of the
         three is instead a [alpha, beta] list - the AO overlap is
         spin-independent, so the single doubled-geometry run serves both
-        channels at no extra CP2K cost.
+        channels at no extra CP2K cost. With fragment_atom_lists a fourth item
+        follows: the list over fragments of P_f, each shaped like S_mo_curr.
 
     Raises ValueError when the window does not fit the stored MOs (python
     slicing would silently truncate or wrap), and for tabulated/ZDO
@@ -4653,10 +4661,30 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
     ix = np.ix_(idx, idx)
     S11, S12, S22 = S[:n, :n][ix], S[:n, n:][ix], S[n:, n:][ix]
     lo, hi = lowest_orbital - 1, highest_orbital
+    frag_cols = None
+    if fragment_atom_lists is not None:
+        ao_atom = mo_curr.get("ao_atom", None)
+        if ao_atom is None:
+            raise ValueError("fragment operators need the AO->atom map of the wfn "
+                             "loader (mo_source='wfn') - the molden route has none")
+        natom = int(np.max(ao_atom)) + 1
+        seen = set()
+        frag_cols = []
+        for f, atoms in enumerate(fragment_atom_lists):
+            atoms = [int(a) for a in atoms]
+            if not atoms or min(atoms) < 1 or max(atoms) > natom:
+                raise ValueError(F"fragment {f} atom list {atoms} is empty or outside "
+                                 F"1..{natom} (1-based atom indices)")
+            if seen & set(atoms):
+                raise ValueError(F"fragment {f} shares atoms {sorted(seen & set(atoms))} "
+                                 F"with an earlier fragment - fragments must be disjoint")
+            seen |= set(atoms)
+            # column j of C is the AO idx[j] of the file order
+            frag_cols.append(np.flatnonzero(np.isin(ao_atom[idx] + 1, atoms)))
     # window BEFORE contracting: O(win * nao^2) instead of O(nao^3) -
     # 20-100x cheaper already at a few thousand AOs. The AO overlap is
     # spin-independent, so the same S blocks serve every spin channel.
-    St, S_prev, S_curr = [], [], []
+    St, S_prev, S_curr, P_frag = [], [], [], []
     for suff in ("", "_b"):
         if F"C{suff}" not in mo_prev or F"C{suff}" not in mo_curr:
             continue
@@ -4664,6 +4692,19 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
         St.append(np.ascontiguousarray((Cp @ S12 @ Cc.T).real))
         S_prev.append(np.ascontiguousarray((Cp @ S11 @ Cp.T).real))
         S_curr.append(np.ascontiguousarray((Cc @ S22 @ Cc.T).real))
+        if frag_cols is not None:
+            SC = S22 @ Cc.T
+            P_spin = []
+            for cols in frag_cols:
+                P = Cc[:, cols] @ SC[cols, :]
+                P_spin.append(np.ascontiguousarray((0.5 * (P + P.T)).real))
+            P_frag.append(P_spin)
+    if frag_cols is not None:
+        # fragment-major, each entry shaped like S_curr
+        P_frag = [[P_spin[f] for P_spin in P_frag] for f in range(len(frag_cols))]
+        if len(St) == 1:
+            return St[0], S_prev[0], S_curr[0], [P[0] for P in P_frag]
+        return St, S_prev, S_curr, P_frag
     if len(St) == 1:
         return St[0], S_prev[0], S_curr[0]
     return St, S_prev, S_curr
@@ -4696,6 +4737,28 @@ def load_newtonx_mo_data(filename):
     return out
 
 
+def _wfn_ao_atom_map(basis):
+    """
+    0-based atom index of every AO, in the CP2K-native AO order, from the
+    RESTART.wfn header (natom, nspin, nao, nset_max, nshell_max, nset_info,
+    nshell_info, nso_info - read_wfn_file). The Fortran arrays are stored
+    column-major: nshell_info(nset_max, natom), nso_info(nshell_max, nset_max, natom).
+    """
+    natom, nao, nset_max, nshell_max = int(basis[0]), int(basis[2]), int(basis[3]), int(basis[4])
+    nset_info = np.asarray(basis[5], dtype=int)
+    nshell_info = np.asarray(basis[6], dtype=int).reshape(nset_max, natom, order="F")
+    nso_info = np.asarray(basis[7], dtype=int).reshape(nshell_max, nset_max, natom, order="F")
+    ao_atom = []
+    for a in range(natom):
+        for iset in range(nset_info[a]):
+            for ishell in range(nshell_info[iset, a]):
+                ao_atom += [a] * int(nso_info[ishell, iset, a])
+    if len(ao_atom) != nao:
+        raise ValueError(F"wfn header inconsistency: the shell structure yields "
+                         F"{len(ao_atom)} AOs but nao = {nao}")
+    return np.asarray(ao_atom, dtype=int)
+
+
 def load_wfn_mo_data(filename):
     """
     MO data from CP2K's binary RESTART.wfn - the zero-cost native source
@@ -4713,10 +4776,12 @@ def load_wfn_mo_data(filename):
               homo (1-based index from the file itself), resort_idx = None,
               nspin. UKS files (nspin=2) return the beta channel alongside as
               C_b / E_b / occ_b / homo_b (alpha and beta HOMOs differ in
-              general - the file stores both).
+              general - the file stores both), ao_atom (0-based atom index of
+              every AO in the file's AO order - the fragment operators of
+              mo_overlaps_via_cp2k need it).
     """
     basis, spin, evocc, moc = read_wfn_file(filename)
-    out = {"resort_idx": None, "nspin": len(spin)}
+    out = {"resort_idx": None, "nspin": len(spin), "ao_atom": _wfn_ao_atom_map(basis)}
     for i, suff in enumerate(("", "_b")[:len(spin)]):
         nmo = int(spin[i][0])
         vals = np.asarray(evocc[i], dtype=np.float64)

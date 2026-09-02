@@ -45,6 +45,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 
 from . import mapping, step2_many_body, step3_many_body
+from libra_py.citools import slatdet
 import util.libutil as comn
 import libra_py.packages.cp2k.methods as CP2K_methods
 import libra_py.units as units
@@ -2484,6 +2485,263 @@ def _orthonormalize_ks_overlaps(step, params):
     print('Done with step', step, '. Elapsed time:', time.time() - t2)
 
 
+def _sd_block_index(orb, nact):
+    """Row of a signed reindexed spin-orbital in the 2-block active-space matrices
+    (alpha j -> j-1, beta -j -> nact+j-1, the ovlp_arb convention)."""
+    return orb - 1 if orb > 0 else nact + (-orb) - 1
+
+
+def _permute_rows(W, perm):
+    """Row permutation of a numpy matrix in the CMATRIX.permute_rows convention."""
+    Wc = data_conv.nparray2CMATRIX(np.asarray(W, dtype=float))
+    p = intList()
+    for k in perm:
+        p.append(int(k))
+    Wc.permute_rows(p)
+    return data_conv.MATRIX2nparray(Wc.real(), np.float64)
+
+
+def sd_diabatization_groups(sd_lists, kind):
+    """
+    The localization manifolds of an SD basis: single excitations of the reference
+    determinant that share the hole ("particle": the excited electron varies) or the
+    particle ("hole": the hole varies).
+
+    Args:
+        sd_lists (list of lists of int): the SDs of one step in the signed reindexed
+            spin-orbital notation of ovlp_arb, in their row order
+        kind (str): "particle" or "hole"
+
+    Returns:
+        gs (int): row of the reference determinant (the lowest orbital sum)
+        groups (list of dict): manifolds with >= 2 members - "key" (the shared spin-orbital),
+            "rows" (member rows), "orbs" (the varying spin-orbital of every member, ascending),
+            "tau" and "sigma" (signs such that the localized state with the varying orbital
+            psi_A = sum_j w_jA orb_j reads sum_j tau_j sigma_j w_jA |SD_row_j>: tau_j is the
+            parity between the member's list and the fixed-orbitals-first order, sigma_j the
+            cofactor sign (-1)^j of a hole manifold, 1 for a particle manifold)
+        singles (list of int): rows left untransformed (the reference, one-member manifolds,
+            non-single excitations)
+    """
+    if kind not in ("particle", "hole"):
+        raise ValueError(F"diabatization {kind!r} - use 'none', 'particle' or 'hole'")
+    sets = [frozenset(int(o) for o in sd) for sd in sd_lists]
+    gs = min(range(len(sets)), key=lambda k: sum(abs(o) for o in sets[k]))
+    ref = sets[gs]
+    manifolds = {}
+    singles = [gs]
+    for k, occ in enumerate(sets):
+        if k == gs:
+            continue
+        hole, part = ref - occ, occ - ref
+        if len(hole) != 1 or len(part) != 1:
+            singles.append(k)
+            continue
+        h, pt = next(iter(hole)), next(iter(part))
+        key, var = (h, pt) if kind == "particle" else (pt, h)
+        manifolds.setdefault(key, []).append((var, k))
+    groups = []
+    for key in sorted(manifolds):
+        members = sorted(manifolds[key])
+        if len(members) < 2:
+            singles.append(members[0][1])
+            continue
+        orbs = [v for v, k in members]
+        rows = [k for v, k in members]
+        if kind == "particle":
+            fixed = sorted(ref - {key})
+            lists = [fixed + [v] for v in orbs]
+            sigma = [1] * len(orbs)
+        else:
+            # member j holds every hole orbital but its own: the localized-hole state
+            # expands with the cofactors of the orthogonal rotation, (-1)^j w_jA
+            fixed = sorted((ref - set(orbs)) | {key})
+            lists = [fixed + [o for o in orbs if o != v] for v in orbs]
+            sigma = [(-1) ** j for j in range(len(orbs))]
+        tau = [slatdet.permutation_parity(lists[j], [int(o) for o in sd_lists[rows[j]]])
+               for j in range(len(orbs))]
+        groups.append({"key": key, "rows": rows, "orbs": orbs, "tau": tau, "sigma": sigma, "kind": kind})
+    return gs, groups, sorted(singles)
+
+
+def localize_fragment_block(P_frag, rows):
+    """
+    Orbitals localized on fragments within the span of the given orbitals, by
+    sequential projection: fragment 0 takes the top round(tr P_0) eigenvectors of its
+    operator in the span, every next fragment the top ones of the remaining span, the
+    last fragment the rest.
+
+    Args:
+        P_frag (list of arrays): the fragment operators in a common orthonormal orbital
+            basis (only the [rows, rows] blocks are read)
+        rows (list of int): the orbitals spanning the localization space
+
+    Returns:
+        w (array (m, m)): columns = localized orbitals in the span, fragment-major, within
+            a fragment by decreasing own-fragment population
+        frag (list of int): the fragment of every column
+        pops (array (m, nfrag)): population of every column on every fragment
+
+    Raises ValueError when a fragment holds a non-integer number of orbitals of the span
+    (|tr - round(tr)| > 0.25): the span mixes with orbitals the fragments do not localize.
+    """
+    m = len(rows)
+    blocks = [0.5 * (B + B.T) for B in
+              (np.asarray(P, dtype=float)[np.ix_(rows, rows)] for P in P_frag)]
+    Q = np.eye(m)
+    cols, frag = [], []
+    for f, B in enumerate(blocks):
+        left = Q.shape[1]
+        if left == 0:
+            break
+        M = Q.T @ B @ Q
+        if f == len(blocks) - 1:
+            n_f = left
+        else:
+            tr = float(np.trace(M))
+            n_f = int(round(tr))
+            if abs(tr - n_f) > 0.25 or n_f > left:
+                raise ValueError(F"fragment {f} holds {tr:.3f} orbitals of the span {rows} - "
+                                 F"not an integer, the fragments do not localize this manifold")
+        if n_f == 0:
+            continue
+        vals, vecs = np.linalg.eigh(M)
+        vecs = vecs[:, np.argsort(-vals)]
+        cols.append(Q @ vecs[:, :n_f])
+        frag += [f] * n_f
+        Q = Q @ vecs[:, n_f:]
+    w = np.concatenate(cols, axis=1)
+    pops = np.stack([np.einsum("jc,jk,kc->c", w, B, w) for B in blocks], axis=1)
+    return w, frag, pops
+
+
+def sd_diabatization_step(sd_lists, P_frag, kind, dia_index=None):
+    """
+    The SD -> diabatic coefficients W of one step, |Phi_A> = sum_k |SD_k> W_kA: the
+    reference and the untransformed SDs map onto themselves, every localization manifold
+    onto its fragment-localized states (sd_diabatization_groups, localize_fragment_block).
+
+    Args:
+        sd_lists (list of lists of int): the SDs of the step in their row order
+        P_frag (list of arrays): fragment operators in the active-space 2-block layout
+            (orthonormal orbitals)
+        kind (str): "particle" or "hole"
+        dia_index (list, optional): the diabatic-state index of an earlier step - the
+            columns keep its order, None builds it (reference and singles first, then
+            the manifolds by key, fragment-major)
+
+    Returns:
+        W (array (nsd, nsd)), dia_index (list), pops (array (nsd, nfrag)): fragment
+        populations of every diabatic state's localized orbital, nan for the untransformed
+
+    Raises ValueError when the SD content or the per-fragment orbital counts differ from
+    the index (the localization must be stable along the trajectory) and when W is not
+    orthogonal to 1e-8.
+    """
+    nsd = len(sd_lists)
+    nact = P_frag[0].shape[0] // 2
+    nfrag = len(P_frag)
+    sets = [frozenset(int(o) for o in sd) for sd in sd_lists]
+    gs, groups, singles = sd_diabatization_groups(sd_lists, kind)
+    loc = {}
+    for g in groups:
+        w, frag, pops = localize_fragment_block(P_frag, [_sd_block_index(o, nact) for o in g["orbs"]])
+        loc[g["key"]] = (g, w, frag, pops)
+    if dia_index is None:
+        dia_index = [("sd", sets[k]) for k in singles]
+        for key in sorted(loc):
+            frag = loc[key][2]
+            for f in range(nfrag):
+                for r in range(frag.count(f)):
+                    dia_index.append(("loc", key, f, r))
+    if len(dia_index) != nsd:
+        raise ValueError(F"{len(dia_index)} diabatic states indexed for {nsd} SDs")
+    W = np.zeros((nsd, nsd))
+    pops_out = np.full((nsd, nfrag), np.nan)
+    for col, entry in enumerate(dia_index):
+        if entry[0] == "sd":
+            match = [k for k in singles if sets[k] == entry[1]]
+            if len(match) != 1:
+                raise ValueError(F"the SD {sorted(entry[1])} of the diabatic index is not an "
+                                 F"untransformed SD of this step - the basis changed")
+            W[match[0], col] = 1.0
+            continue
+        _, key, f, r = entry
+        if key not in loc:
+            raise ValueError(F"manifold {key} of the diabatic index is absent at this step")
+        g, w, frag, pops = loc[key]
+        cols_f = [c for c in range(len(frag)) if frag[c] == f]
+        if r >= len(cols_f):
+            raise ValueError(F"manifold {key}: fragment {f} holds {len(cols_f)} localized "
+                             F"orbitals at this step, at least {r + 1} expected - the "
+                             F"localization is not stable along the trajectory")
+        c = cols_f[r]
+        for j, k in enumerate(g["rows"]):
+            W[k, col] = g["tau"][j] * g["sigma"][j] * w[j, c]
+        pops_out[col] = pops[c]
+    dev = float(np.abs(W.T @ W - np.eye(nsd)).max())
+    if dev > 1e-8:
+        raise ValueError(F"the diabatic transformation is not orthogonal (|W^T W - 1| = {dev:.2e})")
+    return W, dia_index, pops_out
+
+
+def _sd_diabatization_series(params, sd_sorted, active_space, start_time, finish_time, kind):
+    """W, the diabatic index and the populations of every step start_time..finish_time-1,
+    from the step-2 fragment operators sliced to the active space (Lowdin-orthonormalized
+    when the SD overlaps are)."""
+    res_dir_1 = params['path_to_npz_files']
+    nfrag = len(glob.glob(F'{res_dir_1}/P_frag*_ks_{start_time}.npz'))
+    if nfrag < 2:
+        raise ValueError(F"diabatization needs the step-2 fragment operators "
+                         F"P_frag{{f}}_ks_{{step}}.npz of at least two fragments in {res_dir_1} "
+                         F"(fragment_atom_lists of step2), found {nfrag}")
+    mode = params['apply_orthonormalization']
+    W_list, pops_list, dia_index = [], [], None
+    for i, step in enumerate(range(start_time, finish_time)):
+        P_frag = [np.array(sp.load_npz(F'{res_dir_1}/P_frag{f}_ks_{step}.npz').todense()
+                           [active_space, :][:, active_space]).real for f in range(nfrag)]
+        if mode != "none":
+            s_ks = np.array(sp.load_npz(F'{res_dir_1}/S_ks_{step}.npz').todense()
+                            [active_space, :][:, active_space]).real
+            X = orthogonalizations.get_Lowdin_scipy(s_ks)
+            P_frag = [X.T @ P @ X for P in P_frag]
+        W, dia_index, pops = sd_diabatization_step(sd_sorted[i], P_frag, kind, dia_index)
+        W_list.append(W)
+        pops_list.append(pops)
+    return W_list, dia_index, pops_list
+
+
+def _write_diabatization_records(res_dir, kind, dia_index, pops_list, start_time):
+    """U_sd_labels.json (the meaning of every diabatic state) and U_sd_pops.txt
+    (per step, the fragment populations of every diabatic state's localized orbital)."""
+    states = []
+    for col, entry in enumerate(dia_index):
+        if entry[0] == "sd":
+            states.append({"index": col, "type": "sd", "sd": sorted(entry[1])})
+        else:
+            states.append({"index": col, "type": "localized", "manifold": int(entry[1]),
+                           "fragment": int(entry[2]), "rank": int(entry[3])})
+    with open(F'{res_dir}/U_sd_labels.json', 'w') as f:
+        json.dump({"kind": kind,
+                   "note": "particle: the excited electron of the manifold (shared hole = "
+                           "manifold) sits on 'fragment', hole: the hole (shared particle = "
+                           "manifold) sits on 'fragment', ranks order the orbitals of one "
+                           "fragment by decreasing population",
+                   "states": states}, f, indent=1)
+    nfrag = pops_list[0].shape[1]
+    rows = [np.concatenate(([start_time + i], pops_list[i].reshape(-1))) for i in range(len(pops_list))]
+    header = "step " + " ".join(F"p(state{c},frag{f})" for c in range(pops_list[0].shape[0]) for f in range(nfrag))
+    np.savetxt(F'{res_dir}/U_sd_pops.txt', np.array(rows), header=header, fmt="%.6g")
+
+
+def _save_u_sd(res_dir, W, cum_phase, step):
+    """U_sd = (W F)^T: rows = diabatic states, columns = the saved (phase-corrected) SDs."""
+    Wf = np.asarray(W, dtype=float)
+    if cum_phase is not None:
+        Wf = Wf * np.asarray(cum_phase, dtype=float).reshape(-1, 1)
+    sp.save_npz(F'{res_dir}/U_sd_{step}.npz', sp.csc_matrix(Wf.T))
+
+
 @_with_parent_blas_cap
 def run_step3_sd_nacs_libint(params):
     """
@@ -2518,6 +2776,15 @@ def run_step3_sd_nacs_libint(params):
                 The default CHANGED from the historical False (raw overlaps) to
                 "lowdin_cached" - the Lowdin route is the validated convention;
                 set "none" explicitly to reproduce pre-change data
+            * **params['diabatization']** (string): "none" [default] keeps the SD basis. "particle" or
+                "hole" localizes, in every single-excitation manifold sharing the hole (resp. the
+                particle), the varying spin-orbital on the fragments of the step-2 fragment operators
+                (P_frag{f}_ks_{step}.npz from step2's fragment_atom_lists) and writes the
+                SD -> diabatic transformation U_sd_{step}.npz (rows: diabatic states, columns: the
+                saved SD states, in the gauge of Hvib_sd/St_sd - sorted, reordered, phase-corrected)
+                with U_sd_labels.json (what every diabatic state is) and U_sd_pops.txt (fragment
+                populations of the localized orbitals per step). A runner hands U_sd_{step} to
+                obj.basis_transform.
             * **params['npz_file_ks_homo_index']** (integer): the KS HOMO index of the raw npz files.
             * **params['is_many_body']** (bool): a True or False flag for computing the overlaps and energies
                                                  for many-body states
@@ -2570,7 +2837,8 @@ def run_step3_sd_nacs_libint(params):
                       'num_occ_beta': 1, 'num_unocc_beta': 1, 'active_space_num_occ_orbitals': 0,
                       'num_unocc_states': 1, 'verbosity': 0, 'isUKS': 0, 'es_software': 'cp2k',
                       'use_multiprocessing': False, 'logfile_directory': os.getcwd() + '/all_logfiles', 'nac_algo': 0,
-                      'sd_overlap_kernel': 'auto', 'blas_num_threads': None
+                      'sd_overlap_kernel': 'auto', 'blas_num_threads': None,
+                      'diabatization': 'none'
                       }
 
     if params['is_many_body'] and params['isUKS']:
@@ -2826,6 +3094,13 @@ def run_step3_sd_nacs_libint(params):
 
     # Update the params with sd_states_reindexed_sorted
     params.update({'sd_states_reindexed_sorted': sd_states_reindexed_sorted})
+    diabatization = str(params['diabatization']).lower()
+    W_dia = None
+    if diabatization != 'none':
+        W_dia, dia_index, dia_pops = _sd_diabatization_series(params, sd_states_reindexed_sorted,
+                                                              ks_active_space, start_time,
+                                                              finish_time, diabatization)
+        _write_diabatization_records(res_dir_2, diabatization, dia_index, dia_pops, start_time)
     if params['is_many_body']:
         # Add midpoint energies for CI states in here
         ci_midpoint_energies = step3_many_body.compute_ci_energies_midpoint(ci_energies, params)
@@ -2866,6 +3141,12 @@ def run_step3_sd_nacs_libint(params):
             St_sds.append(St_sd)
 
     print('Done with computing the SD overlaps. Elapsed time:', time.time() - t2)
+    if W_dia is not None:
+        # the localization eigenvectors carry arbitrary signs - the diabatic states
+        # follow the trajectory through the raw SD time overlaps of their own basis
+        for i in range(len(St_sds)):
+            O = W_dia[i].T @ np.asarray(St_sds[i].todense()).real @ W_dia[i + 1]
+            W_dia[i + 1] = W_dia[i + 1] * np.where(np.diag(O) < 0.0, -1.0, 1.0)
     if params['do_state_reordering'] == 2 or params['do_state_reordering'] == 1:
         t2 = time.time()
         # For state reordering we need a list of CMATRIX for both St and energy
@@ -2890,6 +3171,8 @@ def run_step3_sd_nacs_libint(params):
             if i > 0:
                 sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/Hvib_sd_{start_time+i-1}_re.npz',
                             sp.csc_matrix(0.5 * (E_sds[i] + E_sds[i - 1])))
+        if W_dia is not None:
+            W_dia = [_permute_rows(W_dia[i], perms[i]) for i in range(len(W_dia))]
         print('Done with state-reordering of SDs. Elapsed time:', time.time() - t2)
 
     if params['is_many_body']:
@@ -2975,6 +3258,10 @@ def run_step3_sd_nacs_libint(params):
                 cum_phase_aa = np.ones((nstates, 1))
                 cum_phase_bb = np.ones((nstates, 1))
 
+            if W_dia is not None:
+                # U_sd(n) refers to the phase-corrected SDs F(n)|SD(n)>: the cumulative
+                # phases BEFORE this step's update
+                _save_u_sd(res_dir_2, W_dia[step], cum_phase_aa, step + start_time)
             St_step_phase_corrected, cum_phase_aa, cum_phase_bb = apply_phase_correction_scipy(
                 St_sds[step].real, step, cum_phase_aa, cum_phase_bb, two_spinor_format=False)
             if nac_algo == 0:
@@ -2993,6 +3280,8 @@ def run_step3_sd_nacs_libint(params):
             sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/Hvib_sd_{step+start_time}_im.npz', sp.csc_matrix(Hvib_sd))
             sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/St_sd_{step+start_time}_re.npz', St_step_phase_corrected)
         print('Done with applying phase-correction to St_sd matrices. Elapsed time:', time.time() - t3)
+        if W_dia is not None:
+            _save_u_sd(res_dir_2, W_dia[len(St_sds)], cum_phase_aa, len(St_sds) + start_time)
 
         if params['is_many_body']:
             # Set up the counter
@@ -3044,6 +3333,9 @@ def run_step3_sd_nacs_libint(params):
                 Hvib_sd = data_conv.MATRIX2nparray(Hvib_sd_MATRIX)
             sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/Hvib_sd_{step+start_time}_im.npz', sp.csc_matrix(Hvib_sd))
             sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/St_sd_{step+start_time}_re.npz', St_sds[step])
+        if W_dia is not None:
+            for i in range(len(W_dia)):
+                _save_u_sd(res_dir_2, W_dia[i], None, i + start_time)
 
         if params['is_many_body']:
             for step in range(finish_time - start_time - 1):

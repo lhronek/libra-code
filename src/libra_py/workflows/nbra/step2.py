@@ -447,6 +447,14 @@ def run_cp2k_libint_step2(params):
                                                         overlap_csr_write=False there for stock CP2K without the
                                                         S_CSR_WRITE patch).
 
+                             fragment_atom_lists (list of lists of int): 1-based atom indices of disjoint
+                                                                          fragments. When set, the Mulliken fragment
+                                                                          operators of every frame are saved as
+                                                                          P_frag{f}_ks_{step}.npz (same 2-block layout
+                                                                          as S_ks) for the step-3 diabatization -
+                                                                          needs mo_source "wfn" with
+                                                                          ao_overlap_method "cp2k" [default: None].
+
                              cp2k_ot_input_template (string): The CP2K OT input template file name (just for the xTB).
                                                               None/absent skips the OT stage: the diagonalization runs then
                                                               chain their own wfn restarts (see CP2K_methods.run_cp2k_xtb) -
@@ -530,6 +538,7 @@ def run_cp2k_libint_step2(params):
         'restart_file': True,
         'ao_overlap_method': 'cp2k',
         'mo_source': 'wfn',
+        'fragment_atom_lists': None,
         'overlap_template': '',
         'cp2k_data_dir': '',
         'omp_num_threads': 1,
@@ -600,6 +609,10 @@ def run_cp2k_libint_step2(params):
     mo_source = params['mo_source'].lower()
     if mo_source == 'wfn' and ao_overlap_method != 'cp2k':
         raise ValueError('mo_source="wfn" requires ao_overlap_method="cp2k" (no libint shells from a wfn)')
+    fragment_atom_lists = params['fragment_atom_lists']
+    if fragment_atom_lists is not None and (mo_source != 'wfn' or ao_overlap_method != 'cp2k'):
+        raise ValueError('fragment_atom_lists needs mo_source="wfn" with ao_overlap_method="cp2k" - '
+                         'the fragment operators use the wfn AO->atom map and the CP2K AO overlap')
     if ao_overlap_method == 'cp2k':
         if params['use_emultipole']:
             raise ValueError('use_emultipole requires the libint machinery (the multipole '
@@ -711,9 +724,10 @@ def run_cp2k_libint_step2(params):
             # the same bracket guard as the libint route
             _check_homo_bracket(step, isxTB, isUKS, lowest_orbital,
                                 highest_orbital)
-            St, S_prev, S = CP2K_methods.mo_overlaps_via_cp2k(mo_prev, mo_curr, R_prev, R_curr,
-                                                              lowest_orbital, highest_orbital,
-                                                              odt_params)
+            odt_out = CP2K_methods.mo_overlaps_via_cp2k(mo_prev, mo_curr, R_prev, R_curr,
+                                                        lowest_orbital, highest_orbital,
+                                                        odt_params, fragment_atom_lists)
+            St, S_prev, S = odt_out[:3]
             # 2-block npz convention (alpha | beta on the diagonal): restricted runs
             # duplicate the single channel, UKS carries genuinely distinct blocks
             S_a, S_b = S if isUKS else (S, S)
@@ -729,6 +743,20 @@ def run_cp2k_libint_step2(params):
             scipy.sparse.save_npz(params['res_dir'] + F'/S_ks_{step}.npz', S_step_sparse)
             E_step_sparse = scipy.sparse.csc_matrix(data_conv.form_block_matrix(E_a, zero_mat, zero_mat, E_b))
             scipy.sparse.save_npz(params['res_dir'] + F'/E_ks_{step}.npz', E_step_sparse)
+            if fragment_atom_lists is not None:
+                # the fragments covering all atoms sum to S - a residual there is a
+                # broken AO->atom map or a broken window
+                P_sum = np.zeros_like(S_a)
+                for f, P in enumerate(odt_out[3]):
+                    P_a, P_b = P if isUKS else (P, P)
+                    P_sum = P_sum + P_a
+                    scipy.sparse.save_npz(params['res_dir'] + F'/P_frag{f}_ks_{step}.npz',
+                                          scipy.sparse.csc_matrix(data_conv.form_block_matrix(P_a, zero_mat, zero_mat, P_b)))
+                if len(set().union(*[set(a) for a in fragment_atom_lists])) == len(labels_step):
+                    resid = float(np.max(np.abs(P_sum - S_a)))
+                    if resid > 1e-8:
+                        raise ValueError(F'step {step}: the fragment operators of all atoms sum to S '
+                                         F'only within {resid:.2e} - the AO->atom map does not match the AO overlap')
             if counter > 0:
                 St_a, St_b = St if isUKS else (St, St)
                 St_step_sparse = scipy.sparse.csc_matrix(data_conv.form_block_matrix(St_a, zero_mat, zero_mat, St_b))
