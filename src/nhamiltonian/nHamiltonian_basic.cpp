@@ -1947,6 +1947,35 @@ int nHamiltonian::lowdin_dia(CMATRIX &X, CMATRIX &Y) {
   return lowdin_frame(*ovlp_dia, X, Y);
 }
 
+int nHamiltonian::lowdin_dia_derivative(int n, CMATRIX &X, CMATRIX &Y, CMATRIX &dX, CMATRIX &dY) {
+  /**
+    The Lowdin frame X = S^-1/2, Y = S^1/2 and its derivative along nuclear DOF n.
+    The metric gradient is the Hermitian part of the diabatic derivative coupling,
+    dS = D_n + D_n^H with D_ij = <i|d j> - a basis without dc1_dia has, by that
+    contract, a constant metric. Returns the lowdin_dia status (0 = identity metric,
+    nothing filled); dX and dY are zero when dc1_dia[n] is absent or dS vanishes
+  */
+  int status = lowdin_dia(X, Y);
+  if (status == 0) { return 0; }
+  if (dX.n_rows != ndia || dX.n_cols != ndia || dY.n_rows != ndia || dY.n_cols != ndia) {
+    cout << "Error in lowdin_dia_derivative: dX and dY must be " << ndia << " x " << ndia << " matrices\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  dX = 0.0;
+  dY = 0.0;
+  if (dc1_dia_mem_status[n] == 0) { return 1; }
+  CMATRIX dS(ndia, ndia);
+  dS = *dc1_dia[n] + (*dc1_dia[n]).H();
+  int moving = 0;
+  for (int i = 0; i < ndia && !moving; i++) {
+    for (int j = 0; j < ndia; j++) {
+      if (std::abs(dS.get(i, j)) > 0.0) { moving = 1; break; }
+    }
+  }
+  if (moving) { sqrt_matrix_derivative(*ovlp_dia, dS, dY, dX); }
+  return 1;
+}
+
 CMATRIX nHamiltonian::get_ham_dia_lowdin() {
   /**
     The diabatic Hamiltonian in the Lowdin frame, X ham_dia X (ham_dia itself at S = I)
@@ -1958,25 +1987,47 @@ CMATRIX nHamiltonian::get_ham_dia_lowdin() {
   return H;
 }
 
-CMATRIX nHamiltonian::get_hvib_dia_lowdin() {
+CMATRIX nHamiltonian::get_hvib_dia_lowdin(MATRIX &p, const MATRIX &invM) {
   /**
-    The diabatic vibronic Hamiltonian in the Lowdin frame, X hvib_dia X
+    The vibronic Hamiltonian in the Lowdin frame: X hvib_dia X + i (dY/dt) X, the generator
+    of i db/dt for b = Y C_dia. The second term is the motion of the frame itself,
+    dY/dt = sum_n v_n dY_n with dY_n from dS_n = dc1_dia[n] + dc1_dia[n]^H - together the two
+    terms are Hermitian, X hvib_dia X alone is not once the metric moves. It vanishes for a
+    constant metric. p and invM are (nnucl x 1)
   */
   CMATRIX H(get_hvib_dia());
   CMATRIX X(ndia, ndia);
   CMATRIX Y(ndia, ndia);
-  if (lowdin_dia(X, Y)) { return X * H * X; }
-  return H;
+  if (lowdin_dia(X, Y) == 0) { return H; }
+  CMATRIX res(X * H * X);
+  CMATRIX dX(ndia, ndia);
+  CMATRIX dY(ndia, ndia);
+  for (int n = 0; n < nnucl; n++) {
+    if (dc1_dia_mem_status[n] == 0) { continue; }
+    double v = p.get(n, 0) * invM.get(n, 0);
+    if (v == 0.0) { continue; }
+    lowdin_dia_derivative(n, X, Y, dX, dY);
+    res += complex<double>(0.0, v) * (dY * X);
+  }
+  return res;
 }
 
 CMATRIX nHamiltonian::get_d1ham_dia_lowdin(int i) {
   /**
-    The derivative of the diabatic Hamiltonian w.r.t. nuclear DOF i in the Lowdin frame, X d1ham_dia[i] X
+    The total derivative of the Lowdin-frame Hamiltonian X ham_dia X along nuclear DOF i:
+    X d1ham_dia[i] X + dX ham_dia X + X ham_dia dX, with dX from dS = dc1_dia[i] + dc1_dia[i]^H.
+    Its diagonal is minus the force on a Lowdin state, the quantity that conserves the total
+    energy with the (X ham_dia X)_ss state energies
   */
   CMATRIX D(get_d1ham_dia(i));
   CMATRIX X(ndia, ndia);
   CMATRIX Y(ndia, ndia);
-  if (lowdin_dia(X, Y)) { return X * D * X; }
+  CMATRIX dX(ndia, ndia);
+  CMATRIX dY(ndia, ndia);
+  if (lowdin_dia_derivative(i, X, Y, dX, dY)) {
+    CMATRIX H(get_ham_dia());
+    return X * D * X + dX * H * X + X * H * dX;
+  }
   return D;
 }
 

@@ -420,8 +420,9 @@ public:
   CMATRIX get_d1ham_dia(int i, vector<int>& id_);
   int lowdin_dia(CMATRIX& X, CMATRIX& Y);       ///< Lowdin frame of the diabats: X = S^-1/2, Y = S^1/2 of ovlp_dia. Returns 0 (X, Y untouched) for an absent or identity metric
   CMATRIX get_ham_dia_lowdin();                  ///< X ham_dia X - the diabatic Hamiltonian in the Lowdin frame (ham_dia itself at S = I)
-  CMATRIX get_hvib_dia_lowdin();                 ///< X hvib_dia X
-  CMATRIX get_d1ham_dia_lowdin(int i);           ///< X d1ham_dia[i] X
+  int lowdin_dia_derivative(int n, CMATRIX& X, CMATRIX& Y, CMATRIX& dX, CMATRIX& dY);  ///< the Lowdin frame and its derivative along nuclear DOF n from dS = dc1_dia[n] + dc1_dia[n]^H. Returns the lowdin_dia status, dX = dY = 0 for a constant metric
+  CMATRIX get_hvib_dia_lowdin(MATRIX& p, const MATRIX& invM);   ///< X hvib_dia X + i (dY/dt) X - the vibronic generator of the Lowdin frame, p and invM (nnucl x 1)
+  CMATRIX get_d1ham_dia_lowdin(int i);           ///< the total derivative of the Lowdin-frame Hamiltonian X ham_dia X along nuclear DOF i
   CMATRIX get_d2ham_dia(int i);
   CMATRIX get_d2ham_dia(int i, vector<int>& id_);
   CMATRIX get_d2ham_dia(int i,int j);

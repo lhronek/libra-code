@@ -60,6 +60,9 @@ void export_nhamiltonian_objects(){
 
   CMATRIX (nHamiltonian::*expt_get_d1ham_dia_v1)(int i) = &nHamiltonian::get_d1ham_dia;
   CMATRIX (nHamiltonian::*expt_get_d1ham_dia_v2)(int i, vector<int>&) = &nHamiltonian::get_d1ham_dia;
+  CMATRIX (nHamiltonian::*expt_get_ham_dia_lowdin_v1)() = &nHamiltonian::get_ham_dia_lowdin;
+  CMATRIX (nHamiltonian::*expt_get_hvib_dia_lowdin_v1)(MATRIX& p, const MATRIX& invM) = &nHamiltonian::get_hvib_dia_lowdin;
+  CMATRIX (nHamiltonian::*expt_get_d1ham_dia_lowdin_v1)(int i) = &nHamiltonian::get_d1ham_dia_lowdin;
 
   CMATRIX (nHamiltonian::*expt_get_d2ham_dia_v11)(int i) = &nHamiltonian::get_d2ham_dia;
   CMATRIX (nHamiltonian::*expt_get_d2ham_dia_v12)(int i, vector<int>&) = &nHamiltonian::get_d2ham_dia;
@@ -470,6 +473,9 @@ void export_nhamiltonian_objects(){
       .def("get_dc1_dia", expt_get_dc1_dia_v2)
       .def("get_ham_dia", expt_get_ham_dia_v1)
       .def("get_ham_dia", expt_get_ham_dia_v2)
+      .def("get_ham_dia_lowdin", expt_get_ham_dia_lowdin_v1)
+      .def("get_hvib_dia_lowdin", expt_get_hvib_dia_lowdin_v1)
+      .def("get_d1ham_dia_lowdin", expt_get_d1ham_dia_lowdin_v1)
       .def("get_nac_dia", expt_get_nac_dia_v1)
       .def("get_ham_dia", expt_get_ham_dia_v2)
       .def("get_hvib_dia", expt_get_hvib_dia_v1)

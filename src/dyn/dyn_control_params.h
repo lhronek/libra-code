@@ -104,6 +104,9 @@ class dyn_control_params{
    (nHamiltonian::lowdin_dia): the hopping states are the symmetrically orthonormalized
    diabats, identical to them at S = I, and the initial active states follow the Lowdin
    populations of the initial amplitudes. se_pop_dia stays the plain |C_i|^2
+   A coordinate-dependent metric enters through dS = dc1_dia + dc1_dia^H: the state
+   forces and LZ gap velocities carry the total derivative of X H X, the hop flux the
+   generator X Hvib X + i (dY/dt) X
   */
   int rep_sh;
 

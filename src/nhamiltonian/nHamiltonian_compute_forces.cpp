@@ -87,7 +87,7 @@ CMATRIX nHamiltonian::forces_dia(vector<int>& act_states){
 
     for(int traj=0; traj<ntraj; traj++){
       int st = act_states[traj];
-      // non-orthogonal diabats: the force of the Lowdin state, -(X dH X)_ss
+      // non-orthogonal diabats: the force of the Lowdin state, minus the total derivative of (X H X)_ss
       CMATRIX X(children[traj]->ndia, children[traj]->ndia);
       CMATRIX Y(children[traj]->ndia, children[traj]->ndia);
       int lowdin = children[traj]->lowdin_dia(X, Y);
@@ -99,7 +99,7 @@ DOF "<<dof<<" is not allocated for trajectory "<<traj<<" but is needed for the c
           std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
         if(lowdin){
-          CMATRIX dH(X * (*children[traj]->d1ham_dia[dof]) * X);
+          CMATRIX dH(children[traj]->get_d1ham_dia_lowdin(dof));
           res.set(dof, traj, -dH.get(st, st) );
         }
         else{ res.set(dof, traj, -children[traj]->d1ham_dia[dof]->get(st, st) ); }

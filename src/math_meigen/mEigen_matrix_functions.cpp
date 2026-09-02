@@ -143,6 +143,41 @@ int lowdin_frame(CMATRIX& S, CMATRIX& X, CMATRIX& Y){
   return 1;
 }
 
+void sqrt_matrix_derivative(CMATRIX& S, CMATRIX& dS, CMATRIX& dY, CMATRIX& dX){
+/**
+  Derivatives of Y = S^1/2 and X = S^-1/2 along a Hermitian variation dS of a positive-definite S.
+  With S = V s V^H (Daleckii-Krein): (V^H dF V)_ab = (V^H dS V)_ab (f(s_a) - f(s_b))/(s_a - s_b), the
+  divided differences written in their cancellation-free forms 1/(sqrt(s_a) + sqrt(s_b)) and
+  -1/(sqrt(s_a) sqrt(s_b) (sqrt(s_a) + sqrt(s_b))), which are the derivatives f' on the diagonal
+*/
+  int n = S.n_cols;
+  if(S.n_rows != n || dS.n_rows != n || dS.n_cols != n || dY.n_rows != n || dY.n_cols != n || dX.n_rows != n || dX.n_cols != n){
+    cout<<"Error in libmeigen::sqrt_matrix_derivative : S, dS, dY and dX must all be "<<n<<" x "<<n<<" matrices\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  CMATRIX s(n, n);
+  CMATRIX V(n, n);
+  solve_eigen(S, s, V, 0);
+  CMATRIX W(n, n);
+  W = V.H() * dS * V;
+  CMATRIX GY(n, n);
+  CMATRIX GX(n, n);
+  for(int a=0; a<n; a++){
+    for(int b=0; b<n; b++){
+      double sa = s.get(a,a).real();
+      double sb = s.get(b,b).real();
+      if(sa <= 0.0 || sb <= 0.0){
+        cout<<"Error in libmeigen::sqrt_matrix_derivative : the metric is not positive definite (eigenvalue "<<std::min(sa, sb)<<")\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
+      double ra = std::sqrt(sa);
+      double rb = std::sqrt(sb);
+      GY.set(a, b, W.get(a,b) / (ra + rb));
+      GX.set(a, b, -W.get(a,b) / (ra * rb * (ra + rb)));
+    }
+  }
+  dY = V * GY * V.H();
+  dX = V * GX * V.H();
+}
+
 
 
 void exp_matrix(CMATRIX& res, CMATRIX& S, complex<double> dt, int do_phase_correction){

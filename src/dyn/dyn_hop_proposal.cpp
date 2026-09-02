@@ -1662,7 +1662,7 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
     else if(prms.rep_sh==0){
       dm = *dyn_var.dm_dia[traj];
       // non-orthogonal diabats: hop in the Lowdin frame - rho_L = Y rho Y here,
-      // Hvib_L = X Hvib X through the getter below, populations |(S^1/2 c)_i|^2
+      // Hvib_L = X Hvib X + i (dY/dt) X through the getter below, populations |(S^1/2 c)_i|^2
       lowdin_sh = ham.child(traj)->lowdin_dia(X_l, Y_l);
       if(lowdin_sh){ dm = Y_l * dm * Y_l; }
     }
@@ -1686,7 +1686,8 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
         if(prms.rep_tdse==2){ Hvib = ham.child(traj)->get_hvib_dia(); }
       }
       else{
-        Hvib = ham.child(traj)->get_hvib_dia_lowdin();
+        pop_submatrix(*dyn_var.p, p_traj, nucl_stenc_x, nucl_stenc_y);
+        Hvib = ham.child(traj)->get_hvib_dia_lowdin(p_traj, *dyn_var.iM);
       }
     }
 
