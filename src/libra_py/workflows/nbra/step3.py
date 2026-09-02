@@ -2895,7 +2895,9 @@ def run_step3_sd_nacs_libint(params):
     if params['is_many_body']:
         St_cis = []
 
-        for step in range(start_time, finish_time - 1):
+        # every step start_time..finish_time-1 has CI energies: the midpoints cover the
+        # same finish_time-start_time-1 intervals as the SD data
+        for step in range(start_time, finish_time):
             # Adding 0.0 to the total energy
             E_ci_step = np.concatenate((np.array([0.0]), np.array(ci_energies[step - start_time])))
             if step > start_time:
@@ -2907,7 +2909,7 @@ def run_step3_sd_nacs_libint(params):
             # Since we have performed state-reordering we need to
             # convert to scipy npz format now
             t2 = time.time()
-            for i in range(len(St_sds_cmatrix) - 1):
+            for i in range(len(St_sds_cmatrix)):
                 sd2ci_prev = SD2CI[i]
                 sd2ci_curr = SD2CI[i + 1]
                 # Compute the St_ci
@@ -2921,11 +2923,13 @@ def run_step3_sd_nacs_libint(params):
             E_cis_cmatrix = []
             St_cis_cmatrix = []
 
-            for step in range(start_time, finish_time - 1):
+            for step in range(start_time, finish_time):
                 # Adding 0.0 to the total energy
                 E_ci_step = np.concatenate((np.array([0.0]), np.array(ci_energies[step - start_time])))
                 E_cis_cmatrix.append(data_conv.nparray2CMATRIX(np.diag(E_ci_step)))
-                St_cis_cmatrix.append(data_conv.nparray2CMATRIX(np.array(St_cis[c].todense().real)))
+                # one interval fewer than steps: the last step carries energies only
+                if c < len(St_cis):
+                    St_cis_cmatrix.append(data_conv.nparray2CMATRIX(np.array(St_cis[c].todense().real)))
                 # if step>start_time:
                 #    E_midpoint = np.diag(0.5*(E_ci_step+E_ci_step_plus)*units.ev2Ha)
                 #    sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/Hvib_ci_{step-1}_re.npz',sp.csc_matrix(E_midpoint))
@@ -2948,7 +2952,7 @@ def run_step3_sd_nacs_libint(params):
                 St_cis[i] = data_conv.MATRIX2scipynpz(St_cis_cmatrix[i].real())
 
         else:
-            for i in range(len(St_sds) - 1):
+            for i in range(len(St_sds)):
                 sd2ci_prev = SD2CI[i]
                 sd2ci_curr = SD2CI[i + 1]
                 # Compute the St_ci
@@ -3042,7 +3046,7 @@ def run_step3_sd_nacs_libint(params):
             sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/St_sd_{step+start_time}_re.npz', St_sds[step])
 
         if params['is_many_body']:
-            for step in range(finish_time - start_time - 2):
+            for step in range(finish_time - start_time - 1):
                 St_ci_step = St_cis[step].todense().real
                 if nac_algo == 0:
                     # HST: Im(Hvib) = -d = (St^T - St)/(2 dt), with St_ij = <i(t)|j(t+dt)>
