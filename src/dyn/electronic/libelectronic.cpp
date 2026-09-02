@@ -103,6 +103,8 @@ void export_Electronic_objects(){
 
   void (*expt_propagate_electronic_nonHermitian_v1)(double dt,CMATRIX& Coeff, CMATRIX& Hvib) = &propagate_electronic_nonHermitian;
   def("propagate_electronic_nonHermitian", expt_propagate_electronic_nonHermitian_v1);
+  void (*expt_propagate_electronic_lowdin_v1)(double dt, CMATRIX& Coeff, CMATRIX& Hvib, CMATRIX& S_old, CMATRIX& S_new) = &propagate_electronic_lowdin;
+  def("propagate_electronic_lowdin", expt_propagate_electronic_lowdin_v1);
 
 
   void (*expt_grid_propagator_v1)(double dt, CMATRIX& Hvib, CMATRIX& S, CMATRIX& U) = &grid_propagator;

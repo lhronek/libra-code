@@ -551,6 +551,39 @@ void propagate_electronic_qtag(double dt, CMATRIX& Coeff, CMATRIX& Hvib, CMATRIX
 
 }// propagate_electronic_qtag
 
+void propagate_electronic_lowdin(double dt, CMATRIX& Coeff, CMATRIX& Hvib, CMATRIX& S_old, CMATRIX& S_new){
+/**
+  Solves i*hbar*S*dc/dt = Hvib*c over one step of a MOVING metric S(t) -> S(t+dt) in the Lowdin
+  frame b = S^1/2 c, where the generator is Hermitian and the step is unitary:
+      i db/dt = G b,   G = X Hvib X + i (dY/dt) X,   X = S^-1/2, Y = S^1/2
+  (Hvib = H - i v.D is itself non-Hermitian for a moving metric, Hvib - Hvib^H = -i dS/dt,
+  and the frame term restores Hermiticity). The midpoint metric gives X and the frame
+  velocity is the finite difference (Y_new - Y_old)/dt; the O(dt^2) mismatch between that
+  difference and the model's dc1_dia is dropped by taking the Hermitian part of G, so
+  b^H b = c^H S c is conserved exactly. c(t+dt) = X_new b(t+dt). For a constant metric this
+  is exp(-i S^-1 Hvib dt) - the callers keep that path for a metric that does not move
+  \param[in] dt The integration time step
+  \param[in,out] Coeff The diabatic amplitudes, CMATRIX(ndia, 1) or (ndia, ntraj)
+  \param[in] Hvib The vibronic Hamiltonian at the midpoint of the step
+  \param[in] S_old, S_new The diabatic overlap at the start and the end of the step
+*/
+  int sz = Hvib.n_cols;
+  CMATRIX Y0(sz, sz);  CMATRIX X0(sz, sz);
+  CMATRIX Y1(sz, sz);  CMATRIX X1(sz, sz);
+  CMATRIX Ym(sz, sz);  CMATRIX Xm(sz, sz);
+  CMATRIX Sm(sz, sz);
+  Sm = 0.5 * (S_old + S_new);
+  sqrt_matrix(S_old, Y0, X0);
+  sqrt_matrix(S_new, Y1, X1);
+  sqrt_matrix(Sm, Ym, Xm);
+  CMATRIX G(sz, sz);
+  G = Xm * Hvib * Xm + complex<double>(0.0, 1.0 / dt) * ((Y1 - Y0) * Xm);
+  G = 0.5 * (G + G.H());
+  CMATRIX b(Y0 * Coeff);
+  propagate_electronic_eig(dt, b, G);
+  Coeff = X1 * b;
+}
+
 void propagate_electronic_qtag2(double dt, CMATRIX& Coeff, CMATRIX& Hvib, CMATRIX& Hvib_old, CMATRIX& S, CMATRIX& S_old){
 /**
   Solves the generalized time-dependent Schrodinger equation:

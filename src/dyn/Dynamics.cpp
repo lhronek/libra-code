@@ -414,6 +414,17 @@ void SSY_correction(CMATRIX &Ham, dyn_variables &dyn_var, nHamiltonian &ham,
   SSY_correction(Ham, dyn_var, &ham, itraj);
 }
 
+// the diabatic metric changed over the step (any element, exactly) - the rep-0
+// propagators then take the Lowdin-frame step instead of their constant-metric form
+static int metric_moved(CMATRIX &S_old, CMATRIX &S_new) {
+  for (int i = 0; i < S_old.n_rows; i++) {
+    for (int j = 0; j < S_old.n_cols; j++) {
+      if (S_old.get(i, j) != S_new.get(i, j)) { return 1; }
+    }
+  }
+  return 0;
+}
+
 void propagate_electronic(dyn_variables &dyn_var, nHamiltonian &ham,
                           nHamiltonian &ham_prev, dyn_control_params &prms) {
 
@@ -1100,8 +1111,16 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         // Based on Lowdin transformations, using mid-point Hvib
         Hvib = 0.5 * (ham->get_hvib_dia() + ham_prev->get_hvib_dia());
         Sdia = ham->get_ovlp_dia();
-        propagate_electronic_eig(dt, C, Hvib,
-                                 Sdia); // in this case C - diabatic coeffs
+        CMATRIX Sdia_old(ham->ndia, ham->ndia);
+        Sdia_old = ham_prev->get_ovlp_dia();
+        if (metric_moved(Sdia_old, Sdia)) {
+          // a moving metric makes Hvib non-Hermitian - the generalized eigen
+          // route cannot take it, the Lowdin-frame step is its exact form
+          propagate_electronic_lowdin(dt, C, Hvib, Sdia_old, Sdia);
+        } else {
+          propagate_electronic_eig(dt, C, Hvib,
+                                   Sdia); // in this case C - diabatic coeffs
+        }
       } else if (method == 1 || method == 101) {
         Hvib = 0.5 * (ham->get_hvib_dia() + ham_prev->get_hvib_dia());
         Sdia = ham->get_ovlp_dia();
@@ -1120,10 +1139,18 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         // Using exp(S^-1 * Hvib_dia * dt)
         Hvib = 0.5 * (ham->get_hvib_dia() + ham_prev->get_hvib_dia());
         Sdia = ham->get_ovlp_dia();
-        CMATRIX invS(ham->ndia, ham->ndia);
-        FullPivLU_inverse(Sdia, invS);
-        Hvib = invS * Hvib;
-        propagate_electronic_nonHermitian(dt, C, Hvib);
+        CMATRIX Sdia_old(ham->ndia, ham->ndia);
+        Sdia_old = ham_prev->get_ovlp_dia();
+        if (metric_moved(Sdia_old, Sdia)) {
+          // exp(S^-1 Hvib dt) with S taken at one end conserves c^H S c only to
+          // O(dt) once the metric moves - the Lowdin-frame step conserves it exactly
+          propagate_electronic_lowdin(dt, C, Hvib, Sdia_old, Sdia);
+        } else {
+          CMATRIX invS(ham->ndia, ham->ndia);
+          FullPivLU_inverse(Sdia, invS);
+          Hvib = invS * Hvib;
+          propagate_electronic_nonHermitian(dt, C, Hvib);
+        }
       }
 
     } // rep == 0 // diabatic
