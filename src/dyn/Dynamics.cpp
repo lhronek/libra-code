@@ -1290,6 +1290,17 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         CMATRIX Hvib(ham->ndia, ham->ndia);
         Hvib = 0.5 * (ham->get_hvib_dia() + ham_prev->get_hvib_dia());
 
+        // non-orthogonal diabats: the generator of i S dC/dt = Hvib C is S^-1 Hvib,
+        // and its Liouvillian (non-Hermitian, real spectrum E_i - E_j) is the image
+        // d rho/dt = -i (A rho - rho A^H) of that equation for the plain C C^H density
+        // the rep-sync layer stores. An identity metric leaves Hvib bit-identical
+        if (ham->ovlp_dia_mem_status) {
+          CMATRIX Sdia(ham->ndia, ham->ndia);
+          Sdia = ham->get_ovlp_dia();
+          CMATRIX invS(ham->ndia, ham->ndia);
+          FullPivLU_inverse(Sdia, invS);
+          Hvib = invS * Hvib;
+        }
         L = make_Liouvillian(Hvib);
         vRHO = vectorize_density_matrix(dyn_var.dm_dia[itraj]);
 

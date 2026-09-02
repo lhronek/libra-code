@@ -265,8 +265,9 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params){
   // dm_dia is the PLAIN-coefficient density C C^H and its diagonal the
   // plain |C_i|^2 - exact populations for orthonormal diabats; with
   // ovlp_dia != I the S-metric variants derive in post (Re diag(dm S)),
-  // and the dia->adi directions here (rep 0/2) assume S = I, guarded at
-  // setup (diabatic propagation/hopping raises for non-identity ovlp_dia)
+  // and the dia->adi directions here carry the cached metric (C_adi = U^H S C_dia,
+  // rho_adi = (S U)^H rho_dia (S U)). Only the diabatic hop machinery (rep_sh 0)
+  // still assumes S = I, guarded at setup
   // Deterministic per-trajectory updates - parallel-safe (each iteration
   // writes only its own dm slots); results identical for any thread count
   // exceptions cannot leave an OMP-outlined region (even serialized) -
