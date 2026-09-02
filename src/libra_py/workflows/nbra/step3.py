@@ -2504,27 +2504,37 @@ def _permute_rows(W, perm):
 def sd_diabatization_groups(sd_lists, kind):
     """
     The localization manifolds of an SD basis: single excitations of the reference
-    determinant that share the hole ("particle": the excited electron varies) or the
-    particle ("hole": the hole varies).
+    determinant that share the hole ("particle": the excited electron varies), the
+    particle ("hole": the hole varies), or the spin channel ("joint": the complete
+    hole x particle product of a channel, holes and electrons localized together).
 
     Args:
         sd_lists (list of lists of int): the SDs of one step in the signed reindexed
             spin-orbital notation of ovlp_arb, in their row order
-        kind (str): "particle" or "hole"
+        kind (str): "particle", "hole" or "joint"
 
     Returns:
         gs (int): row of the reference determinant (the lowest orbital sum)
-        groups (list of dict): manifolds with >= 2 members - "key" (the shared spin-orbital),
-            "rows" (member rows), "orbs" (the varying spin-orbital of every member, ascending),
-            "tau" and "sigma" (signs such that the localized state with the varying orbital
-            psi_A = sum_j w_jA orb_j reads sum_j tau_j sigma_j w_jA |SD_row_j>: tau_j is the
-            parity between the member's list and the fixed-orbitals-first order, sigma_j the
-            cofactor sign (-1)^j of a hole manifold, 1 for a particle manifold)
+        groups (list of dict): manifolds with >= 2 members - "key" (the shared spin-orbital,
+            or the channel sign for "joint"), "rows" (member rows), "tau" (parity signs).
+            particle/hole: "orbs" (the varying spin-orbital of every member, ascending) and
+            "sigma" - the localized state with the varying orbital psi_A = sum_j w_jA orb_j
+            reads sum_j tau_j sigma_j w_jA |SD_row_j> (tau_j: parity between the member's list
+            and the fixed-orbitals-first order, sigma_j: the cofactor sign (-1)^j of a hole
+            manifold, 1 for a particle manifold). joint: "pairs" (the (hole, particle) of every
+            member), "holes" and "parts" (the ascending hole and particle spin-orbitals) -
+            the state a+_Y a_X |ref> with localized psi_X = sum_i wh_iX hole_i and
+            phi_Y = sum_a wp_aY part_a reads sum_j tau_j wh_(i_j)X wp_(a_j)Y |SD_row_j>, tau_j
+            the parity between the member's list and the in-place replacement of its hole in
+            the reference list (a+_a a_i |ref> is the in-place determinant)
         singles (list of int): rows left untransformed (the reference, one-member manifolds,
             non-single excitations)
+
+    Raises ValueError for an unknown kind, and for "joint" when a channel's single
+    excitations do not form the complete hole x particle product.
     """
-    if kind not in ("particle", "hole"):
-        raise ValueError(F"diabatization {kind!r} - use 'none', 'particle' or 'hole'")
+    if kind not in ("particle", "hole", "joint"):
+        raise ValueError(F"diabatization {kind!r} - use 'none', 'particle', 'hole' or 'joint'")
     sets = [frozenset(int(o) for o in sd) for sd in sd_lists]
     gs = min(range(len(sets)), key=lambda k: sum(abs(o) for o in sets[k]))
     ref = sets[gs]
@@ -2538,13 +2548,34 @@ def sd_diabatization_groups(sd_lists, kind):
             singles.append(k)
             continue
         h, pt = next(iter(hole)), next(iter(part))
+        if kind == "joint":
+            manifolds.setdefault(1 if pt > 0 else -1, []).append(((h, pt), k))
+            continue
         key, var = (h, pt) if kind == "particle" else (pt, h)
         manifolds.setdefault(key, []).append((var, k))
     groups = []
+    ref_list = [int(o) for o in sd_lists[gs]]
     for key in sorted(manifolds):
         members = sorted(manifolds[key])
         if len(members) < 2:
             singles.append(members[0][1])
+            continue
+        if kind == "joint":
+            pairs = [ia for ia, k in members]
+            rows = [k for ia, k in members]
+            holes = sorted({h for h, pt in pairs})
+            parts = sorted({pt for h, pt in pairs})
+            if len(set(pairs)) != len(pairs) or len(pairs) != len(holes) * len(parts):
+                raise ValueError(F"joint localization needs the complete hole x particle product of "
+                                 F"the {'alpha' if key > 0 else 'beta'} channel: {len(holes)} holes x "
+                                 F"{len(parts)} particles but {len(pairs)} single excitations")
+            tau = []
+            for j, (h, pt) in enumerate(pairs):
+                in_place = list(ref_list)
+                in_place[in_place.index(h)] = pt
+                tau.append(slatdet.permutation_parity(in_place, [int(o) for o in sd_lists[rows[j]]]))
+            groups.append({"key": key, "rows": rows, "pairs": pairs, "holes": holes, "parts": parts,
+                           "tau": tau, "kind": kind})
             continue
         orbs = [v for v, k in members]
         rows = [k for v, k in members]
@@ -2625,14 +2656,15 @@ def sd_diabatization_step(sd_lists, P_frag, kind, dia_index=None):
         sd_lists (list of lists of int): the SDs of the step in their row order
         P_frag (list of arrays): fragment operators in the active-space 2-block layout
             (orthonormal orbitals)
-        kind (str): "particle" or "hole"
+        kind (str): "particle", "hole" or "joint"
         dia_index (list, optional): the diabatic-state index of an earlier step - the
             columns keep its order, None builds it (reference and singles first, then
-            the manifolds by key, fragment-major)
+            the manifolds by key, fragment-major - hole-major then electron for "joint")
 
     Returns:
-        W (array (nsd, nsd)), dia_index (list), pops (array (nsd, nfrag)): fragment
-        populations of every diabatic state's localized orbital, nan for the untransformed
+        W (array (nsd, nsd)), dia_index (list), pops (array (nsd, nfrag)), pops_hole
+        (array (nsd, nfrag)): fragment populations of every diabatic state's localized
+        electron (varying) orbital and of its localized hole ("joint" only), nan elsewhere
 
     Raises ValueError when the SD content or the per-fragment orbital counts differ from
     the index (the localization must be stable along the trajectory) and when W is not
@@ -2645,19 +2677,42 @@ def sd_diabatization_step(sd_lists, P_frag, kind, dia_index=None):
     gs, groups, singles = sd_diabatization_groups(sd_lists, kind)
     loc = {}
     for g in groups:
-        w, frag, pops = localize_fragment_block(P_frag, [_sd_block_index(o, nact) for o in g["orbs"]])
-        loc[g["key"]] = (g, w, frag, pops)
+        if g["kind"] == "joint":
+            loc_h = localize_fragment_block(P_frag, [_sd_block_index(o, nact) for o in g["holes"]])
+            loc_p = localize_fragment_block(P_frag, [_sd_block_index(o, nact) for o in g["parts"]])
+            loc[g["key"]] = (g, loc_h, loc_p)
+        else:
+            w, frag, pops = localize_fragment_block(P_frag, [_sd_block_index(o, nact) for o in g["orbs"]])
+            loc[g["key"]] = (g, w, frag, pops)
+
+    def _cols(frag, f, r, what, key):
+        cols_f = [c for c in range(len(frag)) if frag[c] == f]
+        if r >= len(cols_f):
+            raise ValueError(F"manifold {key}: fragment {f} holds {len(cols_f)} localized {what} "
+                             F"orbitals at this step, at least {r + 1} expected - the "
+                             F"localization is not stable along the trajectory")
+        return cols_f[r]
+
     if dia_index is None:
         dia_index = [("sd", sets[k]) for k in singles]
         for key in sorted(loc):
-            frag = loc[key][2]
-            for f in range(nfrag):
-                for r in range(frag.count(f)):
-                    dia_index.append(("loc", key, f, r))
+            if loc[key][0]["kind"] == "joint":
+                frag_h, frag_p = loc[key][1][1], loc[key][2][1]
+                for f_h in range(nfrag):
+                    for r_h in range(frag_h.count(f_h)):
+                        for f_p in range(nfrag):
+                            for r_p in range(frag_p.count(f_p)):
+                                dia_index.append(("joint", key, f_h, r_h, f_p, r_p))
+            else:
+                frag = loc[key][2]
+                for f in range(nfrag):
+                    for r in range(frag.count(f)):
+                        dia_index.append(("loc", key, f, r))
     if len(dia_index) != nsd:
         raise ValueError(F"{len(dia_index)} diabatic states indexed for {nsd} SDs")
     W = np.zeros((nsd, nsd))
     pops_out = np.full((nsd, nfrag), np.nan)
+    pops_hole = np.full((nsd, nfrag), np.nan)
     for col, entry in enumerate(dia_index):
         if entry[0] == "sd":
             match = [k for k in singles if sets[k] == entry[1]]
@@ -2666,23 +2721,30 @@ def sd_diabatization_step(sd_lists, P_frag, kind, dia_index=None):
                                  F"untransformed SD of this step - the basis changed")
             W[match[0], col] = 1.0
             continue
-        _, key, f, r = entry
+        key = entry[1]
         if key not in loc:
             raise ValueError(F"manifold {key} of the diabatic index is absent at this step")
+        if entry[0] == "joint":
+            _, _, f_h, r_h, f_p, r_p = entry
+            g, (wh, frag_h, ph), (wp, frag_p, pp) = loc[key]
+            X = _cols(frag_h, f_h, r_h, "hole", key)
+            Y = _cols(frag_p, f_p, r_p, "electron", key)
+            for j, k in enumerate(g["rows"]):
+                h, pt = g["pairs"][j]
+                W[k, col] = g["tau"][j] * wh[g["holes"].index(h), X] * wp[g["parts"].index(pt), Y]
+            pops_out[col] = pp[Y]
+            pops_hole[col] = ph[X]
+            continue
+        _, _, f, r = entry
         g, w, frag, pops = loc[key]
-        cols_f = [c for c in range(len(frag)) if frag[c] == f]
-        if r >= len(cols_f):
-            raise ValueError(F"manifold {key}: fragment {f} holds {len(cols_f)} localized "
-                             F"orbitals at this step, at least {r + 1} expected - the "
-                             F"localization is not stable along the trajectory")
-        c = cols_f[r]
+        c = _cols(frag, f, r, "", key)
         for j, k in enumerate(g["rows"]):
             W[k, col] = g["tau"][j] * g["sigma"][j] * w[j, c]
         pops_out[col] = pops[c]
     dev = float(np.abs(W.T @ W - np.eye(nsd)).max())
     if dev > 1e-8:
         raise ValueError(F"the diabatic transformation is not orthogonal (|W^T W - 1| = {dev:.2e})")
-    return W, dia_index, pops_out
+    return W, dia_index, pops_out, pops_hole
 
 
 def _sd_diabatization_series(params, sd_sorted, active_space, start_time, finish_time, kind):
@@ -2696,7 +2758,7 @@ def _sd_diabatization_series(params, sd_sorted, active_space, start_time, finish
                          F"P_frag{{f}}_ks_{{step}}.npz of at least two fragments in {res_dir_1} "
                          F"(fragment_atom_lists of step2), found {nfrag}")
     mode = params['apply_orthonormalization']
-    W_list, pops_list, dia_index = [], [], None
+    W_list, pops_list, hole_list, dia_index = [], [], [], None
     for i, step in enumerate(range(start_time, finish_time)):
         P_frag = [np.array(sp.load_npz(F'{res_dir_1}/P_frag{f}_ks_{step}.npz').todense()
                            [active_space, :][:, active_space]).real for f in range(nfrag)]
@@ -2705,19 +2767,25 @@ def _sd_diabatization_series(params, sd_sorted, active_space, start_time, finish
                             [active_space, :][:, active_space]).real
             X = orthogonalizations.get_Lowdin_scipy(s_ks)
             P_frag = [X.T @ P @ X for P in P_frag]
-        W, dia_index, pops = sd_diabatization_step(sd_sorted[i], P_frag, kind, dia_index)
+        W, dia_index, pops, pops_hole = sd_diabatization_step(sd_sorted[i], P_frag, kind, dia_index)
         W_list.append(W)
         pops_list.append(pops)
-    return W_list, dia_index, pops_list
+        hole_list.append(pops_hole)
+    return W_list, dia_index, pops_list, hole_list
 
 
-def _write_diabatization_records(res_dir, kind, dia_index, pops_list, start_time):
-    """U_sd_labels.json (the meaning of every diabatic state) and U_sd_pops.txt
-    (per step, the fragment populations of every diabatic state's localized orbital)."""
+def _write_diabatization_records(res_dir, kind, dia_index, pops_list, hole_list, start_time):
+    """U_sd_labels.json (the meaning of every diabatic state) and U_sd_pops.txt (per step,
+    the fragment populations of every diabatic state's localized electron orbital, then of
+    its localized hole - nan where the state has none)."""
     states = []
     for col, entry in enumerate(dia_index):
         if entry[0] == "sd":
             states.append({"index": col, "type": "sd", "sd": sorted(entry[1])})
+        elif entry[0] == "joint":
+            states.append({"index": col, "type": "joint", "channel": int(entry[1]),
+                           "hole_fragment": int(entry[2]), "hole_rank": int(entry[3]),
+                           "electron_fragment": int(entry[4]), "electron_rank": int(entry[5])})
         else:
             states.append({"index": col, "type": "localized", "manifold": int(entry[1]),
                            "fragment": int(entry[2]), "rank": int(entry[3])})
@@ -2725,12 +2793,17 @@ def _write_diabatization_records(res_dir, kind, dia_index, pops_list, start_time
         json.dump({"kind": kind,
                    "note": "particle: the excited electron of the manifold (shared hole = "
                            "manifold) sits on 'fragment', hole: the hole (shared particle = "
-                           "manifold) sits on 'fragment', ranks order the orbitals of one "
+                           "manifold) sits on 'fragment', joint: the hole sits on "
+                           "'hole_fragment' and the electron on 'electron_fragment' (channel "
+                           "1 = alpha, -1 = beta excitations), ranks order the orbitals of one "
                            "fragment by decreasing population",
                    "states": states}, f, indent=1)
     nfrag = pops_list[0].shape[1]
-    rows = [np.concatenate(([start_time + i], pops_list[i].reshape(-1))) for i in range(len(pops_list))]
-    header = "step " + " ".join(F"p(state{c},frag{f})" for c in range(pops_list[0].shape[0]) for f in range(nfrag))
+    nst = pops_list[0].shape[0]
+    rows = [np.concatenate(([start_time + i], pops_list[i].reshape(-1), hole_list[i].reshape(-1)))
+            for i in range(len(pops_list))]
+    header = ("step " + " ".join(F"p_e(state{c},frag{f})" for c in range(nst) for f in range(nfrag))
+              + " " + " ".join(F"p_h(state{c},frag{f})" for c in range(nst) for f in range(nfrag)))
     np.savetxt(F'{res_dir}/U_sd_pops.txt', np.array(rows), header=header, fmt="%.6g")
 
 
@@ -2779,7 +2852,11 @@ def run_step3_sd_nacs_libint(params):
             * **params['diabatization']** (string): "none" [default] keeps the SD basis. "particle" or
                 "hole" localizes, in every single-excitation manifold sharing the hole (resp. the
                 particle), the varying spin-orbital on the fragments of the step-2 fragment operators
-                (P_frag{f}_ks_{step}.npz from step2's fragment_atom_lists) and writes the
+                (P_frag{f}_ks_{step}.npz from step2's fragment_atom_lists). "joint" localizes the holes
+                among the occupied orbitals AND the electrons among the virtuals of every spin
+                channel's complete hole x particle manifold - the diabatic states are the excitations
+                from a localized hole into a localized electron (Frenkel and charge-transfer states of
+                a fragment pair). All three write the
                 SD -> diabatic transformation U_sd_{step}.npz (rows: diabatic states, columns: the
                 saved SD states, in the gauge of Hvib_sd/St_sd - sorted, reordered, phase-corrected)
                 with U_sd_labels.json (what every diabatic state is) and U_sd_pops.txt (fragment
@@ -3097,10 +3174,10 @@ def run_step3_sd_nacs_libint(params):
     diabatization = str(params['diabatization']).lower()
     W_dia = None
     if diabatization != 'none':
-        W_dia, dia_index, dia_pops = _sd_diabatization_series(params, sd_states_reindexed_sorted,
-                                                              ks_active_space, start_time,
-                                                              finish_time, diabatization)
-        _write_diabatization_records(res_dir_2, diabatization, dia_index, dia_pops, start_time)
+        W_dia, dia_index, dia_pops, dia_hole = _sd_diabatization_series(params, sd_states_reindexed_sorted,
+                                                                        ks_active_space, start_time,
+                                                                        finish_time, diabatization)
+        _write_diabatization_records(res_dir_2, diabatization, dia_index, dia_pops, dia_hole, start_time)
     if params['is_many_body']:
         # Add midpoint energies for CI states in here
         ci_midpoint_energies = step3_many_body.compute_ci_energies_midpoint(ci_energies, params)
