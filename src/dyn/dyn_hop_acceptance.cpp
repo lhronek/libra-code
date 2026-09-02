@@ -696,6 +696,10 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
 
 
   else if(prms.hop_acceptance_algo==31){  // stochastic decision based on quantum Boltzmann factors
+    // 31-33 read the energies of the HOPPING states in the hopping representation:
+    // adiabatic for rep_sh 1, the Lowdin-frame diabatic energies for rep_sh 0 (ham_dia
+    // at S = I) - the Boltzmann factor gives diabatic hops the same detailed balance.
+    // The LZ gap-minimum correction indexes adiabatic states and stays with rep_sh 1
 
     for(itraj=0; itraj<ntraj_active; itraj++){
       traj = which_trajectories[itraj];
@@ -705,12 +709,12 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
       // Do the calculations only for itraj=0 if isNBRA is 1
       if(isNBRA==1){
       if(itraj==0){
-      hvib = ham.child(traj)->get_ham_adi();
+      hvib = (prms.rep_sh == 0) ? ham.child(traj)->get_ham_dia_lowdin() : ham.child(traj)->get_ham_adi();
       //hvib = projectors[traj].H() * hvib * projectors[traj];
       }
       }
       else{
-      hvib = ham.child(traj)->get_ham_adi();
+      hvib = (prms.rep_sh == 0) ? ham.child(traj)->get_ham_dia_lowdin() : ham.child(traj)->get_ham_adi();
       //hvib = projectors[traj].H() * hvib * projectors[traj];
       }
       double E_i = hvib.get(old_st, old_st).real();  // initial potential energy
@@ -720,7 +724,7 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
       // crossing, where the gap has reopened - evaluate the thermal
       // filter at the stored at-crossing gap instead, the same geometry
       // the proposal fires for
-      if((prms.tsh_method == 3 || prms.tsh_method == 4) &&
+      if(prms.rep_sh == 1 && (prms.tsh_method == 3 || prms.tsh_method == 4) &&
          dyn_var.lz_gap_min_status == 1){
         double gm = dyn_var.lz_gap_min->get(new_st, traj);
         if(gm >= 0.0 && E_f > E_i){ E_f = E_i + gm; }
@@ -750,12 +754,12 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
       // Do the calculations only for itraj=0 if isNBRA is 1
       if(isNBRA==1){
       if(itraj==0){
-      hvib = ham.child(traj)->get_ham_adi();
+      hvib = (prms.rep_sh == 0) ? ham.child(traj)->get_ham_dia_lowdin() : ham.child(traj)->get_ham_adi();
       //hvib = projectors[traj].H() * hvib * projectors[traj];
       }
       }
       else{
-      hvib = ham.child(traj)->get_ham_adi();
+      hvib = (prms.rep_sh == 0) ? ham.child(traj)->get_ham_dia_lowdin() : ham.child(traj)->get_ham_adi();
       //hvib = projectors[traj].H() * hvib * projectors[traj];
       }
       double E_i = hvib.get(old_st, old_st).real();  // initial potential energy
@@ -765,7 +769,7 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
       // crossing, where the gap has reopened - evaluate the thermal
       // filter at the stored at-crossing gap instead, the same geometry
       // the proposal fires for
-      if((prms.tsh_method == 3 || prms.tsh_method == 4) &&
+      if(prms.rep_sh == 1 && (prms.tsh_method == 3 || prms.tsh_method == 4) &&
          dyn_var.lz_gap_min_status == 1){
         double gm = dyn_var.lz_gap_min->get(new_st, traj);
         if(gm >= 0.0 && E_f > E_i){ E_f = E_i + gm; }
@@ -796,12 +800,12 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
       // Do the calculations only for itraj=0 if isNBRA is 1
       if(isNBRA==1){
       if(itraj==0){
-      hvib = ham.child(traj)->get_ham_adi();
+      hvib = (prms.rep_sh == 0) ? ham.child(traj)->get_ham_dia_lowdin() : ham.child(traj)->get_ham_adi();
       //hvib = projectors[traj].H() * hvib * projectors[traj];
       }
       }
       else{
-      hvib = ham.child(traj)->get_ham_adi();
+      hvib = (prms.rep_sh == 0) ? ham.child(traj)->get_ham_dia_lowdin() : ham.child(traj)->get_ham_adi();
       //hvib = projectors[traj].H() * hvib * projectors[traj];
       }
       double E_i = hvib.get(old_st, old_st).real();  // initial potential energy
@@ -811,7 +815,7 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
       // crossing, where the gap has reopened - evaluate the thermal
       // filter at the stored at-crossing gap instead, the same geometry
       // the proposal fires for
-      if((prms.tsh_method == 3 || prms.tsh_method == 4) &&
+      if(prms.rep_sh == 1 && (prms.tsh_method == 3 || prms.tsh_method == 4) &&
          dyn_var.lz_gap_min_status == 1){
         double gm = dyn_var.lz_gap_min->get(new_st, traj);
         if(gm >= 0.0 && E_f > E_i){ E_f = E_i + gm; }

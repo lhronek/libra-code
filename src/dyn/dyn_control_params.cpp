@@ -320,8 +320,9 @@ void dyn_control_params::sanity_check(){
     int acc = hop_acceptance_algo;
     int res = momenta_rescaling_algo;
     int acc_dia = (acc==11);
-    int acc_adi = (acc==10 || acc==20 || acc==21 || acc==31 || acc==32 ||
-                   acc==33 || acc==40);
+    // the Boltzmann options 31-33 read the hopping representation's own energies and
+    // pair with either rep_sh
+    int acc_adi = (acc==10 || acc==20 || acc==21 || acc==40);
     int res_dia = (res==110 || res==111);
     int res_adi = (res==100 || res==101 || res==200 || res==201 ||
                    res==210 || res==211 || res==40);
@@ -329,7 +330,7 @@ void dyn_control_params::sanity_check(){
       std::cout<<"Error in dyn_control_params::sanity_check: rep_sh = 0 hops between"
           <<" DIABATIC states, but hop_acceptance_algo = "<<acc
           <<" / momenta_rescaling_algo = "<<res<<" read ADIABATIC quantities -"
-          <<" use the diabatic family (acceptance 0 or 11, rescaling 0, 110 or 111)\n";
+          <<" use the diabatic family (acceptance 0, 11 or the Boltzmann 31-33, rescaling 0, 110 or 111)\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     if(rep_sh==1 && (acc_dia || res_dia)){

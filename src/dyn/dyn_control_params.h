@@ -427,6 +427,8 @@ class dyn_control_params{
       - 31: accept hops with the probability taken from the quantum Boltzmann distribution
       - 32: accept hops with the probability taken from the classical Maxwell-Boltzmann distribution
       - 33: accept hops with the probability taken from the updated quantum Boltzmann distribution (experimental)
+        31-33 read the energies of the hopping states - adiabatic for rep_sh 1, the Lowdin-frame
+        diabatic energies for rep_sh 0 - so diabatic hops get the same detailed balance
 
       - 40: based on possibility to conserve energy using tcnbra_ekin variables (for TC-NBRA)
   */
