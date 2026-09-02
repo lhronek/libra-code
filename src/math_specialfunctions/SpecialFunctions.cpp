@@ -1268,9 +1268,33 @@ void exp_(CMATRIX& res, CMATRIX& x, complex<double> dt){
     }
   }
   if(hdev_ > 1e-8 * std::max(amax_, 1.0)){
-    cout<<"Error in libspecialfunctions::exp_ : the input matrix is not Hermitian "
-        <<"(max |x_ij - conj(x_ji)| = "<<hdev_<<" at scale "<<amax_<<")\n";
-    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    // non-Hermitian input (e.g. the Liouvillian of S^-1 Hvib): the general
+    // eigendecomposition x = R D R^-1, res = R exp(dt D) R^-1 - the triangle-reading
+    // paths below would exponentiate the mirrored matrix instead
+    CMATRIX D(sz, sz), R(sz, sz), Rinv(sz, sz);
+    libmeigen::solve_eigen_nosort(x, D, R, 0);   // x R = R D
+    libmeigen::FullPivLU_inverse(R, Rinv);
+    // a defective x (an eigenvalue short of eigenvectors) has a singular R and a
+    // meaningless inverse - refuse it
+    CMATRIX chk(sz, sz);  chk = R * Rinv;
+    double idev_ = 0.0;
+    for(i = 0; i < sz; i++){
+      for(int j = 0; j < sz; j++){
+        double d_ = std::abs(chk.get(i,j) - ((i == j) ? 1.0 : 0.0));
+        if(d_ > idev_){ idev_ = d_; }
+      }
+    }
+    if(idev_ > 1e-6){
+      cout<<"Error in libspecialfunctions::exp_ : the non-Hermitian input is not diagonalizable "
+          <<"(max |R R^-1 - I| = "<<idev_<<")\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    for(int k = 0; k < sz; k++){
+      std::complex<double> f = std::exp(dt * D.get(k,k));
+      for(i = 0; i < sz; i++){ R.set(i, k, R.get(i,k) * f); }
+    }
+    res = R * Rinv;
+    return;
   }
 #ifdef HAVE_LAPACK_ZHEEVD
   {
