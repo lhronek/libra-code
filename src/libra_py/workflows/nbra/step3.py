@@ -832,6 +832,11 @@ def apply_state_reordering(St, E, params):
         perm_t_aa.append(a)
         perm_t_bb.append(a)
 
+    # full-matrix cumulative permutation of the algo-1 branch
+    perm_cum = intList()
+    for a in range(0, 2 * nstates):
+        perm_cum.append(a)
+
     # Temporary matrices for the Hungarian method
     aa = CMATRIX(nstates, nstates)
     ab = CMATRIX(nstates, nstates)
