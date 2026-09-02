@@ -1929,6 +1929,66 @@ CMATRIX nHamiltonian::get_dc1_dia(int i, vector<int> &id_) {
   }
 }
 
+int nHamiltonian::lowdin_dia(CMATRIX &X, CMATRIX &Y) {
+  /**
+    The Lowdin (symmetric) orthonormalization of the diabatic basis: X = S^-1/2
+    and Y = S^1/2 of ovlp_dia. |lambda_i> = sum_j |j> X_ji are the orthonormal
+    states closest to the diabats, identical to them at S = I - the frame the
+    diabatic hop machinery works in for non-orthogonal diabats. The metric is
+    q-independent here, as everywhere in the engine (no d1ovlp_dia exists).
+    Returns 1 with X and Y filled, or 0 for an absent or identity metric (X, Y
+    untouched)
+  */
+  if (ovlp_dia_mem_status == 0) { return 0; }
+  double dev = 0.0;
+  for (int i = 0; i < ndia; i++) {
+    for (int j = 0; j < ndia; j++) {
+      double d = std::abs(ovlp_dia->get(i, j) - ((i == j) ? 1.0 : 0.0));
+      if (d > dev) { dev = d; }
+    }
+  }
+  if (dev <= 1e-12) { return 0; }
+  if (X.n_rows != ndia || X.n_cols != ndia || Y.n_rows != ndia || Y.n_cols != ndia) {
+    cout << "Error in lowdin_dia: X and Y must be " << ndia << " x " << ndia << " matrices\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  sqrt_matrix(*ovlp_dia, Y, X);
+  return 1;
+}
+
+CMATRIX nHamiltonian::get_ham_dia_lowdin() {
+  /**
+    The diabatic Hamiltonian in the Lowdin frame, X ham_dia X (ham_dia itself at S = I)
+  */
+  CMATRIX H(get_ham_dia());
+  CMATRIX X(ndia, ndia);
+  CMATRIX Y(ndia, ndia);
+  if (lowdin_dia(X, Y)) { return X * H * X; }
+  return H;
+}
+
+CMATRIX nHamiltonian::get_hvib_dia_lowdin() {
+  /**
+    The diabatic vibronic Hamiltonian in the Lowdin frame, X hvib_dia X
+  */
+  CMATRIX H(get_hvib_dia());
+  CMATRIX X(ndia, ndia);
+  CMATRIX Y(ndia, ndia);
+  if (lowdin_dia(X, Y)) { return X * H * X; }
+  return H;
+}
+
+CMATRIX nHamiltonian::get_d1ham_dia_lowdin(int i) {
+  /**
+    The derivative of the diabatic Hamiltonian w.r.t. nuclear DOF i in the Lowdin frame, X d1ham_dia[i] X
+  */
+  CMATRIX D(get_d1ham_dia(i));
+  CMATRIX X(ndia, ndia);
+  CMATRIX Y(ndia, ndia);
+  if (lowdin_dia(X, Y)) { return X * D * X; }
+  return D;
+}
+
 CMATRIX nHamiltonian::get_ham_dia() {
   /**
     Return the Hamiltonian matrix in the diabatic basis

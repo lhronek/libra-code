@@ -98,6 +98,11 @@ class dyn_control_params{
    Options: 
      - 0: diabatic
      - 1: adiabatic [ default ]
+   With non-orthogonal diabats (ovlp_dia != I) the diabatic hop machinery - hopping
+   populations and fluxes, state energies for acceptance/rescaling, rep_force 0 forces,
+   the LZ/ZN diabatic detection - works in the Lowdin frame S^-1/2 of the diabats
+   (nHamiltonian::lowdin_dia): the hopping states are the symmetrically orthonormalized
+   diabats, identical to them at S = I. se_pop_dia stays the plain |C_i|^2
   */
   int rep_sh;
 

@@ -266,8 +266,8 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params){
   // plain |C_i|^2 - exact populations for orthonormal diabats; with
   // ovlp_dia != I the S-metric variants derive in post (Re diag(dm S)),
   // and the dia->adi directions here carry the cached metric (C_adi = U^H S C_dia,
-  // rho_adi = (S U)^H rho_dia (S U)). Only the diabatic hop machinery (rep_sh 0)
-  // still assumes S = I, guarded at setup
+  // rho_adi = (S U)^H rho_dia (S U)). The diabatic hop machinery (rep_sh 0) works
+  // in the Lowdin frame S^-1/2 of the diabats (nHamiltonian::lowdin_dia)
   // Deterministic per-trajectory updates - parallel-safe (each iteration
   // writes only its own dm slots); results identical for any thread count
   // exceptions cannot leave an OMP-outlined region (even serialized) -

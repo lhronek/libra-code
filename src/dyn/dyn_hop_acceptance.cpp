@@ -562,8 +562,8 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
 
         p_tr = p.col(traj);
         double T_i = compute_kinetic_energy(p_tr, invM, which_dofs); // initial kinetic energy
-        double E_i = ham.child(traj)->get_ham_dia().get(old_st, old_st).real();  // initial potential energy
-        double E_f = ham.child(traj)->get_ham_dia().get(new_st, new_st).real();  // final potential energy  
+        double E_i = ham.child(traj)->get_ham_dia_lowdin().get(old_st, old_st).real();  // initial potential energy
+        double E_f = ham.child(traj)->get_ham_dia_lowdin().get(new_st, new_st).real();  // final potential energy  
         double T_f = T_i + E_i - E_f;             // predicted final kinetic energy
 
         if(T_f>=0.0){  // hop is possible - accept it
@@ -1068,8 +1068,8 @@ vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms){
 
         p_tr = p.col(traj);
         double T_i = compute_kinetic_energy(p_tr, invM, which_dofs); // initial kinetic energy
-        double E_i = ham.child(traj)->get_ham_dia().get(old_st, old_st).real();  // initial potential energy
-        double E_f = ham.child(traj)->get_ham_dia().get(new_st, new_st).real();  // final potential energy  
+        double E_i = ham.child(traj)->get_ham_dia_lowdin().get(old_st, old_st).real();  // initial potential energy
+        double E_f = ham.child(traj)->get_ham_dia_lowdin().get(new_st, new_st).real();  // final potential energy  
         double T_f = T_i + E_i - E_f;             // predicted final kinetic energy
         // a hop the uniform scaling cannot pay for (no kinetic energy to draw on, or a
         // zero momentum no factor can grow) is reverted - frustrated, not violated

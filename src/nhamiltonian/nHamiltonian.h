@@ -418,6 +418,10 @@ public:
   CMATRIX get_hvib_dia(vector<int>& id_);
   CMATRIX get_d1ham_dia(int i);
   CMATRIX get_d1ham_dia(int i, vector<int>& id_);
+  int lowdin_dia(CMATRIX& X, CMATRIX& Y);       ///< Lowdin frame of the diabats: X = S^-1/2, Y = S^1/2 of ovlp_dia. Returns 0 (X, Y untouched) for an absent or identity metric
+  CMATRIX get_ham_dia_lowdin();                  ///< X ham_dia X - the diabatic Hamiltonian in the Lowdin frame (ham_dia itself at S = I)
+  CMATRIX get_hvib_dia_lowdin();                 ///< X hvib_dia X
+  CMATRIX get_d1ham_dia_lowdin(int i);           ///< X d1ham_dia[i] X
   CMATRIX get_d2ham_dia(int i);
   CMATRIX get_d2ham_dia(int i, vector<int>& id_);
   CMATRIX get_d2ham_dia(int i,int j);

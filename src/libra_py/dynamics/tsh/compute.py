@@ -1778,21 +1778,21 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
 
     #sys.exit(0)
 
-    # the diabatic hop machinery (state energies, acceptance, rescaling) assumes
-    # orthonormal diabats - fail loud instead of drifting on a non-identity metric.
-    # The propagators are S-aware and stay allowed: rep_tdse 0 (generalized-eigenproblem
-    # and S^-1 Hvib routes), rep_tdse 2 (the S^-1 Hvib Liouvillian) and the
-    # metric-cached rep-sync layer behind rep_tdse 1/3
-    if int(dyn_params.get("rep_sh", 1)) == 0:
+    # non-orthogonal diabats: the diabatic hop machinery (rep_sh 0, rep_force 0, the
+    # LZ/ZN diabatic detection) works in the Lowdin frame S^-1/2 of the diabats
+    # (nHamiltonian::lowdin_dia) - the hopping states are the symmetrically
+    # orthonormalized diabats with the transformed energies, forces and populations.
+    # Say so once per run - the plain se_pop_dia readout stays |C_i|^2
+    if int(dyn_params.get("rep_sh", 1)) == 0 or int(dyn_params.get("rep_force", 1)) == 0:
         S0 = ham.get_ovlp_dia(Py2Cpp_int([0, 0]))
         s_dev = max(abs(S0.get(i, j) - (1.0 if i == j else 0.0))
                     for i in range(S0.num_of_rows) for j in range(S0.num_of_cols))
-        if s_dev > 1e-8:
-            raise ValueError(F"rep_sh = 0 hops between diabatic states assuming orthonormal "
-                             F"diabats, but ovlp_dia deviates from identity by {s_dev:.2e} - the "
-                             F"diabatic hop machinery (state energies, acceptance, rescaling) does "
-                             F"not carry the S metric, use rep_sh 1 (the propagators rep_tdse 0-3 "
-                             F"are S-aware) or orthonormalize the diabatic basis")
+        if s_dev > 1e-12:
+            print(F"NOTE: rep_sh/rep_force 0 with non-orthogonal diabats (ovlp_dia deviates from "
+                  F"identity by {s_dev:.2e}) - the diabatic hop machinery works in the Lowdin "
+                  F"frame S^-1/2 |i>: the hopping states are the orthonormalized diabats, with "
+                  F"the transformed energies, forces and hopping populations (se_pop_dia stays "
+                  F"the plain |C_i|^2)")
 
     # Update internal dynamical variables using the computed properties of the Hamiltonian objects
     # Set up the "rep_tdse" variable here to the representation that coinsides with the initial representation

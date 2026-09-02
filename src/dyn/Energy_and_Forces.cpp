@@ -202,7 +202,7 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
       for(itraj=0; itraj<ntraj; itraj++){
         id[1] = (itraj < (int)ham.children.size()) ? itraj : 0;  // NBRA: 1 shared child
         int ist = effective_states[itraj];
-        res[itraj] = ham.get_ham_dia(id).get(ist, ist).real();   
+        res[itraj] = ham.child(id[1])->get_ham_dia_lowdin().get(ist, ist).real();   
       }
     }
     // Adiabatic 
@@ -267,7 +267,7 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
       for(itraj=0; itraj<ntraj; itraj++){
         id[1] = (itraj < (int)ham.children.size()) ? itraj : 0;  // NBRA: 1 shared child
         int ist = effective_states[itraj];
-        res[itraj] = ham.get_ham_dia(id).get(ist, ist).real(); // diagonal energy
+        res[itraj] = ham.child(id[1])->get_ham_dia_lowdin().get(ist, ist).real(); // diagonal energy
         
         coeff = dyn_vars.ampl_dia->col(itraj);
         res[itraj] += ham.QTSH_energy_dia(coeff, id).real(); // coherence energy

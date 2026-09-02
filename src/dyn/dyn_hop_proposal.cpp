@@ -871,8 +871,8 @@ crossings with adiabatic state labels - it requires ndia == nadi (got ndia = "
     // Diabatic Ham matrices
     MATRIX ham_dia(nstates,nstates);
     MATRIX ham_dia_prev(nstates, nstates);
-    ham_dia = ham->get_ham_dia().real();
-    ham_dia_prev = ham_prev->get_ham_dia().real();
+    ham_dia = ham->get_ham_dia_lowdin().real();
+    ham_dia_prev = ham_prev->get_ham_dia_lowdin().real();
     if(ham_dia.max_elt()==0.0 && ham_dia_prev.max_elt()==0.0){
       cout<<"Error in hopping_probabilities_lz(): the diabatic Hamiltonian is all-zero at two \
 consecutive steps - the diabatic crossing detection is inoperative. Adiabatic-native models \
@@ -890,7 +890,7 @@ must supply obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
       // magnitudes would inflate the gap velocity whenever DOF motions
       // oppose each other
       for(k=0;k<ndof;k++){
-        dham = ham->get_d1ham_dia(k).real() * p.get(k,0) * invM.get(k,0);
+        dham = ham->get_d1ham_dia_lowdin(k).real() * p.get(k,0) * invM.get(k,0);
 
         for(j=0;j<nstates;j++){
           double dmod = dham.get(i,i) - dham.get(j,j);
@@ -976,8 +976,8 @@ with adiabatic state labels - it requires ndia == nadi (got ndia = "<<ham->ndia
             <<", nadi = "<<ham->nadi<<"); use rep_lz = 5 or 4 \n";
         std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
-      ham_dia = ham->get_ham_dia().real();
-      ham_dia_prev = ham_prev->get_ham_dia().real();
+      ham_dia = ham->get_ham_dia_lowdin().real();
+      ham_dia_prev = ham_prev->get_ham_dia_lowdin().real();
     }
     if(rep==1 && ham_dia.max_elt()==0.0 && ham_dia_prev.max_elt()==0.0){
       cout<<"Error in hopping_probabilities_lz(): rep_lz = 1 detects crossings in the diabatic \
@@ -1086,8 +1086,8 @@ obj.nac_adi with the couplings in the real part (obj.nac_ci is not an ingested a
     // Diabatic Ham matrices
     MATRIX ham_dia(nstates,nstates);
     MATRIX ham_dia_prev(nstates, nstates);
-    ham_dia = ham->get_ham_dia().real();
-    ham_dia_prev = ham_prev->get_ham_dia().real();
+    ham_dia = ham->get_ham_dia_lowdin().real();
+    ham_dia_prev = ham_prev->get_ham_dia_lowdin().real();
     if(ham_dia.max_elt()==0.0 && ham_dia_prev.max_elt()==0.0){
       cout<<"Error in hopping_probabilities_lz(): the diabatic Hamiltonian is all-zero at two \
 consecutive steps - the diabatic crossing detection is inoperative. Adiabatic-native models \
@@ -1103,7 +1103,7 @@ must supply obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
     if(ham->d1ham_dia_mem_status[0] != 0){
       MATRIX d1(nstates,nstates);
       for(k=0;k<ndof;k++){
-        d1 = ham->get_d1ham_dia(k).real();
+        d1 = ham->get_d1ham_dia_lowdin(k).real();
         double vk = p.get(k,0) * invM.get(k,0);
         for(j=0;j<nstates;j++){
           v1d[j] += 0.5*(d1.get(i,i) - d1.get(j,j)) * vk;
@@ -1371,8 +1371,8 @@ channels with adiabatic state labels - it requires ndia == nadi (got ndia = "
   // Diabatic Ham matrices
   MATRIX ham_dia(nstates,nstates);
   MATRIX ham_dia_prev(nstates, nstates);
-  ham_dia = ham->get_ham_dia().real();
-  ham_dia_prev = ham_prev->get_ham_dia().real();
+  ham_dia = ham->get_ham_dia_lowdin().real();
+  ham_dia_prev = ham_prev->get_ham_dia_lowdin().real();
   if(ham_dia.max_elt()==0.0 && ham_dia_prev.max_elt()==0.0){
     cout<<"Error in hopping_probabilities_zn(): the diabatic Hamiltonian is all-zero at two \
 consecutive steps - the crossing detection and the diabatic coupling are inoperative. \
@@ -1646,6 +1646,9 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
   CMATRIX dm(nst, nst);
   CMATRIX Hvib(nst, nst);
   vector<int> fstates(ntraj,0); 
+  int lowdin_sh = 0;
+  CMATRIX X_l(nst, nst);
+  CMATRIX Y_l(nst, nst);
 
   //============== Begin the TSH part ===================  
   // Proposed hops probabilities
@@ -1658,6 +1661,10 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
     }
     else if(prms.rep_sh==0){
       dm = *dyn_var.dm_dia[traj];
+      // non-orthogonal diabats: hop in the Lowdin frame - rho_L = Y rho Y here,
+      // Hvib_L = X Hvib X through the getter below, populations |(S^1/2 c)_i|^2
+      lowdin_sh = ham.child(traj)->lowdin_dia(X_l, Y_l);
+      if(lowdin_sh){ dm = Y_l * dm * Y_l; }
     }
 
     nucl_stenc_y[0] = traj;
@@ -1679,7 +1686,7 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
         if(prms.rep_tdse==2){ Hvib = ham.child(traj)->get_hvib_dia(); }
       }
       else{
-        Hvib = ham.child(traj)->get_hvib_dia();
+        Hvib = ham.child(traj)->get_hvib_dia_lowdin();
       }
     }
 
@@ -1771,7 +1778,7 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
           int nfil = (int)g[traj].size();
           vector<double> Ecol(nfil, 0.0);
           if(prms.rep_lz == 0 || prms.rep_lz == 3){
-            CMATRIX Hdia_t(ham.child(traj)->get_ham_dia());
+            CMATRIX Hdia_t(ham.child(traj)->get_ham_dia_lowdin());
             for(int st=0; st<nfil; st++){ Ecol[st] = Hdia_t.get(st, st).real(); }
           }
           else if(prms.rep_lz == 5){
@@ -1822,7 +1829,8 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
         g[traj] = hopping_probabilities_fssh2(prms, dm, dm_prev, dyn_var.act_states[traj]);
       }
       else if(prms.rep_sh==0){
-        CMATRIX& dm_prev = *dyn_var.dm_dia_prev[traj];
+        CMATRIX dm_prev(*dyn_var.dm_dia_prev[traj]);
+        if(lowdin_sh){ dm_prev = Y_l * dm_prev * Y_l; }
         g[traj] = hopping_probabilities_fssh2(prms, dm, dm_prev, dyn_var.act_states_dia[traj]);
       }
     }
@@ -1847,8 +1855,9 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
         g[traj] = hopping_probabilities_fssh3(prms, dm, dm_prev_trans, dyn_var.act_states[traj], dyn_var.fssh3_errors[traj]);
       }
       else if(prms.rep_sh==0){
-        CMATRIX& dm_prev = *dyn_var.dm_dia_prev[traj];
-        CMATRIX dm_prev_trans(*dyn_var.dm_dia_prev[traj]);
+        CMATRIX dm_prev(*dyn_var.dm_dia_prev[traj]);
+        if(lowdin_sh){ dm_prev = Y_l * dm_prev * Y_l; }
+        CMATRIX dm_prev_trans(dm_prev);
         g[traj] = hopping_probabilities_fssh3(prms, dm, dm_prev_trans, dyn_var.act_states_dia[traj], dyn_var.fssh3_errors[traj]);
       }
     } // FSSH-3
@@ -1861,7 +1870,8 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
         g[traj] = hopping_probabilities_gfsh_orig(prms, dm, dm_prev, dyn_var.act_states[traj]);
       }
       else if(prms.rep_sh==0){
-        CMATRIX& dm_prev = *dyn_var.dm_dia_prev[traj];
+        CMATRIX dm_prev(*dyn_var.dm_dia_prev[traj]);
+        if(lowdin_sh){ dm_prev = Y_l * dm_prev * Y_l; }
         g[traj] = hopping_probabilities_gfsh_orig(prms, dm, dm_prev, dyn_var.act_states_dia[traj]);
       }
     }// GFSH original
