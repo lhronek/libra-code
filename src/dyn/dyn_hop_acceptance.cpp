@@ -46,6 +46,7 @@ int can_rescale_along_vector(double E_old, double E_new, MATRIX& p, MATRIX& invM
   double a_ij = 0.0;
   double b_ij = 0.0;
   double c_ij = E_old - E_new;
+  double t2 = 0.0;
 
   for(int idof = 0; idof < ndof; idof++){  
 
@@ -53,6 +54,7 @@ int can_rescale_along_vector(double E_old, double E_new, MATRIX& p, MATRIX& invM
 
     a_ij += t.get(dof, 0) * t.get(dof, 0) * invM.get(dof, 0); 
     b_ij += p.get(dof, 0) * t.get(dof, 0) * invM.get(dof, 0); 
+    t2 += t.get(dof, 0) * t.get(dof, 0);
 
   }// for dof
  
@@ -61,7 +63,11 @@ int can_rescale_along_vector(double E_old, double E_new, MATRIX& p, MATRIX& invM
   double det = b_ij*b_ij + 4.0*a_ij*c_ij;
 
   int res = 0;
-  if(det >= 0.0){ res = 1; }
+  // a null direction (t = 0, so a_ij = b_ij = 0) can neither absorb nor supply an
+  // energy difference - det = 0 answered yes for ANY gap. Only an isoenergetic hop
+  // is feasible along it
+  if(t2 == 0.0){ if(fabs(c_ij) <= 1e-12){ res = 1; } }
+  else if(det >= 0.0){ res = 1; }
 
   return res;
 }
@@ -92,6 +98,7 @@ void rescale_along_vector(double E_old, double E_new, MATRIX& p, MATRIX& invM, M
   double a_ij = 0.0;
   double b_ij = 0.0;
   double c_ij = E_old - E_new;
+  double t2 = 0.0;
     
   for(idof=0; idof < ndof; idof++){  
 
@@ -99,6 +106,7 @@ void rescale_along_vector(double E_old, double E_new, MATRIX& p, MATRIX& invM, M
 
     a_ij += t.get(dof, 0) * t.get(dof, 0) * invM.get(dof, 0); 
     b_ij += p.get(dof, 0) * t.get(dof, 0) * invM.get(dof, 0); 
+    t2 += t.get(dof, 0) * t.get(dof, 0);
 
   }// for dof
  
@@ -120,11 +128,19 @@ void rescale_along_vector(double E_old, double E_new, MATRIX& p, MATRIX& invM, M
   }
   else{    // Accepted hops!
 
-    if(fabs(a_ij)>1e-12){  // only consider reversals, if the couplings are sizable
+    if(fabs(a_ij)>1e-12){
       if(b_ij<0){ gamma_ij = 0.5*(b_ij + sqrt(det))/a_ij; }
       else{       gamma_ij = 0.5*(b_ij - sqrt(det))/a_ij; }
     }
-    else{ gamma_ij = 0.0;  }
+    else if(t2 > 0.0){
+      // the same (physical) root in its cancellation-free form -2c/(b + sign(b) sqrt(det)),
+      // finite as a -> 0 (-> -c/b) where the quotient form loses it: the momentum change
+      // gamma*t stays finite for a tiny direction, so the energy difference is still paid
+      double sgn = (b_ij < 0.0) ? -1.0 : 1.0;
+      double den = b_ij + sgn * sqrt(det);
+      if(den != 0.0){ gamma_ij = -2.0 * c_ij / den; }
+    }
+    // t = 0: only an isoenergetic hop reaches here - nothing to scale along
 
   }
 
@@ -927,6 +943,25 @@ void handle_hops_nuclear(dyn_control_params& prms,
        MATRIX& q, MATRIX& p, MATRIX& invM, CMATRIX& C,
        nHamiltonian& ham, vector<int>& new_states, vector<int>& old_states){
 */
+void revert_unconservable_hop(vector<int>& new_states, int traj, int old_st, int new_st, dyn_control_params& prms){
+/**
+  An accepted hop whose energy difference the rescaling cannot absorb or supply is made
+  frustrated: the trajectory stays on old_st and the frustrated-hop momentum treatment of
+  the calling branch applies. A consistent acceptance/rescaling pair never gets here
+  (acceptance 10/11/20/21 test the same feasibility), so the first case is reported once
+*/
+  new_states[traj] = old_st;
+  static int warned = 0;
+  if(warned == 0){
+    warned = 1;
+    std::cout<<"WARNING in handle_hops_nuclear: the accepted hop "<<old_st<<" -> "<<new_st
+             <<" of trajectory "<<traj<<" cannot conserve the total energy with momenta_rescaling_algo = "
+             <<prms.momenta_rescaling_algo<<" - reverted (frustrated hop). hop_acceptance_algo = "
+             <<prms.hop_acceptance_algo<<" does not test this: the consistent pairs are 10 with 100/101,"
+             <<" 11 with 110/111, 20 with 200/201 and 21 with 210/211. Reported once per process\n";
+  }
+}
+
 void handle_hops_nuclear(dyn_variables& dyn_var, nHamiltonian& ham, 
 vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms){
 /**
@@ -997,6 +1032,9 @@ vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms){
         double E_i = hvib.get(old_st, old_st).real();  // initial potential energy
         double E_f = hvib.get(new_st, new_st).real();  // final potential energy  
         double T_f = T_i + E_i - E_f;             // predicted final kinetic energy
+        // a hop the uniform scaling cannot pay for (no kinetic energy to draw on, or a
+        // zero momentum no factor can grow) is reverted - frustrated, not violated
+        if(!((T_i > 0.0 && T_f >= 0.0) || E_i == E_f)){ revert_unconservable_hop(new_states, traj, old_st, new_st, prms); }
 
         double scl_fac = 1.0;
 
@@ -1033,6 +1071,9 @@ vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms){
         double E_i = ham.child(traj)->get_ham_dia().get(old_st, old_st).real();  // initial potential energy
         double E_f = ham.child(traj)->get_ham_dia().get(new_st, new_st).real();  // final potential energy  
         double T_f = T_i + E_i - E_f;             // predicted final kinetic energy
+        // a hop the uniform scaling cannot pay for (no kinetic energy to draw on, or a
+        // zero momentum no factor can grow) is reverted - frustrated, not violated
+        if(!((T_i > 0.0 && T_f >= 0.0) || E_i == E_f)){ revert_unconservable_hop(new_states, traj, old_st, new_st, prms); }
 
         double scl_fac = 1.0;
 
@@ -1126,6 +1167,7 @@ vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms){
           }else{  do_reverse_actual *= 0; }
         }
         
+        if(!can_rescale_along_vector(E_i, E_f, p_tr, invM, dNAC, which_dofs)){ revert_unconservable_hop(new_states, traj, old_st, new_st, prms); }
         rescale_along_vector(E_i, E_f, p_tr, invM, dNAC, do_reverse_actual, which_dofs); 
 
         for(dof = 0; dof < ndof; dof++){   p.set(dof, traj, p_tr.get(dof, 0));     }
@@ -1190,6 +1232,7 @@ vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms){
         }
 
         p_tr = p.col(traj);       
+        if(!can_rescale_along_vector(E_i, E_f, p_tr, invM, dF, which_dofs)){ revert_unconservable_hop(new_states, traj, old_st, new_st, prms); }
         rescale_along_vector(E_i, E_f, p_tr, invM, dF, do_reverse, which_dofs); 
 
         for(dof = 0; dof < ndof; dof++){   p.set(dof, traj, p_tr.get(dof, 0));     }

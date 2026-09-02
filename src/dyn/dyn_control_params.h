@@ -442,6 +442,10 @@ class dyn_control_params{
       - 211: along difference of state-specific forces, reverse on frustrated hops
 
       - 40: does not rescale velocities, but rescales  tcnbra_ekin variables
+    An accepted hop whose energy difference the chosen rescaling cannot absorb or supply
+    (null or vanishing direction, no kinetic energy to draw on) is reverted as a frustrated
+    hop, with a once-per-process warning naming the pair - the consistent pairs (10 with
+    100/101, 11 with 110/111, 20 with 200/201, 21 with 210/211) never trigger it
   */
   int momenta_rescaling_algo;
 
