@@ -370,8 +370,13 @@ def read_cp2k_tddfpt_log_file(params):
             nexcitations = int(float(line.split()[5]))
 
     nao = nmo  # NOTE: may differ in CP2K
-
     nci = min(nstates_req, nexcitations)
+    # the reference occupation is the electron count - the printed "occupied"
+    # count is CP2K's smeared HOMO under &SMEAR (cross-checked, warned once)
+    nocc_printed = nocc
+    ref = reference_occupation(logfile_name, isUKS=isUKS)
+    nref_of = {"alp": ref[0], "bet": ref[1]} if isUKS else {"alp": ref, "bet": ref}
+    nocc = ref[0] if isUKS else ref
 
     # Orbital space
     if orbital_space is None:
@@ -433,6 +438,7 @@ def read_cp2k_tddfpt_log_file(params):
         tmp_coeffs = []
         tmp_spin = []
         kept2 = 0.0
+        foreign = []
 
         for j in range(state_num_lines[i] + 1, state_num_lines[i + 1]):
             tokens = lines[j].split()
@@ -456,21 +462,43 @@ def read_cp2k_tddfpt_log_file(params):
                         vir = int(tokens[1])
 
                 if coeff**2 > tol:
+                    nref = nref_of.get(spin, nref_of["alp"])
+                    if vir <= nref:
+                        raise ValueError(
+                            F"{logfile_name}: state {i + 1} excites {occ}->{vir} into an "
+                            F"orbital the electron-count reference ({nref}) occupies - the "
+                            F"vectors do not belong to this reference")
+                    if occ > nref:
+                        # an excitation FROM an orbital above the reference: CP2K's
+                        # smeared partition counted it as occupied. No integer-
+                        # occupation basis holds it - counted as dropped weight
+                        foreign.append((occ, vir, spin, coeff ** 2))
+                        continue
                     tmp_basis.append([occ, vir])
                     tmp_coeffs.append(coeff)
                     tmp_spin.append(spin)
                     kept2 += coeff ** 2
 
-            except (IndexError, ValueError):
+            except (IndexError, ValueError) as err:
+                if isinstance(err, ValueError) and "electron-count reference" in str(err):
+                    raise
                 continue
 
         # TDA/sTDA vectors are unit-norm, so 1 - kept2 is the exact CI weight
         # this state loses to the log's 5e-2 print floor plus the tolerance
         # cut - downstream normalization hides it from every later norm
         read_drops[i] = max(0.0, 1.0 - kept2)
+        if foreign:
+            foreign.sort(key=lambda x: -x[3])
+            print(F"read_cp2k_tddfpt_log_file: state {i + 1}: {sum(w for *_, w in foreign):.1%} of "
+                  F"the vector excites FROM orbital(s) above the electron-count reference "
+                  F"({nref_of['alp']}{'/' + str(nref_of['bet']) if isUKS else ''}) - counted as "
+                  F"dropped weight: " + ", ".join(F"{o}->{v}{'' if sp == 'alp' else ' ' + sp} ({w:.1%})"
+                                                   for o, v, sp, w in foreign[:4]))
         if read_drops[i] > 1e-6:
             print(F"read_cp2k_tddfpt_log_file: state {i + 1}: dropped CI weight "
-                  F"{read_drops[i]:.2e} to the print floor + ci_threshold cut "
+                  F"{read_drops[i]:.2e} to the print floor + ci_threshold cut"
+                  F"{' + excitations from above the reference' if foreign else ''} "
                   F"(vs the TDA unit norm)")
 
         ci_basis.append(tmp_basis)
@@ -491,6 +519,7 @@ def read_cp2k_tddfpt_log_file(params):
     # ===================== Output =========================
     info = {
         "nocc": nocc,
+        "nocc_printed": nocc_printed,
         "nelec": nelec,
         "nao": nao,
         "nmo": nmo,
@@ -1121,6 +1150,192 @@ def read_energies_from_cp2k_md_log_file(params):
     return KS_energies, total_energy
 
 
+_warned_smeared_partition = set()
+
+
+def read_cp2k_electron_count(filename):
+    """Electron-count bookkeeping of a CP2K log.
+
+    Returns dict(nelec_printed, nocc_printed, nmo): the "Number of electrons"
+    values (one for RKS - the total, two for UKS - alpha then beta), the "Number
+    of occupied orbitals" values in the same order, and the number of MOs. Under
+    &SMEAR the printed occupied count is CP2K's smeared HOMO - every orbital
+    populated beyond EPS_FERMI_DIRAC - while the electron count is exact, so the
+    two disagree exactly when a fractionally populated orbital sits above the
+    aufbau reference.
+    """
+    nelec, nocc, nmo = [], [], None
+    with open(filename, errors="ignore") as f:
+        for line in f:
+            if "Number of electrons:" in line:
+                nelec.append(int(float(line.split()[3])))
+            elif "Number of occupied orbitals:" in line:
+                nocc.append(int(float(line.split()[4])))
+            elif "Number of molecular orbitals:" in line and nmo is None:
+                nmo = int(float(line.split()[4]))
+    if not nelec:
+        raise ValueError(F"no 'Number of electrons' line in {filename} - not a CP2K log "
+                         F"or its SCF section is missing")
+    return {"nelec_printed": nelec, "nocc_printed": nocc, "nmo": nmo}
+
+
+def reference_occupation(filename, isUKS=False):
+    """The reference occupation of a CP2K run FROM ITS ELECTRON COUNT.
+
+    RKS: nelec/2 (an odd count raises - no closed-shell reference exists). UKS:
+    [n_alpha, n_beta], the per-spin electron counts CP2K prints. The printed
+    "Number of occupied orbitals" is cross-checked: a disagreement means a
+    fractionally populated orbital above the reference is being counted as
+    occupied (&SMEAR with a population above EPS_FERMI_DIRAC) - it is reported
+    once per process and the electron-count value is returned, because a fixed
+    SD basis and MO window are only ever defined for the aufbau reference.
+    """
+    ec = read_cp2k_electron_count(filename)
+    nelec, nocc_p = ec["nelec_printed"], ec["nocc_printed"]
+    if isUKS:
+        if len(nelec) < 2:
+            raise ValueError(F"{filename}: a UKS reference needs the per-spin electron "
+                             F"counts but the log prints {len(nelec)} 'Number of electrons' "
+                             F"line(s) - is the run really unrestricted?")
+        ref = [nelec[0], nelec[1]]
+    else:
+        if nelec[0] % 2:
+            raise ValueError(F"{filename}: {nelec[0]} electrons cannot form a closed-shell "
+                             F"reference - the run is not RKS or the charge is wrong")
+        ref = nelec[0] // 2
+    for ch, (r, printed) in enumerate(zip(ref if isUKS else [ref], nocc_p)):
+        if printed != r and ("partition", ch) not in _warned_smeared_partition:
+            _warned_smeared_partition.add(("partition", ch))
+            print(F"WARNING in reference_occupation: {filename} counts {printed} occupied "
+                  F"orbitals{' (spin ' + 'ab'[ch] + ')' if isUKS else ''} but its electron "
+                  F"count gives {r} - an orbital above the reference carries a population "
+                  F"beyond EPS_FERMI_DIRAC (&SMEAR). The electron-count reference {r} is "
+                  F"used and the printed partition is re-mapped onto it (once per process)")
+    return ref
+
+
+def read_cp2k_mo_occupations(filename):
+    """MO occupation numbers from the last 'MO| EIGENVALUES AND OCCUPATION
+    NUMBERS' table(s) of a CP2K log (&DFT &PRINT &MO OCCUPATION_NUMBERS T).
+
+    Returns a list of np.ndarray - one for RKS, [alpha, beta] for UKS - or None
+    when the log carries no such table. Under &SMEAR these are the fractional
+    populations (2 = full for RKS, 1 for UKS); the wfn restart and NAMD_PRINT
+    never show them.
+    """
+    tables, cur, alpha_seen = [], None, False
+    with open(filename, errors="ignore") as f:
+        for line in f:
+            if "EIGENVALUES AND OCCUPATION NUMBERS" in line:
+                cur = []
+                tables.append(cur)
+                alpha_seen = alpha_seen or ("ALPHA" in line)
+                continue
+            if cur is not None:
+                m = re.match(r"\s*MO\|\s+(\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s*$", line)
+                if m:
+                    cur.append(float(m.group(4)))
+                elif cur and not line.strip().startswith("MO|"):
+                    cur = None
+    tables = [np.asarray(x) for x in tables if x]
+    if not tables:
+        return None
+    return tables[-2:] if alpha_seen and len(tables) >= 2 else tables[-1:]
+
+
+def repartition_newtonx(nx, nocc_ref, theta=0.01, occupations=None, nelec=None):
+    """Bring NAMD_PRINT data onto the electron-count reference occupation.
+
+    CP2K prints its occupied/virtual partition from the smeared HOMO. When that
+    is wider than the reference (orbitals above it populated beyond
+    EPS_FERMI_DIRAC), the extra orbitals are moved to the virtual block (energy
+    order kept) and the excitation vectors are re-mapped: excitations FROM the
+    moved orbitals have no place in an integer-occupation basis - their weight
+    is returned per state as dropped weight (to be combined into the capture
+    metric) - and excitations INTO them are absent from the smeared vectors
+    (zero rows). A partition narrower than the reference raises: an orbital the
+    reference occupies is missing, the charge or multiplicity changed.
+    With occupation numbers given, populations are checked against theta (as a
+    fraction of the full occupation): the total must equal the electron count,
+    and any orbital above the reference populated beyond theta, or below it
+    depleted beyond theta, is a fractional reference - it raises, because no
+    integer-occupation SD basis represents it.
+    Args:
+        nx (dict): read_cp2k_newtonx_output result (a modified copy is returned)
+        nocc_ref (int or [int, int]): the electron-count reference
+        theta (float): population tolerance, fraction of the full occupation
+        occupations (list of np.ndarray or None): read_cp2k_mo_occupations
+        nelec (list of int or None): per-channel electron counts for the sum check
+    Returns:
+        (nx_new, drops, moved): drops (np.ndarray, per state) the weight lost to
+        excitations from moved orbitals, moved a list of (channel, [orbitals])
+    """
+    nx = dict(nx)
+    is_uks = nx.get("nspin", 1) == 2 and nx.get("X_b") is not None
+    refs = list(nocc_ref) if is_uks else [int(nocc_ref)]
+    channels = [("", refs[0])] + ([("_b", refs[1])] if is_uks else [])
+    maxocc = 1.0 if is_uks else 2.0
+    drops = np.zeros(len(nx["X"]))
+    moved = []
+    for ic, (s, nref) in enumerate(channels):
+        Xs = nx["X" + s]
+        Co, Cv = nx.get("C_occ" + s), nx.get("C_virt" + s)
+        nocc_p = Co.shape[1] if Co is not None else np.asarray(Xs[0]).shape[1]
+        tag = " (spin " + "ab"[ic] + ")" if is_uks else ""
+        if nocc_p < nref:
+            raise ValueError(
+                F"NAMD_PRINT lists {nocc_p} occupied orbitals{tag} but the electron count "
+                F"requires {nref}: an orbital the reference occupies is missing - the charge "
+                F"or multiplicity changed, nothing downstream is valid")
+        if occupations is not None:
+            occ = np.asarray(occupations[ic] if ic < len(occupations) else occupations[0])
+            if nelec is not None:
+                ne = nelec[ic] if ic < len(nelec) else nelec[0]
+                # an electron count is an integer - half an electron separates any two
+                if abs(float(occ.sum()) - float(ne)) > 0.5:
+                    raise ValueError(
+                        F"the MO occupation numbers sum to {occ.sum():.4f} electrons{tag} but "
+                        F"the log counts {ne} - the printed occupations do not describe this "
+                        F"electron count")
+            above = [(i + 1, float(occ[i])) for i in range(nref, len(occ)) if occ[i] > theta * maxocc]
+            below = [(i + 1, float(occ[i])) for i in range(nref) if occ[i] < (1.0 - theta) * maxocc]
+            if above or below:
+                raise ValueError(
+                    F"fractional reference{tag}: orbital(s) {[i for i, _ in above]} above the "
+                    F"electron-count reference {nref} carry populations "
+                    F"{[round(v, 3) for _, v in above]} and/or occupied orbital(s) "
+                    F"{[i for i, _ in below]} are depleted to {[round(v, 3) for _, v in below]} "
+                    F"(full = {maxocc:g}, occupation_threshold = {theta}). No integer-"
+                    F"occupation SD basis represents this - the frontier orbitals share the "
+                    F"electron pair (&SMEAR at a near-degeneracy). Raise occupation_threshold "
+                    F"only if that population is genuinely negligible for the dynamics")
+        if nocc_p == nref:
+            continue
+        k = nocc_p - nref
+        moved.append((("alp", "bet")[ic] if is_uks else "alp", list(range(nref + 1, nocc_p + 1))))
+        if Co is not None:
+            nx["C_occ" + s] = Co[:, :nref]
+            nx["C_virt" + s] = np.hstack([Co[:, nref:], Cv]) if Cv is not None else Co[:, nref:]
+        for key in ("E_occ", "phases_occ"):
+            v = nx.get(key + s)
+            if v is not None:
+                v = np.asarray(v)
+                vk = key.replace("occ", "virt") + s
+                nx[vk] = np.concatenate([v[nref:], np.asarray(nx[vk])]) if nx.get(vk) is not None else v[nref:]
+                nx[key + s] = v[:nref]
+        new = []
+        for ist, M in enumerate(Xs):
+            M = np.asarray(M)
+            tot2 = float(np.sum(M ** 2))
+            lost2 = float(np.sum(M[:, nref:] ** 2))
+            drops[ist] = 1.0 - (1.0 - drops[ist]) * (1.0 - (lost2 / tot2 if tot2 > 0 else 0.0))
+            R = np.zeros((M.shape[0] + k, nref))
+            R[k:, :] = M[:, :nref]
+            new.append(R)
+        nx["X" + s] = new
+    return nx, drops, moved
+
+
 def read_homo_index(filename: str, isUKS: bool = False):
     """
     This function extract the HOMO index from CP2K log file. This index starts from 1.
@@ -1136,19 +1351,10 @@ def read_homo_index(filename: str, isUKS: bool = False):
         or
         homo (int) The HOMO index (in the case of spin-restricted calculations)
     """
-    homos = []
-    with open(filename, 'r') as f:
-        for line in f:
-            if 'occupied' in line.lower() and 'number' in line.lower():
-                homos.append(int(line.split()[-1]))
-            if len(homos) >= 2:
-                break
-    if not homos:
-        raise ValueError(F"no 'number ... occupied' orbitals line in {filename} - not a CP2K log "
-                         F"or its SCF section is missing")
-    if isUKS:
-        return homos
-    return homos[0]
+    # the value is the ELECTRON-COUNT reference - the printed 'occupied' count is
+    # only cross-checked (under &SMEAR it is the smeared HOMO, see
+    # reference_occupation)
+    return reference_occupation(filename, isUKS=isUKS)
 
 
 def read_molog_file(filename: str):
@@ -5111,6 +5317,18 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     beyond it the renormalized T column is noise and the
                     driver raises; widen num_occ_states/num_unocc_states or
                     reduce nstates to satisfy the contract    [default 0.5]
+                occupation_threshold (float): a population up to this fraction
+                    of the full occupation on an orbital above the electron-
+                    count reference (or missing from one below it) is treated
+                    as zero: CP2K's printed partition is re-mapped onto the
+                    reference and the excitations from the over-counted orbital
+                    become reported dropped weight (into sd_capture_max_drop).
+                    A larger population is a fractional reference and the
+                    driver raises. Set the template's EPS_FERMI_DIRAC to the
+                    same value so CP2K's excitation space keeps HOMO->LUMO for
+                    populations libra treats as zero; the population check
+                    runs only where the log prints MO occupation numbers (&DFT
+                    &PRINT &MO OCCUPATION_NUMBERS T)              [default 0.01]
                 sd_capture_max_drop (float): the largest total CI weight a
                     PROPAGATED state may lose to the truncation chain the CI
                     overlaps are built from (the read-stage threshold/
@@ -5162,7 +5380,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
 
     # ---------------- per-trajectory caches ----------------
     for key in ("mo_prev", "ci_prev", "E_adi_prev", "S_prev", "sd_prev",
-                "coordinates_prev", "is_first_time", "act_state", "homo"):
+                "coordinates_prev", "is_first_time", "act_state", "homo", "nelec"):
         params.setdefault(key, {})
     is_first_time = params["is_first_time"].get(itraj, True)
     act_state = int(params["act_state"].get(itraj, 0))
@@ -5290,11 +5508,19 @@ def cp2k_compute_adi_impl(q, params, full_id):
 
     isUKS = mo_curr.get("nspin", 1) == 2
     if itraj not in params["homo"]:
+        # the reference occupation comes from the ELECTRON COUNT of the log,
+        # never from a printed partition (under &SMEAR CP2K counts every orbital
+        # populated beyond EPS_FERMI_DIRAC as occupied); the wfn's own aufbau
+        # homo must agree with it
+        ref = reference_occupation(res["logfile"], isUKS=isUKS)
         if "homo" in mo_curr:
-            params["homo"][itraj] = ((mo_curr["homo"], mo_curr["homo_b"]) if isUKS
-                                     else mo_curr["homo"])
-        else:
-            params["homo"][itraj] = read_homo_index(res["logfile"], isUKS=isUKS)
+            wfn_h = [mo_curr["homo"], mo_curr["homo_b"]] if isUKS else [mo_curr["homo"]]
+            if wfn_h != (list(ref) if isUKS else [ref]):
+                raise ValueError(
+                    F"the wfn restart's HOMO {wfn_h} disagrees with the electron-count "
+                    F"reference {ref} of {res['logfile']} - the wfn and the log describe "
+                    F"different electron counts or spin treatments")
+        params["homo"][itraj] = tuple(ref) if isUKS else ref
     homo = params["homo"][itraj]        # int, or (homo_alpha, homo_beta) for UKS
     homos = list(homo) if isUKS else [homo]
 
@@ -5417,25 +5643,38 @@ def cp2k_compute_adi_impl(q, params, full_id):
                                  'T) in the input template; set ci_source="log" to '
                                  'parse the excitation-analysis block instead')
             nx = mo_curr.get("newtonx") or read_cp2k_newtonx_output(nx_file)
-            # the SD basis and the cached homo are built ONCE, for one reference
-            # occupation - fractional occupations (&SMEAR) make CP2K count a
-            # partly filled LUMO as occupied, so the printed vectors switch
-            # layout mid-trajectory, every absolute orbital index shifts and the
-            # excitations land outside the basis. CP2K's own symptom is an
-            # "Incompatible number of electrons" abort on the TD restart
-            nocc_print = [np.array(nx["C_occ"]).shape[1]]
-            if isUKS and nx.get("C_occ_b") is not None:
-                nocc_print.append(np.array(nx["C_occ_b"]).shape[1])
-            for ch, (seen, expected) in enumerate(zip(nocc_print, homos)):
-                if seen != expected:
-                    raise ValueError(
-                        F"the reference occupation changed: the NAMD_PRINT vectors "
-                        F"in {nx_file} carry {seen} occupied orbitals"
-                        F"{' (spin ' + 'ab'[ch] + ')' if isUKS else ''}, the SD basis "
-                        F"and the MO window were built for {expected}. A fixed SD "
-                        F"basis cannot represent a moving reference - drop &SMEAR "
-                        F"(fractional occupations do this whenever a gap closes) or "
-                        F"fix the charge/multiplicity of the template")
+            # the SD basis is built ONCE for the electron-count reference. A printed
+            # partition wider than it (orbitals above the reference populated
+            # beyond EPS_FERMI_DIRAC under &SMEAR) is re-partitioned onto the
+            # reference: the extra orbitals become virtuals, excitations FROM them
+            # are counted as dropped weight (named, fed to the capture check),
+            # excitations INTO them are absent from the smeared vectors. Where the
+            # log prints MO occupations they are checked against
+            # occupation_threshold - a population beyond it is a fractional
+            # reference and raises. The electron count itself may never change
+            theta = float(params.get("occupation_threshold", 0.01))
+            if not 0.0 <= theta < 1.0:
+                raise ValueError(F"occupation_threshold must be in [0, 1), got {theta}")
+            ecount = read_cp2k_electron_count(res["logfile"])
+            if params["nelec"].get(itraj) is None:
+                params["nelec"][itraj] = list(ecount["nelec_printed"])
+            elif list(ecount["nelec_printed"]) != params["nelec"][itraj]:
+                raise ValueError(
+                    F"the electron count changed along trajectory {itraj}: "
+                    F"{params['nelec'][itraj]} at the first step, {ecount['nelec_printed']} "
+                    F"now ({res['logfile']}) - a changed charge or multiplicity, nothing "
+                    F"downstream is valid")
+            nx, repart_drops, moved = repartition_newtonx(
+                nx, list(homos) if isUKS else homos[0], theta,
+                occupations=read_cp2k_mo_occupations(res["logfile"]),
+                nelec=ecount["nelec_printed"])
+            if moved and "repartition" not in _warned_smeared_partition:
+                _warned_smeared_partition.add("repartition")
+                print(F"cp2k_compute_adi: {nx_file} counts orbital(s) {moved} as occupied "
+                      F"beyond the electron-count reference {homos} (&SMEAR population "
+                      F"above EPS_FERMI_DIRAC) - re-partitioned onto the reference, the "
+                      F"excitations from them are counted as dropped weight and reported "
+                      F"through the capture check (once per process)")
             if isUKS and nx.get("nspin", 1) != 2:
                 raise ValueError("the run is UKS but the NAMD_PRINT file has no "
                                  "per-spin MO blocks - set PRINT_VIRTUALS T (the "
@@ -5469,6 +5708,17 @@ def cp2k_compute_adi_impl(q, params, full_id):
                 amps_prealigned = True
             ci_curr = ci_data_from_newtonx(nx, res["omegas"][:nexc], ci_threshold,
                                            occ_min=LO, vir_max=HI)
+            if np.any(repart_drops > 0.0):
+                # the weight lost to excitations from the re-partitioned orbitals
+                # belongs in the capture metric like every other truncation, and
+                # is reported per state like every other truncation - a large
+                # loss under the cap must not pass in silence
+                rd = repart_drops[:len(ci_curr["window_drops"])]
+                for k in np.nonzero(rd > 1e-6)[0]:
+                    print(F"cp2k_compute_adi: state {k + 1}: dropped CI weight {rd[k]:.2e} to "
+                          F"excitations from the re-partitioned orbital(s) {moved} (a smeared "
+                          F"population counted as occupied by CP2K)")
+                ci_curr["window_drops"] = 1.0 - (1.0 - rd) * (1.0 - ci_curr["window_drops"])
             if amps_prealigned:
                 # fold the wfn-virtual-range truncation into the capture
                 # metric - those X rows were cut before ci_data_from_newtonx
