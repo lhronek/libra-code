@@ -1814,6 +1814,12 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
         dyn_var.init_active_states(init_elec, rnd)
     elif dyn_params["rep_sh"] == 0:
         dyn_var.init_active_states_dia(init_elec, rnd)
+    # the savers read the other representation's active states at t0, before the first
+    # step's sync - sample them here with the same gate and sampler as every step
+    prms0 = dyn_control_params()
+    prms0.set_parameters(dyn_params)
+    if need_active_states_diff_rep(prms0) == 1:
+        dyn_var.set_active_states_diff_rep(int(dyn_params["rep_sh"]), rnd)
 
     # print("Initial adiabatic amplitudes")
     # dyn_var.get_ampl_adi().show_matrix()
