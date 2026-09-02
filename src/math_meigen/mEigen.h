@@ -111,6 +111,7 @@ void inv_matrix(CMATRIX& S, CMATRIX& S_inv);
 void sqrt_matrix(CMATRIX& S, CMATRIX& S_half, CMATRIX& S_i_half, double thresh, int do_phase_correction);
 void sqrt_matrix(CMATRIX& S, CMATRIX& S_half, CMATRIX& S_i_half, double thresh);
 void sqrt_matrix(CMATRIX& S, CMATRIX& S_half, CMATRIX& S_i_half);
+int lowdin_frame(CMATRIX& S, CMATRIX& X, CMATRIX& Y);  ///< Lowdin frame of a metric: X = S^-1/2, Y = S^1/2. Returns 0 (X, Y untouched) for an identity S (max |S - I| <= 1e-12)
 void exp_matrix(CMATRIX& res, CMATRIX& S, complex<double> dt, int do_phase_correction);
 void exp_matrix(CMATRIX& res, CMATRIX& S, complex<double> dt);
 

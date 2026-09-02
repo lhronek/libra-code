@@ -1940,20 +1940,11 @@ int nHamiltonian::lowdin_dia(CMATRIX &X, CMATRIX &Y) {
     untouched)
   */
   if (ovlp_dia_mem_status == 0) { return 0; }
-  double dev = 0.0;
-  for (int i = 0; i < ndia; i++) {
-    for (int j = 0; j < ndia; j++) {
-      double d = std::abs(ovlp_dia->get(i, j) - ((i == j) ? 1.0 : 0.0));
-      if (d > dev) { dev = d; }
-    }
-  }
-  if (dev <= 1e-12) { return 0; }
   if (X.n_rows != ndia || X.n_cols != ndia || Y.n_rows != ndia || Y.n_cols != ndia) {
     cout << "Error in lowdin_dia: X and Y must be " << ndia << " x " << ndia << " matrices\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
-  sqrt_matrix(*ovlp_dia, Y, X);
-  return 1;
+  return lowdin_frame(*ovlp_dia, X, Y);
 }
 
 CMATRIX nHamiltonian::get_ham_dia_lowdin() {

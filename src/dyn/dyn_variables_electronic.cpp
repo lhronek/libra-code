@@ -19,6 +19,7 @@
 #include "../converters/libconverters.h"
 #include "dyn_variables.h"
 #include "dyn_ham.h"
+#include "../math_meigen/mEigen.h"
 
 
 /// liblibra namespace
@@ -1016,8 +1017,9 @@ void dyn_variables::init_active_states(bp::dict _params, Random& rnd){
       i = dia_act_states_temp[traj]; // active diabatic state
       pop_dia *= 0.0; pop_dia.set(i, i, complex<double>(1.0, 0.0) );
 
-      // The following transformation is correct only for S_dia = 1
-      pop_adi = (*basis_transform[traj]).H() * pop_dia * (*basis_transform[traj]);
+      // the adiabatic populations of the pure diabat: C_adi = U^H S C_dia with the cached
+      // metric (identity when the model supplies none)
+      pop_adi = (*basis_transform[traj]).H() * (*ovlp_dia[traj]) * pop_dia * (*ovlp_dia[traj]) * (*basis_transform[traj]);
 
       vector<double> res(nadi, 0.0);
       for(i=0; i<nadi;i++){ res[i] = pop_adi.get(i,i).real(); }
@@ -1143,7 +1145,8 @@ void dyn_variables::init_active_states_dia(bp::dict _params, Random& rnd){
       i = act_states_temp[traj]; // active diabatic state
       pop_adi *= 0.0; pop_adi.set(i, i, complex<double>(1.0, 0.0) );
 
-      // The following transformation is correct only for S_dia = 1
+      // the diabatic populations of the pure adiabatic state, the S = I form - a
+      // non-orthogonal metric is resampled from the Lowdin populations below
       pop_dia = (*basis_transform[traj]) * pop_adi * (*basis_transform[traj]).H();
 
       vector<double> res(ndia, 0.0);
@@ -1158,6 +1161,22 @@ void dyn_variables::init_active_states_dia(bp::dict _params, Random& rnd){
     }// for traj
 
   }// rep == 1
+
+  // non-orthogonal diabats: the hopping states are the Lowdin states S^-1/2 |i> and a pure
+  // diabat is a superposition of them - the initial active state follows the Lowdin
+  // populations |(S^1/2 C_dia)_i|^2 of the initial amplitudes, else the ensemble starts off
+  // the populations it is meant to track (0.023 off for a 0.3 overlap)
+  for(traj=0; traj<ntraj; traj++){
+    CMATRIX X(ndia, ndia);
+    CMATRIX Y(ndia, ndia);
+    if(libmeigen::lowdin_frame(*ovlp_dia[traj], X, Y)){
+      CMATRIX popL(Y * (*dm_dia[traj]) * Y);
+      vector<double> res(ndia, 0.0);
+      for(i=0; i<ndia; i++){ res[i] = popL.get(i,i).real(); }
+      ksi = rnd.uniform(0.0, 1.0);
+      act_states_dia[traj] = hop(res, ksi);
+    }
+  }
 
 }
 
@@ -1362,10 +1381,13 @@ void dyn_variables:: set_active_states_diff_rep(int rep_sh, Random& rnd){
       for(j=0;j<nadi; j++){ pop_adi.set(j,j, complex<double>(0.0, 0.0) ); }
       pop_adi.set(i, i, complex<double>(1.0, 0.0) );
 
-      // The following transformation is correct only for S_dia = 1
+      // the diabatic populations of an adiabatic state in the hopping frame: the Lowdin
+      // sandwich Y U rho U^H Y for a non-orthogonal metric, the bare U rho U^H at S = I
       U = (*basis_transform[traj]);// * (*proj_adi[traj]);
-      
-      pop_dia = U * pop_adi * U.H(); 
+
+      { CMATRIX X_(ndia, ndia); CMATRIX Y_(ndia, ndia);
+        if(libmeigen::lowdin_frame(*ovlp_dia[traj], X_, Y_)){ pop_dia = Y_ * U * pop_adi * U.H() * Y_; }
+        else{ pop_dia = U * pop_adi * U.H(); } }
       
       vector<double> diag_els(ndia, 0.0);
       for(i=0;i<ndia; i++){ diag_els[i] = pop_dia.get(i,i).real(); }
@@ -1383,10 +1405,13 @@ void dyn_variables:: set_active_states_diff_rep(int rep_sh, Random& rnd){
       for(j=0;j<nadi; j++){ pop_dia.set(j,j, complex<double>(0.0, 0.0) ); }
       pop_dia.set(i, i, complex<double>(1.0, 0.0) );
 
-      // The following transformation is correct only for S_dia = 1
+      // the adiabatic populations of a Lowdin state X e_i: C_adi = U^H S X e_i = U^H Y e_i,
+      // the bare U^H rho U at S = I
       U = (*basis_transform[traj]);// * (*proj_adi[traj]);
-      
-      pop_adi = U.H() * pop_dia * U; 
+
+      { CMATRIX X_(ndia, ndia); CMATRIX Y_(ndia, ndia);
+        if(libmeigen::lowdin_frame(*ovlp_dia[traj], X_, Y_)){ pop_adi = U.H() * Y_ * pop_dia * Y_ * U; }
+        else{ pop_adi = U.H() * pop_dia * U; } }
       
       vector<double> diag_els(nadi, 0.0);
       for(i=0;i<nadi; i++){ diag_els[i] = pop_adi.get(i,i).real(); }
@@ -1657,10 +1682,13 @@ vector<double> dyn_variables::compute_average_sh_pop_TR(int rep){
       for(j=0;j<nadi; j++){ pop_adi.set(j,j, complex<double>(0.0, 0.0) ); }
       pop_adi.set(i, i, complex<double>(1.0, 0.0) );
 
-      // The following transformation is correct only for S_dia = 1
+      // the diabatic populations of an adiabatic state in the hopping frame: the Lowdin
+      // sandwich Y U rho U^H Y for a non-orthogonal metric, the bare U rho U^H at S = I
       U = (*basis_transform[traj]);// * (*proj_adi[traj]);
-      
-      pop_dia = U * pop_adi * U.H(); 
+
+      { CMATRIX X_(ndia, ndia); CMATRIX Y_(ndia, ndia);
+        if(libmeigen::lowdin_frame(*ovlp_dia[traj], X_, Y_)){ pop_dia = Y_ * U * pop_adi * U.H() * Y_; }
+        else{ pop_dia = U * pop_adi * U.H(); } }
       for(j=0; j<ndia; j++){ res[j] += pop_dia.get(j,j).real(); }
     }
   }// rep == 0
@@ -1678,10 +1706,13 @@ vector<double> dyn_variables::compute_average_sh_pop_TR(int rep){
       for(j=0;j<ndia; j++){ pop_dia.set(j,j, complex<double>(0.0, 0.0) ); }
       pop_dia.set(i, i, complex<double>(1.0, 0.0) );
 
-      // The following transformation is correct only for S_dia = 1
+      // the adiabatic populations of a Lowdin state X e_i: C_adi = U^H S X e_i = U^H Y e_i,
+      // the bare U^H rho U at S = I
       U = (*basis_transform[traj]);// * (*proj_adi[traj]);
-      
-      pop_adi = U.H() * pop_dia * U; 
+
+      { CMATRIX X_(ndia, ndia); CMATRIX Y_(ndia, ndia);
+        if(libmeigen::lowdin_frame(*ovlp_dia[traj], X_, Y_)){ pop_adi = U.H() * Y_ * pop_dia * Y_ * U; }
+        else{ pop_adi = U.H() * pop_dia * U; } }
       for(j=0; j<nadi; j++){ res[j] += pop_adi.get(j,j).real(); }
     }
   }// rep == 1

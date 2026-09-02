@@ -118,6 +118,31 @@ void sqrt_matrix(CMATRIX& S, CMATRIX& S_half, CMATRIX& S_i_half){
 
 }
 
+int lowdin_frame(CMATRIX& S, CMATRIX& X, CMATRIX& Y){
+/**
+  The Lowdin (symmetric) orthonormalization frame of a metric S: X = S^-1/2 and Y = S^1/2.
+  Returns 1 with X and Y filled, or 0 for an identity metric (max |S - I| <= 1e-12) with X and
+  Y untouched - callers keep their S = I code path bit-identical
+*/
+  int n = S.n_cols;
+  if(S.n_rows != n){
+    cout<<"Error in libmeigen::lowdin_frame : the metric is not square\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  double dev = 0.0;
+  for(int i=0; i<n; i++){
+    for(int j=0; j<n; j++){
+      double d = std::abs(S.get(i,j) - ((i==j) ? 1.0 : 0.0));
+      if(d > dev){ dev = d; }
+    }
+  }
+  if(dev <= 1e-12){ return 0; }
+  if(X.n_rows != n || X.n_cols != n || Y.n_rows != n || Y.n_cols != n){
+    cout<<"Error in libmeigen::lowdin_frame : X and Y must be "<<n<<" x "<<n<<" matrices\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  sqrt_matrix(S, Y, X);
+  return 1;
+}
+
 
 
 void exp_matrix(CMATRIX& res, CMATRIX& S, complex<double> dt, int do_phase_correction){

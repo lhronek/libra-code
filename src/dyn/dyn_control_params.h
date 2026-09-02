@@ -102,7 +102,8 @@ class dyn_control_params{
    populations and fluxes, state energies for acceptance/rescaling, rep_force 0 forces,
    the LZ/ZN diabatic detection - works in the Lowdin frame S^-1/2 of the diabats
    (nHamiltonian::lowdin_dia): the hopping states are the symmetrically orthonormalized
-   diabats, identical to them at S = I. se_pop_dia stays the plain |C_i|^2
+   diabats, identical to them at S = I, and the initial active states follow the Lowdin
+   populations of the initial amplitudes. se_pop_dia stays the plain |C_i|^2
   */
   int rep_sh;
 
