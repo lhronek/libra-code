@@ -785,6 +785,16 @@ def make_cost_mat(orb_mat_inp, en_mat_inp, alpha):
     return cost_mat
 
 
+def _spin_block_permutation(perm_aa, perm_bb, nstates):
+    """The 2n-index permutation of a spin-block matrix from its alpha and beta block permutations."""
+    p = intList()
+    for k in range(nstates):
+        p.append(perm_aa[k])
+    for k in range(nstates):
+        p.append(nstates + perm_bb[k])
+    return p
+
+
 def apply_state_reordering(St, E, params):
     """
 
@@ -804,8 +814,10 @@ def apply_state_reordering(St, E, params):
                 many states will be included in the reordering
 
     Returns:
-        None: but changes the input St object
-
+        list of lists of int: the label permutation of every step - E[i] (and the rows of
+        St[i]) were permuted with entry i, the trailing E entries (beyond len(St)) with the
+        final one. Apply it to any other per-step quantity of the same basis. St and E are
+        changed in place.
     """
 
     critical_params = []
@@ -832,10 +844,11 @@ def apply_state_reordering(St, E, params):
         perm_t_aa.append(a)
         perm_t_bb.append(a)
 
-    # full-matrix cumulative permutation of the algo-1 branch
+    # full-matrix cumulative permutation (algo 1) and the per-step label permutations
     perm_cum = intList()
     for a in range(0, 2 * nstates):
         perm_cum.append(a)
+    perms = []
 
     # Temporary matrices for the Hungarian method
     aa = CMATRIX(nstates, nstates)
@@ -864,6 +877,7 @@ def apply_state_reordering(St, E, params):
 
             E[i].permute_cols(perm_cum)
             E[i].permute_rows(perm_cum)
+            perms.append([perm_cum[k] for k in range(2 * nstates)])
 
         elif params["do_state_reordering"] == 2:
             """
@@ -873,6 +887,13 @@ def apply_state_reordering(St, E, params):
             pop_submatrix(St[i], ab, alp, bet)
             pop_submatrix(St[i], ba, bet, alp)
             pop_submatrix(St[i], bb, bet, bet)
+
+            # the energies carry the row labels - unpermuted, a state relabeled at a
+            # crossing would keep the other state's energy
+            perm_full = _spin_block_permutation(perm_t_aa, perm_t_bb, nstates)
+            E[i].permute_rows(perm_full)
+            E[i].permute_cols(perm_full)
+            perms.append([perm_full[k] for k in range(2 * nstates)])
 
             # Extract the alpha and beta orbtial energies
             pop_submatrix(E[i], en_mat_aa, alp, alp)
@@ -909,6 +930,17 @@ def apply_state_reordering(St, E, params):
             push_submatrix(St[i], ab, alp, bet)
             push_submatrix(St[i], ba, bet, alp)
             push_submatrix(St[i], bb, bet, bet)
+
+    # the trailing step (E has one entry more than St) takes the final labels
+    if params["do_state_reordering"] == 1:
+        final = perm_cum
+    else:
+        final = _spin_block_permutation(perm_t_aa, perm_t_bb, nstates)
+    for i in range(nsteps, len(E)):
+        E[i].permute_rows(final)
+        E[i].permute_cols(final)
+        perms.append([final[k] for k in range(2 * nstates)])
+    return perms
 
 
 def do_phase_corr(cum_phase1, St, cum_phase2, phase_i):
@@ -1701,7 +1733,10 @@ def apply_state_reordering_general(St, E, params):
             * **params["state_reordering_alpha"]** ( double ): a parameter that controls how
                 many states will be included in the reordering
     Returns:
-        None: but changes the input St object
+        list of lists of int: the label permutation of every step - E[i] (and the rows of
+        St[i]) were permuted with entry i, the trailing E entries (beyond len(St)) with the
+        final one. Apply it to any other per-step quantity of the same basis. St and E are
+        changed in place.
     """
 
     critical_params = []
@@ -1720,6 +1755,7 @@ def apply_state_reordering_general(St, E, params):
     perm_t = intList()
     for i in range(0, nstates):
         perm_t.append(i)
+    perms = []
 
     for i in range(0, nsteps):
 
@@ -1739,6 +1775,7 @@ def apply_state_reordering_general(St, E, params):
 
             E[i].permute_cols(perm_cum)
             E[i].permute_rows(perm_cum)
+            perms.append([perm_cum[k] for k in range(nstates)])
 
         elif params["do_state_reordering"] == 2:
             """
@@ -1747,7 +1784,11 @@ def apply_state_reordering_general(St, E, params):
 
             # Permute rows
             St[i].permute_rows(perm_t)
-
+            # the energies carry the row labels - unpermuted, a state relabeled at a
+            # crossing would keep the other state's energy
+            E[i].permute_rows(perm_t)
+            E[i].permute_cols(perm_t)
+            perms.append([perm_t[k] for k in range(nstates)])
             # compute the cost matrices
             cost_mat = make_cost_mat(St[i], E[i], params["state_reordering_alpha"])
 
@@ -1760,6 +1801,14 @@ def apply_state_reordering_general(St, E, params):
 
             # Permute the blocks by col
             St[i].permute_cols(perm_t)
+
+    # the trailing step (E has one entry more than St) takes the final labels
+    final = perm_cum if params["do_state_reordering"] == 1 else perm_t
+    for i in range(nsteps, len(E)):
+        E[i].permute_rows(final)
+        E[i].permute_cols(final)
+        perms.append([final[k] for k in range(nstates)])
+    return perms
 
 
 def apply_phase_correction_general(St):
@@ -2827,9 +2876,20 @@ def run_step3_sd_nacs_libint(params):
             St_sds_cmatrix.append(St_sd_cmatrix)
             E_sd_cmatrix = data_conv.nparray2CMATRIX(E_sds[i])
             E_sds_cmatrix.append(E_sd_cmatrix)
-
+        # the trailing step has energies but no interval - it takes the final labels
+        for i in range(len(St_sds), len(E_sds)):
+            E_sds_cmatrix.append(data_conv.nparray2CMATRIX(E_sds[i]))
         print('Applying state-reordering to SDs overlaps...\n')
-        apply_state_reordering_general(St_sds_cmatrix, E_sds_cmatrix, params)
+        perms = apply_state_reordering_general(St_sds_cmatrix, E_sds_cmatrix, params)
+        # the relabeled overlaps AND energies replace the sorted ones - the saved
+        # Hvib_sd_re midpoints carry the labels of St_sd
+        for i in range(len(St_sds)):
+            St_sds[i] = data_conv.MATRIX2scipynpz(St_sds_cmatrix[i].real())
+        for i in range(len(E_sds)):
+            E_sds[i] = data_conv.MATRIX2nparray(E_sds_cmatrix[i].real(), np.float64)
+            if i > 0:
+                sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/Hvib_sd_{start_time+i-1}_re.npz',
+                            sp.csc_matrix(0.5 * (E_sds[i] + E_sds[i - 1])))
         print('Done with state-reordering of SDs. Elapsed time:', time.time() - t2)
 
     if params['is_many_body']:
@@ -2848,7 +2908,6 @@ def run_step3_sd_nacs_libint(params):
             # convert to scipy npz format now
             t2 = time.time()
             for i in range(len(St_sds_cmatrix) - 1):
-                St_sds[i] = data_conv.MATRIX2scipynpz(St_sds_cmatrix[i].real())
                 sd2ci_prev = SD2CI[i]
                 sd2ci_curr = SD2CI[i + 1]
                 # Compute the St_ci
@@ -2876,6 +2935,12 @@ def run_step3_sd_nacs_libint(params):
             # if params['do_state_reordering']==2 or params['do_state_reordering']==1:
             print('Applying state-reordering to St_ci...\n')
             apply_state_reordering_general(St_cis_cmatrix, E_cis_cmatrix, params)
+            # the relabeled CI energies replace the midpoints saved above
+            for i in range(1, len(E_cis_cmatrix)):
+                E_ci_prev = data_conv.MATRIX2nparray(E_cis_cmatrix[i - 1].real(), np.float64)
+                E_ci_curr = data_conv.MATRIX2nparray(E_cis_cmatrix[i].real(), np.float64)
+                sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/Hvib_ci_{start_time+i-1}_re.npz',
+                            sp.csc_matrix(0.5 * (E_ci_prev + E_ci_curr) * units.ev2Ha))
             print('Done with state-reordering to St_cis. Elapsed time:', time.time() - t2)
 
             # Now convert back to scipy npz
