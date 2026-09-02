@@ -1402,7 +1402,7 @@ void dyn_variables:: set_active_states_diff_rep(int rep_sh, Random& rnd){
     for(traj=0; traj<ntraj; traj++){
       i = act_states_dia[traj]; // active diabatic state
       pop_dia = *dm_dia[traj];
-      for(j=0;j<nadi; j++){ pop_dia.set(j,j, complex<double>(0.0, 0.0) ); }
+      for(j=0;j<ndia; j++){ pop_dia.set(j,j, complex<double>(0.0, 0.0) ); }
       pop_dia.set(i, i, complex<double>(1.0, 0.0) );
 
       // the adiabatic populations of a Lowdin state X e_i: C_adi = U^H S X e_i = U^H Y e_i,
