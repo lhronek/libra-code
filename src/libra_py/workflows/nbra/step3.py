@@ -2828,15 +2828,21 @@ def _sd_diabatization_series(params, sd_sorted, active_space, start_time, finish
     from the step-2 fragment operators sliced to the active space (Lowdin-orthonormalized
     when the SD overlaps are)."""
     res_dir_1 = params['path_to_npz_files']
-    nfrag = len(glob.glob(F'{res_dir_1}/P_frag*_ks_{start_time}.npz'))
+    prefixes = {"mulliken": "P_frag", "pod_cp2k": "P_pod_cp2k"}
+    operator = str(params['fragment_operator']).lower()
+    if operator not in prefixes:
+        raise ValueError(F"fragment_operator {operator!r} - use 'mulliken' or 'pod_cp2k'")
+    prefix = prefixes[operator]
+    nfrag = len(glob.glob(F'{res_dir_1}/{prefix}*_ks_{start_time}.npz'))
     if nfrag < 2:
         raise ValueError(F"diabatization needs the step-2 fragment operators "
-                         F"P_frag{{f}}_ks_{{step}}.npz of at least two fragments in {res_dir_1} "
-                         F"(fragment_atom_lists of step2), found {nfrag}")
+                         F"{prefix}{{f}}_ks_{{step}}.npz of at least two fragments in {res_dir_1} "
+                         F"({'fragment_atom_lists' if operator == 'mulliken' else 'read_pod_cp2k_files'} of "
+                         F"step2), found {nfrag}")
     mode = params['apply_orthonormalization']
     W_list, pops_list, hole_list, dia_index = [], [], [], None
     for i, step in enumerate(range(start_time, finish_time)):
-        P_frag = [np.array(sp.load_npz(F'{res_dir_1}/P_frag{f}_ks_{step}.npz').todense()
+        P_frag = [np.array(sp.load_npz(F'{res_dir_1}/{prefix}{f}_ks_{step}.npz').todense()
                            [active_space, :][:, active_space]).real for f in range(nfrag)]
         if mode != "none":
             s_ks = np.array(sp.load_npz(F'{res_dir_1}/S_ks_{step}.npz').todense()
@@ -2851,7 +2857,7 @@ def _sd_diabatization_series(params, sd_sorted, active_space, start_time, finish
     return W_list, dia_index, pops_list, hole_list
 
 
-def _write_diabatization_records(res_dir, kind, dia_index, pops_list, hole_list, start_time):
+def _write_diabatization_records(res_dir, kind, dia_index, pops_list, hole_list, start_time, operator="mulliken"):
     """U_sd_labels.json (the meaning of every diabatic state) and U_sd_pops.txt (per step,
     the fragment populations of every diabatic state's localized electron orbital, then of
     its localized hole - nan where the state has none)."""
@@ -2867,7 +2873,7 @@ def _write_diabatization_records(res_dir, kind, dia_index, pops_list, hole_list,
             states.append({"index": col, "type": "localized", "manifold": int(entry[1]),
                            "fragment": int(entry[2]), "rank": int(entry[3])})
     with open(F'{res_dir}/U_sd_labels.json', 'w') as f:
-        json.dump({"kind": kind,
+        json.dump({"kind": kind, "fragment_operator": operator,
                    "note": "particle: the excited electron of the manifold (shared hole = "
                            "manifold) sits on 'fragment', hole: the hole (shared particle = "
                            "manifold) sits on 'fragment', joint: the hole sits on "
@@ -2933,6 +2939,10 @@ def run_step3_sd_nacs_libint(params):
                 neutral orbital energies, no self-consistent screening of the site detuning). -1 is
                 the electron basis of the anion (one alpha electron added to each active virtual).
                 Needs isUKS 0. Pairs with diabatization "hole" / "particle".
+            * **params['fragment_operator']** (string): the fragment operators the diabatization
+                localizes with - "mulliken" [default] reads P_frag{f}_ks_{step}.npz (step2
+                fragment_atom_lists), "pod_cp2k" reads P_pod_cp2k{f}_ks_{step}.npz (step2 read_pod_cp2k_files, the
+                projectors onto the blocks of CP2K's projection-operator diabatization).
             * **params['diabatization']** (string): "none" [default] keeps the SD basis. "particle" or
                 "hole" localizes, in every single-excitation manifold sharing the hole (resp. the
                 particle), the varying spin-orbital on the fragments of the step-2 fragment operators
@@ -2999,7 +3009,7 @@ def run_step3_sd_nacs_libint(params):
                       'num_unocc_states': 1, 'verbosity': 0, 'isUKS': 0, 'es_software': 'cp2k',
                       'use_multiprocessing': False, 'logfile_directory': os.getcwd() + '/all_logfiles', 'nac_algo': 0,
                       'sd_overlap_kernel': 'auto', 'blas_num_threads': None,
-                      'diabatization': 'none', 'koopmans_charge': 0
+                      'diabatization': 'none', 'koopmans_charge': 0, 'fragment_operator': 'mulliken'
                       }
 
     if params['is_many_body'] and params['isUKS']:
@@ -3272,7 +3282,8 @@ def run_step3_sd_nacs_libint(params):
         W_dia, dia_index, dia_pops, dia_hole = _sd_diabatization_series(params, sd_states_reindexed_sorted,
                                                                         ks_active_space, start_time,
                                                                         finish_time, diabatization)
-        _write_diabatization_records(res_dir_2, diabatization, dia_index, dia_pops, dia_hole, start_time)
+        _write_diabatization_records(res_dir_2, diabatization, dia_index, dia_pops, dia_hole, start_time,
+                                     str(params['fragment_operator']).lower())
     if params['is_many_body']:
         # Add midpoint energies for CI states in here
         ci_midpoint_energies = step3_many_body.compute_ci_energies_midpoint(ci_energies, params)

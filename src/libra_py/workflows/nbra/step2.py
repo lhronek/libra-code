@@ -19,6 +19,7 @@
 
 import json
 import os
+import glob
 import sys
 # The sparse matrix library for storing the MO overlaps
 # with a high number of states
@@ -455,6 +456,14 @@ def run_cp2k_libint_step2(params):
                                                                           needs mo_source "wfn" with
                                                                           ao_overlap_method "cp2k" [default: None].
 
+                             read_pod_cp2k_files (bool): the diag template carries Futera's &PROPERTIES &ET_COUPLING
+                                                    &PROJECTION (blocks = fragments) with the HAMILTONIAN,
+                                                    WAVEFUNCTION and TRANSF_MATRIX_R prints: read the POD files of
+                                                    every diagonalization run and save the POD fragment projectors
+                                                    P_pod_cp2k{f}_ks_{step}.npz over the MO window (the analogue of P_frag,
+                                                    step3 fragment_operator "pod_cp2k") and POD_cp2k_hab_{step}.npz (block
+                                                    energies and couplings). Needs mo_source "wfn" [default: False].
+
                              cp2k_ot_input_template (string): The CP2K OT input template file name (just for the xTB).
                                                               None/absent skips the OT stage: the diagonalization runs then
                                                               chain their own wfn restarts (see CP2K_methods.run_cp2k_xtb) -
@@ -539,6 +548,7 @@ def run_cp2k_libint_step2(params):
         'ao_overlap_method': 'cp2k',
         'mo_source': 'wfn',
         'fragment_atom_lists': None,
+        'read_pod_cp2k_files': False,
         'overlap_template': '',
         'cp2k_data_dir': '',
         'omp_num_threads': 1,
@@ -613,6 +623,10 @@ def run_cp2k_libint_step2(params):
     if fragment_atom_lists is not None and (mo_source != 'wfn' or ao_overlap_method != 'cp2k'):
         raise ValueError('fragment_atom_lists needs mo_source="wfn" with ao_overlap_method="cp2k" - '
                          'the fragment operators use the wfn AO->atom map and the CP2K AO overlap')
+    read_pod_cp2k_files = params['read_pod_cp2k_files']
+    if read_pod_cp2k_files and (mo_source != 'wfn' or ao_overlap_method != 'cp2k'):
+        raise ValueError('read_pod_cp2k_files needs mo_source="wfn" with ao_overlap_method="cp2k" - the POD '
+                         'block MOs pair with the wfn MOs in the CP2K AO order')
     if ao_overlap_method == 'cp2k':
         if params['use_emultipole']:
             raise ValueError('use_emultipole requires the libint machinery (the multipole '
@@ -704,6 +718,18 @@ def run_cp2k_libint_step2(params):
                 # molden-free: MOs, exact eigenvalues and HOMO from the binary restart file
                 wfn_file = F'Diag_{step}-RESTART.wfn' if isxTB else F'Diag_libra-{step}-RESTART.wfn'
                 mo_curr = CP2K_methods.load_wfn_mo_data(wfn_file)
+                if read_pod_cp2k_files:
+                    pod_hits = glob.glob(wfn_file[:-len('-RESTART.wfn')] + '-POD-RESTART-*.hab')
+                    if len(pod_hits) != 1:
+                        raise ValueError(F'read_pod_cp2k_files: {len(pod_hits)} POD files match '
+                                         F'{wfn_file[:-len("-RESTART.wfn")]}-POD-RESTART-*.hab - the diag '
+                                         F'template needs &PROPERTIES &ET_COUPLING &PROJECTION with the '
+                                         F'HAMILTONIAN, WAVEFUNCTION and TRANSF_MATRIX_R prints')
+                    pod_prefix = pod_hits[0][:-4]
+                    pod_curr = CP2K_methods.read_pod_cp2k_files(pod_prefix)
+                    for ext in ('.hab', '.wfn', '.tmf', '.tmr'):
+                        if os.path.exists(pod_prefix + ext):
+                            os.remove(pod_prefix + ext)
                 if isUKS != (mo_curr['nspin'] == 2):
                     raise ValueError(F'isUKS={isUKS} but {wfn_file} carries nspin='
                                      F'{mo_curr["nspin"]} - the diag template UKS/MULTIPLICITY '
@@ -743,6 +769,21 @@ def run_cp2k_libint_step2(params):
             scipy.sparse.save_npz(params['res_dir'] + F'/S_ks_{step}.npz', S_step_sparse)
             E_step_sparse = scipy.sparse.csc_matrix(data_conv.form_block_matrix(E_a, zero_mat, zero_mat, E_b))
             scipy.sparse.save_npz(params['res_dir'] + F'/E_ks_{step}.npz', E_step_sparse)
+            if read_pod_cp2k_files:
+                # the POD blocks partition the orthogonalized AO space: the projectors sum to S
+                lo, hi = lowest_orbital - 1, highest_orbital
+                P_pod_a = CP2K_methods.pod_cp2k_fragment_operators(pod_curr, mo_curr['C'][lo:hi], 0)
+                P_pod_b = CP2K_methods.pod_cp2k_fragment_operators(pod_curr, mo_curr['C_b'][lo:hi], 1) if isUKS else P_pod_a
+                resid = float(np.max(np.abs(sum(P_pod_a) - S_a)))
+                if resid > 1e-8:
+                    raise ValueError(F'step {step}: the POD fragment projectors sum to S only within '
+                                     F'{resid:.2e} - the POD blocks do not cover all atoms or the AO orders differ')
+                for f in range(pod_curr['n_blocks']):
+                    scipy.sparse.save_npz(params['res_dir'] + F'/P_pod_cp2k{f}_ks_{step}.npz',
+                                          scipy.sparse.csc_matrix(data_conv.form_block_matrix(P_pod_a[f], zero_mat, zero_mat, P_pod_b[f])))
+                np.savez(params['res_dir'] + F'/POD_cp2k_hab_{step}.npz',
+                         **{F'E_b{ib}_s{sp}': e for (ib, sp), e in pod_curr['energies'].items()},
+                         **{F'V_b{i}_b{j}_s{sp}': v for (i, j, sp), v in pod_curr['couplings'].items()})
             if fragment_atom_lists is not None:
                 # the fragments covering all atoms sum to S - a residual there is a
                 # broken AO->atom map or a broken window

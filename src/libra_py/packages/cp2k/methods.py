@@ -4759,6 +4759,100 @@ def _wfn_ao_atom_map(basis):
     return np.asarray(ao_atom, dtype=int)
 
 
+def _fortran_records(path):
+    """The records of a gfortran unformatted sequential file (4-byte length markers)."""
+    data = open(path, "rb").read()
+    out, pos = [], 0
+    while pos < len(data):
+        n = int(np.frombuffer(data[pos:pos + 4], dtype="<i4")[0])
+        out.append(data[pos + 4:pos + 4 + n])
+        pos += 8 + n
+    return out
+
+
+def _records_to_matrix(records):
+    """A matrix written by cp_fm_write_unformatted: one record per column."""
+    return np.stack([np.frombuffer(r, dtype="<f8") for r in records], axis=1)
+
+
+def read_pod_cp2k_files(prefix, need_tmf=False):
+    """
+    The binary files of CP2K's projection-operator diabatization (Z. Futera's &PROPERTIES
+    &ET_COUPLING &PROJECTION with the HAMILTONIAN, WAVEFUNCTION and TRANSF_MATRIX_R/F prints):
+    gfortran unformatted sequential records, matrices as one record per column.
+
+    Args:
+        prefix (str): the files' path without extension, e.g. "Diag_50-POD-RESTART-1_0"
+        need_tmf (bool): also read the forward transformation S^-1/2 (the inverse of tmr)
+
+    Returns:
+        dict: n_spins, n_blocks, n_ao_blk (AOs per block), tmr (S^+1/2, (n_ao, n_ao)), tmf (or
+            None), S (the AO overlap tmr^2), energies {(block, spin): block-state energies
+            [Ha]}, couplings {(block_i, block_j, spin): H'_ij in the block-state basis [Ha],
+            (nmo_i, nmo_j)}, coeffs {(block, spin): block MOs in the AO basis, (n_ao, nmo)}
+    """
+    hab = _fortran_records(F"{prefix}.hab")
+    wfn = _fortran_records(F"{prefix}.wfn")
+    tmr = _records_to_matrix(_fortran_records(F"{prefix}.tmr"))
+    tmf = _records_to_matrix(_fortran_records(F"{prefix}.tmf")) if need_tmf else None
+    n_spins = int(np.frombuffer(hab[0], "<i4")[0])
+    n_blocks = int(np.frombuffer(hab[1], "<i4")[0])
+    n_ao_blk = np.frombuffer(hab[2], "<i4").tolist()
+    if np.frombuffer(wfn[2], "<i4").tolist() != n_ao_blk:
+        raise ValueError(F"{prefix}: the .hab and .wfn headers disagree on the block sizes")
+    k = 3
+    energies = {}
+    for ib in range(n_blocks):
+        for sp in range(n_spins):
+            energies[(ib, sp)] = np.frombuffer(hab[k], "<f8").copy()
+            k += 1
+    couplings = {}
+    for i in range(n_blocks):
+        for j in range(i + 1, n_blocks):
+            for sp in range(n_spins):
+                nmo_j = len(energies[(j, sp)])
+                couplings[(i, j, sp)] = _records_to_matrix(hab[k:k + nmo_j])
+                k += nmo_j
+    if k != len(hab):
+        raise ValueError(F"{prefix}.hab: {len(hab)} records, {k} expected from the header")
+    k = 3
+    coeffs = {}
+    for ib in range(n_blocks):
+        for sp in range(n_spins):
+            nmo = len(energies[(ib, sp)])
+            coeffs[(ib, sp)] = _records_to_matrix(wfn[k:k + nmo])
+            k += nmo
+    if k != len(wfn):
+        raise ValueError(F"{prefix}.wfn: {len(wfn)} records, {k} expected from the header")
+    return {"n_spins": n_spins, "n_blocks": n_blocks, "n_ao_blk": n_ao_blk, "tmr": tmr,
+            "tmf": tmf, "S": tmr @ tmr, "energies": energies, "couplings": couplings,
+            "coeffs": coeffs}
+
+
+def pod_cp2k_fragment_operators(pod, C_win, spin=0):
+    """
+    The POD fragment projectors over an MO window - the analogue of the Mulliken fragment
+    operators of mo_overlaps_via_cp2k: P_f = X_f X_f^T with X_f = C_win S c_f, c_f the block
+    MOs of fragment f. The blocks partition the Lowdin-orthogonalized AO space, so the
+    projectors sum to C_win S C_win^T (the window's MO overlap).
+
+    Args:
+        pod (dict): read_pod_cp2k_files output
+        C_win (array (nwin, n_ao)): window MO coefficients in the same (CP2K) AO order
+        spin (int): the spin channel of the block MOs
+
+    Returns:
+        list over blocks of arrays (nwin, nwin)
+    """
+    SC = pod["S"] @ np.asarray(C_win).T
+    out = []
+    for ib in range(pod["n_blocks"]):
+        X = pod["coeffs"][(ib, spin)].T @ SC            # (nmo_block, nwin)
+        P = X.T @ X
+        out.append(np.ascontiguousarray(0.5 * (P + P.T)))
+    return out
+
+
 def load_wfn_mo_data(filename):
     """
     MO data from CP2K's binary RESTART.wfn - the zero-cost native source
