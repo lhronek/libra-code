@@ -2248,7 +2248,7 @@ def run_step3_ks_nacs_libint(params):
             params['homo_index'] = CP2K_methods.read_homo_index(sample_logfile)
     if not isUKS:
         params['npz_file_ks_homo_index'] = params['homo_index'] - params['lowest_orbital'] + 1
-    sample_npz_file = glob.glob(params['path_to_npz_files'] + '/*.npz')[0]
+    sample_npz_file = sorted(glob.glob(params['path_to_npz_files'] + '/S_ks_*.npz'))[0]
     params['data_dim'] = int(sp.load_npz(sample_npz_file).shape[0])
     _check_orbital_window(params, params['data_dim'], 'run_step3_ks_nacs_libint')
     # Number of occupied states
@@ -3025,7 +3025,7 @@ def run_step3_sd_nacs_libint(params):
     # CP2K parsing
     if params['es_software'].lower() == 'cp2k':
         sample_logfile = glob.glob(params['logfile_directory'] + '/*.log')[0]
-        sample_npz_file = glob.glob(params['path_to_npz_files'] + '/*.npz')[0]
+        sample_npz_file = sorted(glob.glob(params['path_to_npz_files'] + '/S_ks_*.npz'))[0]
         params['data_dim'] = int(sp.load_npz(sample_npz_file).shape[0])
         _check_orbital_window(params, params['data_dim'], 'run_step3_sd_nacs_libint')
         if params['isUKS']:
