@@ -19,6 +19,8 @@
 #endif 
 
 #include "mEigen.h"
+#include "../math_linalg/blas_interface.h"
+#include <cstdlib>
 
 /// liblibra namespace
 namespace liblibra{
@@ -53,6 +55,41 @@ static void require_hermitian_pair(const T1* H, const T1* S, int N, const char* 
   }
 }
 
+
+
+// The matrix size from which solve_eigen takes the LAPACK kernels (blas_interface.h). Measured
+// crossovers against the Eigen solver (one OpenBLAS thread, 4-core desktop, 2026-09-04): real
+// problems ~128-256, complex standard ~32-64, complex generalized ~64-96, then 2-6x LAPACK gains
+// at n = 600. Below the threshold the Eigen solver is the faster one for the small model
+// Hamiltonians and its eigenvector signs are the ones the small-model certifiers pin. Default
+// LAPACK_EIGEN_MIN_N_DEFAULT, overridden once by the LIBRA_LAPACK_EIGEN_MIN_N environment
+// variable and at any time by set_lapack_eigen_min_n
+static const int LAPACK_EIGEN_MIN_N_DEFAULT = 96;
+static int lapack_eigen_min_n = -1;
+
+int get_lapack_eigen_min_n(){
+  if(lapack_eigen_min_n < 1){
+    const char* env = std::getenv("LIBRA_LAPACK_EIGEN_MIN_N");
+    lapack_eigen_min_n = LAPACK_EIGEN_MIN_N_DEFAULT;
+    if(env != NULL && env[0] != 0){
+      int v = std::atoi(env);
+      if(v < 1){
+        std::cout<<"Error in libmeigen::get_lapack_eigen_min_n : LIBRA_LAPACK_EIGEN_MIN_N must be a positive integer, got '"<<env<<"'\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
+      lapack_eigen_min_n = v;
+    }
+  }
+  return lapack_eigen_min_n;
+}
+
+void set_lapack_eigen_min_n(int n){
+  if(n < 1){
+    std::cout<<"Error in libmeigen::set_lapack_eigen_min_n : the size must be a positive integer, got "<<n<<"\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  lapack_eigen_min_n = n;
+}
 
 
 void solve_eigen(CMATRIX* H, CMATRIX* S, CMATRIX* E, CMATRIX* C, int symm){
@@ -97,6 +134,25 @@ void solve_eigen(CMATRIX* H, CMATRIX* S, CMATRIX* E, CMATRIX* C, int symm){
   // The above two conditions imply E is square matrix
   int N_bas = H->n_cols;
   int N_mo  = C->n_cols;
+
+  if(have_lapack() && N_bas >= get_lapack_eigen_min_n()){
+    // LAPACK divide-and-conquer path (blas_interface.h): the kernel reads one triangle and
+    // refuses a non-Hermitian input, so symm = 0 keeps the fail-loud guard and symm = 1 hands
+    // it the Hermitized pair. The lowest N_mo eigenpairs land in E and C as in the Eigen path
+    if(symm==1){
+      CMATRIX Hs(N_bas, N_bas);
+      CMATRIX Ss(N_bas, N_bas);
+      for(i=0;i<N_bas;i++){
+        for(j=0;j<N_bas;j++){
+          Hs.M[i*N_bas+j] = 0.5*(H->M[i*N_bas+j] + std::conj(H->M[j*N_bas+i]));
+          Ss.M[i*N_bas+j] = 0.5*(S->M[i*N_bas+j] + std::conj(S->M[j*N_bas+i]));
+        }// for j
+      }// for i
+      lapack_hegvd(Hs, Ss, *E, *C);
+    }
+    else{ lapack_hegvd(*H, *S, *E, *C); }
+    return;
+  }
 
 
   // Wrapper matrices for Eigen3
@@ -219,6 +275,32 @@ void solve_eigen(MATRIX* H, MATRIX* S, CMATRIX* E, CMATRIX* C, int symm){
   // The above two conditions imply E is square matrix
   int N_bas = H->n_cols;
   int N_mo  = C->n_cols;
+
+  if(have_lapack() && N_bas >= get_lapack_eigen_min_n()){
+    // LAPACK path through the real kernel (blas_interface.h) - the real symmetric pair has real
+    // eigenpairs, copied into the complex outputs with zero imaginary parts. symm = 0 keeps the
+    // kernel's fail-loud Hermiticity guard, symm = 1 hands it the symmetrized pair
+    MATRIX Er(N_mo, N_mo);
+    MATRIX Cr(N_bas, N_mo);
+    if(symm==1){
+      MATRIX Hs(N_bas, N_bas);
+      MATRIX Ss(N_bas, N_bas);
+      for(i=0;i<N_bas;i++){
+        for(j=0;j<N_bas;j++){
+          Hs.M[i*N_bas+j] = 0.5*(H->M[i*N_bas+j] + H->M[j*N_bas+i]);
+          Ss.M[i*N_bas+j] = 0.5*(S->M[i*N_bas+j] + S->M[j*N_bas+i]);
+        }// for j
+      }// for i
+      lapack_sygvd(Hs, Ss, Er, Cr);
+    }
+    else{ lapack_sygvd(*H, *S, Er, Cr); }
+    *E = complex<double>(0.0, 0.0);
+    for(i=0;i<N_mo;i++){
+      E->M[i*N_mo+i] = complex<double>(Er.M[i*N_mo+i], 0.0);
+      for(j=0;j<N_bas;j++){  C->M[j*N_mo+i] = complex<double>(Cr.M[j*N_mo+i], 0.0);  }// for j
+    }// for i
+    return;
+  }
 
 
   *E = 0.0;
@@ -348,6 +430,24 @@ void solve_eigen(MATRIX* H, MATRIX* S, MATRIX* E, MATRIX* C, int symm){
   // The above two conditions imply E is square matrix
   int N_bas = H->n_cols;
   int N_mo  = C->n_cols;
+
+  if(have_lapack() && N_bas >= get_lapack_eigen_min_n()){
+    // LAPACK divide-and-conquer path (blas_interface.h): symm = 0 keeps the kernel's fail-loud
+    // Hermiticity guard, symm = 1 hands it the symmetrized pair
+    if(symm==1){
+      MATRIX Hs(N_bas, N_bas);
+      MATRIX Ss(N_bas, N_bas);
+      for(i=0;i<N_bas;i++){
+        for(j=0;j<N_bas;j++){
+          Hs.M[i*N_bas+j] = 0.5*(H->M[i*N_bas+j] + H->M[j*N_bas+i]);
+          Ss.M[i*N_bas+j] = 0.5*(S->M[i*N_bas+j] + S->M[j*N_bas+i]);
+        }// for j
+      }// for i
+      lapack_sygvd(Hs, Ss, *E, *C);
+    }
+    else{ lapack_sygvd(*H, *S, *E, *C); }
+    return;
+  }
 
 
   *E = 0.0;

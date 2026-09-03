@@ -18,6 +18,7 @@
 #endif 
 
 #include "mEigen.h"
+#include "../math_linalg/blas_interface.h"
 
 /// liblibra namespace
 namespace liblibra{
@@ -43,6 +44,19 @@ void solve_eigen(CMATRIX* H, CMATRIX* E, CMATRIX* C, int symm){
 */
 
   int N_bas = H->n_cols;
+  if(have_lapack() && N_bas >= get_lapack_eigen_min_n()){
+    // the standard problem goes straight to zheevd (blas_interface.h) - no identity metric,
+    // symm = 1 hands it the Hermitized matrix, symm = 0 keeps the kernel's fail-loud guard
+    if(symm==1){
+      CMATRIX Hs(N_bas, N_bas);
+      for(int i=0;i<N_bas;i++){
+        for(int j=0;j<N_bas;j++){ Hs.M[i*N_bas+j] = 0.5*(H->M[i*N_bas+j] + std::conj(H->M[j*N_bas+i])); }
+      }
+      lapack_heevd(Hs, *E, *C);
+    }
+    else{ lapack_heevd(*H, *E, *C); }
+    return;
+  }
   CMATRIX* S; S = new CMATRIX(N_bas,N_bas); S->diag(N_bas, 1.0);
 
   solve_eigen(H, S, E, C, symm);  
@@ -71,6 +85,27 @@ void solve_eigen(MATRIX* H, CMATRIX* E, CMATRIX* C, int symm){
 */
 
   int N_bas = H->n_cols;
+  if(have_lapack() && N_bas >= get_lapack_eigen_min_n()){
+    // the real standard problem goes straight to dsyevd (blas_interface.h), the real eigenpairs
+    // copied into the complex outputs with zero imaginary parts
+    int N_mo = C->n_cols;
+    MATRIX Er(N_mo, N_mo);
+    MATRIX Cr(N_bas, N_mo);
+    if(symm==1){
+      MATRIX Hs(N_bas, N_bas);
+      for(int i=0;i<N_bas;i++){
+        for(int j=0;j<N_bas;j++){ Hs.M[i*N_bas+j] = 0.5*(H->M[i*N_bas+j] + H->M[j*N_bas+i]); }
+      }
+      lapack_syevd(Hs, Er, Cr);
+    }
+    else{ lapack_syevd(*H, Er, Cr); }
+    *E = complex<double>(0.0, 0.0);
+    for(int i=0;i<N_mo;i++){
+      E->M[i*N_mo+i] = complex<double>(Er.M[i*N_mo+i], 0.0);
+      for(int j=0;j<N_bas;j++){  C->M[j*N_mo+i] = complex<double>(Cr.M[j*N_mo+i], 0.0);  }
+    }
+    return;
+  }
   MATRIX* S; S = new MATRIX(N_bas,N_bas); S->diag(N_bas, 1.0);
 
   solve_eigen(H, S, E, C, symm);  
@@ -99,6 +134,19 @@ void solve_eigen(MATRIX* H, MATRIX* E, MATRIX* C, int symm){
 */
 
   int N_bas = H->n_cols;
+  if(have_lapack() && N_bas >= get_lapack_eigen_min_n()){
+    // the standard problem goes straight to dsyevd (blas_interface.h) - no identity metric,
+    // symm = 1 hands it the symmetrized matrix, symm = 0 keeps the kernel's fail-loud guard
+    if(symm==1){
+      MATRIX Hs(N_bas, N_bas);
+      for(int i=0;i<N_bas;i++){
+        for(int j=0;j<N_bas;j++){ Hs.M[i*N_bas+j] = 0.5*(H->M[i*N_bas+j] + H->M[j*N_bas+i]); }
+      }
+      lapack_syevd(Hs, *E, *C);
+    }
+    else{ lapack_syevd(*H, *E, *C); }
+    return;
+  }
   MATRIX* S; S = new MATRIX(N_bas,N_bas); S->diag(N_bas, 1.0);
 
   solve_eigen(H, S, E, C, symm);  

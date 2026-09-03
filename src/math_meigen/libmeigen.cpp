@@ -73,6 +73,9 @@ void export_mEigen_objects(){
   def("solve_eigen_nosort", expt_solve_eigen_nosort_v2);
   def("solve_eigen_nosort", expt_solve_eigen_nosort_v3);
 
+  def("get_lapack_eigen_min_n", &get_lapack_eigen_min_n);
+  def("set_lapack_eigen_min_n", &set_lapack_eigen_min_n);
+
 
 
 
