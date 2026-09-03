@@ -52,6 +52,24 @@ void require_n_by_n(const char* fn, const M& A, const char* name, int n){
   }
 }
 
+// the outputs of an eigensolver: C (n x m) receives the lowest m eigenvectors in its columns,
+// E (m x m) their eigenvalues on the diagonal, 1 <= m <= n
+template <typename M>
+int require_outputs(const char* fn, const M& E, const M& C, int n){
+  int m = C.n_cols;
+  if(C.n_rows != n || m < 1 || m > n){
+    std::ostringstream o;
+    o<<"C must be "<<n<<" x m with 1 <= m <= "<<n<<", got "<<C.n_rows<<" x "<<C.n_cols;
+    fail(fn, o.str());
+  }
+  if(E.n_rows != m || E.n_cols != m){
+    std::ostringstream o;
+    o<<"E must be "<<m<<" x "<<m<<" (the column count of C), got "<<E.n_rows<<" x "<<E.n_cols;
+    fail(fn, o.str());
+  }
+  return m;
+}
+
 // the eigensolvers read one triangle - a non-Hermitian input would be solved as
 // its mirror silently (the guard of libmeigen's require_hermitian_pair)
 template <typename T>
@@ -76,17 +94,41 @@ std::string info_text(const char* routine, int info){
   return o.str();
 }
 
+void not_positive_definite(const char* fn, int info, int n){
+  std::ostringstream o;
+  o<<"S is not positive definite (its leading minor of order "<<(info - n)<<" is not)";
+  fail(fn, o.str());
+}
+
+// thread-local workspaces of one kernel family, grown on demand
+struct RealWork{
+  std::vector<double> a, b, w, work;
+  std::vector<int> iwork;
+};
+struct ComplexWork{
+  std::vector< std::complex<double> > a, b, work;
+  std::vector<double> w, rwork;
+  std::vector<int> iwork;
+};
+
+template <typename V>
+void grow(V& v, std::size_t n){ if(v.size() < n){ v.resize(n); } }
+
 // eigenvector k is column k of the column-major LAPACK buffer - libra keeps it in column k of C
-void columns_to_C(const double* a, int n, MATRIX& C){
-  for(int k = 0; k < n; k++){
-    for(int i = 0; i < n; i++){ C.M[i*n+k] = a[(std::size_t)k*n + i]; }
+void columns_to_C(const double* a, int n, int m, double* w, MATRIX& E, MATRIX& C){
+  E = 0.0;
+  for(int k = 0; k < m; k++){
+    E.M[k*m+k] = w[k];
+    for(int i = 0; i < n; i++){ C.M[i*m+k] = a[(std::size_t)k*n + i]; }
   }
 }
 
 // the complex buffers solved conj(A): the eigenvectors of A are their conjugates
-void columns_to_C(const std::complex<double>* a, int n, CMATRIX& C){
-  for(int k = 0; k < n; k++){
-    for(int i = 0; i < n; i++){ C.M[i*n+k] = std::conj(a[(std::size_t)k*n + i]); }
+void columns_to_C(const std::complex<double>* a, int n, int m, double* w, CMATRIX& E, CMATRIX& C){
+  E = std::complex<double>(0.0, 0.0);
+  for(int k = 0; k < m; k++){
+    E.M[k*m+k] = std::complex<double>(w[k], 0.0);
+    for(int i = 0; i < n; i++){ C.M[i*m+k] = std::conj(a[(std::size_t)k*n + i]); }
   }
 }
 
@@ -105,25 +147,24 @@ void lapack_syevd(const MATRIX& A, MATRIX& E, MATRIX& C){
   int n = A.n_rows;
   if(n < 1){ fail(fn, "A is empty"); }
   require_n_by_n(fn, A, "A", n);
-  require_n_by_n(fn, E, "E", n);
-  require_n_by_n(fn, C, "C", n);
+  int m = require_outputs(fn, E, C, n);
   require_hermitian(fn, A.M, n, "A");
-  std::vector<double> a(A.M, A.M + (std::size_t)n*n);
-  std::vector<double> w(n);
+  thread_local RealWork ws;
+  grow(ws.a, (std::size_t)n*n);
+  grow(ws.w, n);
+  std::copy(A.M, A.M + (std::size_t)n*n, ws.a.begin());
   int n_ = n, lda = n, info = 0, lwork = -1, liwork = -1;
   double wq = 0.0;
   int iwq = 0;
-  dsyevd_("V", "L", &n_, a.data(), &lda, w.data(), &wq, &lwork, &iwq, &liwork, &info, 1, 1);
+  dsyevd_("V", "L", &n_, ws.a.data(), &lda, ws.w.data(), &wq, &lwork, &iwq, &liwork, &info, 1, 1);
   if(info != 0){ fail(fn, info_text("dsyevd (workspace query)", info)); }
   lwork = (int)wq;
   liwork = iwq;
-  std::vector<double> work(std::max(lwork, 1));
-  std::vector<int> iwork(std::max(liwork, 1));
-  dsyevd_("V", "L", &n_, a.data(), &lda, w.data(), work.data(), &lwork, iwork.data(), &liwork, &info, 1, 1);
+  grow(ws.work, std::max(lwork, 1));
+  grow(ws.iwork, std::max(liwork, 1));
+  dsyevd_("V", "L", &n_, ws.a.data(), &lda, ws.w.data(), ws.work.data(), &lwork, ws.iwork.data(), &liwork, &info, 1, 1);
   if(info != 0){ fail(fn, info_text("dsyevd", info) + " (the algorithm failed to converge)"); }
-  E = 0.0;
-  for(int k = 0; k < n; k++){ E.M[k*n+k] = w[k]; }
-  columns_to_C(a.data(), n, C);
+  columns_to_C(ws.a.data(), n, m, ws.w.data(), E, C);
 #else
   (void)A; (void)E; (void)C;
   fail(fn, MISSING);
@@ -137,28 +178,27 @@ void lapack_heevd(const CMATRIX& A, CMATRIX& E, CMATRIX& C){
   int n = A.n_rows;
   if(n < 1){ fail(fn, "A is empty"); }
   require_n_by_n(fn, A, "A", n);
-  require_n_by_n(fn, E, "E", n);
-  require_n_by_n(fn, C, "C", n);
+  int m = require_outputs(fn, E, C, n);
   require_hermitian(fn, A.M, n, "A");
-  std::vector< std::complex<double> > a(A.M, A.M + (std::size_t)n*n);
-  std::vector<double> w(n);
+  thread_local ComplexWork ws;
+  grow(ws.a, (std::size_t)n*n);
+  grow(ws.w, n);
+  std::copy(A.M, A.M + (std::size_t)n*n, ws.a.begin());
   int n_ = n, lda = n, info = 0, lwork = -1, lrwork = -1, liwork = -1;
   std::complex<double> wq(0.0, 0.0);
   double rwq = 0.0;
   int iwq = 0;
-  zheevd_("V", "L", &n_, a.data(), &lda, w.data(), &wq, &lwork, &rwq, &lrwork, &iwq, &liwork, &info, 1, 1);
+  zheevd_("V", "L", &n_, ws.a.data(), &lda, ws.w.data(), &wq, &lwork, &rwq, &lrwork, &iwq, &liwork, &info, 1, 1);
   if(info != 0){ fail(fn, info_text("zheevd (workspace query)", info)); }
   lwork = (int)wq.real();
   lrwork = (int)rwq;
   liwork = iwq;
-  std::vector< std::complex<double> > work(std::max(lwork, 1));
-  std::vector<double> rwork(std::max(lrwork, 1));
-  std::vector<int> iwork(std::max(liwork, 1));
-  zheevd_("V", "L", &n_, a.data(), &lda, w.data(), work.data(), &lwork, rwork.data(), &lrwork, iwork.data(), &liwork, &info, 1, 1);
+  grow(ws.work, std::max(lwork, 1));
+  grow(ws.rwork, std::max(lrwork, 1));
+  grow(ws.iwork, std::max(liwork, 1));
+  zheevd_("V", "L", &n_, ws.a.data(), &lda, ws.w.data(), ws.work.data(), &lwork, ws.rwork.data(), &lrwork, ws.iwork.data(), &liwork, &info, 1, 1);
   if(info != 0){ fail(fn, info_text("zheevd", info) + " (the algorithm failed to converge)"); }
-  E = std::complex<double>(0.0, 0.0);
-  for(int k = 0; k < n; k++){ E.M[k*n+k] = std::complex<double>(w[k], 0.0); }
-  columns_to_C(a.data(), n, C);
+  columns_to_C(ws.a.data(), n, m, ws.w.data(), E, C);
 #else
   (void)A; (void)E; (void)C;
   fail(fn, MISSING);
@@ -173,32 +213,28 @@ void lapack_sygvd(const MATRIX& H, const MATRIX& S, MATRIX& E, MATRIX& C){
   if(n < 1){ fail(fn, "H is empty"); }
   require_n_by_n(fn, H, "H", n);
   require_n_by_n(fn, S, "S", n);
-  require_n_by_n(fn, E, "E", n);
-  require_n_by_n(fn, C, "C", n);
+  int m = require_outputs(fn, E, C, n);
   require_hermitian(fn, H.M, n, "H");
   require_hermitian(fn, S.M, n, "S");
-  std::vector<double> a(H.M, H.M + (std::size_t)n*n);
-  std::vector<double> b(S.M, S.M + (std::size_t)n*n);
-  std::vector<double> w(n);
+  thread_local RealWork ws;
+  grow(ws.a, (std::size_t)n*n);
+  grow(ws.b, (std::size_t)n*n);
+  grow(ws.w, n);
+  std::copy(H.M, H.M + (std::size_t)n*n, ws.a.begin());
+  std::copy(S.M, S.M + (std::size_t)n*n, ws.b.begin());
   int itype = 1, n_ = n, lda = n, ldb = n, info = 0, lwork = -1, liwork = -1;
   double wq = 0.0;
   int iwq = 0;
-  dsygvd_(&itype, "V", "L", &n_, a.data(), &lda, b.data(), &ldb, w.data(), &wq, &lwork, &iwq, &liwork, &info, 1, 1);
+  dsygvd_(&itype, "V", "L", &n_, ws.a.data(), &lda, ws.b.data(), &ldb, ws.w.data(), &wq, &lwork, &iwq, &liwork, &info, 1, 1);
   if(info != 0){ fail(fn, info_text("dsygvd (workspace query)", info)); }
   lwork = (int)wq;
   liwork = iwq;
-  std::vector<double> work(std::max(lwork, 1));
-  std::vector<int> iwork(std::max(liwork, 1));
-  dsygvd_(&itype, "V", "L", &n_, a.data(), &lda, b.data(), &ldb, w.data(), work.data(), &lwork, iwork.data(), &liwork, &info, 1, 1);
-  if(info > n){
-    std::ostringstream o;
-    o<<"S is not positive definite (its leading minor of order "<<(info - n)<<" is not)";
-    fail(fn, o.str());
-  }
+  grow(ws.work, std::max(lwork, 1));
+  grow(ws.iwork, std::max(liwork, 1));
+  dsygvd_(&itype, "V", "L", &n_, ws.a.data(), &lda, ws.b.data(), &ldb, ws.w.data(), ws.work.data(), &lwork, ws.iwork.data(), &liwork, &info, 1, 1);
+  if(info > n){ not_positive_definite(fn, info, n); }
   if(info != 0){ fail(fn, info_text("dsygvd", info) + " (the algorithm failed to converge)"); }
-  E = 0.0;
-  for(int k = 0; k < n; k++){ E.M[k*n+k] = w[k]; }
-  columns_to_C(a.data(), n, C);
+  columns_to_C(ws.a.data(), n, m, ws.w.data(), E, C);
 #else
   (void)H; (void)S; (void)E; (void)C;
   fail(fn, MISSING);
@@ -213,35 +249,31 @@ void lapack_hegvd(const CMATRIX& H, const CMATRIX& S, CMATRIX& E, CMATRIX& C){
   if(n < 1){ fail(fn, "H is empty"); }
   require_n_by_n(fn, H, "H", n);
   require_n_by_n(fn, S, "S", n);
-  require_n_by_n(fn, E, "E", n);
-  require_n_by_n(fn, C, "C", n);
+  int m = require_outputs(fn, E, C, n);
   require_hermitian(fn, H.M, n, "H");
   require_hermitian(fn, S.M, n, "S");
-  std::vector< std::complex<double> > a(H.M, H.M + (std::size_t)n*n);
-  std::vector< std::complex<double> > b(S.M, S.M + (std::size_t)n*n);
-  std::vector<double> w(n);
+  thread_local ComplexWork ws;
+  grow(ws.a, (std::size_t)n*n);
+  grow(ws.b, (std::size_t)n*n);
+  grow(ws.w, n);
+  std::copy(H.M, H.M + (std::size_t)n*n, ws.a.begin());
+  std::copy(S.M, S.M + (std::size_t)n*n, ws.b.begin());
   int itype = 1, n_ = n, lda = n, ldb = n, info = 0, lwork = -1, lrwork = -1, liwork = -1;
   std::complex<double> wq(0.0, 0.0);
   double rwq = 0.0;
   int iwq = 0;
-  zhegvd_(&itype, "V", "L", &n_, a.data(), &lda, b.data(), &ldb, w.data(), &wq, &lwork, &rwq, &lrwork, &iwq, &liwork, &info, 1, 1);
+  zhegvd_(&itype, "V", "L", &n_, ws.a.data(), &lda, ws.b.data(), &ldb, ws.w.data(), &wq, &lwork, &rwq, &lrwork, &iwq, &liwork, &info, 1, 1);
   if(info != 0){ fail(fn, info_text("zhegvd (workspace query)", info)); }
   lwork = (int)wq.real();
   lrwork = (int)rwq;
   liwork = iwq;
-  std::vector< std::complex<double> > work(std::max(lwork, 1));
-  std::vector<double> rwork(std::max(lrwork, 1));
-  std::vector<int> iwork(std::max(liwork, 1));
-  zhegvd_(&itype, "V", "L", &n_, a.data(), &lda, b.data(), &ldb, w.data(), work.data(), &lwork, rwork.data(), &lrwork, iwork.data(), &liwork, &info, 1, 1);
-  if(info > n){
-    std::ostringstream o;
-    o<<"S is not positive definite (its leading minor of order "<<(info - n)<<" is not)";
-    fail(fn, o.str());
-  }
+  grow(ws.work, std::max(lwork, 1));
+  grow(ws.rwork, std::max(lrwork, 1));
+  grow(ws.iwork, std::max(liwork, 1));
+  zhegvd_(&itype, "V", "L", &n_, ws.a.data(), &lda, ws.b.data(), &ldb, ws.w.data(), ws.work.data(), &lwork, ws.rwork.data(), &lrwork, ws.iwork.data(), &liwork, &info, 1, 1);
+  if(info > n){ not_positive_definite(fn, info, n); }
   if(info != 0){ fail(fn, info_text("zhegvd", info) + " (the algorithm failed to converge)"); }
-  E = std::complex<double>(0.0, 0.0);
-  for(int k = 0; k < n; k++){ E.M[k*n+k] = std::complex<double>(w[k], 0.0); }
-  columns_to_C(a.data(), n, C);
+  columns_to_C(ws.a.data(), n, m, ws.w.data(), E, C);
 #else
   (void)H; (void)S; (void)E; (void)C;
   fail(fn, MISSING);
@@ -256,10 +288,12 @@ void lapack_getri(const MATRIX& A, MATRIX& Ainv){
   if(n < 1){ fail(fn, "A is empty"); }
   require_n_by_n(fn, A, "A", n);
   require_n_by_n(fn, Ainv, "Ainv", n);
-  std::vector<double> a(A.M, A.M + (std::size_t)n*n);
-  std::vector<int> ipiv(n);
+  thread_local RealWork ws;
+  grow(ws.a, (std::size_t)n*n);
+  grow(ws.iwork, n);
+  std::copy(A.M, A.M + (std::size_t)n*n, ws.a.begin());
   int n_ = n, lda = n, info = 0, lwork = -1;
-  dgetrf_(&n_, &n_, a.data(), &lda, ipiv.data(), &info);
+  dgetrf_(&n_, &n_, ws.a.data(), &lda, ws.iwork.data(), &info);
   if(info > 0){
     std::ostringstream o;
     o<<"A is singular (U("<<info<<","<<info<<") of its LU factorization is exactly zero)";
@@ -267,13 +301,13 @@ void lapack_getri(const MATRIX& A, MATRIX& Ainv){
   }
   if(info != 0){ fail(fn, info_text("dgetrf", info)); }
   double wq = 0.0;
-  dgetri_(&n_, a.data(), &lda, ipiv.data(), &wq, &lwork, &info);
+  dgetri_(&n_, ws.a.data(), &lda, ws.iwork.data(), &wq, &lwork, &info);
   if(info != 0){ fail(fn, info_text("dgetri (workspace query)", info)); }
   lwork = (int)wq;
-  std::vector<double> work(std::max(lwork, 1));
-  dgetri_(&n_, a.data(), &lda, ipiv.data(), work.data(), &lwork, &info);
+  grow(ws.work, std::max(lwork, 1));
+  dgetri_(&n_, ws.a.data(), &lda, ws.iwork.data(), ws.work.data(), &lwork, &info);
   if(info != 0){ fail(fn, info_text("dgetri", info)); }
-  std::copy(a.begin(), a.end(), Ainv.M);
+  std::copy(ws.a.begin(), ws.a.begin() + (std::size_t)n*n, Ainv.M);
 #else
   (void)A; (void)Ainv;
   fail(fn, MISSING);
@@ -288,10 +322,12 @@ void lapack_getri(const CMATRIX& A, CMATRIX& Ainv){
   if(n < 1){ fail(fn, "A is empty"); }
   require_n_by_n(fn, A, "A", n);
   require_n_by_n(fn, Ainv, "Ainv", n);
-  std::vector< std::complex<double> > a(A.M, A.M + (std::size_t)n*n);
-  std::vector<int> ipiv(n);
+  thread_local ComplexWork ws;
+  grow(ws.a, (std::size_t)n*n);
+  grow(ws.iwork, n);
+  std::copy(A.M, A.M + (std::size_t)n*n, ws.a.begin());
   int n_ = n, lda = n, info = 0, lwork = -1;
-  zgetrf_(&n_, &n_, a.data(), &lda, ipiv.data(), &info);
+  zgetrf_(&n_, &n_, ws.a.data(), &lda, ws.iwork.data(), &info);
   if(info > 0){
     std::ostringstream o;
     o<<"A is singular (U("<<info<<","<<info<<") of its LU factorization is exactly zero)";
@@ -299,13 +335,13 @@ void lapack_getri(const CMATRIX& A, CMATRIX& Ainv){
   }
   if(info != 0){ fail(fn, info_text("zgetrf", info)); }
   std::complex<double> wq(0.0, 0.0);
-  zgetri_(&n_, a.data(), &lda, ipiv.data(), &wq, &lwork, &info);
+  zgetri_(&n_, ws.a.data(), &lda, ws.iwork.data(), &wq, &lwork, &info);
   if(info != 0){ fail(fn, info_text("zgetri (workspace query)", info)); }
   lwork = (int)wq.real();
-  std::vector< std::complex<double> > work(std::max(lwork, 1));
-  zgetri_(&n_, a.data(), &lda, ipiv.data(), work.data(), &lwork, &info);
+  grow(ws.work, std::max(lwork, 1));
+  zgetri_(&n_, ws.a.data(), &lda, ws.iwork.data(), ws.work.data(), &lwork, &info);
   if(info != 0){ fail(fn, info_text("zgetri", info)); }
-  std::copy(a.begin(), a.end(), Ainv.M);
+  std::copy(ws.a.begin(), ws.a.begin() + (std::size_t)n*n, Ainv.M);
 #else
   (void)A; (void)Ainv;
   fail(fn, MISSING);

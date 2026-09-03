@@ -17,12 +17,15 @@
   libra's conventions - row-major MATRIX/CMATRIX in and out, E a diagonal
   matrix of ascending eigenvalues, C with the eigenvectors in its columns
   (C.col(k) belongs to E(k,k)), the generalized kernels S-orthonormal
-  (C^H S C = 1). The eigensolvers read one triangle, so they refuse a
-  non-Hermitian input (max |A - A^H| > 1e-8 max(|A|, 1)) instead of solving
-  its mirror. The inverse has no conditioning guard - inv_matrix of
-  libmeigen carries the eigenvalue threshold. Without the backend every
-  kernel throws - have_lapack() tells the callers, and the Eigen kernels of
-  libmeigen (solve_eigen, FullPivLU_inverse) stay available.
+  (C^H S C = 1). C may be n x m with 1 <= m <= n and E m x m: the lowest m
+  eigenpairs are returned (the partial output solve_eigen admits). The
+  eigensolvers read one triangle, so they refuse a non-Hermitian input
+  (max |A - A^H| > 1e-8 max(|A|, 1)) instead of solving its mirror. The
+  inverse has no conditioning guard - inv_matrix of libmeigen carries the
+  eigenvalue threshold. Workspaces are thread-local and grow on demand (the
+  kernels sit in the per-trajectory, per-step path of the dynamics).
+  Without the backend every kernel throws - have_lapack() tells the callers,
+  and the Eigen kernels of libmeigen stay available as the fallback.
 */
 #include <complex>
 #include <cstddef>
