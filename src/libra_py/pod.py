@@ -11,12 +11,12 @@ eigenbases, V_fg = U_f^T H'_fg U_g. The results carry the same keys as
 libra_py.packages.cp2k.methods.read_pod_cp2k_files, which reads the same quantities from
 the binary files of Futera's CP2K, so both feed pod_fragment_operators alike.
 
-The heavy linear algebra runs through libra's MATRIX class and libmeigen (OpenBLAS DGEMM,
-LAPACK eigensolvers): sqrt_matrix for S^(+/-1/2), MATRIX products for the transforms,
-solve_eigen for the blocks.
+The heavy linear algebra runs through libra's MATRIX class and its LAPACK/OpenBLAS kernels:
+sqrt_matrix (dsyevd + dgemm) for S^(+/-1/2), MATRIX products (dgemm) for the transforms,
+lapack_syevd for the blocks (the Eigen solve_eigen when the build has no LAPACK backend).
 """
 import numpy as np
-from liblibra_core import MATRIX, CMATRIX, intList, solve_eigen, sqrt_matrix, pop_submatrix
+from liblibra_core import MATRIX, intList, solve_eigen, sqrt_matrix, pop_submatrix, have_lapack, lapack_syevd
 from libra_py import data_conv
 
 
@@ -44,6 +44,15 @@ def _ilist(idx):
     return out
 
 
+def _eigh_ascending(H, E, C):
+    """Eigenpairs of a symmetric MATRIX, ascending: LAPACK dsyevd when the build linked it (one triangle of a
+    block symmetric to rounding), else the Eigen solver with its symmetrization."""
+    if have_lapack():
+        lapack_syevd(H, E, C)
+    else:
+        solve_eigen(H, E, C, 1)
+
+
 def pod_block_states(H_list, S, ao_atom, fragment_atom_lists):
     """
     POD of one or two spin channels of an AO Hamiltonian.
@@ -68,12 +77,9 @@ def pod_block_states(H_list, S, ao_atom, fragment_atom_lists):
     if covered != list(range(n)):
         raise ValueError(F"the fragments cover {len(covered)} of {n} AOs - every atom must belong to a fragment")
     S_m = data_conv.nparray2MATRIX(S)
-    # sqrt_matrix is exported for complex matrices: S is real symmetric, so are its roots
-    Yc = CMATRIX(n, n)
-    Xc = CMATRIX(n, n)
-    sqrt_matrix(CMATRIX(S_m, MATRIX(n, n)), Yc, Xc)
-    Y = Yc.real()             # S^(+1/2)
-    X = Xc.real()             # S^(-1/2)
+    Y = MATRIX(n, n)          # S^(+1/2)
+    X = MATRIX(n, n)          # S^(-1/2)
+    sqrt_matrix(S_m, Y, X)
     all_rows = _ilist(range(n))
     out = {"n_spins": len(H_list), "n_blocks": len(blocks), "n_ao_blk": [len(b) for b in blocks],
            "tmr": data_conv.MATRIX2nparray(Y, np.float64), "tmf": data_conv.MATRIX2nparray(X, np.float64),
@@ -88,7 +94,7 @@ def pod_block_states(H_list, S, ao_atom, fragment_atom_lists):
             pop_submatrix(Hp, Hff, ib, ib)
             E = MATRIX(nb, nb)
             Uf = MATRIX(nb, nb)
-            solve_eigen(Hff, E, Uf, 1)                                           # LAPACK, ascending
+            _eigh_ascending(Hff, E, Uf)
             U.append(Uf)
             ids.append(ib)
             out["energies"][(f, sp)] = np.array([E.get(i, i) for i in range(nb)])
