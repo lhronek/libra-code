@@ -2501,17 +2501,38 @@ def _permute_rows(W, perm):
     return data_conv.MATRIX2nparray(Wc.real(), np.float64)
 
 
-def sd_diabatization_groups(sd_lists, kind):
+def _spin_partner(orb, active_space, data_dim):
+    """The reindexed spin-orbital of the opposite spin on the same spatial orbital, or None
+    (the two channels' active spaces may hold different spatial orbitals). active_space:
+    the 2-block window indices of the step, data_dim: the window's 2-block dimension."""
+    n = data_dim // 2
+    alpha = [a for a in active_space if a < n]
+    beta = [b - n for b in active_space if b >= n]
+    if orb > 0:
+        spatial = alpha[orb - 1]
+        return -(beta.index(spatial) + 1) if spatial in beta else None
+    spatial = beta[-orb - 1]
+    return alpha.index(spatial) + 1 if spatial in alpha else None
+
+
+def sd_diabatization_groups(sd_lists, kind, active_space=None, data_dim=None):
     """
     The localization manifolds of an SD basis: single excitations of the reference
     determinant that share the hole ("particle": the excited electron varies), the
     particle ("hole": the hole varies), or the spin channel ("joint": the complete
     hole x particle product of a channel, holes and electrons localized together).
+    An open-shell reference joins the manifold whose defining orbital it occupies singly
+    (a hole manifold whose particle's spin partner is occupied - the cation's hole - or a
+    particle manifold whose hole's partner is empty - the anion's electron): its own
+    configuration is one of the localized states.
 
     Args:
         sd_lists (list of lists of int): the SDs of one step in the signed reindexed
             spin-orbital notation of ovlp_arb, in their row order
         kind (str): "particle", "hole" or "joint"
+        active_space, data_dim: the 2-block window indices and dimension of the step - the
+            spin-partner test of an open-shell reference needs them (None: the reference
+            is taken as closed-shell and never joins a manifold)
 
     Returns:
         gs (int): row of the reference determinant (the lowest orbital sum)
@@ -2530,14 +2551,23 @@ def sd_diabatization_groups(sd_lists, kind):
         singles (list of int): rows left untransformed (the reference, one-member manifolds,
             non-single excitations)
 
-    Raises ValueError for an unknown kind, and for "joint" when a channel's single
-    excitations do not form the complete hole x particle product.
+    Raises ValueError for an unknown kind, for "joint" when a channel's single
+    excitations do not form the complete hole x particle product or when the reference
+    is open-shell (the joint states presume a closed-shell reference).
     """
     if kind not in ("particle", "hole", "joint"):
         raise ValueError(F"diabatization {kind!r} - use 'none', 'particle', 'hole' or 'joint'")
     sets = [frozenset(int(o) for o in sd) for sd in sd_lists]
     gs = min(range(len(sets)), key=lambda k: sum(abs(o) for o in sets[k]))
     ref = sets[gs]
+
+    def singly_occupied(orb):
+        # orb's spatial orbital holds exactly one electron in the reference
+        if active_space is None:
+            return False
+        partner = _spin_partner(orb, active_space, data_dim)
+        return partner is not None and ((orb in ref) != (partner in ref))
+
     manifolds = {}
     singles = [gs]
     for k, occ in enumerate(sets):
@@ -2549,6 +2579,10 @@ def sd_diabatization_groups(sd_lists, kind):
             continue
         h, pt = next(iter(hole)), next(iter(part))
         if kind == "joint":
+            if singly_occupied(h) or singly_occupied(pt):
+                raise ValueError("joint localization presumes a closed-shell reference - the "
+                                 F"reference holds {h if singly_occupied(h) else pt} singly "
+                                 "(use 'hole' for a cation, 'particle' for an anion)")
             manifolds.setdefault(1 if pt > 0 else -1, []).append(((h, pt), k))
             continue
         key, var = (h, pt) if kind == "particle" else (pt, h)
@@ -2557,6 +2591,12 @@ def sd_diabatization_groups(sd_lists, kind):
     ref_list = [int(o) for o in sd_lists[gs]]
     for key in sorted(manifolds):
         members = sorted(manifolds[key])
+        if kind != "joint" and singly_occupied(key):
+            # the reference is the member whose varying orbital is the manifold's own
+            # defining orbital (the hole sits in the particle p, or the electron in the hole h)
+            members = sorted(members + [(key, gs)])
+            if gs in singles:
+                singles.remove(gs)
         if len(members) < 2:
             singles.append(members[0][1])
             continue
@@ -2580,13 +2620,15 @@ def sd_diabatization_groups(sd_lists, kind):
         orbs = [v for v, k in members]
         rows = [k for v, k in members]
         if kind == "particle":
-            fixed = sorted(ref - {key})
+            # the fixed orbitals: the reference without the shared hole (an open-shell
+            # reference is a member itself, its varying orbital is that hole)
+            fixed = sorted(ref - {key} - set(orbs))
             lists = [fixed + [v] for v in orbs]
             sigma = [1] * len(orbs)
         else:
             # member j holds every hole orbital but its own: the localized-hole state
             # expands with the cofactors of the orthogonal rotation, (-1)^j w_jA
-            fixed = sorted((ref - set(orbs)) | {key})
+            fixed = sorted((ref - set(orbs)) | ({key} if key not in orbs else set()))
             lists = [fixed + [o for o in orbs if o != v] for v in orbs]
             sigma = [(-1) ** j for j in range(len(orbs))]
         tau = [slatdet.permutation_parity(lists[j], [int(o) for o in sd_lists[rows[j]]])
@@ -2646,7 +2688,7 @@ def localize_fragment_block(P_frag, rows):
     return w, frag, pops
 
 
-def sd_diabatization_step(sd_lists, P_frag, kind, dia_index=None):
+def sd_diabatization_step(sd_lists, P_frag, kind, dia_index=None, active_space=None, data_dim=None):
     """
     The SD -> diabatic coefficients W of one step, |Phi_A> = sum_k |SD_k> W_kA: the
     reference and the untransformed SDs map onto themselves, every localization manifold
@@ -2660,6 +2702,7 @@ def sd_diabatization_step(sd_lists, P_frag, kind, dia_index=None):
         dia_index (list, optional): the diabatic-state index of an earlier step - the
             columns keep its order, None builds it (reference and singles first, then
             the manifolds by key, fragment-major - hole-major then electron for "joint")
+        active_space, data_dim: passed to sd_diabatization_groups (open-shell references)
 
     Returns:
         W (array (nsd, nsd)), dia_index (list), pops (array (nsd, nfrag)), pops_hole
@@ -2674,7 +2717,7 @@ def sd_diabatization_step(sd_lists, P_frag, kind, dia_index=None):
     nact = P_frag[0].shape[0] // 2
     nfrag = len(P_frag)
     sets = [frozenset(int(o) for o in sd) for sd in sd_lists]
-    gs, groups, singles = sd_diabatization_groups(sd_lists, kind)
+    gs, groups, singles = sd_diabatization_groups(sd_lists, kind, active_space, data_dim)
     loc = {}
     for g in groups:
         if g["kind"] == "joint":
@@ -2767,7 +2810,8 @@ def _sd_diabatization_series(params, sd_sorted, active_space, start_time, finish
                             [active_space, :][:, active_space]).real
             X = orthogonalizations.get_Lowdin_scipy(s_ks)
             P_frag = [X.T @ P @ X for P in P_frag]
-        W, dia_index, pops, pops_hole = sd_diabatization_step(sd_sorted[i], P_frag, kind, dia_index)
+        W, dia_index, pops, pops_hole = sd_diabatization_step(sd_sorted[i], P_frag, kind, dia_index,
+                                                              active_space, params['data_dim'])
         W_list.append(W)
         pops_list.append(pops)
         hole_list.append(pops_hole)
