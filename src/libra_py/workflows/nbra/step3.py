@@ -2828,16 +2828,16 @@ def _sd_diabatization_series(params, sd_sorted, active_space, start_time, finish
     from the step-2 fragment operators sliced to the active space (Lowdin-orthonormalized
     when the SD overlaps are)."""
     res_dir_1 = params['path_to_npz_files']
-    prefixes = {"mulliken": "P_frag", "pod_cp2k": "P_pod_cp2k"}
+    prefixes = {"mulliken": "P_frag", "pod": "P_pod", "pod_cp2k": "P_pod_cp2k"}
     operator = str(params['fragment_operator']).lower()
     if operator not in prefixes:
-        raise ValueError(F"fragment_operator {operator!r} - use 'mulliken' or 'pod_cp2k'")
+        raise ValueError(F"fragment_operator {operator!r} - use 'mulliken', 'pod' or 'pod_cp2k'")
     prefix = prefixes[operator]
     nfrag = len(glob.glob(F'{res_dir_1}/{prefix}*_ks_{start_time}.npz'))
     if nfrag < 2:
         raise ValueError(F"diabatization needs the step-2 fragment operators "
                          F"{prefix}{{f}}_ks_{{step}}.npz of at least two fragments in {res_dir_1} "
-                         F"({'fragment_atom_lists' if operator == 'mulliken' else 'read_pod_cp2k_files'} of "
+                         F"({dict(mulliken='fragment_atom_lists', pod='compute_pod', pod_cp2k='read_pod_cp2k_files')[operator]} of "
                          F"step2), found {nfrag}")
     mode = params['apply_orthonormalization']
     W_list, pops_list, hole_list, dia_index = [], [], [], None
@@ -2941,8 +2941,9 @@ def run_step3_sd_nacs_libint(params):
                 Needs isUKS 0. Pairs with diabatization "hole" / "particle".
             * **params['fragment_operator']** (string): the fragment operators the diabatization
                 localizes with - "mulliken" [default] reads P_frag{f}_ks_{step}.npz (step2
-                fragment_atom_lists), "pod_cp2k" reads P_pod_cp2k{f}_ks_{step}.npz (step2 read_pod_cp2k_files, the
-                projectors onto the blocks of CP2K's projection-operator diabatization).
+                fragment_atom_lists), "pod" reads P_pod{f}_ks_{step}.npz (step2 compute_pod, libra's own
+                projection-operator diabatization), "pod_cp2k" reads P_pod_cp2k{f}_ks_{step}.npz (step2
+                read_pod_cp2k_files, the blocks of CP2K's POD).
             * **params['diabatization']** (string): "none" [default] keeps the SD basis. "particle" or
                 "hole" localizes, in every single-excitation manifold sharing the hole (resp. the
                 particle), the varying spin-orbital on the fragments of the step-2 fragment operators

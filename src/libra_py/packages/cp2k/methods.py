@@ -3403,6 +3403,68 @@ def _skip_to_overlap_banner(f):
     return False
 
 
+def _count_banners(logfile, suffix):
+    """How many banner lines end with `suffix` - the AO_MATRICES prints of the
+    Hamiltonian repeat every SCF iteration, the last one is the converged matrix."""
+    n = 0
+    with open(logfile) as f:
+        for l in f:
+            if l.strip().endswith(suffix):
+                n += 1
+    return n
+
+
+def _skip_to_nth_banner(f, suffix, n):
+    """Advance a log-file iterator past the n-th (1-based) banner ending with `suffix`."""
+    seen = 0
+    for l in f:
+        if l.strip().endswith(suffix):
+            seen += 1
+            if seen == n:
+                return True
+    return False
+
+
+def read_cp2k_ao_ks_print(logfile, n_spins=1):
+    """
+    The AO Kohn-Sham (Hamiltonian) matrices printed by &DFT &PRINT &AO_MATRICES
+    (KOHN_SHAM_MATRIX T, NDIGITS 12) in the same MOLog block layout as the overlap print.
+    CP2K prints them at every SCF iteration (xTB banner "HAMILTONIAN MATRIX", GPW
+    "KOHN-SHAM MATRIX", one print per spin channel) - the last n_spins prints are the
+    matrices of the converged density, in the CP2K-internal AO order.
+
+    Returns:
+        list of np.ndarray (n, n), one per spin channel
+    """
+    suffix = None
+    for cand in ("HAMILTONIAN MATRIX", "KOHN-SHAM MATRIX"):
+        if _count_banners(logfile, cand):
+            suffix = cand
+            break
+    if suffix is None:
+        raise RuntimeError(F"no AO Kohn-Sham matrix print found in {logfile} - the run needs "
+                           F"&DFT &PRINT &AO_MATRICES KOHN_SHAM_MATRIX T (NDIGITS 12)")
+    total = _count_banners(logfile, suffix)
+    if total < n_spins:
+        raise ValueError(F"{logfile}: {total} Kohn-Sham matrix prints for {n_spins} spin channels")
+    out = []
+    for k in range(total - n_spins + 1, total + 1):
+        with open(logfile) as f:
+            _skip_to_nth_banner(f, suffix, k)
+            try:
+                H = _ao_overlap_blocks_fast(f)
+            except (AssertionError, ValueError, IndexError, KeyError):
+                H = None
+        if H is None:
+            with open(logfile) as f:
+                _skip_to_nth_banner(f, suffix, k)
+                H = _ao_overlap_blocks_flex(f, logfile)
+        if np.abs(H - H.T).max() > 1e-8:
+            raise ValueError(F"parsed Kohn-Sham matrix not symmetric ({logfile})")
+        out.append(0.5 * (H + H.T))
+    return out
+
+
 def read_cp2k_ao_overlap_print(logfile):
     """
     Parse the AO overlap matrix printed by &DFT &PRINT &AO_MATRICES (OVERLAP T,
@@ -4544,7 +4606,8 @@ def _scan_overlap_template(text):
     return has_csr, has_dense
 
 def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
-                         lowest_orbital, highest_orbital, params, fragment_atom_lists=None):
+                         lowest_orbital, highest_orbital, params, fragment_atom_lists=None,
+                         return_ao_overlap=False):
     """
     All three windowed MO overlap matrices from ONE CP2K-native OVERLAP_DELTAT
     run on the doubled geometry (prev atoms + curr atoms) - no libint needed.
@@ -4568,6 +4631,8 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
             eigenvectors are the MOs localized on fragment f, and the fragments
             covering all atoms sum to S_mo_curr. Needs mo_curr["ao_atom"] (the
             wfn loader supplies it).
+        return_ao_overlap (bool): also return the AO overlap of the current geometry (the
+            S(curr, curr) block of the doubled run, in the MO coefficients' AO order)
 
     Returns:
         St_mo, S_mo_prev, S_mo_curr  (each (norb_w, norb_w)). When the mo
@@ -4575,7 +4640,8 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
         three is instead a [alpha, beta] list - the AO overlap is
         spin-independent, so the single doubled-geometry run serves both
         channels at no extra CP2K cost. With fragment_atom_lists a fourth item
-        follows: the list over fragments of P_f, each shaped like S_mo_curr.
+        follows: the list over fragments of P_f, each shaped like S_mo_curr. With
+        return_ao_overlap the AO overlap S22 (n_ao, n_ao) is the last item.
 
     Raises ValueError when the window does not fit the stored MOs (python
     slicing would silently truncate or wrap), and for tabulated/ZDO
@@ -4702,12 +4768,12 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
     if frag_cols is not None:
         # fragment-major, each entry shaped like S_curr
         P_frag = [[P_spin[f] for P_spin in P_frag] for f in range(len(frag_cols))]
-        if len(St) == 1:
-            return St[0], S_prev[0], S_curr[0], [P[0] for P in P_frag]
-        return St, S_prev, S_curr, P_frag
-    if len(St) == 1:
-        return St[0], S_prev[0], S_curr[0]
-    return St, S_prev, S_curr
+        out = (St[0], S_prev[0], S_curr[0], [P[0] for P in P_frag]) if len(St) == 1 else (St, S_prev, S_curr, P_frag)
+    else:
+        out = (St[0], S_prev[0], S_curr[0]) if len(St) == 1 else (St, S_prev, S_curr)
+    if return_ao_overlap:
+        out = out + (np.ascontiguousarray(S22),)
+    return out
 
 
 def load_newtonx_mo_data(filename):
@@ -4830,27 +4896,10 @@ def read_pod_cp2k_files(prefix, need_tmf=False):
 
 
 def pod_cp2k_fragment_operators(pod, C_win, spin=0):
-    """
-    The POD fragment projectors over an MO window - the analogue of the Mulliken fragment
-    operators of mo_overlaps_via_cp2k: P_f = X_f X_f^T with X_f = C_win S c_f, c_f the block
-    MOs of fragment f. The blocks partition the Lowdin-orthogonalized AO space, so the
-    projectors sum to C_win S C_win^T (the window's MO overlap).
-
-    Args:
-        pod (dict): read_pod_cp2k_files output
-        C_win (array (nwin, n_ao)): window MO coefficients in the same (CP2K) AO order
-        spin (int): the spin channel of the block MOs
-
-    Returns:
-        list over blocks of arrays (nwin, nwin)
-    """
-    SC = pod["S"] @ np.asarray(C_win).T
-    out = []
-    for ib in range(pod["n_blocks"]):
-        X = pod["coeffs"][(ib, spin)].T @ SC            # (nmo_block, nwin)
-        P = X.T @ X
-        out.append(np.ascontiguousarray(0.5 * (P + P.T)))
-    return out
+    """The POD fragment projectors over an MO window - libra_py.pod.pod_fragment_operators
+    on the read_pod_cp2k_files output (the same dict keys as the native pod_block_states)."""
+    from libra_py import pod as _pod
+    return _pod.pod_fragment_operators(pod, C_win, spin)
 
 
 def load_wfn_mo_data(filename):

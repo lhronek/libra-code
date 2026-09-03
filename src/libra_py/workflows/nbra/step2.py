@@ -34,6 +34,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 import libra_py.packages.qe.methods as QE_methods
 import libra_py.packages.qe.utils as QE_utils
 import libra_py.packages.cp2k.methods as CP2K_methods
+from libra_py import pod as pod_lib
 from libra_py import cube_file_methods
 from libra_py import molden_methods
 from libra_py import data_conv
@@ -456,6 +457,15 @@ def run_cp2k_libint_step2(params):
                                                                           needs mo_source "wfn" with
                                                                           ao_overlap_method "cp2k" [default: None].
 
+                             compute_pod (bool): libra's own projection-operator diabatization (libra_py.pod) of every
+                                                 frame with the fragment_atom_lists as the blocks: the AO Kohn-Sham matrix
+                                                 comes from the diagonalization run's &DFT &PRINT &AO_MATRICES
+                                                 KOHN_SHAM_MATRIX print, or is rebuilt from a COMPLETE MO set (ADDED_MOS =
+                                                 n_ao - n_occ) when the print is absent, the AO overlap from the OVERLAP_DELTAT
+                                                 run. Saves P_pod{f}_ks_{step}.npz (the block projectors over the MO window,
+                                                 step3 fragment_operator "pod") and POD_hab_{step}.npz (block energies and
+                                                 couplings). Needs mo_source "wfn" [default: False].
+
                              read_pod_cp2k_files (bool): the diag template carries Futera's &PROPERTIES &ET_COUPLING
                                                     &PROJECTION (blocks = fragments) with the HAMILTONIAN,
                                                     WAVEFUNCTION and TRANSF_MATRIX_R prints: read the POD files of
@@ -549,6 +559,7 @@ def run_cp2k_libint_step2(params):
         'mo_source': 'wfn',
         'fragment_atom_lists': None,
         'read_pod_cp2k_files': False,
+        'compute_pod': False,
         'overlap_template': '',
         'cp2k_data_dir': '',
         'omp_num_threads': 1,
@@ -623,6 +634,9 @@ def run_cp2k_libint_step2(params):
     if fragment_atom_lists is not None and (mo_source != 'wfn' or ao_overlap_method != 'cp2k'):
         raise ValueError('fragment_atom_lists needs mo_source="wfn" with ao_overlap_method="cp2k" - '
                          'the fragment operators use the wfn AO->atom map and the CP2K AO overlap')
+    compute_pod = params['compute_pod']
+    if compute_pod and fragment_atom_lists is None:
+        raise ValueError('compute_pod needs fragment_atom_lists - the POD blocks are the fragments')
     read_pod_cp2k_files = params['read_pod_cp2k_files']
     if read_pod_cp2k_files and (mo_source != 'wfn' or ao_overlap_method != 'cp2k'):
         raise ValueError('read_pod_cp2k_files needs mo_source="wfn" with ao_overlap_method="cp2k" - the POD '
@@ -752,7 +766,8 @@ def run_cp2k_libint_step2(params):
                                 highest_orbital)
             odt_out = CP2K_methods.mo_overlaps_via_cp2k(mo_prev, mo_curr, R_prev, R_curr,
                                                         lowest_orbital, highest_orbital,
-                                                        odt_params, fragment_atom_lists)
+                                                        odt_params, fragment_atom_lists,
+                                                        return_ao_overlap=compute_pod)
             St, S_prev, S = odt_out[:3]
             # 2-block npz convention (alpha | beta on the diagonal): restricted runs
             # duplicate the single channel, UKS carries genuinely distinct blocks
@@ -769,6 +784,29 @@ def run_cp2k_libint_step2(params):
             scipy.sparse.save_npz(params['res_dir'] + F'/S_ks_{step}.npz', S_step_sparse)
             E_step_sparse = scipy.sparse.csc_matrix(data_conv.form_block_matrix(E_a, zero_mat, zero_mat, E_b))
             scipy.sparse.save_npz(params['res_dir'] + F'/E_ks_{step}.npz', E_step_sparse)
+            if compute_pod:
+                # the AO Kohn-Sham matrices: the diag run's print, else rebuilt from a complete MO set
+                S_ao = odt_out[-1]
+                diag_log = F'OUT-diag_{step}.log' if isxTB else F'step_{step}.log'
+                try:
+                    H_ao = CP2K_methods.read_cp2k_ao_ks_print(diag_log, 2 if isUKS else 1)
+                except RuntimeError:
+                    H_ao = [pod_lib.ks_matrix_from_mos(mo_curr['C'], mo_curr['E'], S_ao)]
+                    if isUKS:
+                        H_ao.append(pod_lib.ks_matrix_from_mos(mo_curr['C_b'], mo_curr['E_b'], S_ao))
+                pod_nat = pod_lib.pod_block_states(H_ao, S_ao, mo_curr['ao_atom'], fragment_atom_lists)
+                lo, hi = lowest_orbital - 1, highest_orbital
+                P_nat_a = pod_lib.pod_fragment_operators(pod_nat, mo_curr['C'][lo:hi], 0)
+                P_nat_b = pod_lib.pod_fragment_operators(pod_nat, mo_curr['C_b'][lo:hi], 1) if isUKS else P_nat_a
+                resid = float(np.max(np.abs(sum(P_nat_a) - S_a)))
+                if resid > 1e-8:
+                    raise ValueError(F'step {step}: the POD projectors sum to S only within {resid:.2e}')
+                for f in range(pod_nat['n_blocks']):
+                    scipy.sparse.save_npz(params['res_dir'] + F'/P_pod{f}_ks_{step}.npz',
+                                          scipy.sparse.csc_matrix(data_conv.form_block_matrix(P_nat_a[f], zero_mat, zero_mat, P_nat_b[f])))
+                np.savez(params['res_dir'] + F'/POD_hab_{step}.npz',
+                         **{F'E_b{ib}_s{sp}': e for (ib, sp), e in pod_nat['energies'].items()},
+                         **{F'V_b{i}_b{j}_s{sp}': v for (i, j, sp), v in pod_nat['couplings'].items()})
             if read_pod_cp2k_files:
                 # the POD blocks partition the orthogonalized AO space: the projectors sum to S
                 lo, hi = lowest_orbital - 1, highest_orbital
