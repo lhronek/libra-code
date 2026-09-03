@@ -15,6 +15,7 @@
 #include <Eigen/Eigenvalues>
 #include <Eigen/Core>
 #include "mEigen.h"
+#include "../math_linalg/blas_interface.h"
 #include <cmath>
 
 /// liblibra namespace
@@ -70,7 +71,11 @@ void sqrt_matrix(CMATRIX& S, CMATRIX& S_half, CMATRIX& S_i_half, double thresh, 
 
 
   // Find the eigenvalues of the the S matrix
-  solve_eigen(S, *Seig, *C, 0);  // S * C = C * Seig  ==>  S = C * Seig * C.H()
+  // S * C = C * Seig  ==>  S = C * Seig * C.H() - the LAPACK zheevd when the build linked it,
+  // the Eigen solver otherwise (both refuse a non-Hermitian S). The result is a function of S,
+  // so the eigenvector gauge of either solver cancels in it
+  if(have_lapack()){ lapack_heevd(S, *Seig, *C); }
+  else{ solve_eigen(S, *Seig, *C, 0); }
 
   //if(do_phase_correction){   correct_phase(C);  }
 
@@ -118,6 +123,65 @@ void sqrt_matrix(CMATRIX& S, CMATRIX& S_half, CMATRIX& S_i_half){
 
 }
 
+void sqrt_matrix(MATRIX& S, MATRIX& S_half, MATRIX& S_i_half, double thresh, int do_phase_correction){
+/**
+  S^{1/2} and S^{-1/2} of a real symmetric positive-definite S - the real counterpart of the
+  CMATRIX version: the eigenpairs from LAPACK dsyevd when the build linked it (the Eigen solver
+  otherwise), the back-transforms as dgemm-backed MATRIX products. A negative eigenvalue has no
+  real root and is refused, a root below thresh stops with the singularity message (thresh <= 0
+  disables that check)
+  \param[in] S Input matrix
+  \param[out] S_half Computed S^{1/2} matrix
+  \param[out] S_i_half Computed S^{-1/2} matrix
+  \param[in] thresh - the singularity threshold on the roots of the eigenvalues
+  \param[in] do_phase_correction - signature parity with the CMATRIX version, unused
+*/
+  int sz = S.n_cols;
+  if(S.n_rows != sz || S_half.n_rows != sz || S_half.n_cols != sz || S_i_half.n_rows != sz || S_i_half.n_cols != sz){
+    cout<<"Error in libmeigen::sqrt_matrix : S, S^{1/2} and S^{-1/2} must all be "<<sz<<" x "<<sz<<" matrices\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  MATRIX C(sz, sz);
+  MATRIX Seig(sz, sz);
+  if(have_lapack()){ lapack_syevd(S, Seig, C); }
+  else{ solve_eigen(S, Seig, C, 0); }
+  MATRIX D_half(sz, sz);
+  MATRIX D_i_half(sz, sz);
+  for(int i=0;i<sz;i++){
+    double e = Seig.get(i,i);
+    if(e < 0.0){
+      std::cout<<"\n Error in sqrt_matrix: the matrix S has a negative eigenvalue "<<e
+               <<"\n a real S^{1/2} needs a positive semi-definite S - the CMATRIX version returns the complex root\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    double val = std::sqrt(e);
+    if(val < thresh){
+      std::cout<<"\n Error in sqrt_matrix: One of the eigenvalues of the matrix S is "<< e <<" (root "<<val<<")"
+               <<"\n this is below the used threshold of "<<thresh
+               <<"\n So... the matrix is likely singular or your threshold is too large"
+               <<"\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    D_half.set(i, i, val);
+    D_i_half.set(i, i, 1.0/val);
+  }
+  S_half = C * D_half * C.T();
+  S_i_half = C * D_i_half * C.T();
+
+}// sqrt_matrix (MATRIX)
+
+
+void sqrt_matrix(MATRIX& S, MATRIX& S_half, MATRIX& S_i_half, double thresh){
+
+  sqrt_matrix(S, S_half, S_i_half, thresh, 0);
+
+}
+
+void sqrt_matrix(MATRIX& S, MATRIX& S_half, MATRIX& S_i_half){
+
+  sqrt_matrix(S, S_half, S_i_half, -1.0, 0);
+
+}
+
 int lowdin_frame(CMATRIX& S, CMATRIX& X, CMATRIX& Y){
 /**
   The Lowdin (symmetric) orthonormalization frame of a metric S: X = S^-1/2 and Y = S^1/2.
@@ -156,7 +220,10 @@ void sqrt_matrix_derivative(CMATRIX& S, CMATRIX& dS, CMATRIX& dY, CMATRIX& dX){
   }
   CMATRIX s(n, n);
   CMATRIX V(n, n);
-  solve_eigen(S, s, V, 0);
+  // the divided differences are gauge-invariant (V GY V^H with GY built from V^H dS V),
+  // so either eigensolver serves
+  if(have_lapack()){ lapack_heevd(S, s, V); }
+  else{ solve_eigen(S, s, V, 0); }
   CMATRIX W(n, n);
   W = V.H() * dS * V;
   CMATRIX GY(n, n);
@@ -202,7 +269,11 @@ void exp_matrix(CMATRIX& res, CMATRIX& S, complex<double> dt, int do_phase_corre
 
 
   // Find the eigenvalues of the the S matrix
-  solve_eigen(S, *Seig, *C, 0);  // S * C = C * Seig  ==>  S = C * Seig * C.H()
+  // S * C = C * Seig  ==>  S = C * Seig * C.H() - the LAPACK zheevd when the build linked it,
+  // the Eigen solver otherwise (both refuse a non-Hermitian S). The result is a function of S,
+  // so the eigenvector gauge of either solver cancels in it
+  if(have_lapack()){ lapack_heevd(S, *Seig, *C); }
+  else{ solve_eigen(S, *Seig, *C, 0); }
 
   //if(do_phase_correction){   correct_phase(C);  }
 

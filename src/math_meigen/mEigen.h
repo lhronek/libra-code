@@ -111,6 +111,9 @@ void inv_matrix(CMATRIX& S, CMATRIX& S_inv);
 void sqrt_matrix(CMATRIX& S, CMATRIX& S_half, CMATRIX& S_i_half, double thresh, int do_phase_correction);
 void sqrt_matrix(CMATRIX& S, CMATRIX& S_half, CMATRIX& S_i_half, double thresh);
 void sqrt_matrix(CMATRIX& S, CMATRIX& S_half, CMATRIX& S_i_half);
+void sqrt_matrix(MATRIX& S, MATRIX& S_half, MATRIX& S_i_half, double thresh, int do_phase_correction);  ///< real symmetric positive-definite S: LAPACK dsyevd when the build linked it, the Eigen solver otherwise
+void sqrt_matrix(MATRIX& S, MATRIX& S_half, MATRIX& S_i_half, double thresh);
+void sqrt_matrix(MATRIX& S, MATRIX& S_half, MATRIX& S_i_half);
 int lowdin_frame(CMATRIX& S, CMATRIX& X, CMATRIX& Y);  ///< Lowdin frame of a metric: X = S^-1/2, Y = S^1/2. Returns 0 (X, Y untouched) for an identity S (max |S - I| <= 1e-12)
 void sqrt_matrix_derivative(CMATRIX& S, CMATRIX& dS, CMATRIX& dY, CMATRIX& dX);  ///< d(S^1/2) and d(S^-1/2) along a Hermitian variation dS of a positive-definite S (Daleckii-Krein divided differences of one eigendecomposition)
 void exp_matrix(CMATRIX& res, CMATRIX& S, complex<double> dt, int do_phase_correction);

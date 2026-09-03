@@ -15,6 +15,7 @@
 #include <Eigen/Eigenvalues>
 #include <Eigen/Core>
 #include "mEigen.h"
+#include "../math_linalg/blas_interface.h"
 
 
 /// liblibra namespace
@@ -194,39 +195,38 @@ void inv_matrix(MATRIX& S, MATRIX& S_inv, double thresh, int do_phase_correction
 
 
   int i;
- 
+
   // Let us first diagonalize the overlap matrix S
-  int sz = S.n_cols;  
+  int sz = S.n_cols;
 
-  CMATRIX* C; C = new CMATRIX(sz, sz);  *C = complex<double>(0.0,0.0);
-  CMATRIX* Seig; Seig = new CMATRIX(sz, sz);  *Seig = complex<double>(0.0,0.0);
-  CMATRIX* tmp; tmp = new CMATRIX(sz, sz);  *tmp = complex<double>(0.0,0.0);
+  MATRIX C(sz, sz);
+  MATRIX Seig(sz, sz);
+  MATRIX tmp(sz, sz);
 
-  // Find the eigenvalues of the the S matrix
-  libmeigen::solve_eigen(S, *Seig, *C, 0);  // S * C = C * Seig  ==>  S = C * Seig * C.H()
+  // S * C = C * Seig  ==>  S = C * Seig * C.T() - the LAPACK dsyevd when the build linked it,
+  // the Eigen solver otherwise (both refuse a non-symmetric S). The inverse is a function of S,
+  // so the eigenvector gauge of either solver cancels in it
+  if(have_lapack()){ lapack_syevd(S, Seig, C); }
+  else{ solve_eigen(S, Seig, C, 0); }
 
   //if(do_phase_correction){   correct_phase(C);  }
 
 
   for(i=0;i<sz;i++){
-    complex<double> val = Seig->get(i,i);
+    double val = Seig.get(i,i);
     double nrm = std::abs(val);
-    if(nrm<thresh){  
+    if(nrm<thresh){
       std::cout<<"\n Error in inv_matrix: One of the eigenvalues of the matrix S is "<< val
                <<"\n this is below the used threshold of "<<thresh
                <<"\n So... the matrix is likely singular or your threshold is too large"
                <<"\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
-    else{    tmp->M[i*sz+i] = 1.0/val; }
+    else{    tmp.set(i, i, 1.0/val); }
   }
 
   // Convert to the original basis
-  S_inv = ((*C) * (*tmp) * ((*C).H())).real();
-
-  delete C;
-  delete Seig;
-  delete tmp;
+  S_inv = C * tmp * C.T();
 
 
 }// inv_matrix
@@ -283,7 +283,11 @@ void inv_matrix(CMATRIX& S, CMATRIX& S_inv, double thresh, int do_phase_correcti
   CMATRIX* Seig; Seig = new CMATRIX(sz, sz);  *Seig = complex<double>(0.0,0.0);
 
   // Find the eigenvalues of the the S matrix
-  libmeigen::solve_eigen(S, *Seig, *C, 0);  // S * C = C * Seig  ==>  S = C * Seig * C.H()
+  // S * C = C * Seig  ==>  S = C * Seig * C.H() - the LAPACK zheevd when the build linked it,
+  // the Eigen solver otherwise (both refuse a non-Hermitian S). The inverse is a function of S,
+  // so the eigenvector gauge of either solver cancels in it
+  if(have_lapack()){ lapack_heevd(S, *Seig, *C); }
+  else{ libmeigen::solve_eigen(S, *Seig, *C, 0); }
 
   //if(do_phase_correction){   correct_phase(C);  }
 
