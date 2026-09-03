@@ -4434,9 +4434,12 @@ def make_overlap_deltat_input(template_file, csr_write=True):
 
     DROP = ("PROPERTIES", "VDW_POTENTIAL", "MOTION")
     # the overlap must be printed somewhere: sparse &S_CSR_WRITE (the Libra
-    # CP2K patch) or the dense &AO_MATRICES log print (stock CP2K)
-    have_out = any(("S_CSR_WRITE" if csr_write else "AO_MATRICES") in ln.upper()
-                   for ln in lines)
+    # CP2K patch) or the dense &AO_MATRICES log print (stock CP2K). The dense
+    # print is OWNED by this generator: the source's &AO_MATRICES section (any
+    # matrix selection, e.g. the KOHN_SHAM_MATRIX print of a POD template) is
+    # dropped and one OVERLAP T section emitted - a substring test on the section
+    # name once passed a KOHN_SHAM-only section as an overlap request
+    have_out = _scan_overlap_template("\n".join(lines))[0] if csr_write else False
     out = []
     stack = []
     skip_until = None      # stack depth at which a dropped section ends
@@ -4485,7 +4488,8 @@ def make_overlap_deltat_input(template_file, csr_write=True):
             if skip_until is not None:
                 stack.append(name)
                 continue
-            if name in DROP or (name == "EXCITED_STATES" and "DFT" in stack):
+            if name in DROP or (name == "EXCITED_STATES" and "DFT" in stack) \
+                    or (name == "AO_MATRICES" and not csr_write):
                 stack.append(name)
                 skip_until = len(stack)
                 if name == "EXCITED_STATES" and not did_excited:
