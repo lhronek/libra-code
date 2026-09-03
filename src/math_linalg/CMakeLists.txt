@@ -66,4 +66,44 @@ IF(WITH_BLAS_GEMM)
   ENDIF()
 ENDIF()
 
+#
+#  Optional LAPACK backend for the eigen, inverse and matrix-function kernels
+#  (blas_interface.cpp) - libmeigen routes sqrt_matrix, inv_matrix, exp_matrix
+#  and sqrt_matrix_derivative through them when the probe passes
+#
+OPTION(WITH_LAPACK "Route the eigen, inverse and matrix-function kernels through LAPACK (dsyevd, zheevd, dsygvd, zhegvd, dgetri)" ON)
+SET(LIBRA_HAVE_LAPACK_BACKEND "" CACHE INTERNAL "LAPACK backend linked (probe passed)")
+IF(WITH_LAPACK)
+  # the zheevd probe RUNS a 2x2 diagonalization through the int-argument Fortran
+  # prototype of blas_interface.h - the other kernels come from the same library
+  INCLUDE(LibraBlasProbe)
+  SET(LIBRA_LAPACK_LIBS "")
+  FIND_PACKAGE(BLAS QUIET)
+  IF(BLAS_FOUND)
+    libra_probe_zheevd("${BLAS_LIBRARIES}" LIBRA_HAVE_LAPACK_BLAS)
+    IF(LIBRA_HAVE_LAPACK_BLAS)
+      SET(LIBRA_LAPACK_LIBS ${BLAS_LIBRARIES})
+    ENDIF()
+  ENDIF()
+  IF(NOT LIBRA_LAPACK_LIBS)
+    FIND_LIBRARY(LIBRA_OPENBLAS_LIB NAMES openblas)
+    IF(LIBRA_OPENBLAS_LIB)
+      libra_probe_zheevd("${LIBRA_OPENBLAS_LIB}" LIBRA_HAVE_LAPACK_OPENBLAS)
+      IF(LIBRA_HAVE_LAPACK_OPENBLAS)
+        SET(LIBRA_LAPACK_LIBS ${LIBRA_OPENBLAS_LIB})
+      ENDIF()
+    ENDIF()
+  ENDIF()
+  SET(LIBRA_HAVE_LAPACK_BACKEND "${LIBRA_LAPACK_LIBS}" CACHE INTERNAL "LAPACK backend linked (probe passed)")
+  IF(LIBRA_LAPACK_LIBS)
+    MESSAGE(STATUS "math_linalg: LAPACK backend enabled: ${LIBRA_LAPACK_LIBS}")
+    SET_SOURCE_FILES_PROPERTIES(${CMAKE_CURRENT_SOURCE_DIR}/blas_interface.cpp
+      PROPERTIES COMPILE_DEFINITIONS HAVE_LAPACK)
+    TARGET_LINK_LIBRARIES(linalg      ${LIBRA_LAPACK_LIBS})
+    TARGET_LINK_LIBRARIES(linalg_stat ${LIBRA_LAPACK_LIBS})
+  ELSE()
+    MESSAGE(STATUS "math_linalg: no working int-ABI zheevd in BLAS or libopenblas - LAPACK backend disabled, the Eigen kernels stay")
+  ENDIF()
+ENDIF()
+
                                                  

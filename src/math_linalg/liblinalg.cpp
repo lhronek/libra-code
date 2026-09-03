@@ -27,6 +27,7 @@
 #endif 
 
 #include "liblinalg.h"
+#include "blas_interface.h"
 
 
 /// liblibra namespace
@@ -1128,6 +1129,20 @@ void export_linalg_objects(){
 
 
 
+
+
+  ///============== LAPACK kernels (blas_interface.h) ======================
+
+  def("have_lapack", &have_lapack);
+  def("lapack_syevd", &lapack_syevd);
+  def("lapack_heevd", &lapack_heevd);
+  def("lapack_sygvd", &lapack_sygvd);
+  def("lapack_hegvd", &lapack_hegvd);
+
+  void (*expt_lapack_getri_v1)(const MATRIX& A, MATRIX& Ainv) = &lapack_getri;
+  void (*expt_lapack_getri_v2)(const CMATRIX& A, CMATRIX& Ainv) = &lapack_getri;
+  def("lapack_getri", expt_lapack_getri_v1);
+  def("lapack_getri", expt_lapack_getri_v2);
 
 
 }// export_linalg_objects()
