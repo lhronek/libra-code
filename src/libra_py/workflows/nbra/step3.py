@@ -2485,6 +2485,39 @@ def _orthonormalize_ks_overlaps(step, params):
     print('Done with step', step, '. Elapsed time:', time.time() - t2)
 
 
+def koopmans_sd_basis(reference, charge, nact):
+    """
+    The frozen-orbital (Koopmans) SD basis of an ionized closed-shell reference: charge +1
+    removes one beta electron from every occupied orbital of the reference (the hole basis,
+    N-1 electrons), charge -1 adds one alpha electron to every active virtual (the electron
+    basis, N+1). The orbitals and their energies stay those of the neutral SCF - the hole or
+    electron never relaxes the density, so the site energies keep their geometric detuning
+    (a self-consistent ion screens it).
+
+    Args:
+        reference (list of int): the reference SD in the reindexed signed notation
+        charge (int): +1 or -1
+        nact (int): active spatial orbitals per spin (the virtuals are the alpha indices
+            1..nact absent from the reference)
+
+    Returns:
+        sd_unique_basis (list): one [[orbital, orbital], spin] descriptor per determinant -
+            the removed ('bet') or added ('alp') spin-orbital
+        sd_states_reindexed (list of lists of int): the determinants, the reference's list
+            order kept (in-place removal or an appended orbital)
+    """
+    ref = [int(o) for o in reference]
+    if charge == 1:
+        holes = sorted([o for o in ref if o < 0], key=abs)
+        return ([[[-h, -h], 'bet'] for h in holes],
+                [[o for o in ref if o != h] for h in holes])
+    if charge == -1:
+        virt = [a for a in range(1, nact + 1) if a not in ref]
+        return ([[[a, a], 'alp'] for a in virt],
+                [ref + [a] for a in virt])
+    raise ValueError(F"koopmans_charge {charge} - use 0, +1 (hole basis) or -1 (electron basis)")
+
+
 def _sd_block_index(orb, nact):
     """Row of a signed reindexed spin-orbital in the 2-block active-space matrices
     (alpha j -> j-1, beta -j -> nact+j-1, the ovlp_arb convention)."""
@@ -2893,6 +2926,13 @@ def run_step3_sd_nacs_libint(params):
                 The default CHANGED from the historical False (raw overlaps) to
                 "lowdin_cached" - the Lowdin route is the validated convention;
                 set "none" explicitly to reproduce pre-change data
+            * **params['koopmans_charge']** (int): 0 [default] keeps the SCF reference and its single
+                excitations. +1 replaces the SD basis by the frozen-orbital (Koopmans) hole basis of
+                the cation: one beta electron removed from each of the num_occ_states active occupied
+                orbitals of the closed-shell reference (num_occ_states determinants, energies from the
+                neutral orbital energies, no self-consistent screening of the site detuning). -1 is
+                the electron basis of the anion (one alpha electron added to each active virtual).
+                Needs isUKS 0. Pairs with diabatization "hole" / "particle".
             * **params['diabatization']** (string): "none" [default] keeps the SD basis. "particle" or
                 "hole" localizes, in every single-excitation manifold sharing the hole (resp. the
                 particle), the varying spin-orbital on the fragments of the step-2 fragment operators
@@ -2959,7 +2999,7 @@ def run_step3_sd_nacs_libint(params):
                       'num_unocc_states': 1, 'verbosity': 0, 'isUKS': 0, 'es_software': 'cp2k',
                       'use_multiprocessing': False, 'logfile_directory': os.getcwd() + '/all_logfiles', 'nac_algo': 0,
                       'sd_overlap_kernel': 'auto', 'blas_num_threads': None,
-                      'diabatization': 'none'
+                      'diabatization': 'none', 'koopmans_charge': 0
                       }
 
     if params['is_many_body'] and params['isUKS']:
@@ -3169,6 +3209,17 @@ def run_step3_sd_nacs_libint(params):
             active_space_num_occ_orbitals=params['active_space_num_occ_orbitals'])
 
     # Some printings
+    koopmans_charge = int(params['koopmans_charge'])
+    if koopmans_charge != 0:
+        if params['isUKS']:
+            raise ValueError("koopmans_charge needs a closed-shell reference (isUKS 0) - an "
+                             "unrestricted reference is already the ion, use its own SD basis")
+        # the reference is the first reindexed determinant of the closed-shell basis
+        sd_unique_basis, sd_states_reindexed = koopmans_sd_basis(sd_states_reindexed[0], koopmans_charge,
+                                                                 len(ks_active_space) // 2)
+        params['sd_unique_basis'] = sd_unique_basis
+        print(F'koopmans_charge {koopmans_charge}: {len(sd_states_reindexed)} frozen-orbital '
+              F'{"hole" if koopmans_charge > 0 else "electron"} determinants of the neutral reference')
     print('sd_unique_basis is:', sd_unique_basis)
     print('sd_states_reindexed is:', sd_states_reindexed)
     print('ks_homo_index', ks_homo_index)
