@@ -56,7 +56,11 @@ void least_squares_solve(MATRIX& A, MATRIX& X, MATRIX& B, int option){
    x = a.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(b);
   }
   else if(option==1){
-   x = a.fullPivLu().solve(b);
+   // FullPivLU::solve is an exact-system solver: on a rectangular system it returned a vector that
+   // is not the least-squares solution (residual 13.0 against 8.5 on a 40 x 12 test) - the complete
+   // orthogonal decomposition serves that case, the LU the square one
+   if(N == M){ x = a.fullPivLu().solve(b); }
+   else{ x = a.completeOrthogonalDecomposition().solve(b); }
   }
   else if(option==2){
    x = a.fullPivHouseholderQr().solve(b);
