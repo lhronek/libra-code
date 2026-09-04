@@ -1144,6 +1144,15 @@ void export_linalg_objects(){
   def("lapack_geev", expt_lapack_geev_v1);
   def("lapack_geev", expt_lapack_geev_v2);
 
+  int (*expt_lapack_getc2_rank_v1)(const MATRIX& A, double rel_threshold) = &lapack_getc2_rank;
+  int (*expt_lapack_getc2_rank_v2)(const CMATRIX& A, double rel_threshold) = &lapack_getc2_rank;
+  def("lapack_getc2_rank", expt_lapack_getc2_rank_v1);
+  def("lapack_getc2_rank", expt_lapack_getc2_rank_v2);
+  void (*expt_lapack_getc2_v1)(const MATRIX& A, MATRIX& P, MATRIX& L, MATRIX& U, MATRIX& Q) = &lapack_getc2;
+  void (*expt_lapack_getc2_v2)(const CMATRIX& A, CMATRIX& P, CMATRIX& L, CMATRIX& U, CMATRIX& Q) = &lapack_getc2;
+  def("lapack_getc2", expt_lapack_getc2_v1);
+  def("lapack_getc2", expt_lapack_getc2_v2);
+
   double (*expt_lapack_det_v1)(const MATRIX& A) = &lapack_det;
   std::complex<double> (*expt_lapack_det_v2)(const CMATRIX& A) = &lapack_det;
   def("lapack_det", expt_lapack_det_v1);

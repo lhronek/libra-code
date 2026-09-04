@@ -14,9 +14,11 @@
 
   The kernels (liblinalg namespace): the divide-and-conquer eigensolvers
   (dsyevd, zheevd, dsygvd, zhegvd), the general eigensolvers (dgeev, zgeev),
-  the LU inverse (dgetrf + dgetri) and the LU determinant (dgetrf: the
+  the LU inverse (dgetrf + dgetri), the LU determinant (dgetrf: the
   product of the pivots with the permutation sign, exactly 0 for an exactly
-  singular matrix) in libra's conventions - row-major MATRIX/CMATRIX in and out, E a diagonal
+  singular matrix) and the complete-pivoting LU (dgetc2, zgetc2: the rank
+  with a relative pivot threshold, and P A Q = L U with explicit permutation
+  matrices) in libra's conventions - row-major MATRIX/CMATRIX in and out, E a diagonal
   matrix of ascending eigenvalues, C with the eigenvectors in its columns
   (C.col(k) belongs to E(k,k)), the generalized kernels S-orthonormal
   (C^H S C = 1). C may be n x m with 1 <= m <= n and E m x m: the lowest m
@@ -78,6 +80,10 @@ void zgetrf_(const int* m, const int* n, std::complex<double>* a,
 void zgetri_(const int* n, std::complex<double>* a, const int* lda,
              const int* ipiv, std::complex<double>* work, const int* lwork,
              int* info);
+void dgetc2_(const int* n, double* a, const int* lda, int* ipiv, int* jpiv,
+             int* info);
+void zgetc2_(const int* n, std::complex<double>* a, const int* lda, int* ipiv,
+             int* jpiv, int* info);
 void dgeev_(const char* jobvl, const char* jobvr, const int* n, double* a,
             const int* lda, double* wr, double* wi, double* vl,
             const int* ldvl, double* vr, const int* ldvr, double* work,
@@ -112,6 +118,10 @@ void lapack_geev(const MATRIX& A, CMATRIX& E, CMATRIX& C);                      
 void lapack_geev(const CMATRIX& A, CMATRIX& E, CMATRIX& C);                      ///< A C = C E for a general complex matrix
 void lapack_getri(const MATRIX& A, MATRIX& Ainv);                                ///< inverse of a general real matrix (LU, partial pivoting)
 double lapack_det(const MATRIX& A);                                              ///< determinant of a general real matrix (LU)
+int lapack_getc2_rank(const MATRIX& A, double rel_threshold);                    ///< rank = the complete-pivoting LU pivots above rel_threshold times the largest one
+int lapack_getc2_rank(const CMATRIX& A, double rel_threshold);
+void lapack_getc2(const MATRIX& A, MATRIX& P, MATRIX& L, MATRIX& U, MATRIX& Q);   ///< complete-pivoting LU: P A Q = L U, L unit lower, U upper, P and Q permutation matrices
+void lapack_getc2(const CMATRIX& A, CMATRIX& P, CMATRIX& L, CMATRIX& U, CMATRIX& Q);
 std::complex<double> lapack_det(const CMATRIX& A);                               ///< determinant of a general complex matrix (LU)
 void lapack_getri(const CMATRIX& A, CMATRIX& Ainv);                              ///< inverse of a general complex matrix
 

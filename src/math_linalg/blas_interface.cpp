@@ -423,6 +423,151 @@ std::complex<double> lapack_det(const CMATRIX& A){
 }
 
 
+namespace {
+
+#ifdef HAVE_LAPACK
+
+// the rank from a completed complete-pivoting factorization: the pivots above rel_threshold
+// times the largest one (Eigen's FullPivLU rule with its default threshold eps n)
+template <typename T>
+int pivots_above(const T* a, int n, double rel_threshold){
+  double pmax = 0.0;
+  for(int i = 0; i < n; i++){ pmax = std::max(pmax, std::abs(a[(std::size_t)i*n + i])); }
+  int rank = 0;
+  for(int i = 0; i < n; i++){ if(std::abs(a[(std::size_t)i*n + i]) > rel_threshold * pmax){ rank++; } }
+  return rank;
+}
+
+// the factors of P A Q = L U from the packed column-major LU and the sequential interchanges
+// ipiv (rows) and jpiv (columns): P = S_n ... S_1, Q = T_1 ... T_n applied to the identity
+template <typename T, typename M>
+void unpack_getc2(const T* a, const int* ipiv, const int* jpiv, int n, M& P, M& L, M& U, M& Q){
+  P = 0.0; L = 0.0; U = 0.0; Q = 0.0;
+  for(int i = 0; i < n; i++){ P.M[i*n+i] = 1.0; Q.M[i*n+i] = 1.0; }
+  for(int i = 0; i < n; i++){
+    if(ipiv[i] != i + 1){ P.swap_rows(i, ipiv[i] - 1); }
+    if(jpiv[i] != i + 1){ Q.swap_cols(i, jpiv[i] - 1); }
+  }
+  for(int i = 0; i < n; i++){
+    L.M[i*n+i] = 1.0;
+    for(int j = 0; j < i; j++){ L.M[i*n+j] = a[(std::size_t)j*n + i]; }
+    for(int j = i; j < n; j++){ U.M[i*n+j] = a[(std::size_t)j*n + i]; }
+  }
+}
+
+#endif
+
+}// anonymous namespace
+
+
+int lapack_getc2_rank(const MATRIX& A, double rel_threshold){
+  const char* fn = "lapack_getc2_rank";
+#ifdef HAVE_LAPACK
+  int n = A.n_rows;
+  if(n < 1){ fail(fn, "A is empty"); }
+  require_n_by_n(fn, A, "A", n);
+  thread_local RealWork ws;
+  thread_local std::vector<int> jpiv;
+  grow(ws.a, (std::size_t)n*n);
+  grow(ws.iwork, n);
+  grow(jpiv, n);
+  // rank(A^T) = rank(A): the row-major buffer read column-major serves as it is
+  std::copy(A.M, A.M + (std::size_t)n*n, ws.a.begin());
+  int n_ = n, lda = n, info = 0;
+  dgetc2_(&n_, ws.a.data(), &lda, ws.iwork.data(), jpiv.data(), &info);
+  if(info < 0){ fail(fn, info_text("dgetc2", info)); }
+  return pivots_above(ws.a.data(), n, rel_threshold);
+#else
+  (void)A; (void)rel_threshold;
+  fail(fn, MISSING);
+  return -1;
+#endif
+}
+
+
+int lapack_getc2_rank(const CMATRIX& A, double rel_threshold){
+  const char* fn = "lapack_getc2_rank";
+#ifdef HAVE_LAPACK
+  int n = A.n_rows;
+  if(n < 1){ fail(fn, "A is empty"); }
+  require_n_by_n(fn, A, "A", n);
+  thread_local ComplexWork ws;
+  thread_local std::vector<int> jpiv;
+  grow(ws.a, (std::size_t)n*n);
+  grow(ws.iwork, n);
+  grow(jpiv, n);
+  std::copy(A.M, A.M + (std::size_t)n*n, ws.a.begin());
+  int n_ = n, lda = n, info = 0;
+  zgetc2_(&n_, ws.a.data(), &lda, ws.iwork.data(), jpiv.data(), &info);
+  if(info < 0){ fail(fn, info_text("zgetc2", info)); }
+  return pivots_above(ws.a.data(), n, rel_threshold);
+#else
+  (void)A; (void)rel_threshold;
+  fail(fn, MISSING);
+  return -1;
+#endif
+}
+
+
+void lapack_getc2(const MATRIX& A, MATRIX& P, MATRIX& L, MATRIX& U, MATRIX& Q){
+  const char* fn = "lapack_getc2";
+#ifdef HAVE_LAPACK
+  int n = A.n_rows;
+  if(n < 1){ fail(fn, "A is empty"); }
+  require_n_by_n(fn, A, "A", n);
+  require_n_by_n(fn, P, "P", n);
+  require_n_by_n(fn, L, "L", n);
+  require_n_by_n(fn, U, "U", n);
+  require_n_by_n(fn, Q, "Q", n);
+  thread_local RealWork ws;
+  thread_local std::vector<int> jpiv;
+  grow(ws.a, (std::size_t)n*n);
+  grow(ws.iwork, n);
+  grow(jpiv, n);
+  // the factors of A itself: transpose-copy into the column-major buffer
+  for(int i = 0; i < n; i++){
+    for(int j = 0; j < n; j++){ ws.a[(std::size_t)j*n + i] = A.M[i*n+j]; }
+  }
+  int n_ = n, lda = n, info = 0;
+  dgetc2_(&n_, ws.a.data(), &lda, ws.iwork.data(), jpiv.data(), &info);
+  if(info < 0){ fail(fn, info_text("dgetc2", info)); }
+  unpack_getc2(ws.a.data(), ws.iwork.data(), jpiv.data(), n, P, L, U, Q);
+#else
+  (void)A; (void)P; (void)L; (void)U; (void)Q;
+  fail(fn, MISSING);
+#endif
+}
+
+
+void lapack_getc2(const CMATRIX& A, CMATRIX& P, CMATRIX& L, CMATRIX& U, CMATRIX& Q){
+  const char* fn = "lapack_getc2";
+#ifdef HAVE_LAPACK
+  int n = A.n_rows;
+  if(n < 1){ fail(fn, "A is empty"); }
+  require_n_by_n(fn, A, "A", n);
+  require_n_by_n(fn, P, "P", n);
+  require_n_by_n(fn, L, "L", n);
+  require_n_by_n(fn, U, "U", n);
+  require_n_by_n(fn, Q, "Q", n);
+  thread_local ComplexWork ws;
+  thread_local std::vector<int> jpiv;
+  grow(ws.a, (std::size_t)n*n);
+  grow(ws.iwork, n);
+  grow(jpiv, n);
+  for(int i = 0; i < n; i++){
+    for(int j = 0; j < n; j++){ ws.a[(std::size_t)j*n + i] = A.M[i*n+j]; }
+  }
+  int n_ = n, lda = n, info = 0;
+  zgetc2_(&n_, ws.a.data(), &lda, ws.iwork.data(), jpiv.data(), &info);
+  if(info < 0){ fail(fn, info_text("zgetc2", info)); }
+  unpack_getc2(ws.a.data(), ws.iwork.data(), jpiv.data(), n, P, L, U, Q);
+#else
+  (void)A; (void)P; (void)L; (void)U; (void)Q;
+  fail(fn, MISSING);
+#endif
+}
+
+
 void lapack_getri(const MATRIX& A, MATRIX& Ainv){
   const char* fn = "lapack_getri";
 #ifdef HAVE_LAPACK
