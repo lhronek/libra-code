@@ -288,7 +288,23 @@ void LLT_decomposition(MATRIX& A, MATRIX& L){
     }// for j
   }// for i
 
-  Eigen::MatrixXd l( a.llt().matrixL() );
+  // Eigen's LLT reads one triangle and reports a non-positive-definite input only through info():
+  // both silent outcomes (a factor of the mirrored lower triangle, a NaN or partial factor) are refused
+  double amax_ = 0.0, sdev_ = 0.0;
+  for(i=0;i<N;i++){
+    for(j=0;j<N;j++){
+      amax_ = std::max(amax_, std::abs(A.M[i*N+j]));
+      sdev_ = std::max(sdev_, std::abs(A.M[i*N+j] - A.M[j*N+i]));
+    }// for j
+  }// for i
+  if(sdev_ > 1e-8 * std::max(amax_, 1.0)){
+    cout<<"Error in libmeigen::LLT_decomposition : the matrix is not symmetric (max |A - A^T| = "<<sdev_<<")\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  Eigen::LLT<MatrixXd> llt(a);
+  if(llt.info() != Eigen::Success){
+    cout<<"Error in libmeigen::LLT_decomposition : the matrix is not positive definite\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  Eigen::MatrixXd l( llt.matrixL() );
 
   for(i=0;i<N;i++){
     for(j=0;j<N;j++){
