@@ -180,6 +180,11 @@ void JacobiSVD_decomposition(CMATRIX& A, CMATRIX& U, CMATRIX& S, CMATRIX& V){
   int N = A.n_cols;
   int i,j;
 
+  if(have_lapack() && N >= get_lapack_svd_min_n()){
+    // LAPACK divide-and-conquer SVD (blas_interface.h): A = U S V^H in the same convention
+    lapack_gesdd(A, U, S, V);
+    return;
+  }
   MatrixXcd a(N,N);
   for(i=0;i<N;i++){
     for(j=0;j<N;j++){
@@ -232,6 +237,11 @@ void BDCSVD_decomposition(CMATRIX& A, CMATRIX& U, CMATRIX& S, CMATRIX& V){
   int N = A.n_cols;
   int i,j;
 
+  if(have_lapack() && N >= get_lapack_svd_min_n()){
+    // LAPACK divide-and-conquer SVD (blas_interface.h): A = U S V^H in the same convention
+    lapack_gesdd(A, U, S, V);
+    return;
+  }
   MatrixXcd a(N,N);
   for(i=0;i<N;i++){
     for(j=0;j<N;j++){
@@ -281,6 +291,11 @@ void LLT_decomposition(MATRIX& A, MATRIX& L){
   int N = A.n_cols;
   int i,j;
 
+  if(have_lapack() && N >= get_lapack_llt_min_n()){
+    // LAPACK Cholesky factor (blas_interface.h): a non-positive-definite A throws here
+    lapack_potrf(A, L);
+    return;
+  }
   MatrixXd a(N,N);
   for(i=0;i<N;i++){
     for(j=0;j<N;j++){

@@ -86,6 +86,15 @@ static int lapack_det_min_n = -1;
 // the complete-pivoting LU (rank, P L U Q): LAPACK's unblocked getc2 against Eigen's FullPivLU
 static const int LAPACK_FULLPIV_MIN_N_DEFAULT = 1;
 static int lapack_fullpiv_min_n = -1;
+// the SVD (measured 2026-09-04, one OpenBLAS thread, complex): Eigen's JacobiSVD / BDCSVD keep only
+// the 2 x 2 case (0.7 / 1.8 vs 5.4 us), gesdd is equal at 3 and ahead from 4 on (8: 174 / 167 vs
+// 15-27 us, 128: 0.84 s / 10.6 ms vs 5 ms, 600: BDCSVD 424 ms vs 294 ms)
+static const int LAPACK_SVD_MIN_N_DEFAULT = 3;
+static int lapack_svd_min_n = -1;
+// the Cholesky factor: Eigen's LLT is the faster one below ~100 states (64: 16 vs 22 us), potrf
+// from there (128: 107 vs 80 us, 600: 5.4 vs 4.4 ms)
+static const int LAPACK_LLT_MIN_N_DEFAULT = 96;
+static int lapack_llt_min_n = -1;
 
 static int read_min_n(int& value, int dflt, const char* env_name, const char* fn){
   if(value < 1){
@@ -121,6 +130,10 @@ int get_lapack_det_min_n(){ return read_min_n(lapack_det_min_n, LAPACK_DET_MIN_N
 void set_lapack_det_min_n(int n){ write_min_n(lapack_det_min_n, n, "set_lapack_det_min_n"); }
 int get_lapack_fullpiv_min_n(){ return read_min_n(lapack_fullpiv_min_n, LAPACK_FULLPIV_MIN_N_DEFAULT, "LIBRA_LAPACK_FULLPIV_MIN_N", "get_lapack_fullpiv_min_n"); }
 void set_lapack_fullpiv_min_n(int n){ write_min_n(lapack_fullpiv_min_n, n, "set_lapack_fullpiv_min_n"); }
+int get_lapack_svd_min_n(){ return read_min_n(lapack_svd_min_n, LAPACK_SVD_MIN_N_DEFAULT, "LIBRA_LAPACK_SVD_MIN_N", "get_lapack_svd_min_n"); }
+void set_lapack_svd_min_n(int n){ write_min_n(lapack_svd_min_n, n, "set_lapack_svd_min_n"); }
+int get_lapack_llt_min_n(){ return read_min_n(lapack_llt_min_n, LAPACK_LLT_MIN_N_DEFAULT, "LIBRA_LAPACK_LLT_MIN_N", "get_lapack_llt_min_n"); }
+void set_lapack_llt_min_n(int n){ write_min_n(lapack_llt_min_n, n, "set_lapack_llt_min_n"); }
 
 
 void solve_eigen(CMATRIX* H, CMATRIX* S, CMATRIX* E, CMATRIX* C, int symm){

@@ -92,6 +92,10 @@ int get_lapack_det_min_n();          ///< the switch for det and FullPivLU_det (
 void set_lapack_det_min_n(int n);
 int get_lapack_fullpiv_min_n();      ///< the switch for FullPivLU_rank_invertible and FullPivLU_decomposition (the complete-pivoting LU dgetc2/zgetc2) - default 1 (LAPACK_FULLPIV_MIN_N_DEFAULT), LIBRA_LAPACK_FULLPIV_MIN_N overrides it
 void set_lapack_fullpiv_min_n(int n);
+int get_lapack_svd_min_n();          ///< the switch for JacobiSVD_decomposition and BDCSVD_decomposition (the divide-and-conquer SVD zgesdd, both coincide there) - default LAPACK_SVD_MIN_N_DEFAULT, LIBRA_LAPACK_SVD_MIN_N overrides it
+void set_lapack_svd_min_n(int n);
+int get_lapack_llt_min_n();          ///< the switch for LLT_decomposition (the Cholesky factor dpotrf) - default LAPACK_LLT_MIN_N_DEFAULT, LIBRA_LAPACK_LLT_MIN_N overrides it
+void set_lapack_llt_min_n(int n);
 
 
 
@@ -140,9 +144,11 @@ void exp_matrix(CMATRIX& res, CMATRIX& S, complex<double> dt);
 void FullPivLU_decomposition(MATRIX& A, MATRIX& P, MATRIX& L, MATRIX& U, MATRIX& Q);
 void FullPivLU_decomposition(CMATRIX& A, CMATRIX& P, CMATRIX& L, CMATRIX& U, CMATRIX& Q);
 
+///< A = U S V^H (S the diagonal of descending singular values, V not V^H): LAPACK zgesdd from get_lapack_svd_min_n states on (both functions coincide there), Eigen's JacobiSVD / BDCSVD below
 void JacobiSVD_decomposition(CMATRIX& A, CMATRIX& U, CMATRIX& S, CMATRIX& V);
 void BDCSVD_decomposition(CMATRIX& A, CMATRIX& U, CMATRIX& S, CMATRIX& V);
 
+///< A = L L^T, L lower: LAPACK dpotrf from get_lapack_llt_min_n states on (a non-positive-definite or non-symmetric A throws there), Eigen's LLT below
 void LLT_decomposition(MATRIX& A, MATRIX& L);
 
 ///=========== Look in: mEigen_linsolve.cpp ==================
