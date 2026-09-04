@@ -16,6 +16,7 @@
 #include <Eigen/Core>
 #include "mEigen.h"
 #include "../math_linalg/blas_interface.h"
+#include <limits>
 
 
 /// liblibra namespace
@@ -40,6 +41,12 @@ void FullPivLU_rank_invertible(MATRIX& A, int& rank, int& is_inver){
   int N = A.n_cols;
   int i,j;
 
+  if(have_lapack() && N >= get_lapack_fullpiv_min_n()){
+    // LAPACK complete-pivoting LU (blas_interface.h) with Eigen's rank threshold eps N
+    rank = lapack_getc2_rank(A, std::numeric_limits<double>::epsilon() * N);
+    is_inver = (rank == N) ? 1 : 0;
+    return;
+  }
   MatrixXd a(N,N);
   for(i=0;i<N;i++){
     for(j=0;j<N;j++){
@@ -68,6 +75,12 @@ void FullPivLU_rank_invertible(CMATRIX& A, int& rank, int& is_inver){
   int N = A.n_cols;
   int i,j;
 
+  if(have_lapack() && N >= get_lapack_fullpiv_min_n()){
+    // LAPACK complete-pivoting LU (blas_interface.h) with Eigen's rank threshold eps N
+    rank = lapack_getc2_rank(A, std::numeric_limits<double>::epsilon() * N);
+    is_inver = (rank == N) ? 1 : 0;
+    return;
+  }
   MatrixXcd a(N,N);
   for(i=0;i<N;i++){
     for(j=0;j<N;j++){

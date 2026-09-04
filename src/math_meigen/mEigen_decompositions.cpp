@@ -20,6 +20,7 @@
 #endif 
 
 #include "mEigen.h"
+#include "../math_linalg/blas_interface.h"
 
 /// liblibra namespace
 namespace liblibra{
@@ -51,6 +52,11 @@ void FullPivLU_decomposition(MATRIX& A, MATRIX& P, MATRIX& L, MATRIX& U, MATRIX&
   int N = A.n_cols;
   int i,j;
 
+  if(have_lapack() && N >= get_lapack_fullpiv_min_n()){
+    // LAPACK complete-pivoting LU (blas_interface.h): P A Q = L U in the same convention
+    lapack_getc2(A, P, L, U, Q);
+    return;
+  }
   MatrixXd a(N,N);
   for(i=0;i<N;i++){
     for(j=0;j<N;j++){
@@ -110,6 +116,11 @@ void FullPivLU_decomposition(CMATRIX& A, CMATRIX& P, CMATRIX& L, CMATRIX& U, CMA
   int N = A.n_cols;
   int i,j;
 
+  if(have_lapack() && N >= get_lapack_fullpiv_min_n()){
+    // LAPACK complete-pivoting LU (blas_interface.h): P A Q = L U in the same convention
+    lapack_getc2(A, P, L, U, Q);
+    return;
+  }
   MatrixXcd a(N,N);
   for(i=0;i<N;i++){
     for(j=0;j<N;j++){

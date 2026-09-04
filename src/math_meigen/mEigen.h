@@ -90,12 +90,15 @@ int get_lapack_inverse_min_n();      ///< the switch for FullPivLU_inverse and t
 void set_lapack_inverse_min_n(int n);
 int get_lapack_det_min_n();          ///< the switch for det and FullPivLU_det (the LU determinant through dgetrf/zgetrf) - default 1 (the kernel wins at every complex size, Eigen's real LU determinant only between ~8 and ~64 states), LIBRA_LAPACK_DET_MIN_N overrides it
 void set_lapack_det_min_n(int n);
+int get_lapack_fullpiv_min_n();      ///< the switch for FullPivLU_rank_invertible and FullPivLU_decomposition (the complete-pivoting LU dgetc2/zgetc2) - default 1 (LAPACK_FULLPIV_MIN_N_DEFAULT), LIBRA_LAPACK_FULLPIV_MIN_N overrides it
+void set_lapack_fullpiv_min_n(int n);
 
 
 
 
 ///=========== Look in: mEigen_inverse.cpp ==================
 ///< Invertability check
+///< rank = pivots of the complete-pivoting LU above eps n times the largest one (Eigen's rule), invertible = full rank: LAPACK getc2 from get_lapack_fullpiv_min_n states on, Eigen's FullPivLU below
 void FullPivLU_rank_invertible(MATRIX& A, int& rank, int& is_inver);
 void FullPivLU_rank_invertible(CMATRIX& A, int& rank, int& is_inver);
 boost::python::list FullPivLU_rank_invertible(MATRIX& A);
@@ -133,6 +136,7 @@ void exp_matrix(CMATRIX& res, CMATRIX& S, complex<double> dt);
 
 ///=========== Look in: mEigen_decompositions.cpp ==================
 ///< LU decomposition
+///< P A Q = L U (L unit lower, U upper, P and Q permutation matrices): LAPACK getc2 from get_lapack_fullpiv_min_n states on, Eigen's FullPivLU below
 void FullPivLU_decomposition(MATRIX& A, MATRIX& P, MATRIX& L, MATRIX& U, MATRIX& Q);
 void FullPivLU_decomposition(CMATRIX& A, CMATRIX& P, CMATRIX& L, CMATRIX& U, CMATRIX& Q);
 

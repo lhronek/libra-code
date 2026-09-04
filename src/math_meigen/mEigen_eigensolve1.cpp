@@ -83,6 +83,9 @@ static int lapack_inverse_min_n = -1;
 // the hot path, so the kernel is the default at every size
 static const int LAPACK_DET_MIN_N_DEFAULT = 1;
 static int lapack_det_min_n = -1;
+// the complete-pivoting LU (rank, P L U Q): LAPACK's unblocked getc2 against Eigen's FullPivLU
+static const int LAPACK_FULLPIV_MIN_N_DEFAULT = 1;
+static int lapack_fullpiv_min_n = -1;
 
 static int read_min_n(int& value, int dflt, const char* env_name, const char* fn){
   if(value < 1){
@@ -116,6 +119,8 @@ int get_lapack_inverse_min_n(){ return read_min_n(lapack_inverse_min_n, LAPACK_I
 void set_lapack_inverse_min_n(int n){ write_min_n(lapack_inverse_min_n, n, "set_lapack_inverse_min_n"); }
 int get_lapack_det_min_n(){ return read_min_n(lapack_det_min_n, LAPACK_DET_MIN_N_DEFAULT, "LIBRA_LAPACK_DET_MIN_N", "get_lapack_det_min_n"); }
 void set_lapack_det_min_n(int n){ write_min_n(lapack_det_min_n, n, "set_lapack_det_min_n"); }
+int get_lapack_fullpiv_min_n(){ return read_min_n(lapack_fullpiv_min_n, LAPACK_FULLPIV_MIN_N_DEFAULT, "LIBRA_LAPACK_FULLPIV_MIN_N", "get_lapack_fullpiv_min_n"); }
+void set_lapack_fullpiv_min_n(int n){ write_min_n(lapack_fullpiv_min_n, n, "set_lapack_fullpiv_min_n"); }
 
 
 void solve_eigen(CMATRIX* H, CMATRIX* S, CMATRIX* E, CMATRIX* C, int symm){
