@@ -96,6 +96,8 @@ int get_lapack_svd_min_n();          ///< the switch for JacobiSVD_decomposition
 void set_lapack_svd_min_n(int n);
 int get_lapack_llt_min_n();          ///< the switch for LLT_decomposition (the Cholesky factor dpotrf) - default LAPACK_LLT_MIN_N_DEFAULT, LIBRA_LAPACK_LLT_MIN_N overrides it
 void set_lapack_llt_min_n(int n);
+int get_lapack_lstsq_min_n();        ///< the switch for least_squares_solve (dgelsd for option 0, dgesv for option 1 on a square system, dgelsy otherwise) by the larger dimension of A - default LAPACK_LSTSQ_MIN_N_DEFAULT, LIBRA_LAPACK_LSTSQ_MIN_N overrides it
+void set_lapack_lstsq_min_n(int n);
 
 
 
@@ -153,6 +155,7 @@ void LLT_decomposition(MATRIX& A, MATRIX& L);
 
 ///=========== Look in: mEigen_linsolve.cpp ==================
 ///< Solver for a system of linear equations (iterative schemes)
+///< min |A X - B|: options 0 SVD, 1 LU (a square system, the complete orthogonal decomposition for a rectangular one), 2 column-pivoted QR, 3 complete orthogonal decomposition - LAPACK dgelsd / dgesv / dgelsy with Eigen's rank threshold eps min(N, M) from get_lapack_lstsq_min_n on, Eigen's solvers below
 void least_squares_solve(MATRIX& A, MATRIX& X, MATRIX& B, int option);
 bool linsys_solver(const MATRIX& A, MATRIX& X, const MATRIX& B, const double NormThreshold);
 void solve_linsys(MATRIX&,MATRIX&, MATRIX&,double,int);

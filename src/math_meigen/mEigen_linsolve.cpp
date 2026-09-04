@@ -15,6 +15,8 @@
 #include <Eigen/Eigenvalues>
 #include <Eigen/Core>
 #include "mEigen.h"
+#include "../math_linalg/blas_interface.h"
+#include <limits>
 
 
 /// liblibra namespace
@@ -43,6 +45,21 @@ void least_squares_solve(MATRIX& A, MATRIX& X, MATRIX& B, int option){
   int i,j;
 
 
+  if(have_lapack() && std::max(N, M) >= get_lapack_lstsq_min_n()){
+    // LAPACK (blas_interface.h) with Eigen's rank threshold eps min(N, M): the SVD driver for option
+    // 0 (Eigen's BDCSVD), the LU solve for option 1 on a square system (Eigen's FullPivLU), the
+    // complete orthogonal factorization for the rest (Eigen's FullPivHouseholderQR and
+    // CompleteOrthogonalDecomposition solves) - on a full-rank system all of them return the same
+    // solution, on a rank-deficient one the minimum-norm solution where Eigen's QR solve returns a
+    // basic one
+    double rcond = std::numeric_limits<double>::epsilon() * std::min(N, M);
+    if(option == 0){ lapack_gelsd(A, X, B, rcond); return; }
+    // option 1 on a square system is the LU solve as in Eigen - an exactly singular one falls
+    // through to the minimum-norm least squares
+    if(option == 1 && N == M && lapack_gesv(A, X, B) == 0){ return; }
+    lapack_gelsy(A, X, B, rcond);
+    return;
+  }
   Eigen::MatrixXd a(N,M);
   Eigen::MatrixXd x(M,K);
   Eigen::MatrixXd b(N,K);

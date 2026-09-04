@@ -95,6 +95,15 @@ static int lapack_svd_min_n = -1;
 // from there (128: 107 vs 80 us, 600: 5.4 vs 4.4 ms)
 static const int LAPACK_LLT_MIN_N_DEFAULT = 96;
 static int lapack_llt_min_n = -1;
+// least_squares_solve (measured 2026-09-05, one OpenBLAS thread, square systems, one right-hand
+// side, Eigen vs LAPACK us): the crossover depends on the option - the LU solve (option 1, dgesv)
+// wins from 8 states on (8: 2.8 vs 2.4, 128: 1631 vs 390, 600: 140 ms vs 12 ms), the SVD (option 0)
+// from ~32 (32: 708 vs 430, 600: 383 vs 192 ms), the QR and complete-orthogonal solves (options 2,
+// 3) only from ~200 (128: 1939 vs 2121 and 849 vs 1492, 600: 161 vs 44 ms and 61 vs 46 ms). One
+// knob by the larger dimension of A: 128 keeps the small FSSH3 systems (option 3) on Eigen and
+// hands the large ones to LAPACK
+static const int LAPACK_LSTSQ_MIN_N_DEFAULT = 128;
+static int lapack_lstsq_min_n = -1;
 
 static int read_min_n(int& value, int dflt, const char* env_name, const char* fn){
   if(value < 1){
@@ -134,6 +143,8 @@ int get_lapack_svd_min_n(){ return read_min_n(lapack_svd_min_n, LAPACK_SVD_MIN_N
 void set_lapack_svd_min_n(int n){ write_min_n(lapack_svd_min_n, n, "set_lapack_svd_min_n"); }
 int get_lapack_llt_min_n(){ return read_min_n(lapack_llt_min_n, LAPACK_LLT_MIN_N_DEFAULT, "LIBRA_LAPACK_LLT_MIN_N", "get_lapack_llt_min_n"); }
 void set_lapack_llt_min_n(int n){ write_min_n(lapack_llt_min_n, n, "set_lapack_llt_min_n"); }
+int get_lapack_lstsq_min_n(){ return read_min_n(lapack_lstsq_min_n, LAPACK_LSTSQ_MIN_N_DEFAULT, "LIBRA_LAPACK_LSTSQ_MIN_N", "get_lapack_lstsq_min_n"); }
+void set_lapack_lstsq_min_n(int n){ write_min_n(lapack_lstsq_min_n, n, "set_lapack_lstsq_min_n"); }
 
 
 void solve_eigen(CMATRIX* H, CMATRIX* S, CMATRIX* E, CMATRIX* C, int symm){

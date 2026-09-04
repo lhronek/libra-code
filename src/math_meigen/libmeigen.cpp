@@ -87,6 +87,8 @@ void export_mEigen_objects(){
   def("set_lapack_svd_min_n", &set_lapack_svd_min_n);
   def("get_lapack_llt_min_n", &get_lapack_llt_min_n);
   def("set_lapack_llt_min_n", &set_lapack_llt_min_n);
+  def("get_lapack_lstsq_min_n", &get_lapack_lstsq_min_n);
+  def("set_lapack_lstsq_min_n", &set_lapack_lstsq_min_n);
 
 
 
