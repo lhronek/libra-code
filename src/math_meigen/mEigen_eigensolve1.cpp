@@ -66,30 +66,40 @@ static void require_hermitian_pair(const T1* H, const T1* S, int N, const char* 
 // variable and at any time by set_lapack_eigen_min_n
 static const int LAPACK_EIGEN_MIN_N_DEFAULT = 96;
 static int lapack_eigen_min_n = -1;
+// solve_eigen_nosort: the Eigen general solvers fall behind dgeev/zgeev already at a few states
+// (real 8: 30 vs 36 us, 32: 2.9 ms vs 0.36 ms, 600: 748 s vs 0.9 s - measured 2026-09-04), so the
+// general kernels take over almost at once
+static const int LAPACK_NOSORT_MIN_N_DEFAULT = 8;
+static int lapack_nosort_min_n = -1;
 
-int get_lapack_eigen_min_n(){
-  if(lapack_eigen_min_n < 1){
-    const char* env = std::getenv("LIBRA_LAPACK_EIGEN_MIN_N");
-    lapack_eigen_min_n = LAPACK_EIGEN_MIN_N_DEFAULT;
+static int read_min_n(int& value, int dflt, const char* env_name, const char* fn){
+  if(value < 1){
+    const char* env = std::getenv(env_name);
+    value = dflt;
     if(env != NULL && env[0] != 0){
       int v = std::atoi(env);
       if(v < 1){
-        std::cout<<"Error in libmeigen::get_lapack_eigen_min_n : LIBRA_LAPACK_EIGEN_MIN_N must be a positive integer, got '"<<env<<"'\n";
+        std::cout<<"Error in libmeigen::"<<fn<<" : "<<env_name<<" must be a positive integer, got '"<<env<<"'\n";
         std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
-      lapack_eigen_min_n = v;
+      value = v;
     }
   }
-  return lapack_eigen_min_n;
+  return value;
 }
 
-void set_lapack_eigen_min_n(int n){
+static void write_min_n(int& value, int n, const char* fn){
   if(n < 1){
-    std::cout<<"Error in libmeigen::set_lapack_eigen_min_n : the size must be a positive integer, got "<<n<<"\n";
+    std::cout<<"Error in libmeigen::"<<fn<<" : the size must be a positive integer, got "<<n<<"\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
-  lapack_eigen_min_n = n;
+  value = n;
 }
+
+int get_lapack_eigen_min_n(){ return read_min_n(lapack_eigen_min_n, LAPACK_EIGEN_MIN_N_DEFAULT, "LIBRA_LAPACK_EIGEN_MIN_N", "get_lapack_eigen_min_n"); }
+void set_lapack_eigen_min_n(int n){ write_min_n(lapack_eigen_min_n, n, "set_lapack_eigen_min_n"); }
+int get_lapack_nosort_min_n(){ return read_min_n(lapack_nosort_min_n, LAPACK_NOSORT_MIN_N_DEFAULT, "LIBRA_LAPACK_NOSORT_MIN_N", "get_lapack_nosort_min_n"); }
+void set_lapack_nosort_min_n(int n){ write_min_n(lapack_nosort_min_n, n, "set_lapack_nosort_min_n"); }
 
 
 void solve_eigen(CMATRIX* H, CMATRIX* S, CMATRIX* E, CMATRIX* C, int symm){

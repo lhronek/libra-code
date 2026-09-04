@@ -19,6 +19,7 @@
 #endif
 
 #include "mEigen.h"
+#include "../math_linalg/blas_interface.h"
 
 
 /// liblibra namespace
@@ -70,6 +71,41 @@ void solve_eigen_nosort(CMATRIX* H, CMATRIX* E, CMATRIX* C, int symm){
   // The above two conditions imply E is square matrix
   int N_bas = H->n_cols;
   int N_mo  = C->n_cols;
+
+  if(have_lapack() && N_bas >= get_lapack_nosort_min_n()){
+    // LAPACK zgeev (blas_interface.h) on the full matrix, then the order of the Eigen
+    // ComplexEigenSolver - ascending modulus, selection swaps - so both paths return the
+    // eigenpairs in the same order before the first N_mo are copied out
+    CMATRIX Ef(N_bas, N_bas);
+    CMATRIX Cf(N_bas, N_bas);
+    if(symm==1){
+      CMATRIX Hs(N_bas, N_bas);
+      for(i=0;i<N_bas;i++){
+        for(j=0;j<N_bas;j++){ Hs.M[i*N_bas+j] = 0.5*(H->M[i*N_bas+j] + std::conj(H->M[j*N_bas+i])); }
+      }
+      lapack_geev(Hs, Ef, Cf);
+    }
+    else{ lapack_geev(*H, Ef, Cf); }
+    for(i=0;i<N_bas;i++){
+      int k = i;
+      double amin = std::abs(Ef.get(i,i));
+      for(j=i+1;j<N_bas;j++){
+        double a = std::abs(Ef.get(j,j));
+        if(a < amin){ amin = a; k = j; }
+      }
+      if(k != i){
+        complex<double> tmp = Ef.get(i,i);
+        Ef.set(i, i, Ef.get(k,k));
+        Ef.set(k, k, tmp);
+        Cf.swap_cols(i, k);
+      }
+    }
+    for(i=0;i<N_mo;i++){
+      E->M[i*N_mo+i] = Ef.get(i,i);
+      for(j=0;j<N_bas;j++){  C->M[j*N_mo+i] = Cf.get(j,i);  }// for j
+    }// for i
+    return;
+  }
 
 
   // Wrapper matrices for Eigen3
@@ -183,6 +219,27 @@ void solve_eigen_nosort(MATRIX* H, CMATRIX* E, CMATRIX* C, int symm){
   // The above two conditions imply E is square matrix
   int N_bas = H->n_cols;
   int N_mo  = C->n_cols;
+
+  if(have_lapack() && N_bas >= get_lapack_nosort_min_n()){
+    // LAPACK dgeev (blas_interface.h): the eigenvalues in Schur order with the conjugate pairs
+    // adjacent, the positive imaginary part first - the convention of the Eigen EigenSolver too
+    CMATRIX Ef(N_bas, N_bas);
+    CMATRIX Cf(N_bas, N_bas);
+    if(symm==1){
+      MATRIX Hs(N_bas, N_bas);
+      for(i=0;i<N_bas;i++){
+        for(j=0;j<N_bas;j++){ Hs.M[i*N_bas+j] = 0.5*(H->M[i*N_bas+j] + H->M[j*N_bas+i]); }
+      }
+      lapack_geev(Hs, Ef, Cf);
+    }
+    else{ lapack_geev(*H, Ef, Cf); }
+    *E = complex<double>(0.0, 0.0);
+    for(i=0;i<N_mo;i++){
+      E->M[i*N_mo+i] = Ef.get(i,i);
+      for(j=0;j<N_bas;j++){  C->M[j*N_mo+i] = Cf.get(j,i);  }// for j
+    }// for i
+    return;
+  }
 
 
   *E = 0.0;
@@ -303,6 +360,26 @@ void solve_eigen_nosort(MATRIX* H, MATRIX* E, MATRIX* C, int symm){
   // The above two conditions imply E is square matrix
   int N_bas = H->n_cols;
   int N_mo  = C->n_cols;
+
+  if(have_lapack() && N_bas >= get_lapack_nosort_min_n()){
+    // LAPACK dgeev (blas_interface.h) with the real parts of the eigenpairs kept, as the Eigen path does
+    CMATRIX Ef(N_bas, N_bas);
+    CMATRIX Cf(N_bas, N_bas);
+    if(symm==1){
+      MATRIX Hs(N_bas, N_bas);
+      for(i=0;i<N_bas;i++){
+        for(j=0;j<N_bas;j++){ Hs.M[i*N_bas+j] = 0.5*(H->M[i*N_bas+j] + H->M[j*N_bas+i]); }
+      }
+      lapack_geev(Hs, Ef, Cf);
+    }
+    else{ lapack_geev(*H, Ef, Cf); }
+    *E = 0.0;
+    for(i=0;i<N_mo;i++){
+      E->M[i*N_mo+i] = Ef.get(i,i).real();
+      for(j=0;j<N_bas;j++){  C->M[j*N_mo+i] = Cf.get(j,i).real();  }// for j
+    }// for i
+    return;
+  }
 
 
   *E = 0.0;
