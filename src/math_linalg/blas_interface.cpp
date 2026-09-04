@@ -281,6 +281,91 @@ void lapack_hegvd(const CMATRIX& H, const CMATRIX& S, CMATRIX& E, CMATRIX& C){
 }
 
 
+void lapack_geev(const MATRIX& A, CMATRIX& E, CMATRIX& C){
+  const char* fn = "lapack_geev";
+#ifdef HAVE_LAPACK
+  int n = A.n_rows;
+  if(n < 1){ fail(fn, "A is empty"); }
+  require_n_by_n(fn, A, "A", n);
+  int m = require_outputs(fn, E, C, n);
+  thread_local RealWork ws;
+  thread_local std::vector<double> wi, vr;
+  grow(ws.a, (std::size_t)n*n);
+  grow(ws.w, n);
+  grow(wi, n);
+  grow(vr, (std::size_t)n*n);
+  // a general matrix has no symmetry to lean on: the column-major copy is the transpose
+  for(int i = 0; i < n; i++){
+    for(int j = 0; j < n; j++){ ws.a[(std::size_t)j*n + i] = A.M[i*n+j]; }
+  }
+  int n_ = n, lda = n, ldvl = 1, ldvr = n, info = 0, lwork = -1;
+  double vl_dummy = 0.0;
+  double wq = 0.0;
+  dgeev_("N", "V", &n_, ws.a.data(), &lda, ws.w.data(), wi.data(), &vl_dummy, &ldvl, vr.data(), &ldvr, &wq, &lwork, &info, 1, 1);
+  if(info != 0){ fail(fn, info_text("dgeev (workspace query)", info)); }
+  lwork = (int)wq;
+  grow(ws.work, std::max(lwork, 1));
+  dgeev_("N", "V", &n_, ws.a.data(), &lda, ws.w.data(), wi.data(), &vl_dummy, &ldvl, vr.data(), &ldvr, ws.work.data(), &lwork, &info, 1, 1);
+  if(info != 0){ fail(fn, info_text("dgeev", info) + " (the QR algorithm failed to compute all eigenvalues)"); }
+  // a complex conjugate pair (wi > 0 first) is stored as the real and imaginary columns of the first
+  // member - the second member is its conjugate
+  E = std::complex<double>(0.0, 0.0);
+  for(int k = 0; k < m; k++){ E.M[k*m+k] = std::complex<double>(ws.w[k], wi[k]); }
+  for(int k = 0; k < m; k++){
+    if(wi[k] == 0.0){
+      for(int i = 0; i < n; i++){ C.M[i*m+k] = std::complex<double>(vr[(std::size_t)k*n + i], 0.0); }
+    }
+    else if(wi[k] > 0.0){
+      for(int i = 0; i < n; i++){ C.M[i*m+k] = std::complex<double>(vr[(std::size_t)k*n + i], vr[(std::size_t)(k+1)*n + i]); }
+    }
+    else{
+      for(int i = 0; i < n; i++){ C.M[i*m+k] = std::complex<double>(vr[(std::size_t)(k-1)*n + i], -vr[(std::size_t)k*n + i]); }
+    }
+  }
+#else
+  (void)A; (void)E; (void)C;
+  fail(fn, MISSING);
+#endif
+}
+
+
+void lapack_geev(const CMATRIX& A, CMATRIX& E, CMATRIX& C){
+  const char* fn = "lapack_geev";
+#ifdef HAVE_LAPACK
+  int n = A.n_rows;
+  if(n < 1){ fail(fn, "A is empty"); }
+  require_n_by_n(fn, A, "A", n);
+  int m = require_outputs(fn, E, C, n);
+  thread_local ComplexWork ws;
+  thread_local std::vector< std::complex<double> > wz, vr;
+  grow(ws.a, (std::size_t)n*n);
+  grow(wz, n);
+  grow(vr, (std::size_t)n*n);
+  grow(ws.rwork, 2*n);
+  for(int i = 0; i < n; i++){
+    for(int j = 0; j < n; j++){ ws.a[(std::size_t)j*n + i] = A.M[i*n+j]; }
+  }
+  int n_ = n, lda = n, ldvl = 1, ldvr = n, info = 0, lwork = -1;
+  std::complex<double> vl_dummy(0.0, 0.0);
+  std::complex<double> wq(0.0, 0.0);
+  zgeev_("N", "V", &n_, ws.a.data(), &lda, wz.data(), &vl_dummy, &ldvl, vr.data(), &ldvr, &wq, &lwork, ws.rwork.data(), &info, 1, 1);
+  if(info != 0){ fail(fn, info_text("zgeev (workspace query)", info)); }
+  lwork = (int)wq.real();
+  grow(ws.work, std::max(lwork, 1));
+  zgeev_("N", "V", &n_, ws.a.data(), &lda, wz.data(), &vl_dummy, &ldvl, vr.data(), &ldvr, ws.work.data(), &lwork, ws.rwork.data(), &info, 1, 1);
+  if(info != 0){ fail(fn, info_text("zgeev", info) + " (the QR algorithm failed to compute all eigenvalues)"); }
+  E = std::complex<double>(0.0, 0.0);
+  for(int k = 0; k < m; k++){
+    E.M[k*m+k] = wz[k];
+    for(int i = 0; i < n; i++){ C.M[i*m+k] = vr[(std::size_t)k*n + i]; }
+  }
+#else
+  (void)A; (void)E; (void)C;
+  fail(fn, MISSING);
+#endif
+}
+
+
 void lapack_getri(const MATRIX& A, MATRIX& Ainv){
   const char* fn = "lapack_getri";
 #ifdef HAVE_LAPACK

@@ -13,8 +13,8 @@
   reference them only inside the corresponding HAVE_* guards.
 
   The kernels (liblinalg namespace): the divide-and-conquer eigensolvers
-  (dsyevd, zheevd, dsygvd, zhegvd) and the LU inverse (dgetrf + dgetri) in
-  libra's conventions - row-major MATRIX/CMATRIX in and out, E a diagonal
+  (dsyevd, zheevd, dsygvd, zhegvd), the general eigensolvers (dgeev, zgeev)
+  and the LU inverse (dgetrf + dgetri) in libra's conventions - row-major MATRIX/CMATRIX in and out, E a diagonal
   matrix of ascending eigenvalues, C with the eigenvectors in its columns
   (C.col(k) belongs to E(k,k)), the generalized kernels S-orthonormal
   (C^H S C = 1). C may be n x m with 1 <= m <= n and E m x m: the lowest m
@@ -22,8 +22,12 @@
   eigensolvers read one triangle, so they refuse a non-Hermitian input
   (max |A - A^H| > 1e-8 max(|A|, 1)) instead of solving its mirror. The
   inverse has no conditioning guard - inv_matrix of libmeigen carries the
-  eigenvalue threshold. Workspaces are thread-local and grow on demand (the
-  kernels sit in the per-trajectory, per-step path of the dynamics).
+  eigenvalue threshold. The general kernels return the eigenvalues in the
+  order of the Schur form (no sorting, complex conjugate pairs of a real
+  matrix adjacent with the positive imaginary part first) and unit-norm right
+  eigenvectors with the largest component real. Workspaces are thread-local
+  and grow on demand (the kernels sit in the per-trajectory, per-step path of
+  the dynamics).
   Without the backend every kernel throws - have_lapack() tells the callers,
   and the Eigen kernels of libmeigen stay available as the fallback.
 */
@@ -72,6 +76,17 @@ void zgetrf_(const int* m, const int* n, std::complex<double>* a,
 void zgetri_(const int* n, std::complex<double>* a, const int* lda,
              const int* ipiv, std::complex<double>* work, const int* lwork,
              int* info);
+void dgeev_(const char* jobvl, const char* jobvr, const int* n, double* a,
+            const int* lda, double* wr, double* wi, double* vl,
+            const int* ldvl, double* vr, const int* ldvr, double* work,
+            const int* lwork, int* info, std::size_t jobvl_len,
+            std::size_t jobvr_len);
+void zgeev_(const char* jobvl, const char* jobvr, const int* n,
+            std::complex<double>* a, const int* lda, std::complex<double>* w,
+            std::complex<double>* vl, const int* ldvl,
+            std::complex<double>* vr, const int* ldvr,
+            std::complex<double>* work, const int* lwork, double* rwork,
+            int* info, std::size_t jobvl_len, std::size_t jobvr_len);
 
 }// extern "C"
 
@@ -91,6 +106,8 @@ void lapack_syevd(const MATRIX& A, MATRIX& E, MATRIX& C);                       
 void lapack_heevd(const CMATRIX& A, CMATRIX& E, CMATRIX& C);                     ///< A C = C E, A Hermitian
 void lapack_sygvd(const MATRIX& H, const MATRIX& S, MATRIX& E, MATRIX& C);       ///< H C = S C E, C^T S C = 1, S positive definite
 void lapack_hegvd(const CMATRIX& H, const CMATRIX& S, CMATRIX& E, CMATRIX& C);   ///< H C = S C E, C^H S C = 1, S positive definite
+void lapack_geev(const MATRIX& A, CMATRIX& E, CMATRIX& C);                       ///< A C = C E for a general real matrix - complex eigenvalues and eigenvectors
+void lapack_geev(const CMATRIX& A, CMATRIX& E, CMATRIX& C);                      ///< A C = C E for a general complex matrix
 void lapack_getri(const MATRIX& A, MATRIX& Ainv);                                ///< inverse of a general real matrix (LU, partial pivoting)
 void lapack_getri(const CMATRIX& A, CMATRIX& Ainv);                              ///< inverse of a general complex matrix
 

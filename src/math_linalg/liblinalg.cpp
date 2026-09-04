@@ -1139,6 +1139,11 @@ void export_linalg_objects(){
   def("lapack_sygvd", &lapack_sygvd);
   def("lapack_hegvd", &lapack_hegvd);
 
+  void (*expt_lapack_geev_v1)(const MATRIX& A, CMATRIX& E, CMATRIX& C) = &lapack_geev;
+  void (*expt_lapack_geev_v2)(const CMATRIX& A, CMATRIX& E, CMATRIX& C) = &lapack_geev;
+  def("lapack_geev", expt_lapack_geev_v1);
+  def("lapack_geev", expt_lapack_geev_v2);
+
   void (*expt_lapack_getri_v1)(const MATRIX& A, MATRIX& Ainv) = &lapack_getri;
   void (*expt_lapack_getri_v2)(const CMATRIX& A, CMATRIX& Ainv) = &lapack_getri;
   def("lapack_getri", expt_lapack_getri_v1);
