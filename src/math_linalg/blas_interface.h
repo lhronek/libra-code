@@ -13,8 +13,10 @@
   reference them only inside the corresponding HAVE_* guards.
 
   The kernels (liblinalg namespace): the divide-and-conquer eigensolvers
-  (dsyevd, zheevd, dsygvd, zhegvd), the general eigensolvers (dgeev, zgeev)
-  and the LU inverse (dgetrf + dgetri) in libra's conventions - row-major MATRIX/CMATRIX in and out, E a diagonal
+  (dsyevd, zheevd, dsygvd, zhegvd), the general eigensolvers (dgeev, zgeev),
+  the LU inverse (dgetrf + dgetri) and the LU determinant (dgetrf: the
+  product of the pivots with the permutation sign, exactly 0 for an exactly
+  singular matrix) in libra's conventions - row-major MATRIX/CMATRIX in and out, E a diagonal
   matrix of ascending eigenvalues, C with the eigenvectors in its columns
   (C.col(k) belongs to E(k,k)), the generalized kernels S-orthonormal
   (C^H S C = 1). C may be n x m with 1 <= m <= n and E m x m: the lowest m
@@ -109,6 +111,8 @@ void lapack_hegvd(const CMATRIX& H, const CMATRIX& S, CMATRIX& E, CMATRIX& C);  
 void lapack_geev(const MATRIX& A, CMATRIX& E, CMATRIX& C);                       ///< A C = C E for a general real matrix - complex eigenvalues and eigenvectors
 void lapack_geev(const CMATRIX& A, CMATRIX& E, CMATRIX& C);                      ///< A C = C E for a general complex matrix
 void lapack_getri(const MATRIX& A, MATRIX& Ainv);                                ///< inverse of a general real matrix (LU, partial pivoting)
+double lapack_det(const MATRIX& A);                                              ///< determinant of a general real matrix (LU)
+std::complex<double> lapack_det(const CMATRIX& A);                               ///< determinant of a general complex matrix (LU)
 void lapack_getri(const CMATRIX& A, CMATRIX& Ainv);                              ///< inverse of a general complex matrix
 
 }// namespace liblinalg

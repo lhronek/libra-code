@@ -366,6 +366,63 @@ void lapack_geev(const CMATRIX& A, CMATRIX& E, CMATRIX& C){
 }
 
 
+double lapack_det(const MATRIX& A){
+  const char* fn = "lapack_det";
+#ifdef HAVE_LAPACK
+  int n = A.n_rows;
+  if(n < 1){ fail(fn, "A is empty"); }
+  require_n_by_n(fn, A, "A", n);
+  thread_local RealWork ws;
+  grow(ws.a, (std::size_t)n*n);
+  grow(ws.iwork, n);
+  // det(A^T) = det(A): the row-major buffer read column-major serves as it is
+  std::copy(A.M, A.M + (std::size_t)n*n, ws.a.begin());
+  int n_ = n, lda = n, info = 0;
+  dgetrf_(&n_, &n_, ws.a.data(), &lda, ws.iwork.data(), &info);
+  if(info < 0){ fail(fn, info_text("dgetrf", info)); }
+  if(info > 0){ return 0.0; }
+  double d = 1.0;
+  for(int i = 0; i < n; i++){
+    d *= ws.a[(std::size_t)i*n + i];
+    if(ws.iwork[i] != i + 1){ d = -d; }
+  }
+  return d;
+#else
+  (void)A;
+  fail(fn, MISSING);
+  return 0.0;
+#endif
+}
+
+
+std::complex<double> lapack_det(const CMATRIX& A){
+  const char* fn = "lapack_det";
+#ifdef HAVE_LAPACK
+  int n = A.n_rows;
+  if(n < 1){ fail(fn, "A is empty"); }
+  require_n_by_n(fn, A, "A", n);
+  thread_local ComplexWork ws;
+  grow(ws.a, (std::size_t)n*n);
+  grow(ws.iwork, n);
+  std::copy(A.M, A.M + (std::size_t)n*n, ws.a.begin());
+  int n_ = n, lda = n, info = 0;
+  zgetrf_(&n_, &n_, ws.a.data(), &lda, ws.iwork.data(), &info);
+  if(info < 0){ fail(fn, info_text("zgetrf", info)); }
+  if(info > 0){ return std::complex<double>(0.0, 0.0); }
+  std::complex<double> d(1.0, 0.0);
+  for(int i = 0; i < n; i++){
+    d *= ws.a[(std::size_t)i*n + i];
+    if(ws.iwork[i] != i + 1){ d = -d; }
+  }
+  return d;
+#else
+  (void)A;
+  fail(fn, MISSING);
+  return std::complex<double>(0.0, 0.0);
+#endif
+}
+
+
 void lapack_getri(const MATRIX& A, MATRIX& Ainv){
   const char* fn = "lapack_getri";
 #ifdef HAVE_LAPACK
