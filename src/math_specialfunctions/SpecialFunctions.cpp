@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <vector>
 #include <cstring>
+#include <limits>
 #include "../math_linalg/blas_interface.h"
 #include "SpecialFunctions.h"
 #include "../math_meigen/mEigen.h"
@@ -1274,19 +1275,29 @@ void exp_(CMATRIX& res, CMATRIX& x, complex<double> dt){
     CMATRIX D(sz, sz), R(sz, sz), Rinv(sz, sz);
     libmeigen::solve_eigen_nosort(x, D, R, 0);   // x R = R D
     libmeigen::FullPivLU_inverse(R, Rinv);
-    // a defective x (an eigenvalue short of eigenvectors) has a singular R and a
-    // meaningless inverse - refuse it
+    // a defective x (an eigenvalue short of eigenvectors) has a numerically singular R:
+    // refuse an eigenvector basis conditioned beyond working precision, kappa_1(R) =
+    // |R|_1 |R^-1|_1 with kappa eps > 1e-6 (the level at which R f(D) R^-1 loses the
+    // target digits), and an inverse that fails to reproduce the identity. The residual
+    // alone let an accurate LU inverse pass the Jordan block [[1,1],[0,1]] (kappa 5e15,
+    // residual 0) and exp_ returned e I instead of e [[1,1],[0,1]]
     CMATRIX chk(sz, sz);  chk = R * Rinv;
-    double idev_ = 0.0;
-    for(i = 0; i < sz; i++){
-      for(int j = 0; j < sz; j++){
+    double idev_ = 0.0, r1_ = 0.0, ri1_ = 0.0;
+    for(int j = 0; j < sz; j++){
+      double cr_ = 0.0, ci_ = 0.0;
+      for(i = 0; i < sz; i++){
         double d_ = std::abs(chk.get(i,j) - ((i == j) ? 1.0 : 0.0));
         if(d_ > idev_){ idev_ = d_; }
+        cr_ += std::abs(R.get(i,j));
+        ci_ += std::abs(Rinv.get(i,j));
       }
+      if(cr_ > r1_){ r1_ = cr_; }
+      if(ci_ > ri1_){ ri1_ = ci_; }
     }
-    if(idev_ > 1e-6){
-      cout<<"Error in libspecialfunctions::exp_ : the non-Hermitian input is not diagonalizable "
-          <<"(max |R R^-1 - I| = "<<idev_<<")\n";
+    double kappa_ = r1_ * ri1_;
+    if(idev_ > 1e-6 || kappa_ * std::numeric_limits<double>::epsilon() > 1e-6){
+      cout<<"Error in libspecialfunctions::exp_ : the non-Hermitian input is not diagonalizable to working precision "
+          <<"(condition of the eigenvector matrix kappa_1 = "<<kappa_<<", max |R R^-1 - I| = "<<idev_<<")\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     for(int k = 0; k < sz; k++){
