@@ -122,6 +122,11 @@ void FullPivLU_inverse(MATRIX& A, MATRIX& invA){
   int N = A.n_cols;
   int i,j;
 
+  if(have_lapack() && N >= get_lapack_inverse_min_n()){
+    // LAPACK getrf + getri (blas_interface.h): partial pivoting, an exactly singular matrix throws
+    lapack_getri(A, invA);
+    return;
+  }
   MatrixXd a(N,N);
   for(i=0;i<N;i++){
     for(j=0;j<N;j++){
@@ -149,6 +154,11 @@ void FullPivLU_inverse(CMATRIX& A, CMATRIX& invA){
   int N = A.n_cols;
   int i,j;
 
+  if(have_lapack() && N >= get_lapack_inverse_min_n()){
+    // LAPACK getrf + getri (blas_interface.h): partial pivoting, an exactly singular matrix throws
+    lapack_getri(A, invA);
+    return;
+  }
   MatrixXcd a(N,N);
   for(i=0;i<N;i++){
     for(j=0;j<N;j++){
@@ -180,6 +190,8 @@ void inv_matrix(MATRIX& S, MATRIX& S_inv, double thresh, int do_phase_correction
   \param[out] S_inv Computed S^{-1} matrix
   \param[in] threshold - if an absolute value of any eigenvalue of S is below this level, we stop,
    throwing an error message
+  thresh <= 0 (the default) takes the LU inverse of the matrix as given (LAPACK getri when linked),
+  thresh > 0 the eigendecomposition route with the guard, which needs a Hermitian S
 
 */
 
@@ -195,6 +207,13 @@ void inv_matrix(MATRIX& S, MATRIX& S_inv, double thresh, int do_phase_correction
 
 
   int i;
+
+  if(thresh <= 0.0 && have_lapack() && S.n_cols >= get_lapack_inverse_min_n()){
+    // no eigenvalue guard asked for: the LU kernel (blas_interface.h) inverts the matrix as given, a
+    // non-Hermitian S included - the eigendecomposition route below serves the |eigenvalue| threshold
+    lapack_getri(S, S_inv);
+    return;
+  }
 
   // Let us first diagonalize the overlap matrix S
   int sz = S.n_cols;
@@ -239,6 +258,8 @@ void inv_matrix(MATRIX& S, MATRIX& S_inv, double thresh){
   \param[out] S_inv Computed S^{-1} matrix
   \param[in] threshold - if an absolute value of any eigenvalue of S is below this level, we stop,
    throwing an error message
+  thresh <= 0 (the default) takes the LU inverse of the matrix as given (LAPACK getri when linked),
+  thresh > 0 the eigendecomposition route with the guard, which needs a Hermitian S
 
 */
   inv_matrix(S, S_inv, thresh, 1);
@@ -260,6 +281,8 @@ void inv_matrix(CMATRIX& S, CMATRIX& S_inv, double thresh, int do_phase_correcti
   \param[out] S_inv Computed S^{-1} matrix
   \param[in] threshold - if an absolute value of any eigenvalue of S is below this level, we stop,
    throwing an error message
+  thresh <= 0 (the default) takes the LU inverse of the matrix as given (LAPACK getri when linked),
+  thresh > 0 the eigendecomposition route with the guard, which needs a Hermitian S
 
 */
 
@@ -276,6 +299,13 @@ void inv_matrix(CMATRIX& S, CMATRIX& S_inv, double thresh, int do_phase_correcti
 
   int i;
  
+  if(thresh <= 0.0 && have_lapack() && S.n_cols >= get_lapack_inverse_min_n()){
+    // no eigenvalue guard asked for: the LU kernel (blas_interface.h) inverts the matrix as given, a
+    // non-Hermitian S included - the eigendecomposition route below serves the |eigenvalue| threshold
+    lapack_getri(S, S_inv);
+    return;
+  }
+
   // Let us first diagonalize the overlap matrix S
   int sz = S.n_cols;  
 

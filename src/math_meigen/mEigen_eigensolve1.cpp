@@ -71,6 +71,11 @@ static int lapack_eigen_min_n = -1;
 // general kernels take over almost at once
 static const int LAPACK_NOSORT_MIN_N_DEFAULT = 8;
 static int lapack_nosort_min_n = -1;
+// the LU inverse: dgetri/zgetri beat Eigen's FullPivLU at every complex size (0.8 vs 1.2 us at
+// 2 states, 50x at 600) and from ~32 states for real matrices (measured 2026-09-04), so the kernel
+// is the default at every size
+static const int LAPACK_INVERSE_MIN_N_DEFAULT = 1;
+static int lapack_inverse_min_n = -1;
 
 static int read_min_n(int& value, int dflt, const char* env_name, const char* fn){
   if(value < 1){
@@ -100,6 +105,8 @@ int get_lapack_eigen_min_n(){ return read_min_n(lapack_eigen_min_n, LAPACK_EIGEN
 void set_lapack_eigen_min_n(int n){ write_min_n(lapack_eigen_min_n, n, "set_lapack_eigen_min_n"); }
 int get_lapack_nosort_min_n(){ return read_min_n(lapack_nosort_min_n, LAPACK_NOSORT_MIN_N_DEFAULT, "LIBRA_LAPACK_NOSORT_MIN_N", "get_lapack_nosort_min_n"); }
 void set_lapack_nosort_min_n(int n){ write_min_n(lapack_nosort_min_n, n, "set_lapack_nosort_min_n"); }
+int get_lapack_inverse_min_n(){ return read_min_n(lapack_inverse_min_n, LAPACK_INVERSE_MIN_N_DEFAULT, "LIBRA_LAPACK_INVERSE_MIN_N", "get_lapack_inverse_min_n"); }
+void set_lapack_inverse_min_n(int n){ write_min_n(lapack_inverse_min_n, n, "set_lapack_inverse_min_n"); }
 
 
 void solve_eigen(CMATRIX* H, CMATRIX* S, CMATRIX* E, CMATRIX* C, int symm){

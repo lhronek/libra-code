@@ -85,6 +85,8 @@ int get_lapack_eigen_min_n();        ///< solve_eigen takes the LAPACK kernels o
 void set_lapack_eigen_min_n(int n);  ///< 1 = every size through LAPACK, a huge value = Eigen everywhere
 int get_lapack_nosort_min_n();       ///< the same switch for solve_eigen_nosort (the general dgeev/zgeev kernels) - its own, much lower default, LIBRA_LAPACK_NOSORT_MIN_N overrides it
 void set_lapack_nosort_min_n(int n);
+int get_lapack_inverse_min_n();      ///< the switch for FullPivLU_inverse and the threshold-free inv_matrix (the LU kernels dgetri/zgetri) - default 1, LIBRA_LAPACK_INVERSE_MIN_N overrides it
+void set_lapack_inverse_min_n(int n);
 
 
 
@@ -97,10 +99,12 @@ boost::python::list FullPivLU_rank_invertible(MATRIX& A);
 boost::python::list FullPivLU_rank_invertible(CMATRIX& A);
 
 ///< Matrix inversion via an LU decomposition
+///< LU inverse: LAPACK dgetri/zgetri when linked (from get_lapack_inverse_min_n states on, an exactly singular matrix throws), Eigen's FullPivLU otherwise
 void FullPivLU_inverse(MATRIX& A, MATRIX& invA);
 void FullPivLU_inverse(CMATRIX& A, CMATRIX& invA);
 
 ///< Matrix inversion via solving the eigenvalue problem
+///< S^-1: thresh <= 0 takes the LU kernel on the matrix as given (a non-Hermitian S included), thresh > 0 the eigendecomposition route with the |eigenvalue| guard (Hermitian S)
 void inv_matrix(MATRIX& S, MATRIX& S_inv, double thresh, int do_phase_correction);
 void inv_matrix(MATRIX& S, MATRIX& S_inv, double thresh);
 void inv_matrix(MATRIX& S, MATRIX& S_inv);
