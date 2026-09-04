@@ -16,9 +16,12 @@
   (dsyevd, zheevd, dsygvd, zhegvd), the general eigensolvers (dgeev, zgeev),
   the LU inverse (dgetrf + dgetri), the LU determinant (dgetrf: the
   product of the pivots with the permutation sign, exactly 0 for an exactly
-  singular matrix) and the complete-pivoting LU (dgetc2, zgetc2: the rank
+  singular matrix), the complete-pivoting LU (dgetc2, zgetc2: the rank
   with a relative pivot threshold, and P A Q = L U with explicit permutation
-  matrices) in libra's conventions - row-major MATRIX/CMATRIX in and out, E a diagonal
+  matrices), the divide-and-conquer SVD (dgesdd, zgesdd: A = U S V^H with
+  full U and V, S the rectangular diagonal of descending singular values)
+  and the Cholesky factor (dpotrf, zpotrf: A = L L^H of a Hermitian
+  positive-definite A, a non-definite A throws) in libra's conventions - row-major MATRIX/CMATRIX in and out, E a diagonal
   matrix of ascending eigenvalues, C with the eigenvectors in its columns
   (C.col(k) belongs to E(k,k)), the generalized kernels S-orthonormal
   (C^H S C = 1). C may be n x m with 1 <= m <= n and E m x m: the lowest m
@@ -84,6 +87,19 @@ void dgetc2_(const int* n, double* a, const int* lda, int* ipiv, int* jpiv,
              int* info);
 void zgetc2_(const int* n, std::complex<double>* a, const int* lda, int* ipiv,
              int* jpiv, int* info);
+void dgesdd_(const char* jobz, const int* m, const int* n, double* a,
+             const int* lda, double* s, double* u, const int* ldu, double* vt,
+             const int* ldvt, double* work, const int* lwork, int* iwork,
+             int* info, std::size_t jobz_len);
+void zgesdd_(const char* jobz, const int* m, const int* n,
+             std::complex<double>* a, const int* lda, double* s,
+             std::complex<double>* u, const int* ldu, std::complex<double>* vt,
+             const int* ldvt, std::complex<double>* work, const int* lwork,
+             double* rwork, int* iwork, int* info, std::size_t jobz_len);
+void dpotrf_(const char* uplo, const int* n, double* a, const int* lda,
+             int* info, std::size_t uplo_len);
+void zpotrf_(const char* uplo, const int* n, std::complex<double>* a,
+             const int* lda, int* info, std::size_t uplo_len);
 void dgeev_(const char* jobvl, const char* jobvr, const int* n, double* a,
             const int* lda, double* wr, double* wi, double* vl,
             const int* ldvl, double* vr, const int* ldvr, double* work,
@@ -122,6 +138,10 @@ int lapack_getc2_rank(const MATRIX& A, double rel_threshold);                   
 int lapack_getc2_rank(const CMATRIX& A, double rel_threshold);
 void lapack_getc2(const MATRIX& A, MATRIX& P, MATRIX& L, MATRIX& U, MATRIX& Q);   ///< complete-pivoting LU: P A Q = L U, L unit lower, U upper, P and Q permutation matrices
 void lapack_getc2(const CMATRIX& A, CMATRIX& P, CMATRIX& L, CMATRIX& U, CMATRIX& Q);
+void lapack_gesdd(const MATRIX& A, MATRIX& U, MATRIX& S, MATRIX& V);              ///< A (m x n) = U (m x m) S (m x n) V^T (n x n), singular values descending
+void lapack_gesdd(const CMATRIX& A, CMATRIX& U, CMATRIX& S, CMATRIX& V);          ///< A = U S V^H, the column phases of U and V paired
+void lapack_potrf(const MATRIX& A, MATRIX& L);                                   ///< A = L L^T of a symmetric positive-definite A, L lower
+void lapack_potrf(const CMATRIX& A, CMATRIX& L);                                 ///< A = L L^H of a Hermitian positive-definite A, L lower
 std::complex<double> lapack_det(const CMATRIX& A);                               ///< determinant of a general complex matrix (LU)
 void lapack_getri(const CMATRIX& A, CMATRIX& Ainv);                              ///< inverse of a general complex matrix
 

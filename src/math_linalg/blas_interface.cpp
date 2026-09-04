@@ -568,6 +568,167 @@ void lapack_getc2(const CMATRIX& A, CMATRIX& P, CMATRIX& L, CMATRIX& U, CMATRIX&
 }
 
 
+namespace {
+
+#ifdef HAVE_LAPACK
+
+template <typename M>
+void require_svd_shapes(const char* fn, const M& A, const M& U, const M& S, const M& V, int m, int n){
+  if(m < 1 || n < 1){ fail(fn, "A is empty"); }
+  if(U.n_rows != m || U.n_cols != m || S.n_rows != m || S.n_cols != n || V.n_rows != n || V.n_cols != n){
+    std::ostringstream o;
+    o<<"for A "<<m<<" x "<<n<<" the factors must be U "<<m<<" x "<<m<<", S "<<m<<" x "<<n<<", V "<<n<<" x "<<n
+     <<", got U "<<U.n_rows<<" x "<<U.n_cols<<", S "<<S.n_rows<<" x "<<S.n_cols<<", V "<<V.n_rows<<" x "<<V.n_cols;
+    fail(fn, o.str());
+  }
+}
+
+#endif
+
+}// anonymous namespace
+
+
+void lapack_gesdd(const MATRIX& A, MATRIX& U, MATRIX& S, MATRIX& V){
+  const char* fn = "lapack_gesdd";
+#ifdef HAVE_LAPACK
+  int m = A.n_rows, n = A.n_cols;
+  require_svd_shapes(fn, A, U, S, V, m, n);
+  int mn = std::min(m, n), mx = std::max(m, n);
+  thread_local RealWork ws;
+  thread_local std::vector<double> u, vt;
+  grow(ws.a, (std::size_t)m*n);
+  grow(ws.w, mn);
+  grow(u, (std::size_t)m*m);
+  grow(vt, (std::size_t)n*n);
+  grow(ws.iwork, 8*mn);
+  // the factors of A itself: transpose-copy into the column-major buffer (m x n, lda = m)
+  for(int i = 0; i < m; i++){
+    for(int j = 0; j < n; j++){ ws.a[(std::size_t)j*m + i] = A.M[i*n+j]; }
+  }
+  int m_ = m, n_ = n, lda = m, ldu = m, ldvt = n, info = 0, lwork = -1;
+  double wq = 0.0;
+  dgesdd_("A", &m_, &n_, ws.a.data(), &lda, ws.w.data(), u.data(), &ldu, vt.data(), &ldvt, &wq, &lwork, ws.iwork.data(), &info, 1);
+  if(info != 0){ fail(fn, info_text("dgesdd (workspace query)", info)); }
+  lwork = (int)wq;
+  grow(ws.work, std::max(lwork, 1));
+  dgesdd_("A", &m_, &n_, ws.a.data(), &lda, ws.w.data(), u.data(), &ldu, vt.data(), &ldvt, ws.work.data(), &lwork, ws.iwork.data(), &info, 1);
+  if(info != 0){ fail(fn, info_text("dgesdd", info) + " (the algorithm failed to converge)"); }
+  // U column-major -> libra rows, S the rectangular diagonal, V = VT^T (the column-major VT read row-major)
+  for(int i = 0; i < m; i++){
+    for(int j = 0; j < m; j++){ U.M[i*m+j] = u[(std::size_t)j*m + i]; }
+  }
+  S = 0.0;
+  for(int k = 0; k < mn; k++){ S.M[k*n+k] = ws.w[k]; }
+  std::copy(vt.begin(), vt.begin() + (std::size_t)n*n, V.M);
+  (void)mx;
+#else
+  (void)A; (void)U; (void)S; (void)V;
+  fail(fn, MISSING);
+#endif
+}
+
+
+void lapack_gesdd(const CMATRIX& A, CMATRIX& U, CMATRIX& S, CMATRIX& V){
+  const char* fn = "lapack_gesdd";
+#ifdef HAVE_LAPACK
+  int m = A.n_rows, n = A.n_cols;
+  require_svd_shapes(fn, A, U, S, V, m, n);
+  int mn = std::min(m, n), mx = std::max(m, n);
+  thread_local ComplexWork ws;
+  thread_local std::vector< std::complex<double> > u, vt;
+  grow(ws.a, (std::size_t)m*n);
+  grow(ws.w, mn);
+  grow(u, (std::size_t)m*m);
+  grow(vt, (std::size_t)n*n);
+  grow(ws.iwork, 8*mn);
+  grow(ws.rwork, (std::size_t)5*mn*mn + 7*mn + (std::size_t)2*mx*mn);
+  for(int i = 0; i < m; i++){
+    for(int j = 0; j < n; j++){ ws.a[(std::size_t)j*m + i] = A.M[i*n+j]; }
+  }
+  int m_ = m, n_ = n, lda = m, ldu = m, ldvt = n, info = 0, lwork = -1;
+  std::complex<double> wq(0.0, 0.0);
+  zgesdd_("A", &m_, &n_, ws.a.data(), &lda, ws.w.data(), u.data(), &ldu, vt.data(), &ldvt, &wq, &lwork, ws.rwork.data(), ws.iwork.data(), &info, 1);
+  if(info != 0){ fail(fn, info_text("zgesdd (workspace query)", info)); }
+  lwork = (int)wq.real();
+  grow(ws.work, std::max(lwork, 1));
+  zgesdd_("A", &m_, &n_, ws.a.data(), &lda, ws.w.data(), u.data(), &ldu, vt.data(), &ldvt, ws.work.data(), &lwork, ws.rwork.data(), ws.iwork.data(), &info, 1);
+  if(info != 0){ fail(fn, info_text("zgesdd", info) + " (the algorithm failed to converge)"); }
+  // U column-major -> libra rows, S the rectangular diagonal, V = VT^H (conjugate of the column-major VT read row-major)
+  for(int i = 0; i < m; i++){
+    for(int j = 0; j < m; j++){ U.M[i*m+j] = u[(std::size_t)j*m + i]; }
+  }
+  S = std::complex<double>(0.0, 0.0);
+  for(int k = 0; k < mn; k++){ S.M[k*n+k] = std::complex<double>(ws.w[k], 0.0); }
+  for(std::size_t idx = 0; idx < (std::size_t)n*n; idx++){ V.M[idx] = std::conj(vt[idx]); }
+#else
+  (void)A; (void)U; (void)S; (void)V;
+  fail(fn, MISSING);
+#endif
+}
+
+
+void lapack_potrf(const MATRIX& A, MATRIX& L){
+  const char* fn = "lapack_potrf";
+#ifdef HAVE_LAPACK
+  int n = A.n_rows;
+  if(n < 1){ fail(fn, "A is empty"); }
+  require_n_by_n(fn, A, "A", n);
+  require_n_by_n(fn, L, "L", n);
+  require_hermitian(fn, A.M, n, "A");
+  thread_local RealWork ws;
+  grow(ws.a, (std::size_t)n*n);
+  // A symmetric: the row-major buffer read column-major is A itself
+  std::copy(A.M, A.M + (std::size_t)n*n, ws.a.begin());
+  int n_ = n, lda = n, info = 0;
+  dpotrf_("L", &n_, ws.a.data(), &lda, &info, 1);
+  if(info > 0){
+    std::ostringstream o;
+    o<<"A is not positive definite (its leading minor of order "<<info<<" is not)";
+    fail(fn, o.str());
+  }
+  if(info != 0){ fail(fn, info_text("dpotrf", info)); }
+  L = 0.0;
+  for(int i = 0; i < n; i++){
+    for(int j = 0; j <= i; j++){ L.M[i*n+j] = ws.a[(std::size_t)j*n + i]; }
+  }
+#else
+  (void)A; (void)L;
+  fail(fn, MISSING);
+#endif
+}
+
+
+void lapack_potrf(const CMATRIX& A, CMATRIX& L){
+  const char* fn = "lapack_potrf";
+#ifdef HAVE_LAPACK
+  int n = A.n_rows;
+  if(n < 1){ fail(fn, "A is empty"); }
+  require_n_by_n(fn, A, "A", n);
+  require_n_by_n(fn, L, "L", n);
+  require_hermitian(fn, A.M, n, "A");
+  thread_local ComplexWork ws;
+  grow(ws.a, (std::size_t)n*n);
+  // A Hermitian: the row-major buffer read column-major is conj(A) = A^T, whose factor is conj(L)
+  std::copy(A.M, A.M + (std::size_t)n*n, ws.a.begin());
+  int n_ = n, lda = n, info = 0;
+  zpotrf_("L", &n_, ws.a.data(), &lda, &info, 1);
+  if(info > 0){
+    std::ostringstream o;
+    o<<"A is not positive definite (its leading minor of order "<<info<<" is not)";
+    fail(fn, o.str());
+  }
+  if(info != 0){ fail(fn, info_text("zpotrf", info)); }
+  L = std::complex<double>(0.0, 0.0);
+  for(int i = 0; i < n; i++){
+    for(int j = 0; j <= i; j++){ L.M[i*n+j] = std::conj(ws.a[(std::size_t)j*n + i]); }
+  }
+#else
+  (void)A; (void)L;
+  fail(fn, MISSING);
+#endif
+}
+
+
 void lapack_getri(const MATRIX& A, MATRIX& Ainv){
   const char* fn = "lapack_getri";
 #ifdef HAVE_LAPACK
