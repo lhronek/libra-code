@@ -76,6 +76,13 @@ static int lapack_nosort_min_n = -1;
 // is the default at every size
 static const int LAPACK_INVERSE_MIN_N_DEFAULT = 1;
 static int lapack_inverse_min_n = -1;
+// the determinant (measured 2026-09-04, one OpenBLAS thread): getrf beats Eigen at every
+// complex size (det 3.6 vs 1.8 us at 8 states, 597 vs 125 us at 64, FullPivLU_det 5.4 s vs
+// 0.03 s at 600) and from ~100 states for real det (Eigen's real LU determinant is the faster
+// one between ~8 and ~64: 60 vs 102 us at 64) - the complex Slater-determinant overlaps are
+// the hot path, so the kernel is the default at every size
+static const int LAPACK_DET_MIN_N_DEFAULT = 1;
+static int lapack_det_min_n = -1;
 
 static int read_min_n(int& value, int dflt, const char* env_name, const char* fn){
   if(value < 1){
@@ -107,6 +114,8 @@ int get_lapack_nosort_min_n(){ return read_min_n(lapack_nosort_min_n, LAPACK_NOS
 void set_lapack_nosort_min_n(int n){ write_min_n(lapack_nosort_min_n, n, "set_lapack_nosort_min_n"); }
 int get_lapack_inverse_min_n(){ return read_min_n(lapack_inverse_min_n, LAPACK_INVERSE_MIN_N_DEFAULT, "LIBRA_LAPACK_INVERSE_MIN_N", "get_lapack_inverse_min_n"); }
 void set_lapack_inverse_min_n(int n){ write_min_n(lapack_inverse_min_n, n, "set_lapack_inverse_min_n"); }
+int get_lapack_det_min_n(){ return read_min_n(lapack_det_min_n, LAPACK_DET_MIN_N_DEFAULT, "LIBRA_LAPACK_DET_MIN_N", "get_lapack_det_min_n"); }
+void set_lapack_det_min_n(int n){ write_min_n(lapack_det_min_n, n, "set_lapack_det_min_n"); }
 
 
 void solve_eigen(CMATRIX* H, CMATRIX* S, CMATRIX* E, CMATRIX* C, int symm){

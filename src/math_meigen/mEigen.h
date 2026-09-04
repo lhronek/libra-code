@@ -33,6 +33,7 @@ namespace libmeigen{
 
 ///=========== Look in: mEigen_determinant.cpp =================
 ///< Several versions of the determinants
+///< LAPACK getrf (the pivot product with the permutation sign) from get_lapack_det_min_n states on - det and FullPivLU_det coincide there - Eigen's determinant / FullPivLU below it
 double det(MATRIX&);
 double FullPivLU_det(MATRIX&);
 complex<double> det(CMATRIX&);
@@ -87,6 +88,8 @@ int get_lapack_nosort_min_n();       ///< the same switch for solve_eigen_nosort
 void set_lapack_nosort_min_n(int n);
 int get_lapack_inverse_min_n();      ///< the switch for FullPivLU_inverse and the threshold-free inv_matrix (the LU kernels dgetri/zgetri) - default 1, LIBRA_LAPACK_INVERSE_MIN_N overrides it
 void set_lapack_inverse_min_n(int n);
+int get_lapack_det_min_n();          ///< the switch for det and FullPivLU_det (the LU determinant through dgetrf/zgetrf) - default 1 (the kernel wins at every complex size, Eigen's real LU determinant only between ~8 and ~64 states), LIBRA_LAPACK_DET_MIN_N overrides it
+void set_lapack_det_min_n(int n);
 
 
 

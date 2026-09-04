@@ -19,6 +19,7 @@
 #endif 
 
 #include "mEigen.h"
+#include "../math_linalg/blas_interface.h"
 
 /// liblibra namespace
 namespace liblibra{
@@ -43,6 +44,10 @@ double det(MATRIX& A){
   int N = A.n_cols;
   int i,j;
 
+  if(have_lapack() && N >= get_lapack_det_min_n()){
+    // LAPACK getrf (blas_interface.h): the pivot product with the permutation sign
+    return lapack_det(A);
+  }
   MatrixXd a(N,N);
   for(i=0;i<N;i++){
     for(j=0;j<N;j++){
@@ -69,6 +74,10 @@ double FullPivLU_det(MATRIX& A){
   int N = A.n_cols;
   int i,j;
 
+  if(have_lapack() && N >= get_lapack_det_min_n()){
+    // LAPACK getrf (blas_interface.h): the pivot product with the permutation sign
+    return lapack_det(A);
+  }
   MatrixXd a(N,N);
   for(i=0;i<N;i++){
     for(j=0;j<N;j++){
@@ -99,6 +108,10 @@ complex<double> det(CMATRIX& A){
   int N = A.n_cols;
   int i,j;
 
+  if(have_lapack() && N >= get_lapack_det_min_n()){
+    // LAPACK getrf (blas_interface.h): the pivot product with the permutation sign
+    return lapack_det(A);
+  }
   MatrixXcd a(N,N);
   for(i=0;i<N;i++){
     for(j=0;j<N;j++){
@@ -124,6 +137,10 @@ complex<double> FullPivLU_det(CMATRIX& A){
   int N = A.n_cols;
   int i,j;
 
+  if(have_lapack() && N >= get_lapack_det_min_n()){
+    // LAPACK getrf (blas_interface.h): the pivot product with the permutation sign
+    return lapack_det(A);
+  }
   MatrixXcd a(N,N);
   for(i=0;i<N;i++){
     for(j=0;j<N;j++){
