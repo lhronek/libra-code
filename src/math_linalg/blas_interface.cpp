@@ -729,6 +729,142 @@ void lapack_potrf(const CMATRIX& A, CMATRIX& L){
 }
 
 
+namespace {
+
+#ifdef HAVE_LAPACK
+
+// the least-squares drivers: A (m x n) transposed into the column-major buffer, B (m x k) into a
+// buffer with max(m, n) rows that returns the solution in its first n rows
+struct LstsqBuffers{
+  int m, n, k, ldb;
+};
+
+template <typename M>
+LstsqBuffers lstsq_setup(const char* fn, const M& A, const M& X, const M& B, RealWork& ws, std::vector<double>& bbuf){
+  LstsqBuffers d;
+  d.m = A.n_rows; d.n = A.n_cols; d.k = B.n_cols;
+  if(d.m < 1 || d.n < 1 || d.k < 1){ fail(fn, "A or B is empty"); }
+  if(B.n_rows != d.m || X.n_rows != d.n || X.n_cols != d.k){
+    std::ostringstream o;
+    o<<"for A "<<d.m<<" x "<<d.n<<" the right-hand side must be "<<d.m<<" x k and the solution "<<d.n<<" x k, got B "
+     <<B.n_rows<<" x "<<B.n_cols<<", X "<<X.n_rows<<" x "<<X.n_cols;
+    fail(fn, o.str());
+  }
+  d.ldb = std::max(d.m, d.n);
+  grow(ws.a, (std::size_t)d.m*d.n);
+  grow(bbuf, (std::size_t)d.ldb*d.k);
+  for(int i = 0; i < d.m; i++){
+    for(int j = 0; j < d.n; j++){ ws.a[(std::size_t)j*d.m + i] = A.M[i*d.n+j]; }
+  }
+  std::fill(bbuf.begin(), bbuf.begin() + (std::size_t)d.ldb*d.k, 0.0);
+  for(int i = 0; i < d.m; i++){
+    for(int j = 0; j < d.k; j++){ bbuf[(std::size_t)j*d.ldb + i] = B.M[i*d.k+j]; }
+  }
+  return d;
+}
+
+void lstsq_solution(const LstsqBuffers& d, const std::vector<double>& bbuf, MATRIX& X){
+  for(int i = 0; i < d.n; i++){
+    for(int j = 0; j < d.k; j++){ X.M[i*d.k+j] = bbuf[(std::size_t)j*d.ldb + i]; }
+  }
+}
+
+#endif
+
+}// anonymous namespace
+
+
+int lapack_gelsd(const MATRIX& A, MATRIX& X, const MATRIX& B, double rcond){
+  const char* fn = "lapack_gelsd";
+#ifdef HAVE_LAPACK
+  thread_local RealWork ws;
+  thread_local std::vector<double> bbuf;
+  LstsqBuffers d = lstsq_setup(fn, A, X, B, ws, bbuf);
+  int mn = std::min(d.m, d.n);
+  grow(ws.w, mn);
+  int m_ = d.m, n_ = d.n, k_ = d.k, lda = d.m, ldb = d.ldb, rank = 0, info = 0, lwork = -1;
+  double wq = 0.0;
+  int iwq = 0;
+  dgelsd_(&m_, &n_, &k_, ws.a.data(), &lda, bbuf.data(), &ldb, ws.w.data(), &rcond, &rank, &wq, &lwork, &iwq, &info);
+  if(info != 0){ fail(fn, info_text("dgelsd (workspace query)", info)); }
+  lwork = (int)wq;
+  grow(ws.work, std::max(lwork, 1));
+  grow(ws.iwork, std::max(iwq, 1));
+  dgelsd_(&m_, &n_, &k_, ws.a.data(), &lda, bbuf.data(), &ldb, ws.w.data(), &rcond, &rank, ws.work.data(), &lwork, ws.iwork.data(), &info);
+  if(info != 0){ fail(fn, info_text("dgelsd", info) + " (the SVD failed to converge)"); }
+  lstsq_solution(d, bbuf, X);
+  return rank;
+#else
+  (void)A; (void)X; (void)B; (void)rcond;
+  fail(fn, MISSING);
+  return -1;
+#endif
+}
+
+
+int lapack_gelsy(const MATRIX& A, MATRIX& X, const MATRIX& B, double rcond){
+  const char* fn = "lapack_gelsy";
+#ifdef HAVE_LAPACK
+  thread_local RealWork ws;
+  thread_local std::vector<double> bbuf;
+  LstsqBuffers d = lstsq_setup(fn, A, X, B, ws, bbuf);
+  grow(ws.iwork, d.n);
+  std::fill(ws.iwork.begin(), ws.iwork.begin() + d.n, 0);      // every column free to be pivoted
+  int m_ = d.m, n_ = d.n, k_ = d.k, lda = d.m, ldb = d.ldb, rank = 0, info = 0, lwork = -1;
+  double wq = 0.0;
+  dgelsy_(&m_, &n_, &k_, ws.a.data(), &lda, bbuf.data(), &ldb, ws.iwork.data(), &rcond, &rank, &wq, &lwork, &info);
+  if(info != 0){ fail(fn, info_text("dgelsy (workspace query)", info)); }
+  lwork = (int)wq;
+  grow(ws.work, std::max(lwork, 1));
+  dgelsy_(&m_, &n_, &k_, ws.a.data(), &lda, bbuf.data(), &ldb, ws.iwork.data(), &rcond, &rank, ws.work.data(), &lwork, &info);
+  if(info != 0){ fail(fn, info_text("dgelsy", info)); }
+  lstsq_solution(d, bbuf, X);
+  return rank;
+#else
+  (void)A; (void)X; (void)B; (void)rcond;
+  fail(fn, MISSING);
+  return -1;
+#endif
+}
+
+
+int lapack_gesv(const MATRIX& A, MATRIX& X, const MATRIX& B){
+  const char* fn = "lapack_gesv";
+#ifdef HAVE_LAPACK
+  int n = A.n_rows;
+  if(n < 1){ fail(fn, "A is empty"); }
+  require_n_by_n(fn, A, "A", n);
+  int k = B.n_cols;
+  if(k < 1 || B.n_rows != n || X.n_rows != n || X.n_cols != k){
+    std::ostringstream o;
+    o<<"for A "<<n<<" x "<<n<<" the right-hand side and the solution must be "<<n<<" x k, got B "<<B.n_rows<<" x "<<B.n_cols<<", X "<<X.n_rows<<" x "<<X.n_cols;
+    fail(fn, o.str());
+  }
+  thread_local RealWork ws;
+  thread_local std::vector<double> bbuf;
+  grow(ws.a, (std::size_t)n*n);
+  grow(ws.iwork, n);
+  grow(bbuf, (std::size_t)n*k);
+  for(int i = 0; i < n; i++){
+    for(int j = 0; j < n; j++){ ws.a[(std::size_t)j*n + i] = A.M[i*n+j]; }
+    for(int j = 0; j < k; j++){ bbuf[(std::size_t)j*n + i] = B.M[i*k+j]; }
+  }
+  int n_ = n, k_ = k, lda = n, ldb = n, info = 0;
+  dgesv_(&n_, &k_, ws.a.data(), &lda, ws.iwork.data(), bbuf.data(), &ldb, &info);
+  if(info < 0){ fail(fn, info_text("dgesv", info)); }
+  if(info > 0){ return info; }
+  for(int i = 0; i < n; i++){
+    for(int j = 0; j < k; j++){ X.M[i*k+j] = bbuf[(std::size_t)j*n + i]; }
+  }
+  return 0;
+#else
+  (void)A; (void)X; (void)B;
+  fail(fn, MISSING);
+  return -1;
+#endif
+}
+
+
 void lapack_getri(const MATRIX& A, MATRIX& Ainv){
   const char* fn = "lapack_getri";
 #ifdef HAVE_LAPACK

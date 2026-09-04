@@ -1162,6 +1162,10 @@ void export_linalg_objects(){
   def("lapack_potrf", expt_lapack_potrf_v1);
   def("lapack_potrf", expt_lapack_potrf_v2);
 
+  def("lapack_gelsd", &lapack_gelsd);
+  def("lapack_gelsy", &lapack_gelsy);
+  def("lapack_gesv", &lapack_gesv);
+
   double (*expt_lapack_det_v1)(const MATRIX& A) = &lapack_det;
   std::complex<double> (*expt_lapack_det_v2)(const CMATRIX& A) = &lapack_det;
   def("lapack_det", expt_lapack_det_v1);
