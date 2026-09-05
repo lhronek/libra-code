@@ -169,102 +169,25 @@ bool linsys_solver(const MATRIX& A, MATRIX& X, const MATRIX& B, const double Nor
 
 
 void solve_linsys(MATRIX& C,MATRIX& D, MATRIX& X,double eps,int maxiter){
-/*********************************************
- Here we solve the system of linear equations
-              AX = D
- using Gauss-Seidel iterative procedure
-
- Inputs: A, D - matrices
-         eps  - precision criterion
- Output: X
-
- Some preliminary transformations are made in order
- to be able to use Gauss-Seidel method for any matrix A
-
- More details:
- 80.47 An iterative Algorithm for Matrix Inversion
- Which is Always Convergent
- Authors: S. Simons
- Source: The Mathematical Gazette, Vol. 80, No. 489
- (Nov., 1996), pp. 567-569
-
- url: http://www.jstor.org/stable/pdfplus/3618529.pdf
-
-**********************************************/
-
-// Do the transformations A = C^T * C and b = C^T * d
-// If matrices d and c have more then 1 columns we do the
-// procedure for each column
-
-
-    int i,j,k;   // counters
-    int n,m,p;   // dimetions
-    double s;    // sums
-    double error;// error
-    int iter;    // number of iterations
-
+/**
+  Solve C X = D: the exact LU solution for a square nonsingular C, the minimum-norm least-squares
+  solution otherwise (least_squares_solve, option 1) - the solution the Gauss-Seidel iteration on the
+  normal equations C^T C X = C^T D (S. Simons, Math. Gazette 80, 567 (1996)) converged to when it
+  converged. That iteration squared the condition number and stopped on the size of its step, which
+  accepted a wrong X at a loose eps (the QTAG momentum fit: 420 % off for an off-center cloud) and
+  never finished at a tight one.
+  Inputs: C (n x m), D (n x p)
+          eps, maxiter - kept for the signature, without effect on the direct solution
+  Output: X (m x p)
+*/
     if(C.n_rows!=D.n_rows)
         {std::cout<<"Error: The number of rows of matrices C and D in equation CX = D must be equal\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); } // n
     if(C.n_cols!=X.n_rows)
         {std::cout<<"Error: The number of cols of matrix C and num of rows in matrix D in equation CX = D must be equal\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); } // m
     if(X.n_cols!=D.n_cols)
         {std::cout<<"Error: The number of cols of matrices X and D in equation CX = D must be equal\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); } // p
-
-    // Set dimentions
-    n = C.n_rows;
-    m = C.n_cols;
-    p = D.n_cols;
-
-    MATRIX A(m,m); A = C.T() * C;
-    X = 0.0;
-    error = 2.0*eps;
-    iter = 0;
-
-    while((error>eps)&&(iter<maxiter)){
-
-    error = 0.0;
-
-    for( k = 0; k < p; k++ ){
-
-        //------- Matrix preparation step -----------
-
-        MATRIX d(n,1);  for(i = 0;i<n;i++){ d.M[i] = D.M[i*p+k]; }
-        MATRIX x(m,1);  for(i = 0;i<m;i++){ x.M[i] = X.M[i*p+k]; }
-        MATRIX xprev(m,1); xprev = x;
-        MATRIX b(m,1);  b = C.T() * d;
-
-        //------- Gauss-Seidel step -----------------
-
-        for( i = 0; i < m; i++ ){
-
-            s = 0.0;
-            for( j = 0; j < i; j++ ){ s += A.M[i*m + j]*x.M[j];   }// for j
-            for( j = i+1; j < m; j++ ){ s += A.M[i*m + j]*xprev.M[j]; }// for j
-
-            x.M[i] = (b.M[i] - s)/A.M[i*m + i];
-
-        }// for i - all elements of vector x
-
-
-        //-------- Now calculate the error and update X ---------
-        for( i = 0; i < m; i++ ){
-            error += (x.M[i] - xprev.M[i])*(x.M[i] - xprev.M[i]);
-            X.M[i*p + k] = x.M[i];
-        }// for i
-
-
-    }// for k - all columns of D
-
-    error = sqrt(error/double(m));
-    iter++;
-
-    }// loop over convergence
-
-    if(error>eps){
-      cout<<"Error in solve_linsys: convergence to eps= "<<eps<<" is not achieved for "<<iter<<" iterations\n";
-      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-    }
-
+    (void)eps; (void)maxiter;
+    least_squares_solve(C, X, D, 1);
 }
 
 
