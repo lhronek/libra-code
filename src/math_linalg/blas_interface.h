@@ -114,6 +114,14 @@ void dgelsy_(const int* m, const int* n, const int* nrhs, double* a,
              int* info);
 void dgesv_(const int* n, const int* nrhs, double* a, const int* lda,
             int* ipiv, double* b, const int* ldb, int* info);
+void zgesv_(const int* n, const int* nrhs, std::complex<double>* a,
+            const int* lda, int* ipiv, std::complex<double>* b, const int* ldb,
+            int* info);
+void zgelsy_(const int* m, const int* n, const int* nrhs,
+             std::complex<double>* a, const int* lda, std::complex<double>* b,
+             const int* ldb, int* jpvt, const double* rcond, int* rank,
+             std::complex<double>* work, const int* lwork, double* rwork,
+             int* info);
 void dgeev_(const char* jobvl, const char* jobvr, const int* n, double* a,
             const int* lda, double* wr, double* wi, double* vl,
             const int* ldvl, double* vr, const int* ldvr, double* work,
@@ -159,6 +167,8 @@ void lapack_potrf(const CMATRIX& A, CMATRIX& L);                                
 int lapack_gelsd(const MATRIX& A, MATRIX& X, const MATRIX& B, double rcond);      ///< min |A X - B| with minimum-norm X (m x n, n x k, m x k) through the SVD, singular values below rcond times the largest dropped, returns the rank
 int lapack_gelsy(const MATRIX& A, MATRIX& X, const MATRIX& B, double rcond);      ///< the same through the complete orthogonal factorization (column-pivoted QR), returns the rank
 int lapack_gesv(const MATRIX& A, MATRIX& X, const MATRIX& B);                     ///< A X = B for a square A by LU with partial pivoting - returns 0 with X filled, or the index of the exactly zero pivot with X untouched
+int lapack_gesv(const CMATRIX& A, CMATRIX& X, const CMATRIX& B);                  ///< the complex square LU solve
+int lapack_gelsy(const CMATRIX& A, CMATRIX& X, const CMATRIX& B, double rcond);   ///< the complex minimum-norm least squares through the complete orthogonal factorization, returns the rank
 std::complex<double> lapack_det(const CMATRIX& A);                               ///< determinant of a general complex matrix (LU)
 void lapack_getri(const CMATRIX& A, CMATRIX& Ainv);                              ///< inverse of a general complex matrix
 

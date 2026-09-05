@@ -1163,8 +1163,14 @@ void export_linalg_objects(){
   def("lapack_potrf", expt_lapack_potrf_v2);
 
   def("lapack_gelsd", &lapack_gelsd);
-  def("lapack_gelsy", &lapack_gelsy);
-  def("lapack_gesv", &lapack_gesv);
+  int (*expt_lapack_gelsy_v1)(const MATRIX& A, MATRIX& X, const MATRIX& B, double rcond) = &lapack_gelsy;
+  int (*expt_lapack_gelsy_v2)(const CMATRIX& A, CMATRIX& X, const CMATRIX& B, double rcond) = &lapack_gelsy;
+  def("lapack_gelsy", expt_lapack_gelsy_v1);
+  def("lapack_gelsy", expt_lapack_gelsy_v2);
+  int (*expt_lapack_gesv_v1)(const MATRIX& A, MATRIX& X, const MATRIX& B) = &lapack_gesv;
+  int (*expt_lapack_gesv_v2)(const CMATRIX& A, CMATRIX& X, const CMATRIX& B) = &lapack_gesv;
+  def("lapack_gesv", expt_lapack_gesv_v1);
+  def("lapack_gesv", expt_lapack_gesv_v2);
 
   double (*expt_lapack_det_v1)(const MATRIX& A) = &lapack_det;
   std::complex<double> (*expt_lapack_det_v2)(const CMATRIX& A) = &lapack_det;

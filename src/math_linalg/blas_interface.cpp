@@ -739,8 +739,8 @@ struct LstsqBuffers{
   int m, n, k, ldb;
 };
 
-template <typename M>
-LstsqBuffers lstsq_setup(const char* fn, const M& A, const M& X, const M& B, RealWork& ws, std::vector<double>& bbuf){
+template <typename M, typename W, typename T>
+LstsqBuffers lstsq_setup(const char* fn, const M& A, const M& X, const M& B, W& ws, std::vector<T>& bbuf){
   LstsqBuffers d;
   d.m = A.n_rows; d.n = A.n_cols; d.k = B.n_cols;
   if(d.m < 1 || d.n < 1 || d.k < 1){ fail(fn, "A or B is empty"); }
@@ -756,14 +756,15 @@ LstsqBuffers lstsq_setup(const char* fn, const M& A, const M& X, const M& B, Rea
   for(int i = 0; i < d.m; i++){
     for(int j = 0; j < d.n; j++){ ws.a[(std::size_t)j*d.m + i] = A.M[i*d.n+j]; }
   }
-  std::fill(bbuf.begin(), bbuf.begin() + (std::size_t)d.ldb*d.k, 0.0);
+  std::fill(bbuf.begin(), bbuf.begin() + (std::size_t)d.ldb*d.k, T(0.0));
   for(int i = 0; i < d.m; i++){
     for(int j = 0; j < d.k; j++){ bbuf[(std::size_t)j*d.ldb + i] = B.M[i*d.k+j]; }
   }
   return d;
 }
 
-void lstsq_solution(const LstsqBuffers& d, const std::vector<double>& bbuf, MATRIX& X){
+template <typename M, typename T>
+void lstsq_solution(const LstsqBuffers& d, const std::vector<T>& bbuf, M& X){
   for(int i = 0; i < d.n; i++){
     for(int j = 0; j < d.k; j++){ X.M[i*d.k+j] = bbuf[(std::size_t)j*d.ldb + i]; }
   }
@@ -859,6 +860,70 @@ int lapack_gesv(const MATRIX& A, MATRIX& X, const MATRIX& B){
   return 0;
 #else
   (void)A; (void)X; (void)B;
+  fail(fn, MISSING);
+  return -1;
+#endif
+}
+
+
+int lapack_gesv(const CMATRIX& A, CMATRIX& X, const CMATRIX& B){
+  const char* fn = "lapack_gesv";
+#ifdef HAVE_LAPACK
+  int n = A.n_rows;
+  if(n < 1){ fail(fn, "A is empty"); }
+  require_n_by_n(fn, A, "A", n);
+  int k = B.n_cols;
+  if(k < 1 || B.n_rows != n || X.n_rows != n || X.n_cols != k){
+    std::ostringstream o;
+    o<<"for A "<<n<<" x "<<n<<" the right-hand side and the solution must be "<<n<<" x k, got B "<<B.n_rows<<" x "<<B.n_cols<<", X "<<X.n_rows<<" x "<<X.n_cols;
+    fail(fn, o.str());
+  }
+  thread_local ComplexWork ws;
+  thread_local std::vector< std::complex<double> > bbuf;
+  grow(ws.a, (std::size_t)n*n);
+  grow(ws.iwork, n);
+  grow(bbuf, (std::size_t)n*k);
+  for(int i = 0; i < n; i++){
+    for(int j = 0; j < n; j++){ ws.a[(std::size_t)j*n + i] = A.M[i*n+j]; }
+    for(int j = 0; j < k; j++){ bbuf[(std::size_t)j*n + i] = B.M[i*k+j]; }
+  }
+  int n_ = n, k_ = k, lda = n, ldb = n, info = 0;
+  zgesv_(&n_, &k_, ws.a.data(), &lda, ws.iwork.data(), bbuf.data(), &ldb, &info);
+  if(info < 0){ fail(fn, info_text("zgesv", info)); }
+  if(info > 0){ return info; }
+  for(int i = 0; i < n; i++){
+    for(int j = 0; j < k; j++){ X.M[i*k+j] = bbuf[(std::size_t)j*n + i]; }
+  }
+  return 0;
+#else
+  (void)A; (void)X; (void)B;
+  fail(fn, MISSING);
+  return -1;
+#endif
+}
+
+
+int lapack_gelsy(const CMATRIX& A, CMATRIX& X, const CMATRIX& B, double rcond){
+  const char* fn = "lapack_gelsy";
+#ifdef HAVE_LAPACK
+  thread_local ComplexWork ws;
+  thread_local std::vector< std::complex<double> > bbuf;
+  LstsqBuffers d = lstsq_setup(fn, A, X, B, ws, bbuf);
+  grow(ws.iwork, d.n);
+  std::fill(ws.iwork.begin(), ws.iwork.begin() + d.n, 0);
+  grow(ws.rwork, (std::size_t)2*d.n);
+  int m_ = d.m, n_ = d.n, k_ = d.k, lda = d.m, ldb = d.ldb, rank = 0, info = 0, lwork = -1;
+  std::complex<double> wq(0.0, 0.0);
+  zgelsy_(&m_, &n_, &k_, ws.a.data(), &lda, bbuf.data(), &ldb, ws.iwork.data(), &rcond, &rank, &wq, &lwork, ws.rwork.data(), &info);
+  if(info != 0){ fail(fn, info_text("zgelsy (workspace query)", info)); }
+  lwork = (int)wq.real();
+  grow(ws.work, std::max(lwork, 1));
+  zgelsy_(&m_, &n_, &k_, ws.a.data(), &lda, bbuf.data(), &ldb, ws.iwork.data(), &rcond, &rank, ws.work.data(), &lwork, ws.rwork.data(), &info);
+  if(info != 0){ fail(fn, info_text("zgelsy", info)); }
+  lstsq_solution(d, bbuf, X);
+  return rank;
+#else
+  (void)A; (void)X; (void)B; (void)rcond;
   fail(fn, MISSING);
   return -1;
 #endif
