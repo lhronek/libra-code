@@ -286,11 +286,14 @@ def pod_fragment_operators(pod, C_win, spin=0):
     Returns:
         list over blocks of arrays (nwin, nwin)
     """
-    SC = pod["S"] @ np.asarray(C_win).T
+    S_m = data_conv.nparray2MATRIX(np.asarray(pod["S"], dtype=float))
+    Cw = data_conv.nparray2MATRIX(np.asarray(C_win, dtype=float))
+    SC = S_m * Cw.T()                                                        # (n_ao, nwin), DGEMM
     out = []
     for ib in range(pod["n_blocks"]):
-        X = pod["coeffs"][(ib, spin)].T @ SC
-        P = X.T @ X
+        cf = data_conv.nparray2MATRIX(np.asarray(pod["coeffs"][(ib, spin)], dtype=float))
+        X = cf.T() * SC                                                      # (n_block, nwin)
+        P = data_conv.MATRIX2nparray(X.T() * X, np.float64)                  # (nwin, nwin)
         out.append(np.ascontiguousarray(0.5 * (P + P.T)))
     return out
 
@@ -309,7 +312,15 @@ def ks_matrix_from_mos(C, E, S, tol=1e-6):
     if C.shape[0] != C.shape[1]:
         raise ValueError(F"ks_matrix_from_mos needs the complete MO set: {C.shape[0]} MOs for "
                          F"{C.shape[1]} AOs (ADDED_MOS = n_ao - n_occ), or print the Kohn-Sham matrix")
-    dev = float(np.abs(C @ S @ C.T - np.eye(C.shape[0])).max())
+    n = C.shape[0]
+    C_m = data_conv.nparray2MATRIX(C)
+    S_m = data_conv.nparray2MATRIX(np.asarray(S, dtype=float))
+    SCt = S_m * C_m.T()                                                      # (n_ao, nmo), DGEMM
+    ortho = data_conv.MATRIX2nparray(C_m * SCt, np.float64)
+    dev = float(np.abs(ortho - np.eye(n)).max())
     if dev > tol:
         raise ValueError(F"the MOs are not orthonormal in S (|C S C^T - 1| = {dev:.1e})")
-    return S @ C.T @ np.diag(np.asarray(E, dtype=float)) @ C @ S
+    E_m = MATRIX(n, n)
+    for i, e in enumerate(np.asarray(E, dtype=float)):
+        E_m.set(i, i, float(e))
+    return data_conv.MATRIX2nparray(SCt * E_m * SCt.T(), np.float64)         # S C^T E C S
