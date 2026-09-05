@@ -1125,6 +1125,12 @@ void export_linalg_objects(){
   def("QUATERNION_TO_MATRIX", expt_QUATERNION_TO_MATRIX_v1);
   def("QUATERNION_TO_MATRIX", expt_QUATERNION_TO_MATRIX_v2);
 
+  // the complex linear solvers of FT.cpp (the real solve_linsys is exported by libmeigen)
+  void (*expt_solve_linsys_c)(CMATRIX& C, CMATRIX& D, CMATRIX& X, double eps, int maxiter, double omega) = &solve_linsys;
+  void (*expt_solve_linsys1_c)(CMATRIX& C, CMATRIX& X, double eps, int maxiter, double omega) = &solve_linsys1;
+  def("solve_linsys", expt_solve_linsys_c);
+  def("solve_linsys1", expt_solve_linsys1_c);
+
 
 
 

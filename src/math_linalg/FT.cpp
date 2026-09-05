@@ -11,6 +11,8 @@
 
 #include "FT.h"
 #include <stdexcept>
+#include "blas_interface.h"
+#include <limits>
 
 
 /// liblibra 
@@ -23,40 +25,15 @@ namespace liblinalg{
 
 void solve_linsys(CMATRIX& C,CMATRIX& D, CMATRIX& X,double eps,int maxiter,double omega){
 /**
-  Here we solve the system of linear equations
-       CX = D  --->     AX = D', where  A = C.T()*C   D' = C.T()*D
-  using Gauss-Seidel iterative procedure
-
-  Inputs: A, D - matrices
-          eps  - precision criterion
-          omega - parameter of overrelaxation - must be in range (1,2)
-                  to accelerate convergence
-  Output: X
-
-  Some preliminary transformations are made in order
-  to be able to use Gauss-Seidel method for any CMATRIX A
-
-  More details:
-  80.47 An iterative Algorithm for Matrix Inversion
-  Which is Always Convergent
-  Authors: S. Simons
-  Source: The Mathematical Gazette, Vol. 80, No. 489
-  (Nov., 1996), pp. 567-569
-
-  url: http://www.jstor.org/stable/pdfplus/3618529.pdf
+  Solve C X = D: the exact LU solution for a square nonsingular C, the minimum-norm least-squares
+  solution otherwise (zgesv / zgelsy of blas_interface.h) - the solution the over-relaxed Gauss-Seidel
+  iteration on the normal equations C^H C X = C^H D (S. Simons, Math. Gazette 80, 567 (1996)) converged
+  to when it converged. That iteration squared the condition number, stopped on the size of its step
+  and returned silently at maxiter, so a loose eps accepted a wrong X and a tight one never finished.
+  Inputs: C (n x m), D (n x p)
+          eps, maxiter, omega - kept for the signature, without effect on the direct solution
+  Output: X (m x p)
 */
-
-/// Do the transformations A = C^H * C and b = C^H * d
-/// If matrices d and c have more then 1 columns we do the
-/// procedure for each column
-
-
-  int i,j,k;   // counters
-  int n,m,p;   // dimetions
-  complex<double> s;    // sums
-  double error;// error
-  int iter;    // number of iterations
-
   if(C.n_rows!=D.n_rows)
       {std::cout<<"Error: The number of rows of matrices C and D in equation CX = D must be equal\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); } // n
   if(C.n_cols!=X.n_rows)
@@ -64,177 +41,56 @@ void solve_linsys(CMATRIX& C,CMATRIX& D, CMATRIX& X,double eps,int maxiter,doubl
   if(X.n_cols!=D.n_cols)
       {std::cout<<"Error: The number of cols of matrices X and D in equation CX = D must be equal\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); } // p
 
-  // Set dimentions
-  n = C.n_rows;
-  m = C.n_cols;
-  p = D.n_cols;  // this is just 1 in most of the cases
-
-  cout<<"n = "<<n<<endl;
-  cout<<"m = "<<m<<endl;
-  cout<<"p = "<<p<<endl;
-
-  CMATRIX A(m,m); A = C.H() * C;       
-  eps = eps*eps;
-  error = 2.0*eps;
-  iter = 0;
-
-  CMATRIX d(n,1);
-  CMATRIX x(m,1);
-  CMATRIX xprev(m,1);
-  CMATRIX b(m,1);
-
-
-  while((error>eps)&&(iter<maxiter)){
-
-  error = 0.0;
-
-  for( k = 0; k < p; k++ ){
-
-    //------- Matrix preparation step -----------
-
-    for(i = 0;i<n;i++){ d.M[i] = D.M[i*p+k]; }
-    for(i = 0;i<m;i++){ x.M[i] = X.M[i*p+k]; }
-    xprev = x;
-    b = C.H() * d;
-
-    //------- Gauss-Seidel step -----------------
-
-    for( i = 0; i < m; i++ ){
-      s = 0.0;
-      for( j = 0; j < i; j++ ){ s += A.M[i*m + j]*x.M[j]; }
-      for( j = i+1; j < m; j++ ){ s += A.M[i*m + j]*xprev.M[j]; }
-      x.M[i] = (b.M[i] - s)/A.M[i*m + i];
-
-    }// for i - all elements of vector x
-
-
-    //-------- Now calculate the error and update X ---------
-
-    for( i = 0; i < m; i++ ){
-      int indx = i*p+k;
-      error += ((std::conj(x.M[i] - xprev.M[i]))*(x.M[i] - xprev.M[i])).real();
-      X.M[indx] = omega*x.M[i] + (1.0-omega)*X.M[indx]; 
-    }// for i
-
-
-
-  }// for k - all columns of D
-
-  error = (error/double(m));
-
-  iter++;
-
-  }// loop over convergence
-
-
+  (void)eps; (void)maxiter; (void)omega;
+  if(!have_lapack()){
+    std::cout<<"Error in solve_linsys (CMATRIX): the direct solve needs the LAPACK backend (WITH_LAPACK)\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  int n = C.n_rows;
+  int m = C.n_cols;
+  double rcond = std::numeric_limits<double>::epsilon() * std::min(n, m);
+  if(n == m && lapack_gesv(C, X, D) == 0){ return; }
+  lapack_gelsy(C, X, D, rcond);
 }
+
 
 void solve_linsys1(CMATRIX& C, CMATRIX& X,double eps,int maxiter,double omega){
 /**
-  This is gonna be optimized version of the solve_linsys function
-  for the case when D = 0
-
-  omega - is a convergence parameter:
-  x^(n+1) = omega * z^(n+1) + (1-omega)*x^n, where:
- 
-  z^(n+1) - is a normal Gauss-Seidel iterate (that is omega = 1)
-
-  Here we solve the system of linear equations
-       CX = D  --->     AX = D', where  A = C.T()*C   D' = C.T()*D
-  using Gauss-Seidel iterative procedure
-
-  Inputs: A, D - matrices
-          eps  - precision criterion
-  Output: X
-
-  Some preliminary transformations are made in order
-  to be able to use Gauss-Seidel method for any CMATRIX A
-
-  More details:
-  80.47 An iterative Algorithm for Matrix Inversion
-  Which is Always Convergent
-  Authors: S. Simons
-  Source: The Mathematical Gazette, Vol. 80, No. 489
-  (Nov., 1996), pp. 567-569
-
-  url: http://www.jstor.org/stable/pdfplus/3618529.pdf
-
+  The homogeneous case C X = 0 from the starting vector X: the orthogonal projection of X onto the null
+  space of C (the SVD of blas_interface.h, singular values below eps_machine min(n, m) times the largest
+  count as zero). A nonsingular C leaves the zero vector. This is the fixed point the removed Gauss-Seidel
+  iteration on C^H C x = 0 approached from X - a null-space vector for a singular C, zero otherwise.
+  Inputs: C (n x m), X (m x 1) the start
+          eps, maxiter, omega - kept for the signature, without effect
+  Output: X (m x 1)
 */
-
-/// Do the transformations A = C^H * C and b = C^H * d
-/// If matrices d and c have more then 1 columns we do the
-/// procedure for each column
-
-
-  int i,j,k;   // counters
-  int n,m,p;   // dimetions
-  complex<double> s;    // sums
-  complex<double> diff;
-  double error;// error
-  int iter;    // number of iterations
-
   if(C.n_cols!=X.n_rows)
       {std::cout<<"Error: The number of cols of CMATRIX C and num of rows in CMATRIX D in equation CX = D must be equal\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); } // m
   if(X.n_cols!=1)
       {std::cout<<"Error: The number of cols of matrices X and D in equation CX = D must be equal\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); } // p
 
-  // Set dimentions
-  n = C.n_rows;
-  m = C.n_cols;
-  p = 1;  // this is just 1 in most of the cases
-
-  CMATRIX d(n,1);
-  CMATRIX x(m,1);
-  CMATRIX xprev(m,1);
-  
-  
-  CMATRIX A(m,m); A = C.H() * C;       
-  eps = eps*eps;
-  error = 2.0*eps;
-  iter = 0;
-
-  int im; // i*m
-  
-
-  while((error>eps)&&(iter<maxiter)){
-
-  error = 0.0;
-
-  for( k = 0; k < p; k++ ){
-
-      //------- Matrix preparation step -----------
-
-      for(i = 0;i<m;i++){ xprev.M[i] = x.M[i] = X.M[i*p+k]; }
-
-      //------- Gauss-Seidel step -----------------
-      im = 0;
-      for( i = 0; i < m; i++ ){
-        s = 0.0;
-        for( j = 0; j < i; j++ ){ s += A.M[im + j]*x.M[j];  }
-        for( j = i+1; j < m; j++ ){ s += A.M[im + j]*xprev.M[j]; }
-        x.M[i] = (-s)/A.M[im + i];
-        im += m;
-
-      }// for i - all elements of vector x
-
-      //-------- Now calculate the error and update X ---------
-
-      for( i = 0; i < m; i++ ){
-        error += ((std::conj(x.M[i] - xprev.M[i]))*(x.M[i] - xprev.M[i])).real();
-        X.M[i] = omega*x.M[i] + (1.0-omega)*X.M[i];  // k takes value of only 0, p = 1, so i*p+k = i
-      }// for i
-
-  }// for k - all columns of D
-
-  error = error/double(m);
-
-  iter++;
-
-  }// loop over convergence
-
-
+  (void)eps; (void)maxiter; (void)omega;
+  if(!have_lapack()){
+    std::cout<<"Error in solve_linsys1 (CMATRIX): the null-space projection needs the LAPACK backend (WITH_LAPACK)\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  int n = C.n_rows;
+  int m = C.n_cols;
+  int mn = std::min(n, m);
+  CMATRIX U(n, n);
+  CMATRIX S(n, m);
+  CMATRIX V(m, m);
+  lapack_gesdd(C, U, S, V);
+  double smax = (mn > 0) ? S.get(0, 0).real() : 0.0;
+  double thresh = std::numeric_limits<double>::epsilon() * mn * smax;
+  CMATRIX proj(m, 1);
+  proj = complex<double>(0.0, 0.0);
+  for(int k = 0; k < m; k++){
+    if(k < mn && S.get(k, k).real() > thresh){ continue; }
+    complex<double> coef(0.0, 0.0);
+    for(int i = 0; i < m; i++){ coef += std::conj(V.get(i, k)) * X.get(i, 0); }
+    for(int i = 0; i < m; i++){ proj.set(i, 0, proj.get(i, 0) + V.get(i, k) * coef); }
+  }
+  X = proj;
 }
-
 
 void dft(CMATRIX& in,CMATRIX& out){
 /**
