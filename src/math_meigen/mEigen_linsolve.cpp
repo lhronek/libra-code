@@ -15,6 +15,7 @@
 #include <Eigen/Eigenvalues>
 #include <Eigen/Core>
 #include "mEigen.h"
+#include <cmath>
 #include "../math_linalg/blas_interface.h"
 #include <limits>
 
@@ -92,20 +93,11 @@ void least_squares_solve(MATRIX& A, MATRIX& X, MATRIX& B, int option){
 
 bool linsys_solver(const MATRIX& A, MATRIX& X, const MATRIX& B, const double NormThreshold){
 /**
-  This function is adapted from the OpenBabel Qeq method:
-
-  Solving a linear system of equations: A * x = b
-
-  The result goes into the x argument
-
-  //! Wrapper around the Eigen linear solver routines
-  // First attempts to solve using Gaussian elimination
-  // if that fails, tries again using singular value decomposition (SVD)
+  Adapted from the OpenBabel QEq method: solve A x = b for the column vector x - the LU solution
+  first, and when it is not finite or its residual |A x - b| exceeds NormThreshold, the minimum-norm
+  SVD solution in its place (least_squares_solve options 1 and 0). Returns true when the final
+  residual is finite - above NormThreshold it is reported as a warning, not an error
 */
-
-    std::cout<<"Not implemented. ";
-    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-
     if(A.n_rows!=A.n_cols){
         std::cout<<"Error: The matrix A in equation A * x = b must be square\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");  // N
     }
@@ -118,52 +110,32 @@ bool linsys_solver(const MATRIX& A, MATRIX& X, const MATRIX& B, const double Nor
     if(X.n_cols!=1){
         std::cout<<"Error: The matrices x and b in equation A * x = b should be column-vectors (num_of_cols ==1) \n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); 
     }
-
-/*
-    // Convert out matrices to the Eigen types:
-    MatrixXd a(N,N); for(i=0;i<N;i++){  for(j=0;j<N;j++){  a(i,j) = A.M[i*N+j];  }    }// for i
-    VectorXd x(N);   for(i=0;i<N;i++){  x(i) = 0.0;   }// for i
-    VectorXd b(N);   for(i=0;i<N;i++){  b(i) = B.M[i];   }// for i
-
-
-    // using a LU factorization
-    bool SolverOK = true;
-    x = A.partialPivLu().solve(b);   //  bool SolverOK = A.lu().solve(b, &x);
-
-    VectorXd resid = A*x - b;
-    double resnorm = resid.norm();
-    if(IsNan(resnorm) || resnorm > NormThreshold || !SolverOK){
-        std::cout << "Warning, LU solver failed." << endl;
-        if(!SolverOK){ std::cout << "Solver returned error." << endl; }
-        if(IsNan(resnorm)){ std::cout << "NaNs were returned" << endl; }
-        if(resnorm > NormThreshold){ std::cout << "Residual has norm " << resnorm
-                                         << " which exceeds the recommended threshold of " << NormThreshold
-                                         << endl;
-        }
-        std::cout << "Proceeding with singular value decomposition.";
-               
-        x = A.jacobiSvd().solve(b);   //     SolverOK = A.svd().solve(b, &x);
-        resid = A*x - b;
-        resnorm = resid.norm();
-
-        if(IsNan(resnorm) || !SolverOK){
-            std::cout << "SVD solver returned an error. Solution may be not reliable!\n";
+    // least_squares_solve takes non-const references and leaves its inputs untouched
+    MATRIX a(A);
+    MATRIX b(B);
+    least_squares_solve(a, X, b, 1);
+    MATRIX resid(B.n_rows, 1);  resid = a * X - b;
+    double resnorm = 0.0;
+    for(int i = 0; i < resid.n_rows; i++){ resnorm += resid.M[i] * resid.M[i]; }
+    resnorm = std::sqrt(resnorm);
+    if(!std::isfinite(resnorm) || resnorm > NormThreshold){
+        std::cout << "Warning, LU solver failed: the residual has norm " << resnorm
+                  << " which exceeds the recommended threshold of " << NormThreshold
+                  << ". Proceeding with singular value decomposition.\n";
+        least_squares_solve(a, X, b, 0);
+        resid = a * X - b;
+        resnorm = 0.0;
+        for(int i = 0; i < resid.n_rows; i++){ resnorm += resid.M[i] * resid.M[i]; }
+        resnorm = std::sqrt(resnorm);
+        if(!std::isfinite(resnorm)){
+            std::cout << "SVD solver returned a non-finite residual. Solution may be not reliable!\n";
             return false;
         }
-
-    }// if go into Jacobi SVD
-
-    std::cout << "The residual of the solution has norm " << resnorm << endl;
-
-    if (resnorm > NormThreshold) {
-      std::cout  << "Warning, the norm of the residual is " << resnorm
-                 << "which exceeds the recommended threshold of " << NormThreshold << endl;
+        if(resnorm > NormThreshold){
+            std::cout << "Warning, the norm of the residual is " << resnorm
+                      << " which exceeds the recommended threshold of " << NormThreshold << "\n";
+        }
     }
-
-    // Copy results from the intermediate variable back into the argument
-    for(i=0;i<N;i++){  X.M[i] = x(i);   }// for i
-*/
-
     return true;
 }
 
