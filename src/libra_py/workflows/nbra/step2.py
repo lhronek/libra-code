@@ -466,6 +466,19 @@ def run_cp2k_libint_step2(params):
                                                  step3 fragment_operator "pod") and POD_hab_{step}.npz (block energies and
                                                  couplings). Needs mo_source "wfn" [default: False].
 
+                             pod_schemes (list of str): the schemes compute_pod evaluates - "pod" (libra's POD, the global
+                                                 Lowdin orthogonalization), "pod2" (fragment-first orthogonalization, the coupling
+                                                 read between the non-orthogonal fragment states), "pod2l" and "pod2gs" (the
+                                                 donor-acceptor pairs of fragment states orthogonalized by Lowdin or by
+                                                 Gram-Schmidt first). Every scheme saves {SCHEME}_hab_{step}.npz (block energies
+                                                 E_b*, couplings V_b*, and for the pod2 family the raw couplings V_raw_* and the
+                                                 state overlaps S_*); "pod", "pod2l" and "pod2gs" also save the projectors
+                                                 P_{scheme}{f}_ks_{step}.npz (step3 fragment_operator) - "pod2" cannot, its
+                                                 states are not orthogonal across fragments [default: ["pod"]].
+
+                             pod2gs_kept_block (int): POD2GS - the fragment whose states stay unchanged in the Gram-Schmidt
+                                                 orthogonalization [default: 0].
+
                              read_pod_cp2k_files (bool): the diag template carries Futera's &PROPERTIES &ET_COUPLING
                                                     &PROJECTION (blocks = fragments) with the HAMILTONIAN,
                                                     WAVEFUNCTION and TRANSF_MATRIX_R prints: read the POD files of
@@ -560,6 +573,8 @@ def run_cp2k_libint_step2(params):
         'fragment_atom_lists': None,
         'read_pod_cp2k_files': False,
         'compute_pod': False,
+        'pod_schemes': ['pod'],
+        'pod2gs_kept_block': 0,
         'overlap_template': '',
         'cp2k_data_dir': '',
         'omp_num_threads': 1,
@@ -637,6 +652,9 @@ def run_cp2k_libint_step2(params):
     compute_pod = params['compute_pod']
     if compute_pod and fragment_atom_lists is None:
         raise ValueError('compute_pod needs fragment_atom_lists - the POD blocks are the fragments')
+    pod_schemes = [str(s).lower() for s in params['pod_schemes']]
+    if compute_pod and (not pod_schemes or any(s not in ('pod', 'pod2', 'pod2l', 'pod2gs') for s in pod_schemes)):
+        raise ValueError(F'pod_schemes {pod_schemes} - use "pod", "pod2", "pod2l" and/or "pod2gs"')
     read_pod_cp2k_files = params['read_pod_cp2k_files']
     if read_pod_cp2k_files and (mo_source != 'wfn' or ao_overlap_method != 'cp2k'):
         raise ValueError('read_pod_cp2k_files needs mo_source="wfn" with ao_overlap_method="cp2k" - the POD '
@@ -794,19 +812,32 @@ def run_cp2k_libint_step2(params):
                     H_ao = [pod_lib.ks_matrix_from_mos(mo_curr['C'], mo_curr['E'], S_ao)]
                     if isUKS:
                         H_ao.append(pod_lib.ks_matrix_from_mos(mo_curr['C_b'], mo_curr['E_b'], S_ao))
-                pod_nat = pod_lib.pod_block_states(H_ao, S_ao, mo_curr['ao_atom'], fragment_atom_lists)
                 lo, hi = lowest_orbital - 1, highest_orbital
-                P_nat_a = pod_lib.pod_fragment_operators(pod_nat, mo_curr['C'][lo:hi], 0)
-                P_nat_b = pod_lib.pod_fragment_operators(pod_nat, mo_curr['C_b'][lo:hi], 1) if isUKS else P_nat_a
-                resid = float(np.max(np.abs(sum(P_nat_a) - S_a)))
-                if resid > 1e-8:
-                    raise ValueError(F'step {step}: the POD projectors sum to S only within {resid:.2e}')
-                for f in range(pod_nat['n_blocks']):
-                    scipy.sparse.save_npz(params['res_dir'] + F'/P_pod{f}_ks_{step}.npz',
-                                          scipy.sparse.csc_matrix(data_conv.form_block_matrix(P_nat_a[f], zero_mat, zero_mat, P_nat_b[f])))
-                np.savez(params['res_dir'] + F'/POD_hab_{step}.npz',
-                         **{F'E_b{ib}_s{sp}': e for (ib, sp), e in pod_nat['energies'].items()},
-                         **{F'V_b{i}_b{j}_s{sp}': v for (i, j, sp), v in pod_nat['couplings'].items()})
+                for scheme in pod_schemes:
+                    if scheme == 'pod':
+                        pod_nat = pod_lib.pod_block_states(H_ao, S_ao, mo_curr['ao_atom'], fragment_atom_lists)
+                    else:
+                        pod_nat = pod_lib.pod2_block_states(H_ao, S_ao, mo_curr['ao_atom'], fragment_atom_lists,
+                                                            {'pod2': 'none', 'pod2l': 'lowdin', 'pod2gs': 'gram_schmidt'}[scheme],
+                                                            params['pod2gs_kept_block'])
+                    if scheme != 'pod2':
+                        # the fragment states of these schemes form one orthonormal set: the projectors sum to S
+                        # (the POD2 states are not orthogonal across fragments - no projectors, the hab file only)
+                        P_nat_a = pod_lib.pod_fragment_operators(pod_nat, mo_curr['C'][lo:hi], 0)
+                        P_nat_b = pod_lib.pod_fragment_operators(pod_nat, mo_curr['C_b'][lo:hi], 1) if isUKS else P_nat_a
+                        resid = float(np.max(np.abs(sum(P_nat_a) - S_a)))
+                        if resid > 1e-8:
+                            raise ValueError(F'step {step}: the {scheme} projectors sum to S only within {resid:.2e}')
+                        for f in range(pod_nat['n_blocks']):
+                            scipy.sparse.save_npz(params['res_dir'] + F'/P_{scheme}{f}_ks_{step}.npz',
+                                                  scipy.sparse.csc_matrix(data_conv.form_block_matrix(P_nat_a[f], zero_mat, zero_mat, P_nat_b[f])))
+                    extras = {}
+                    if scheme != 'pod':
+                        extras.update({F'V_raw_b{i}_b{j}_s{sp}': v for (i, j, sp), v in pod_nat['couplings_raw'].items()})
+                        extras.update({F'S_b{i}_b{j}_s{sp}': v for (i, j, sp), v in pod_nat['state_overlaps'].items()})
+                    np.savez(params['res_dir'] + F'/{scheme.upper()}_hab_{step}.npz',
+                             **{F'E_b{ib}_s{sp}': e for (ib, sp), e in pod_nat['energies'].items()},
+                             **{F'V_b{i}_b{j}_s{sp}': v for (i, j, sp), v in pod_nat['couplings'].items()}, **extras)
             if read_pod_cp2k_files:
                 # the POD blocks partition the orthogonalized AO space: the projectors sum to S
                 lo, hi = lowest_orbital - 1, highest_orbital
