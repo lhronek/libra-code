@@ -34,6 +34,7 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
+from libra_py import data_conv
 
 from libra_py import data_outs, data_read, data_stat, data_conv
 from libra_py import units, molden_methods, orthogonalizations
@@ -4609,6 +4610,41 @@ def _scan_overlap_template(text):
             has_dense = True
     return has_csr, has_dense
 
+def mulliken_fragment_operators(C_win, S_ao, frag_cols):
+    """
+    The Mulliken fragment operators over an MO window: P_f = 1/2 (C_f (S C^T)_f + transpose), C_f the
+    window MOs restricted to the AO columns of fragment f - the symmetrized oblique projector onto the
+    fragment's AO span, whose expectation value is the Mulliken population of the fragment. The
+    fragments' operators sum to the window's MO overlap C S C^T.
+
+    Args:
+        C_win (array (nwin, n_ao)): window MO coefficients (rows) in the AO order of S_ao
+        S_ao (array (n_ao, n_ao)): the AO overlap
+        frag_cols (list of index arrays): the AO columns of every fragment
+
+    Returns:
+        list over fragments of arrays (nwin, nwin)
+    """
+    C_m = data_conv.nparray2MATRIX(np.asarray(C_win))
+    S_m = data_conv.nparray2MATRIX(np.asarray(S_ao))
+    nwin, n_ao = C_m.num_of_rows, C_m.num_of_cols
+    SC = S_m * C_m.T()                                                   # (n_ao, nwin), DGEMM
+    rows = intList()
+    rows.extend(list(range(nwin)))
+    out = []
+    for cols in frag_cols:
+        ids = intList()
+        ids.extend([int(i) for i in cols])
+        nf = len(ids)
+        Cf = MATRIX(nwin, nf)
+        pop_submatrix(C_m, Cf, rows, ids)                                # the fragment's AO columns
+        SCf = MATRIX(nf, nwin)
+        pop_submatrix(SC, SCf, ids, rows)
+        P = data_conv.MATRIX2nparray(Cf * SCf, np.float64)              # (nwin, nwin), DGEMM
+        out.append(np.ascontiguousarray(0.5 * (P + P.T)))
+    return out
+
+
 def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
                          lowest_orbital, highest_orbital, params, fragment_atom_lists=None,
                          return_ao_overlap=False):
@@ -4763,12 +4799,7 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
         S_prev.append(np.ascontiguousarray((Cp @ S11 @ Cp.T).real))
         S_curr.append(np.ascontiguousarray((Cc @ S22 @ Cc.T).real))
         if frag_cols is not None:
-            SC = S22 @ Cc.T
-            P_spin = []
-            for cols in frag_cols:
-                P = Cc[:, cols] @ SC[cols, :]
-                P_spin.append(np.ascontiguousarray((0.5 * (P + P.T)).real))
-            P_frag.append(P_spin)
+            P_frag.append(mulliken_fragment_operators(Cc, S22, frag_cols))
     if frag_cols is not None:
         # fragment-major, each entry shaped like S_curr
         P_frag = [[P_spin[f] for P_spin in P_frag] for f in range(len(frag_cols))]
