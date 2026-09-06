@@ -28,6 +28,7 @@
 
 #include "liblinalg.h"
 #include "blas_interface.h"
+#include "buffer_io.h"
 
 
 /// liblibra namespace
@@ -1187,6 +1188,22 @@ void export_linalg_objects(){
   void (*expt_lapack_getri_v2)(const CMATRIX& A, CMATRIX& Ainv) = &lapack_getri;
   def("lapack_getri", expt_lapack_getri_v1);
   def("lapack_getri", expt_lapack_getri_v2);
+
+
+  ///============== bulk numpy <-> matrix transfer (buffer_io.h) ======================
+
+  void (*expt_set_from_buffer_v1)(MATRIX& m, boost::python::object buf) = &set_from_buffer;
+  void (*expt_set_from_buffer_v2)(CMATRIX& m, boost::python::object buf) = &set_from_buffer;
+  void (*expt_set_from_buffer_v3)(IMATRIX& m, boost::python::object buf) = &set_from_buffer;
+  def("set_from_buffer", expt_set_from_buffer_v1);
+  def("set_from_buffer", expt_set_from_buffer_v2);
+  def("set_from_buffer", expt_set_from_buffer_v3);
+  void (*expt_copy_to_buffer_v1)(MATRIX& m, boost::python::object buf) = &copy_to_buffer;
+  void (*expt_copy_to_buffer_v2)(CMATRIX& m, boost::python::object buf) = &copy_to_buffer;
+  void (*expt_copy_to_buffer_v3)(IMATRIX& m, boost::python::object buf) = &copy_to_buffer;
+  def("copy_to_buffer", expt_copy_to_buffer_v1);
+  def("copy_to_buffer", expt_copy_to_buffer_v2);
+  def("copy_to_buffer", expt_copy_to_buffer_v3);
 
 
 }// export_linalg_objects()
