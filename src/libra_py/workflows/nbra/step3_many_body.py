@@ -244,6 +244,17 @@ def compute_ci_energies_midpoint(ci_energies, _params):
     return ci_midpoint_energies
 
 
+def _normalized_columns(T, step):
+    """The CMATRIX of T with every column scaled to unit norm, the column sums taken row by row (the
+    order of the former element loop) - a column without any configuration (a CI state with no SD
+    in the basis) raises instead of dividing by zero."""
+    sums = np.add.reduce(np.abs(T) ** 2, axis=0)
+    if not np.all(sums > 0.0):
+        empty = np.flatnonzero(sums == 0.0).tolist()
+        raise ValueError(F"step {step}: CI states {empty} have no configuration in the SD basis - their T columns are zero")
+    return data_conv.nparray2CMATRIX(T * (1.0 / np.sqrt(sums)))
+
+
 def _kernel_input(M):
     """The two-spinor MO matrix of a step as the ndarray the SD-overlap kernels take - real when its
     imaginary part vanishes (the real LAPACK and BLAS paths), complex otherwise."""
@@ -305,7 +316,8 @@ def make_T_matrices(ci_coefficients, ci_basis_states, spin_components, sd_states
 
     # Compute
     for step in range(fstep - istep):
-        SD2CI.append(CMATRIX(nSDs, nCIs))
+        # assembled as an ndarray, lifted to the CMATRIX once after the normalization
+        T = np.zeros((nSDs, nCIs), dtype=np.complex128)
 
         # Make the list of ci_coefficients for each step in the way Libra accepts
         # ci_coefficients_libra.append( [] ) -  deprecate AVA 7/8
@@ -316,7 +328,7 @@ def make_T_matrices(ci_coefficients, ci_basis_states, spin_components, sd_states
         # ci_coefficients_libra[step][0][0] = 1.0
 
         # Ground state "CI"
-        SD2CI[step].set(0, 0, 1.0 + 0.0j)
+        T[0, 0] = 1.0 + 0.0j
 
         if verbosity >= 2:
             print(F"   ========== in step {step} ===========")
@@ -364,21 +376,16 @@ def make_T_matrices(ci_coefficients, ci_basis_states, spin_components, sd_states
 
                     # ci_coefficients_libra[step][i+1][j+1] =
                     # float(ci_coefficients[step][i][item_index])  # deprecate - AVA 7/8
-                    SD2CI[step].set(j + 1, i + 1, float(ci_coefficients[step][i][item_index]) * 1.0 + 0.0j)
+                    T[j + 1, i + 1] = float(ci_coefficients[step][i][item_index]) * 1.0 + 0.0j
 
         if verbosity >= 2:
             print("Matrix before the normalization")
-            data_outs.print_matrix(SD2CI[step])
+            data_outs.print_matrix(data_conv.nparray2CMATRIX(T))
 
         # Sanity check. Make sure sum of squared elements of columns == 1:
-        for i in range(nCIs):
-            check_norm = 0.0
-            for j in range(nSDs):
-                # check_norm += ci_coefficients_libra[step][i][j]**2
-                check_norm += abs(SD2CI[step].get(j, i))**2
-            check_norm = 1.0 / math.sqrt(check_norm)
-
-            SD2CI[step].scale(-1, i, check_norm * (1.0 + 0.0j))
+        # check_norm += ci_coefficients_libra[step][i][j]**2  (the element loop - now the column sums of
+        # _normalized_columns, summed row by row in the same order)
+        SD2CI.append(_normalized_columns(T, step))
 
         if verbosity >= 2:
             print("Matrix after the normalization")
@@ -449,10 +456,11 @@ def make_T_matrices_fast(ci_coefficients, ci_basis_states, spin_components, sd_b
         if verbosity >= 2:
             print(F"   ========== in step {step} ===========")
 
-        SD2CI.append(CMATRIX(nSDs, nCIs))
+        # assembled as an ndarray, lifted to the CMATRIX once after the normalization
+        T = np.zeros((nSDs, nCIs), dtype=np.complex128)
 
         # Ground state "CI"
-        SD2CI[step].set(0, 0, 1.0 + 0.0j)
+        T[0, 0] = 1.0 + 0.0j
 
         # Excited states "CI"s
         for i in range(number_of_states):
@@ -474,21 +482,16 @@ def make_T_matrices_fast(ci_coefficients, ci_basis_states, spin_components, sd_b
                     indx = sd_basis_states_unique.index(conf)
                     val = ci_coefficients[step][i][k] * (1.0 + 0.0j)
 
-                    SD2CI[step].set(indx + 1, i + 1, val)
+                    T[indx + 1, i + 1] = val
 
         if verbosity >= 2:
             print("Matrix before the normalization")
-            data_outs.print_matrix(SD2CI[step])
+            data_outs.print_matrix(data_conv.nparray2CMATRIX(T))
 
         # Sanity check. Make sure sum of squared elements of columns == 1:
-        for i in range(nCIs):
-            check_norm = 0.0
-            for j in range(nSDs):
-                # check_norm += ci_coefficients_libra[step][i][j]**2
-                check_norm += abs(SD2CI[step].get(j, i))**2
-            check_norm = 1.0 / math.sqrt(check_norm)
-
-            SD2CI[step].scale(-1, i, check_norm * (1.0 + 0.0j))
+        # check_norm += ci_coefficients_libra[step][i][j]**2  (the element loop - now the column sums of
+        # _normalized_columns, summed row by row in the same order)
+        SD2CI.append(_normalized_columns(T, step))
 
         if verbosity >= 2:
             print("Matrix after the normalization")
