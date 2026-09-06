@@ -22,7 +22,7 @@ orthogonalize the donor-acceptor pairs of states first - symmetrically (Lowdin) 
 fragment's state (Gram-Schmidt).
 """
 import numpy as np
-from liblibra_core import MATRIX, intList, solve_eigen, sqrt_matrix, pop_submatrix, have_lapack, lapack_syevd
+from liblibra_core import MATRIX, intList, solve_eigen, sqrt_matrix, pop_submatrix, have_lapack, lapack_syevd, set_from_buffer
 from libra_py import data_conv
 
 
@@ -45,8 +45,7 @@ def _ao_blocks(ao_atom, fragment_atom_lists):
 
 def _ilist(idx):
     out = intList()
-    for i in idx:
-        out.append(int(i))
+    out.extend([int(i) for i in idx])
     return out
 
 
@@ -103,7 +102,7 @@ def pod_block_states(H_list, S, ao_atom, fragment_atom_lists):
             _eigh_ascending(Hff, E, Uf)
             U.append(Uf)
             ids.append(ib)
-            out["energies"][(f, sp)] = np.array([E.get(i, i) for i in range(nb)])
+            out["energies"][(f, sp)] = np.diag(data_conv.MATRIX2nparray(E, np.float64)).copy()
             # block MOs back in the AO basis: c = S^-1/2 (U embedded in the block rows)
             Xf = MATRIX(n, nb)
             pop_submatrix(X, Xf, all_rows, ib)
@@ -244,7 +243,7 @@ def pod2_block_states(H_list, S, ao_atom, fragment_atom_lists, orthogonalization
             Ct = MATRIX(nb, nb)
             _eigh_ascending(Ht, E, Ct)
             C_blk.append(X[f] * Ct)                                       # fragment eigenstates in the block's AOs
-            out["energies"][(f, sp)] = np.array([E.get(i, i) for i in range(nb)])
+            out["energies"][(f, sp)] = np.diag(data_conv.MATRIX2nparray(E, np.float64)).copy()
         for i in range(nblk):
             for j in range(i + 1, nblk):
                 Hij = MATRIX(len(blocks[i]), len(blocks[j]))
@@ -321,6 +320,5 @@ def ks_matrix_from_mos(C, E, S, tol=1e-6):
     if dev > tol:
         raise ValueError(F"the MOs are not orthonormal in S (|C S C^T - 1| = {dev:.1e})")
     E_m = MATRIX(n, n)
-    for i, e in enumerate(np.asarray(E, dtype=float)):
-        E_m.set(i, i, float(e))
+    set_from_buffer(E_m, np.ascontiguousarray(np.diag(np.asarray(E, dtype=float))))
     return data_conv.MATRIX2nparray(SCt * E_m * SCt.T(), np.float64)         # S C^T E C S
