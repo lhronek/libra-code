@@ -141,14 +141,18 @@ def sd2ci_matrix(ci_data, sd_unique, lowest_orbital):
     for [o, v], sp in sd_unique:
         lo_o, hi_o, lo_v, hi_v = ref.get(sp, (o, o, v, v))
         ref[sp] = (min(lo_o, o), max(hi_o, o), min(lo_v, v), max(hi_v, v))
+    # the row of every basis configuration (the first row of a repeated entry) - one dict lookup per
+    # configuration instead of a scan of sd_unique (states x configurations x SDs comparisons per call)
+    rows = {}
+    for j, ([o, v], sp) in enumerate(sd_unique):
+        rows.setdefault(((o, v), sp), j)
     for i, (confs, amps) in enumerate(zip(ci_data["configs"], ci_data["amps"])):
         spins = ci_data["spins"][i] if "spins" in ci_data else ["alp"] * len(confs)
         truncated = []
         for c, a, sp in zip(confs, amps, spins):
             cw = [c[0] - lowest_orbital + 1, c[1] - lowest_orbital + 1]
-            try:
-                j = sd_unique.index([cw, sp])
-            except ValueError:
+            j = rows.get(((cw[0], cw[1]), sp))
+            if j is None:
                 if sp not in ref:
                     raise ValueError(
                         F"CI state {i+1} carries a '{sp}' configuration {c[0]}->{c[1]} "
