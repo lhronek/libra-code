@@ -695,3 +695,17 @@ def ovlp_mat_arb_auto(SD1, SD2, S2, active_space=None, mem_limit_mb=256):
     if res is None:
         res = ovlp_mat_arb_batched(SD1, SD2, S2, active_space, mem_limit_mb)
     return res
+
+
+SD_OVERLAP_KERNELS = {"per_pair": ovlp_mat_arb, "batched": ovlp_mat_arb_batched,
+                      "lemma": ovlp_mat_arb_lemma_only, "auto": ovlp_mat_arb_auto}
+
+
+def sd_overlap_kernel(name):
+    """The kernel behind the sd_overlap_kernel option, shared by the step-3 routes and the CP2K
+    driver: 'auto' (the determinant lemma with the batched fallback), 'batched', 'lemma' (raises
+    when the lemma declines), 'per_pair' (the ovlp_mat_arb loop). Every kernel takes the two-spinor
+    MO matrix as an ndarray and returns the listed-order overlaps as an ndarray."""
+    if name not in SD_OVERLAP_KERNELS:
+        raise ValueError(F"sd_overlap_kernel {name!r} - use one of {list(SD_OVERLAP_KERNELS)}")
+    return SD_OVERLAP_KERNELS[name]

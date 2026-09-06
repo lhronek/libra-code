@@ -4334,10 +4334,7 @@ def sd_overlaps(sd_states, St_mo, S_mo_prev, S_mo_curr, orthonormalize=True,
         raise ValueError(f"unknown orthonormalize mode: {orthonormalize}")
     if mode == "lowdin_cached" and cache is None:
         raise ValueError("orthonormalize='lowdin_cached' requires a cache dict")
-    ovlp = {"per_pair": mapping.ovlp_mat_arb,
-            "batched": mapping.ovlp_mat_arb_batched,
-            "lemma": mapping.ovlp_mat_arb_lemma_only,
-            "auto": mapping.ovlp_mat_arb_auto}[kernel]
+    ovlp = mapping.sd_overlap_kernel(kernel)
     if sd_states_prev is None:
         sd_states_prev = sd_states
     n_half = (St_mo[0] if isinstance(St_mo, (tuple, list)) else St_mo).shape[0]

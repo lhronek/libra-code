@@ -3599,11 +3599,7 @@ def _compute_sd_overlaps(step, params):
     # SD overlap kernel: "auto" = batched LAPACK determinants + determinant-lemma shortcut
     # for low-degree excitations (machine precision vs the legacy per-pair loop, orders of
     # magnitude faster for large SD bases); "batched"/"lemma" force one; "per_pair" = ovlp_mat_arb
-    kernel = params.get('sd_overlap_kernel', 'auto')
-    ovlp = {'per_pair': mapping.ovlp_mat_arb,
-            'batched': mapping.ovlp_mat_arb_batched,
-            'lemma': mapping.ovlp_mat_arb_lemma_only,
-            'auto': mapping.ovlp_mat_arb_auto}[kernel]
+    ovlp = mapping.sd_overlap_kernel(params.get('sd_overlap_kernel', 'auto'))
 
     #print("active_space = ", active_space)
     #print("active_space2 = ", active_space2)
