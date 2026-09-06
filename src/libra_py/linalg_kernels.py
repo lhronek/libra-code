@@ -2,9 +2,10 @@
 numpy-facing entry points to libra's BLAS/LAPACK kernels. The arrays cross into MATRIX / CMATRIX through
 the bulk transfer (one memcpy each way), the work runs in OpenBLAS (dgemm / zgemm through the MATRIX
 products) and LAPACK (dsyevd / zheevd, dgesdd / zgesdd, dgetri / zgetri, the pivot-product determinant)
-through liblinalg, and numpy arrays come back. For the python workflows that hold numpy arrays and would
-otherwise call numpy.linalg - the names mirror numpy's. Real inputs stay real (MATRIX), any complex input
-promotes the operation to CMATRIX.
+through liblinalg, and numpy arrays come back. The names mirror numpy's. Real inputs stay real (MATRIX), any
+complex input promotes the operation to CMATRIX. For NUMPY-RESIDENT operands numpy's own @, eigvalsh, svd and
+inv are faster (the transfer and the intermediate matrices cost 1.2-9x at every size measured, 2026-09-06) -
+these entry points serve the flows whose data must run on libra's kernels.
 """
 import numpy as np
 from liblibra_core import MATRIX, CMATRIX, lapack_syevd, lapack_heevd, lapack_gesdd, lapack_getri, lapack_det

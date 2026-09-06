@@ -38,7 +38,6 @@ import time
 import glob
 import json
 import numpy as np
-from libra_py import linalg_kernels
 from libra_py.workflows.nbra.mp_context import MP_CTX as _MP_CTX
 import scipy.sparse as sp
 if sys.platform == "cygwin":
@@ -2142,7 +2141,7 @@ def _validate_cmatrix_overlap(S, label):
     # 8-significant-digit text archives carry ~1e-8-scale round-off
     # asymmetry - the structural Hermiticity test must sit above it
     validate_overlap_matrix(S_np, label, sym_tol=1e-6)
-    w_min = float(linalg_kernels.eigh(0.5 * (S_np + S_np.conj().T))[0].min())
+    w_min = float(np.linalg.eigvalsh(0.5 * (S_np + S_np.conj().T)).min())
     if w_min < -1e-8 * max(1.0, float(np.abs(S_np).max())):
         raise ValueError(
             F"{label}: the overlap matrix has a negative eigenvalue "
@@ -2155,7 +2154,7 @@ def _check_contraction(St, step, basis, tol=1e-6):
     after the Lowdin stage means the two sides were orthonormalized
     against inconsistent metrics (e.g. a wrong-time overlap) and the
     couplings are inflated."""
-    smax = float(linalg_kernels.singular_values(St)[0])
+    smax = float(np.linalg.svd(St, compute_uv=False).max())
     if smax > 1.0 + tol:
         raise ValueError(
             F"orthonormalized {basis} time-overlap at step {step} has "
@@ -2467,8 +2466,8 @@ def _orthonormalize_ks_overlaps(step, params):
             U1 = get_Lowdin_scipy(S_1d)
         U2 = get_Lowdin_scipy(S_2d)
         _lowdin_cache_put(step + 1, lowdin_digest(S_2d), U2)
-        St_step = linalg_kernels.product(U1.conj().T, np.asarray(St_step.todense()), U2)
-        S_step = linalg_kernels.product(U1.conj().T, np.asarray(S_1d), U1)
+        St_step = np.linalg.multi_dot([U1.conj().T, St_step.todense(), U2])
+        S_step = np.linalg.multi_dot([U1.conj().T, S_1d, U1])
     else:
         St_step, S_step = apply_orthonormalization_scipy(S_1.todense(), S_2.todense(), St_step.todense())
 
@@ -2702,7 +2701,7 @@ def localize_fragment_block(P_frag, rows):
         left = Q.shape[1]
         if left == 0:
             break
-        M = linalg_kernels.product(Q.T, B, Q)
+        M = Q.T @ B @ Q
         if f == len(blocks) - 1:
             n_f = left
         else:
@@ -2713,11 +2712,11 @@ def localize_fragment_block(P_frag, rows):
                                  F"not an integer, the fragments do not localize this manifold")
         if n_f == 0:
             continue
-        vals, vecs = linalg_kernels.eigh(M)
+        vals, vecs = np.linalg.eigh(M)
         vecs = vecs[:, np.argsort(-vals)]
-        cols.append(linalg_kernels.product(Q, vecs[:, :n_f]))
+        cols.append(Q @ vecs[:, :n_f])
         frag += [f] * n_f
-        Q = linalg_kernels.product(Q, vecs[:, n_f:])
+        Q = Q @ vecs[:, n_f:]
     w = np.concatenate(cols, axis=1)
     pops = np.stack([np.einsum("jc,jk,kc->c", w, B, w) for B in blocks], axis=1)
     return w, frag, pops
@@ -2819,7 +2818,7 @@ def sd_diabatization_step(sd_lists, P_frag, kind, dia_index=None, active_space=N
         for j, k in enumerate(g["rows"]):
             W[k, col] = g["tau"][j] * g["sigma"][j] * w[j, c]
         pops_out[col] = pops[c]
-    dev = float(np.abs(linalg_kernels.product(W.T, W) - np.eye(nsd)).max())
+    dev = float(np.abs(W.T @ W - np.eye(nsd)).max())
     if dev > 1e-8:
         raise ValueError(F"the diabatic transformation is not orthogonal (|W^T W - 1| = {dev:.2e})")
     return W, dia_index, pops_out, pops_hole
@@ -2868,7 +2867,7 @@ def _sd_diabatization_series(params, sd_sorted, active_space, start_time, finish
             s_ks = np.array(sp.load_npz(F'{res_dir_1}/S_ks_{step}.npz').todense()
                             [active_space, :][:, active_space]).real
             X = orthogonalizations.get_Lowdin_scipy(s_ks)
-            P_frag = [linalg_kernels.product(X.T, P, X) for P in P_frag]
+            P_frag = [X.T @ P @ X for P in P_frag]
         W, dia_index, pops, pops_hole = sd_diabatization_step(sd_sorted[i], P_frag, kind, dia_index,
                                                               active_space, params['data_dim'])
         W_list.append(W)
@@ -3352,7 +3351,7 @@ def run_step3_sd_nacs_libint(params):
         # the localization eigenvectors carry arbitrary signs - the diabatic states
         # follow the trajectory through the raw SD time overlaps of their own basis
         for i in range(len(St_sds)):
-            O = linalg_kernels.product(W_dia[i].T, np.asarray(St_sds[i].todense()).real, W_dia[i + 1])
+            O = W_dia[i].T @ np.asarray(St_sds[i].todense()).real @ W_dia[i + 1]
             W_dia[i + 1] = W_dia[i + 1] * np.where(np.diag(O) < 0.0, -1.0, 1.0)
     if params['do_state_reordering'] == 2 or params['do_state_reordering'] == 1:
         t2 = time.time()
@@ -3403,7 +3402,7 @@ def run_step3_sd_nacs_libint(params):
                 sd2ci_prev = SD2CI[i]
                 sd2ci_curr = SD2CI[i + 1]
                 # Compute the St_ci
-                St_ci = linalg_kernels.product(sd2ci_prev.T, np.asarray(St_sds[i].todense()).real, sd2ci_curr)
+                St_ci = np.linalg.multi_dot([sd2ci_prev.T, St_sds[i].todense().real, sd2ci_curr])
                 St_cis.append(sp.csc_matrix(St_ci))
 
             # Now we need to apply state-reordering to St_cis
@@ -3446,7 +3445,7 @@ def run_step3_sd_nacs_libint(params):
                 sd2ci_prev = SD2CI[i]
                 sd2ci_curr = SD2CI[i + 1]
                 # Compute the St_ci
-                St_ci = linalg_kernels.product(sd2ci_prev.T, np.asarray(St_sds[i].todense()).real, sd2ci_curr)
+                St_ci = np.linalg.multi_dot([sd2ci_prev.T, St_sds[i].todense().real, sd2ci_curr])
                 St_cis.append(sp.csc_matrix(St_ci))
                 # indexed by the loop variable: `step` is stale here (frozen at
                 # finish_time - 2 by the energy loop above), so every iteration
@@ -3667,7 +3666,7 @@ def _compute_sd_overlaps(step, params):
 
     if mode == "lowdin_cached":
         print('Applying orthonormalization for SDs for step', step)
-        st_sd = linalg_kernels.product(U1.conj().T, st_sd.real, U2)
+        st_sd = np.linalg.multi_dot([U1.conj().T, st_sd.real, U2])
     elif mode == "lowdin":
         print('Applying orthonormalization for SDs for step', step)
         st_sd, s_sd = apply_orthonormalization_scipy(s_sd_1.real, s_sd_2.real, st_sd.real)
