@@ -385,17 +385,6 @@ def _check_homo_bracket(step, isxTB, isUKS, lowest_orbital, highest_orbital):
                          F"lowest_orbital <= HOMO < highest_orbital")
 
 
-def _window_mo_matrix(C_bra, AO, C_ket, lowest_orbital, highest_orbital):
-    """C_bra[w] AO C_ket[w]^T over the MO window w = [lowest_orbital - 1, highest_orbital) as an ndarray:
-    the window rows enter the MATRIX products (dgemm), the bilinear form of the other stored MOs is never
-    formed. AO is the libint MATRIX of the AO integrals, C_bra / C_ket the MO coefficient rows (nmo x nao),
-    the same object for a same-time matrix."""
-    lo, hi = lowest_orbital - 1, highest_orbital
-    Cb = data_conv.nparray2MATRIX(C_bra[lo:hi])
-    Ck = Cb if C_ket is C_bra else data_conv.nparray2MATRIX(C_ket[lo:hi])
-    return data_conv.MATRIX2nparray(Cb * AO * Ck.T(), np.float64)
-
-
 def run_cp2k_libint_step2(params):
     """
     This function runs the step2 for computing the MO overlaps for both DFT and xTB calculations and saves them as sparse
@@ -998,16 +987,16 @@ def run_cp2k_libint_step2(params):
                     # component writes the standard S_ks file name, so the
                     # emultipole route stays a superset of the plain one
                     for counter1 in range(len(emultipole_labels)):
-                        A_alpha = _window_mo_matrix(alpha_eigenvectors_1, AO_c_all[emultipole_index[counter1]], alpha_eigenvectors_1, lowest_orbital, highest_orbital)
-                        A_beta = _window_mo_matrix(beta_eigenvectors_1, AO_c_all[emultipole_index[counter1]], beta_eigenvectors_1, lowest_orbital, highest_orbital)
+                        A_alpha = CP2K_methods.mo_window_matrix(alpha_eigenvectors_1, AO_c_all[emultipole_index[counter1]], alpha_eigenvectors_1, lowest_orbital, highest_orbital)
+                        A_beta = CP2K_methods.mo_window_matrix(beta_eigenvectors_1, AO_c_all[emultipole_index[counter1]], beta_eigenvectors_1, lowest_orbital, highest_orbital)
                         zero_mat = np.zeros((len(A_alpha), len(A_beta)))
                         A_step = data_conv.form_block_matrix(A_alpha, zero_mat, zero_mat.T, A_beta)
                         scipy.sparse.save_npz(params['res_dir'] +
                                               F'/{emultipole_labels[counter1]}_ks_{step}.npz',
                                               scipy.sparse.csc_matrix(A_step))
                 else:
-                    S_alpha = _window_mo_matrix(alpha_eigenvectors_1, AO_S, alpha_eigenvectors_1, lowest_orbital, highest_orbital)
-                    S_beta = _window_mo_matrix(beta_eigenvectors_1, AO_S, beta_eigenvectors_1, lowest_orbital, highest_orbital)
+                    S_alpha = CP2K_methods.mo_window_matrix(alpha_eigenvectors_1, AO_S, alpha_eigenvectors_1, lowest_orbital, highest_orbital)
+                    S_beta = CP2K_methods.mo_window_matrix(beta_eigenvectors_1, AO_S, beta_eigenvectors_1, lowest_orbital, highest_orbital)
                     # creating zero matrix
                     mat_block_size = (len(S_alpha), len(S_beta))
                     zero_mat = np.zeros(mat_block_size)
@@ -1040,7 +1029,7 @@ def run_cp2k_libint_step2(params):
                 if params['use_emultipole']:
                     for counter1 in range(len(emultipole_labels)):
                         # I'll keep the same naming for matrices as it is more convenient
-                        S = _window_mo_matrix(eigenvectors_1, AO_c_all[emultipole_index[counter1]], eigenvectors_1, lowest_orbital, highest_orbital)
+                        S = CP2K_methods.mo_window_matrix(eigenvectors_1, AO_c_all[emultipole_index[counter1]], eigenvectors_1, lowest_orbital, highest_orbital)
                         mat_block_size = len(S)
                         zero_mat = np.zeros((mat_block_size, mat_block_size))
                         S_step = data_conv.form_block_matrix(S, zero_mat, zero_mat, S)
@@ -1049,7 +1038,7 @@ def run_cp2k_libint_step2(params):
                         scipy.sparse.save_npz(params['res_dir'] +
                                               F'/{emultipole_labels[counter1]}_ks_{step}.npz', S_step_sparse)
                 else:
-                    S = _window_mo_matrix(eigenvectors_1, AO_S, eigenvectors_1, lowest_orbital, highest_orbital)
+                    S = CP2K_methods.mo_window_matrix(eigenvectors_1, AO_S, eigenvectors_1, lowest_orbital, highest_orbital)
                     # creating zero matrix
                     mat_block_size = len(S)
                     zero_mat = np.zeros((mat_block_size, mat_block_size))
@@ -1190,10 +1179,10 @@ def run_cp2k_libint_step2(params):
                     # previous step's channel as the bra; the 'S' component
                     # writes the standard S_ks/St_ks file names
                     for counter1 in range(len(emultipole_labels)):
-                        A_alpha = _window_mo_matrix(alpha_eigenvectors_2, AO_c_all[emultipole_index[counter1]], alpha_eigenvectors_2, lowest_orbital, highest_orbital)
-                        A_beta = _window_mo_matrix(beta_eigenvectors_2, AO_c_all[emultipole_index[counter1]], beta_eigenvectors_2, lowest_orbital, highest_orbital)
-                        At_alpha = _window_mo_matrix(alpha_eigenvectors_1, AO_t_all[emultipole_index[counter1]], alpha_eigenvectors_2, lowest_orbital, highest_orbital)
-                        At_beta = _window_mo_matrix(beta_eigenvectors_1, AO_t_all[emultipole_index[counter1]], beta_eigenvectors_2, lowest_orbital, highest_orbital)
+                        A_alpha = CP2K_methods.mo_window_matrix(alpha_eigenvectors_2, AO_c_all[emultipole_index[counter1]], alpha_eigenvectors_2, lowest_orbital, highest_orbital)
+                        A_beta = CP2K_methods.mo_window_matrix(beta_eigenvectors_2, AO_c_all[emultipole_index[counter1]], beta_eigenvectors_2, lowest_orbital, highest_orbital)
+                        At_alpha = CP2K_methods.mo_window_matrix(alpha_eigenvectors_1, AO_t_all[emultipole_index[counter1]], alpha_eigenvectors_2, lowest_orbital, highest_orbital)
+                        At_beta = CP2K_methods.mo_window_matrix(beta_eigenvectors_1, AO_t_all[emultipole_index[counter1]], beta_eigenvectors_2, lowest_orbital, highest_orbital)
                         zero_mat = np.zeros((len(A_alpha), len(A_beta)))
                         A_step = data_conv.form_block_matrix(A_alpha, zero_mat, zero_mat.T, A_beta)
                         At_step = data_conv.form_block_matrix(At_alpha, zero_mat, zero_mat.T, At_beta)
@@ -1204,11 +1193,11 @@ def run_cp2k_libint_step2(params):
                                               F'/{emultipole_labels[counter1]}t_ks_{step-1}.npz',
                                               scipy.sparse.csc_matrix(At_step))
                 else:
-                    S_alpha = _window_mo_matrix(alpha_eigenvectors_2, AO_S, alpha_eigenvectors_2, lowest_orbital, highest_orbital)
-                    St_alpha = _window_mo_matrix(alpha_eigenvectors_1, AO_St, alpha_eigenvectors_2, lowest_orbital, highest_orbital)
+                    S_alpha = CP2K_methods.mo_window_matrix(alpha_eigenvectors_2, AO_S, alpha_eigenvectors_2, lowest_orbital, highest_orbital)
+                    St_alpha = CP2K_methods.mo_window_matrix(alpha_eigenvectors_1, AO_St, alpha_eigenvectors_2, lowest_orbital, highest_orbital)
 
-                    S_beta = _window_mo_matrix(beta_eigenvectors_2, AO_S, beta_eigenvectors_2, lowest_orbital, highest_orbital)
-                    St_beta = _window_mo_matrix(beta_eigenvectors_1, AO_St, beta_eigenvectors_2, lowest_orbital, highest_orbital)
+                    S_beta = CP2K_methods.mo_window_matrix(beta_eigenvectors_2, AO_S, beta_eigenvectors_2, lowest_orbital, highest_orbital)
+                    St_beta = CP2K_methods.mo_window_matrix(beta_eigenvectors_1, AO_St, beta_eigenvectors_2, lowest_orbital, highest_orbital)
 
                     # its own zero block: the emultipole branch's zero_mat is not
                     # defined on this path (NameError, or a stale shape from a
@@ -1249,7 +1238,7 @@ def run_cp2k_libint_step2(params):
                         # computed over shell_2, so the contraction must use the current
                         # MOs (eigenvectors_1 still holds the previous step's here -
                         # it rotates only at the end of the loop)
-                        S = _window_mo_matrix(eigenvectors_2, AO_c_all[emultipole_index[counter1]], eigenvectors_2, lowest_orbital, highest_orbital)
+                        S = CP2K_methods.mo_window_matrix(eigenvectors_2, AO_c_all[emultipole_index[counter1]], eigenvectors_2, lowest_orbital, highest_orbital)
                         mat_block_size = len(S)
                         zero_mat = np.zeros((mat_block_size, mat_block_size))
                         S_step = data_conv.form_block_matrix(S, zero_mat, zero_mat, S)
@@ -1257,15 +1246,15 @@ def run_cp2k_libint_step2(params):
                         S_step_sparse = scipy.sparse.csc_matrix(S_step)
                         scipy.sparse.save_npz(params['res_dir'] +
                                               F'/{emultipole_labels[counter1]}_ks_{step}.npz', S_step_sparse)
-                        St = _window_mo_matrix(eigenvectors_1, AO_t_all[emultipole_index[counter1]], eigenvectors_2, lowest_orbital, highest_orbital)
+                        St = CP2K_methods.mo_window_matrix(eigenvectors_1, AO_t_all[emultipole_index[counter1]], eigenvectors_2, lowest_orbital, highest_orbital)
                         St_step = data_conv.form_block_matrix(St, zero_mat, zero_mat, St)
                         St_step_sparse = scipy.sparse.csc_matrix(St_step)
                         scipy.sparse.save_npz(params['res_dir'] +
                                               F'/{emultipole_labels[counter1]}t_ks_{step-1}.npz', St_step_sparse)
 
                 else:
-                    S = _window_mo_matrix(eigenvectors_2, AO_S, eigenvectors_2, lowest_orbital, highest_orbital)
-                    St = _window_mo_matrix(eigenvectors_1, AO_St, eigenvectors_2, lowest_orbital, highest_orbital)
+                    S = CP2K_methods.mo_window_matrix(eigenvectors_2, AO_S, eigenvectors_2, lowest_orbital, highest_orbital)
+                    St = CP2K_methods.mo_window_matrix(eigenvectors_1, AO_St, eigenvectors_2, lowest_orbital, highest_orbital)
                     S_step = data_conv.form_block_matrix(S, zero_mat, zero_mat, S)
                     St_step = data_conv.form_block_matrix(St, zero_mat, zero_mat, St)
                     S_step_sparse = scipy.sparse.csc_matrix(S_step)

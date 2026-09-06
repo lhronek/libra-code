@@ -4157,6 +4157,17 @@ def load_molden_data(molden_file, is_spherical=True, isUKS=False):
     return out
 
 
+def mo_window_matrix(C_bra, AO, C_ket, lowest_orbital, highest_orbital):
+    """C_bra[w] AO C_ket[w]^T over the MO window w = [lowest_orbital - 1, highest_orbital) as an ndarray:
+    the window rows enter the MATRIX products (dgemm), the bilinear form of the other stored MOs is never
+    formed. AO is the libint MATRIX of the AO integrals, C_bra / C_ket the MO coefficient rows (nmo x nao),
+    the same object for a same-time matrix. Shared by the driver's mo_overlap and the libint step-2 branch."""
+    lo, hi = lowest_orbital - 1, highest_orbital
+    Cb = data_conv.nparray2MATRIX(C_bra[lo:hi])
+    Ck = Cb if C_ket is C_bra else data_conv.nparray2MATRIX(C_ket[lo:hi])
+    return data_conv.MATRIX2nparray(Cb * AO * Ck.T(), np.float64)
+
+
 def mo_overlap(data1, data2, lowest_orbital, highest_orbital, nprocs=1):
     """
     Windowed MO overlap  S_ij = <phi_i(R1)|phi_j(R2)>  (one spin channel).
@@ -4178,10 +4189,9 @@ def mo_overlap(data1, data2, lowest_orbital, highest_orbital, nprocs=1):
             raise ValueError(F"orbital window [{lowest_orbital}, {highest_orbital}] does "
                              F"not fit the {nmo} stored MOs (1-based) - increase ADDED_MOS "
                              F"in the template or adjust lowest_orbital/highest_orbital")
-    S_ao = data_conv.MATRIX2nparray(compute_overlaps(data1["shell"], data2["shell"], nprocs))
-    lo, hi = lowest_orbital - 1, highest_orbital
-    S = data1["C"][lo:hi] @ S_ao @ data2["C"][lo:hi].T   # window first: O(win*nao^2)
-    return np.ascontiguousarray(S.real)
+    # the libint MATRIX enters the window contraction as it is (window first: O(win*nao^2))
+    return mo_window_matrix(data1["C"], compute_overlaps(data1["shell"], data2["shell"], nprocs), data2["C"],
+                            lowest_orbital, highest_orbital)
 
 
 def align_mo_phases(C_prev_aligned, data_curr, St_mo):
