@@ -30,8 +30,38 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 
+import numpy as np
 from libra_py import units
 from libra_py import data_stat
+from libra_py import data_conv
+
+
+def _diagonal_energies(Hvib):
+    """The diagonal (state energies) of every Hamiltonian of a series as an (nsteps, nstates) array - one
+    bulk copy per matrix instead of nstates element reads."""
+    return np.array([np.diagonal(data_conv.MATRIX2nparray(H)).real for H in Hvib])
+
+
+def _gap_stack(E):
+    """|E_i - E_j| for every step of an (nsteps, nstates) energy array: an (nsteps, nstates, nstates) stack,
+    zero on the diagonal like the former loops that filled i < j and its mirror."""
+    return np.abs(E[:, :, None] - E[:, None, :])
+
+
+def _times_from_std(dE_std, nstates):
+    """The decoherence-time matrix of a gap-fluctuation standard deviation (a.u.): sqrt(12/5) / std, a
+    state with itself 1e10."""
+    decoh_times = MATRIX(nstates, nstates)
+    for a in range(0, nstates):
+        for b in range(0, nstates):
+            if a == b:
+                decoh_times.set(a, a, 1.0e+10)
+            else:
+                de = float(dE_std[a, b])
+                if de > 0.0:
+                    tau = math.sqrt(12.0 / 5.0) / de
+                    decoh_times.set(a, b, tau)
+    return decoh_times
 
 __all__ = ["decoherence_times2rates",
            "energy_gaps",
@@ -85,23 +115,7 @@ def energy_gaps(Hvib):
 
     """
 
-    nsteps = len(Hvib)
-    nstates = Hvib[0].num_of_cols
-
-    dE = []
-    for step in range(0, nsteps):
-        dEij = MATRIX(nstates, nstates)
-
-        for i in range(0, nstates):
-            for j in range(i + 1, nstates):
-
-                deij = math.fabs(Hvib[step].get(i, i).real - Hvib[step].get(j, j).real)
-                dEij.set(i, j, deij)
-                dEij.set(j, i, deij)
-
-        dE.append(dEij)
-
-    return dE
+    return [data_conv.nparray2MATRIX(g) for g in _gap_stack(_diagonal_energies(Hvib))]
 
 
 def energy_gaps_ave(Hvib, itimes, nsteps):
@@ -131,28 +145,15 @@ def energy_gaps_ave(Hvib, itimes, nsteps):
     nitimes = len(itimes)
     nstates = Hvib[0][0].num_of_cols
 
-    dE = []
-    for step in range(0, nsteps):
-        dEij = MATRIX(nstates, nstates)
-
-        for i in range(0, nstates):
-            for j in range(i + 1, nstates):
-
-                deij = 0.0
-                for idata in range(0, ndata):
-                    for it_indx in range(0, nitimes):
-                        it = itimes[it_indx]
-
-                        deij = deij + math.fabs(Hvib[idata][it + step].get(i, i).real -
-                                                Hvib[idata][it + step].get(j, j).real)
-                deij = deij / float(nitimes * ndata)
-
-                dEij.set(i, j, deij)
-                dEij.set(j, i, deij)
-
-        dE.append(dEij)
-
-    return dE
+    # the windows accumulate in the order (data set, initial time) of the former loop
+    acc = np.zeros((nsteps, nstates, nstates))
+    for idata in range(0, ndata):
+        E = _diagonal_energies(Hvib[idata])
+        for it_indx in range(0, nitimes):
+            it = itimes[it_indx]
+            acc = acc + _gap_stack(E[it:it + nsteps])
+    acc = acc / float(nitimes * ndata)
+    return [data_conv.nparray2MATRIX(g) for g in acc]
 
 
 def decoherence_times(Hvib, verbosity=0):
@@ -179,22 +180,11 @@ def decoherence_times(Hvib, verbosity=0):
     """
 
     # Compute energy gaps
-    dE = energy_gaps(Hvib)
-    dE_ave, dE_std, dE_dw_bound, dE_up_bound = data_stat.mat_stat(dE)
+    dE = _gap_stack(_diagonal_energies(Hvib))
+    dE_ave, dE_std, dE_dw_bound, dE_up_bound = data_stat.stat_arrays(dE)
 
     nstates = Hvib[0].num_of_cols
-    decoh_times = MATRIX(nstates, nstates)
-
-    for a in range(0, nstates):
-        for b in range(0, nstates):
-            if a == b:
-                decoh_times.set(a, a, 1.0e+10)
-            else:
-                de = dE_std.get(a, b)
-                if de > 0.0:
-                    tau = math.sqrt(12.0 / 5.0) / de
-                    decoh_times.set(a, b, tau)
-
+    decoh_times = _times_from_std(dE_std, nstates)
     decoh_rates = decoherence_times2rates(decoh_times)
 
     if verbosity > 0:
@@ -248,22 +238,11 @@ def decoherence_times_ave_old(Hvib, itimes, nsteps, verbosity=0):
     """
 
     # Compute energy gaps
-    dE = energy_gaps_ave(Hvib, itimes, nsteps)
-    dE_ave, dE_std, dE_dw_bound, dE_up_bound = data_stat.mat_stat(dE)
+    dE = np.array([data_conv.MATRIX2nparray(g, np.float64) for g in energy_gaps_ave(Hvib, itimes, nsteps)])
+    dE_ave, dE_std, dE_dw_bound, dE_up_bound = data_stat.stat_arrays(dE)
 
     nstates = Hvib[0][0].num_of_cols
-    decoh_times = MATRIX(nstates, nstates)
-
-    for a in range(0, nstates):
-        for b in range(0, nstates):
-            if a == b:
-                decoh_times.set(a, a, 1.0e+10)
-            else:
-                de = dE_std.get(a, b)
-                if de > 0.0:
-                    tau = math.sqrt(12.0 / 5.0) / de
-                    decoh_times.set(a, b, tau)
-
+    decoh_times = _times_from_std(dE_std, nstates)
     decoh_rates = decoherence_times2rates(decoh_times)
 
     if verbosity > 0:
@@ -321,51 +300,29 @@ def decoherence_times_ave(Hvib, itimes, nsteps, verbosity=0):
     nitimes = len(itimes)
     nstates = Hvib[0][0].num_of_cols
 
-    # Compute a concatenated list of gap magnitudes for all sub-trajectories
+    # Compute a concatenated stack of gap magnitudes for all sub-trajectories
     dE = []
     for idata in range(0, ndata):
+        E = _diagonal_energies(Hvib[idata])
         for it_indx in range(0, nitimes):
             it = itimes[it_indx]
 
             # ========== Fluctuations for a given sub-trajectory ===========
-            de = []
-            for step in range(0, nsteps):
-                dEij = MATRIX(nstates, nstates)
-
-                for i in range(0, nstates):
-                    for j in range(i + 1, nstates):
-
-                        deij = math.fabs(Hvib[idata][it + step].get(i, i).real - Hvib[idata][it + step].get(j, j).real)
-                        dEij.set(i, j, deij)
-                        dEij.set(j, i, deij)
-
-                de.append(dEij)
+            de = _gap_stack(E[it:it + nsteps])
 
             # ============== Averages for this sub-trajectory ==================
             # we only care about dE_ave, other outputs are not used here
-            dE_ave, dE_std, dE_dw_bound, dE_up_bound = data_stat.mat_stat(de)
+            dE_ave = np.add.reduce(de, axis=0) / float(nsteps)
 
             # ============== Subtract the sub-trajectory-specific average =============
-            for step in range(0, nsteps):
-                dE.append(de[step] - dE_ave)
+            dE.append(de - dE_ave)
 
     # Compute the statistics of the obtained data set
     # the dE_ave should be zero, considering the transformations above
     # we only care about dE_std, other outputs are not used here
-    dE_ave, dE_std, dE_dw_bound, dE_up_bound = data_stat.mat_stat(dE)
+    dE_ave, dE_std, dE_dw_bound, dE_up_bound = data_stat.stat_arrays(np.concatenate(dE, axis=0))
 
-    decoh_times = MATRIX(nstates, nstates)
-
-    for a in range(0, nstates):
-        for b in range(0, nstates):
-            if a == b:
-                decoh_times.set(a, a, 1.0e+10)
-            else:
-                de = dE_std.get(a, b)
-                if de > 0.0:
-                    tau = math.sqrt(12.0 / 5.0) / de
-                    decoh_times.set(a, b, tau)
-
+    decoh_times = _times_from_std(dE_std, nstates)
     decoh_rates = decoherence_times2rates(decoh_times)
 
     if verbosity > 0:
