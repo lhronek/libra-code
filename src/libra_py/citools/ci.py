@@ -19,6 +19,7 @@
 
 import numpy as np
 from . import interfaces
+from libra_py import linalg_kernels
 #from .import 
 
 def overlap(st_mo, data1, data2, params):
@@ -153,7 +154,7 @@ def overlap(st_mo, data1, data2, params):
     # ------------------------------------------------------------------
     # CI-state overlap matrix
     # ------------------------------------------------------------------
-    st_ci = C1.T @ csf_ovlp @ C2
+    st_ci = linalg_kernels.product(C1.T, csf_ovlp, C2)
 
     return st_ci
 

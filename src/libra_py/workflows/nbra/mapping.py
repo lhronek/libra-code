@@ -31,6 +31,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 
 import libra_py.data_conv as data_conv
+import libra_py.linalg_kernels as linalg_kernels
 import libra_py.citools.slatdet as slatdet
 
 
@@ -607,11 +608,13 @@ def ovlp_mat_arb_lemma(SD1, SD2, S2, active_space=None, mem_limit_mb=256):
         return None
 
     A = S2[np.ix_(ref1, ref2)]
+    # the reference determinant stays in the log domain (slogdet): the guard below reads log|det|
+    # and a plain pivot product would under/overflow first for large occupied blocks
     sign, logdet = np.linalg.slogdet(A)
     if sign == 0 or logdet < -30:                 # singular/near-singular ref
         return None
     D0 = sign * np.exp(logdet)
-    G = np.linalg.inv(A)
+    G = linalg_kernels.inv(A)
 
     pa = np.unique(np.concatenate([np.asarray(x, dtype=int) for x in parts1] +
                                   [np.empty(0, dtype=int)]))
@@ -620,9 +623,12 @@ def ovlp_mat_arb_lemma(SD1, SD2, S2, active_space=None, mem_limit_mb=256):
     U = S2[pa][:, ref2]                           # (na, ne): bra particle rows
     V = S2[ref1][:, pb]                           # (ne, nb): ket particle cols
     W = S2[np.ix_(pa, pb)]                        # (na, nb)
-    R = U @ G                                     # (na, ne)
-    C = G @ V                                     # (ne, nb)
-    TW = R @ V - W                                # (na, nb) - the one GEMM
+    R = linalg_kernels.product(U, G)              # (na, ne)
+    C = linalg_kernels.product(G, V)              # (ne, nb)
+    TW = linalg_kernels.product(R, V) - W         # (na, nb) - the one GEMM
+    # the block determinants below stay on numpy's BATCHED det: one C loop over the stacked
+    # submatrices calling LAPACK once each - a python loop over lapack_det would bring back the
+    # per-call overhead this kernel removed
 
     g1 = _degree_groups(deg1, holes1, parts1, pa)
     g2 = _degree_groups(deg2, holes2, parts2, pb)
