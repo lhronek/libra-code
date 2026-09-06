@@ -308,13 +308,9 @@ def list2MATRIX(data):
         MATRIX(N,1): a matrix representation of the data
 
     """
-
     N = len(data)
     res = MATRIX(N, 1)
-
-    for n in range(0, N):
-        res.set(n, 0, data[n])
-
+    set_from_buffer(res, np.ascontiguousarray(np.asarray(data, dtype=np.float64).reshape(N, 1)))
     return res
 
 
@@ -329,16 +325,14 @@ def nparray2MATRIX(data):
         MATRIX( N, M ): a matrix representation of the data
 
     """
-
-    N = data.shape[0]
-    M = data.shape[1]
-
+    data = np.asarray(data)
+    if data.ndim != 2:
+        raise ValueError(F"nparray2MATRIX needs a 2D array, got shape {data.shape}")
+    N, M = data.shape
     res = MATRIX(N, M)
-
-    for n in range(0, N):
-        for m in range(0, M):
-            res.set(n, m, data[n][m].real)
-
+    # one buffer copy (liblinalg set_from_buffer) - a complex input keeps its real part
+    real = data.real if np.iscomplexobj(data) else data
+    set_from_buffer(res, np.ascontiguousarray(real, dtype=np.float64))
     return res
 
 
@@ -353,16 +347,12 @@ def nparray2CMATRIX(data):
         MATRIX( N, M ): a matrix representation of the data
 
     """
-
-    N = data.shape[0]
-    M = data.shape[1]
-
+    data = np.asarray(data)
+    if data.ndim != 2:
+        raise ValueError(F"nparray2CMATRIX needs a 2D array, got shape {data.shape}")
+    N, M = data.shape
     res = CMATRIX(N, M)
-
-    for n in range(0, N):
-        for m in range(0, M):
-            res.set(n, m, data[n][m])
-
+    set_from_buffer(res, np.ascontiguousarray(data, dtype=np.complex128))
     return res
 
 
@@ -414,17 +404,25 @@ def MATRIX2nparray(data, _dtype=np.complex128):
         2d np.array: 2D np.array of shape( N, M )
 
     """
-
     N = data.num_of_rows
     M = data.num_of_cols
-
-    res = np.zeros((N, M), dtype=_dtype)
-
-    for n in range(0, N):
-        for m in range(0, M):
-            res[n, m] = data.get(n, m)
-
-    return res
+    # one buffer copy (liblinalg copy_to_buffer) in the matrix's own element type, then the requested
+    # dtype - a complex matrix into a real dtype keeps its real part
+    native = {CMATRIX: np.complex128, MATRIX: np.float64, IMATRIX: np.int32}
+    kind = next((k for k in native if isinstance(data, k)), None)
+    if kind is None:
+        res = np.zeros((N, M), dtype=_dtype)
+        for n in range(0, N):
+            for m in range(0, M):
+                res[n, m] = data.get(n, m)
+        return res
+    res = np.empty((N, M), dtype=native[kind])
+    copy_to_buffer(data, res)
+    if np.dtype(_dtype) == res.dtype:
+        return res
+    if np.iscomplexobj(res) and not np.issubdtype(np.dtype(_dtype), np.complexfloating):
+        res = res.real
+    return res.astype(_dtype)
 
     """
     res = []
