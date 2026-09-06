@@ -379,16 +379,51 @@ def cmat_distrib(X, i, j, component, xmin, xmax, dx):
             y.append(X[idata].get(i, j).real)
         elif component == 1:
             y.append(X[idata].get(i, j).imag)
-    data = DATA(y)
+
+    bin_support, dens, cum = distribution(y, xmin, xmax, dx)
+
+    return bin_support.tolist(), dens.tolist(), cum.tolist()
+
+
+def distribution(values, xmin, xmax, dx):
+    """Computes the distribution of the values of a 1D array - the array form of cmat_distrib
+
+    Args:
+        values ( array-like of doubles ): the data to be analyzed
+        xmin ( double ): the minimal value of the bin support
+        xmax ( double ): the maximal value of the bin support
+        dx ( double ): the value of the bin support grid spacing
+
+    Returns:
+        tuple: ( bin_support, dens, cum ), where:
+
+            * bin_support ( numpy array of doubles ): the range of values the distribution is computed for
+            * dens ( numpy array of doubles ): the probability density
+            * cum ( numpy array of doubles ): the cumulative distribution function - the fraction of the values
+              not above each support point, the numbers DATA.Calculate_Distribution accumulates one 1/N at a time
+
+    """
+
+    values = np.sort(np.asarray(values, dtype=np.float64).ravel())
 
     # ============= Build the bin support ===========
+    # by repeated addition, as before - the support points are the density denominators below
     bin_support = []
     x = xmin
     while x <= xmax:
         bin_support.append(x)
         x = x + dx
+    bin_support = np.array(bin_support, dtype=np.float64)
 
-    dens, cum = data.Calculate_Distribution(bin_support)
+    # the count of values not above each support point, and the sum of that many 1/N terms accumulated one at a
+    # time (np.cumsum adds sequentially) - the product k / N differs from the accumulated sum in the last bit
+    counts = np.searchsorted(values, bin_support, side="right")
+    partial = np.zeros(values.size + 1)
+    if values.size > 0:
+        partial[1:] = np.cumsum(np.full(values.size, 1.0 / values.size))
+    cum = partial[counts]
+    dens = np.zeros_like(cum)
+    dens[1:] = (cum[1:] - cum[:-1]) / (bin_support[1:] - bin_support[:-1])
 
     return bin_support, dens, cum
 
