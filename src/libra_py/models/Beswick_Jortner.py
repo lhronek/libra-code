@@ -42,7 +42,7 @@ def Beswick_Jortner(q, params):
     References:
         (1) A. Beswick and J. Jortner, Chern. Phys. 1977, 24, 1
         (2) Brown, R. C.; Heller, E. J. Classical Trajectory Approach to Photodissociation: The Wigner Method.
-        J. Chem. Phys. 1981, 75, 186–188.
+        J. Chem. Phys. 1981, 75, 186-188.
     """
 
     eV = 0.036749309  # Ha
