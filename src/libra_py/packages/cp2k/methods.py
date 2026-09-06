@@ -4790,14 +4790,18 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
     # window BEFORE contracting: O(win * nao^2) instead of O(nao^3) -
     # 20-100x cheaper already at a few thousand AOs. The AO overlap is
     # spin-independent, so the same S blocks serve every spin channel.
+    # MATRIX products (DGEMM) through the bulk transfer, the real parts of
+    # the inputs as before
+    S11_m, S12_m, S22_m = (data_conv.nparray2MATRIX(np.asarray(b)) for b in (S11, S12, S22))
     St, S_prev, S_curr, P_frag = [], [], [], []
     for suff in ("", "_b"):
         if F"C{suff}" not in mo_prev or F"C{suff}" not in mo_curr:
             continue
         Cp, Cc = mo_prev[F"C{suff}"][lo:hi], mo_curr[F"C{suff}"][lo:hi]
-        St.append(np.ascontiguousarray((Cp @ S12 @ Cc.T).real))
-        S_prev.append(np.ascontiguousarray((Cp @ S11 @ Cp.T).real))
-        S_curr.append(np.ascontiguousarray((Cc @ S22 @ Cc.T).real))
+        Cp_m, Cc_m = data_conv.nparray2MATRIX(np.asarray(Cp)), data_conv.nparray2MATRIX(np.asarray(Cc))
+        St.append(data_conv.MATRIX2nparray((Cp_m * S12_m) * Cc_m.T(), np.float64))
+        S_prev.append(data_conv.MATRIX2nparray((Cp_m * S11_m) * Cp_m.T(), np.float64))
+        S_curr.append(data_conv.MATRIX2nparray((Cc_m * S22_m) * Cc_m.T(), np.float64))
         if frag_cols is not None:
             P_frag.append(mulliken_fragment_operators(Cc, S22, frag_cols))
     if frag_cols is not None:
