@@ -244,6 +244,23 @@ def compute_ci_energies_midpoint(ci_energies, _params):
     return ci_midpoint_energies
 
 
+def _conf_key(conf):
+    """The hashable key of a configuration [[orbitals], spin] - nested lists as tuples, equal exactly
+    when the list forms are equal."""
+    if isinstance(conf, (list, tuple, np.ndarray)):
+        return tuple(_conf_key(x) for x in conf)
+    return conf
+
+
+def _configuration_rows(configurations):
+    """The row indices of every configuration of an SD list, in order (a repeated configuration keeps
+    every row) - one dict lookup per configuration instead of a list scan per SD and CI state."""
+    rows = {}
+    for j, conf in enumerate(configurations):
+        rows.setdefault(_conf_key(conf), []).append(j)
+    return rows
+
+
 def _normalized_columns(T, step):
     """The CMATRIX of T with every column scaled to unit norm, the column sums taken row by row (the
     order of the former element loop) - a column without any configuration (a CI state with no SD
@@ -330,6 +347,9 @@ def make_T_matrices(ci_coefficients, ci_basis_states, spin_components, sd_states
         # Ground state "CI"
         T[0, 0] = 1.0 + 0.0j
 
+        # the rows of this step's SDs by configuration (the first nSDs - 1 entries, as the loop below scanned)
+        rows = _configuration_rows(sd_states_unique_sorted[step][:nSDs - 1])
+
         if verbosity >= 2:
             print(F"   ========== in step {step} ===========")
             print(F"    sd_states_unique_sorted{step} ", sd_states_unique_sorted[step])
@@ -359,14 +379,13 @@ def make_T_matrices(ci_coefficients, ci_basis_states, spin_components, sd_states
             if verbosity >= 3:
                 print("      tmp_ci_basis_state_and_spin = ", tmp_ci_basis_state_and_spin)
 
-            # Now, loop over the SDs (excluding the ground state) to assign the coefficients
-            for j in range(nSDs - 1):
-
-                # Check to see if one of the SDs from the list of unique SDs comprises this ci state
-                if sd_states_unique_sorted[step][j] in tmp_ci_basis_state_and_spin:
-
-                    # ok, it has found a match, now what is the index of the SD in the list of unique SDs?
-                    item_index = tmp_ci_basis_state_and_spin.index(sd_states_unique_sorted[step][j])
+            # Now, assign the coefficients to the SDs (excluding the ground state): the first occurrence of a
+            # configuration in this ci state carries its coefficient, every SD row equal to it receives it
+            first = {}
+            for k in range(nconf):
+                first.setdefault(_conf_key(tmp_ci_basis_state_and_spin[k]), k)
+            for key, item_index in first.items():
+                for j in rows.get(key, ()):
                     # the coefficient enters as a complex with a +0.0 imaginary part (a float times (1.0 + 0.0j)
                     # carries -0.0 for a negative float under the mixed-mode rules)
                     val = complex(ci_coefficients[step][i][item_index])
@@ -452,6 +471,10 @@ def make_T_matrices_fast(ci_coefficients, ci_basis_states, spin_components, sd_b
     # Results
     SD2CI = []
 
+    # the row of every configuration of the SD basis (the first row of a repeated one) - one dict lookup
+    # per configuration instead of two list scans
+    row = {key: js[0] for key, js in _configuration_rows(sd_basis_states_unique).items()}
+
     # Compute
     for step in range(fstep - istep):
 
@@ -480,8 +503,8 @@ def make_T_matrices_fast(ci_coefficients, ci_basis_states, spin_components, sd_b
             for k in range(nconf):
                 conf = [ci_basis_states[step][i][k], spin_components[step][i][k]]
 
-                if conf in sd_basis_states_unique:
-                    indx = sd_basis_states_unique.index(conf)
+                indx = row.get(_conf_key(conf))
+                if indx is not None:
                     # a complex with a +0.0 imaginary part (a float times (1.0 + 0.0j) carries -0.0 for a
                     # negative float under the mixed-mode rules)
                     val = complex(ci_coefficients[step][i][k])
