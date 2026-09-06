@@ -147,6 +147,46 @@ def common_defaults(plot_params_):
     return plot_params
 
 
+def _time_axis(hdf_file):
+    """The time axis of a results file in fs, read once per figure."""
+    return hdf_file["time/data"][:] / units.fs2au
+
+
+def _selected(which, n):
+    """The requested indices along an axis of length n in ascending order without repeats - the order the former
+    range scans plotted them - and the h5py selection that reads exactly those rows in one call: a plain slice when
+    every index is wanted, otherwise the list (h5py takes one increasing list per read)."""
+    sel = sorted({int(i) for i in which if i in range(n)})
+    return sel, (slice(None) if sel == list(range(n)) else sel)
+
+
+def _span(which, n):
+    """The requested indices along an axis of length n (as _selected) and the slice from the first to the last of them:
+    h5py takes one list per read - the trajectories - so the dofs are read as their span and indexed from its start."""
+    sel = _selected(which, n)[0]
+    return sel, (slice(sel[0], sel[-1] + 1) if sel else slice(0, 0))
+
+
+def _series(dset, trajs, rows, cols, slab_bytes=1 << 28):
+    """The matrix elements (rows[i], cols[i]) of a (steps x ntraj x n x m) dataset for the plotted trajectories as a
+    (steps x trajectories x elements) array, read in slabs of whole trajectories no larger than slab_bytes: one pass
+    per slab instead of one per curve, and never the whole block in memory."""
+    nsteps = dset.shape[0]
+    rows, cols = list(rows), list(cols)
+    out = np.empty((nsteps, len(trajs), len(rows)), dtype=dset.dtype)
+    per_traj = nsteps * dset.shape[2] * dset.shape[3] * dset.dtype.itemsize
+    width = max(1, slab_bytes // per_traj)
+    for a in range(0, len(trajs), width):
+        chunk = trajs[a:a + width]
+        if chunk == list(range(chunk[0], chunk[-1] + 1)):
+            block = dset[:, chunk[0]:chunk[-1] + 1, :, :]
+        else:
+            block = dset[:, chunk, :, :]
+        for j in range(len(chunk)):
+            out[:, a + j, :] = block[:, j, rows, cols]
+    return out
+
+
 def add_energies(plt, hdf_file, plot_params_, property_type):
     """
     Adds the plotting of the ensemble-averaged kinetic, potential, and total energies
@@ -192,41 +232,43 @@ def add_energies(plt, hdf_file, plot_params_, property_type):
     plt.ylabel('Energy, a.u.', fontsize=axes_label_fontsize[1])
 
     res = 0
+    # the time axis once for every curve of the panel
+    t = _time_axis(hdf_file) if "time/data" in hdf_file.keys() else None
 
     if property_type == "energies":
-        if "potential" in which_energies and "Epot_ave/data" in hdf_file.keys() and "time/data" in hdf_file.keys():
-            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["Epot_ave/data"][:],
+        if "potential" in which_energies and "Epot_ave/data" in hdf_file.keys() and t is not None:
+            plt.plot(t, hdf_file["Epot_ave/data"][:],
                      label="Potential energy", linewidth=Lw, color=colors[clrs_index[0]])
             res = 1
-        if "kinetic" in which_energies and "Ekin_ave/data" in hdf_file.keys() and "time/data" in hdf_file.keys():
-            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["Ekin_ave/data"][:],
+        if "kinetic" in which_energies and "Ekin_ave/data" in hdf_file.keys() and t is not None:
+            plt.plot(t, hdf_file["Ekin_ave/data"][:],
                      label="Kinetic energy", linewidth=Lw, color=colors[clrs_index[1]])
             res = 1
-        if "total" in which_energies and "Etot_ave/data" in hdf_file.keys() and "time/data" in hdf_file.keys():
-            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["Etot_ave/data"][:],
+        if "total" in which_energies and "Etot_ave/data" in hdf_file.keys() and t is not None:
+            plt.plot(t, hdf_file["Etot_ave/data"][:],
                      label="Total energy", linewidth=Lw, color=colors[clrs_index[2]])
             res = 1
-        if "extended" in which_energies and "E_NHC/data" in hdf_file.keys() and "time/data" in hdf_file.keys():
-            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["E_NHC/data"][:],
+        if "extended" in which_energies and "E_NHC/data" in hdf_file.keys() and t is not None:
+            plt.plot(t, hdf_file["E_NHC/data"][:],
                      label="Extended energy", linewidth=Lw, color=colors[clrs_index[3]])
             res = 1
 
     elif property_type == "energy_fluctuations":
-        if "potential" in which_energies and "dEpot_ave/data" in hdf_file.keys() and "time/data" in hdf_file.keys():
-            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["dEpot_ave/data"][:],
+        if "potential" in which_energies and "dEpot_ave/data" in hdf_file.keys() and t is not None:
+            plt.plot(t, hdf_file["dEpot_ave/data"][:],
                      label="Potential energy", linewidth=Lw, color=colors[clrs_index[0]])
             res = 1
-        if "kinetic" in which_energies and "dEkin_ave/data" in hdf_file.keys() and "time/data" in hdf_file.keys():
-            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["dEkin_ave/data"][:],
+        if "kinetic" in which_energies and "dEkin_ave/data" in hdf_file.keys() and t is not None:
+            plt.plot(t, hdf_file["dEkin_ave/data"][:],
                      label="Kinetic energy", linewidth=Lw, color=colors[clrs_index[1]])
             res = 1
-        if "total" in which_energies and "dEtot_ave/data" in hdf_file.keys() and "time/data" in hdf_file.keys():
-            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["dEtot_ave/data"][:],
+        if "total" in which_energies and "dEtot_ave/data" in hdf_file.keys() and t is not None:
+            plt.plot(t, hdf_file["dEtot_ave/data"][:],
                      label="Total energy", linewidth=Lw, color=colors[clrs_index[2]])
             res = 1
         # This one is not yet present
         # if "extended" in which_energies:
-        #    plt.plot(hdf_file["time/data"][:]/units.fs2au, hdf_file["dE_NHC/data"][:],
+        #    plt.plot(t, hdf_file["dE_NHC/data"][:],
         #             label="Extended energy", linewidth=Lw, color = colors[ clrs_index[3] ])
     plt.legend(fontsize=legend_fontsize)
     plt.tight_layout()
@@ -297,26 +339,21 @@ def add_trajectory_resolved_ham_property(plt, hdf_file, plot_params_, ham_proper
     plt.ylabel('Energy, a.u.', fontsize=axes_label_fontsize[1])
 
     res = 0
-    indx = -1
-    for istate in range(nstates):
-        if istate in which_states:
-            indx = indx + 1
-            for tr in range(ntraj):
-                if tr in which_trajectories:
-                    if "time/data" in hdf_file.keys() and F"{ham_property_type}/data" in hdf_file.keys():
-                        if no_label:
-                            plt.plot(hdf_file["time/data"][:] / units.fs2au,
-                                     hdf_file[F"{ham_property_type}/data"][:, tr, istate, istate],
-                                     label="",
-                                     linewidth=Lw, color=colors[clrs_index[indx]])
-                            res = 1
-
-                        else:
-                            plt.plot(hdf_file["time/data"][:] / units.fs2au,
-                                     hdf_file[F"{ham_property_type}/data"][:, tr, istate, istate],
-                                     label=F"traj={tr}, state={istate}",
-                                     linewidth=Lw, color=colors[clrs_index[indx]])
-                            res = 1
+    if "time/data" in hdf_file.keys() and F"{ham_property_type}/data" in hdf_file.keys():
+        # the time axis once and the plotted diagonal elements read in trajectory slabs - a strided hyperslab per
+        # curve scanned the whole block every time
+        t = _time_axis(hdf_file)
+        states = _selected(which_states, nstates)[0]
+        trajs = _selected(which_trajectories, ntraj)[0]
+        E = _series(hdf_file[F"{ham_property_type}/data"], trajs, states, states)
+        for indx, istate in enumerate(states):
+            for k, tr in enumerate(trajs):
+                if no_label:
+                    plt.plot(t, E[:, k, indx], label="", linewidth=Lw, color=colors[clrs_index[indx]])
+                else:
+                    plt.plot(t, E[:, k, indx], label=F"traj={tr}, state={istate}",
+                             linewidth=Lw, color=colors[clrs_index[indx]])
+                res = 1
 
     plt.legend(fontsize=legend_fontsize)
     plt.tight_layout()
@@ -369,18 +406,17 @@ def add_cooordinates_vs_t(plt, hdf_file, plot_params_):
         res = 1
 
     if res == 1 and "time/data" in hdf_file.keys():
-        for tr in range(ntraj):
-            if tr in which_trajectories:
-                for dof in range(ndofs):
-                    if dof in which_dofs:
-                        if no_label:
-                            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["q/data"][:, tr, dof],
-                                     label="", linewidth=Lw,
-                                     color=colors[clrs_index[dof]])
-                        else:
-                            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["q/data"][:, tr, dof],
-                                     label=F"traj={tr} dof={dof}", linewidth=Lw,
-                                     color=colors[clrs_index[dof]])
+        # the time axis and the plotted trajectories in one read each - a strided hyperslab per curve scans the whole block
+        t = _time_axis(hdf_file)
+        trajs, tsel = _selected(which_trajectories, ntraj)
+        dofs, dsel = _span(which_dofs, ndofs)
+        Q = hdf_file["q/data"][:, tsel, dsel]
+        for k, tr in enumerate(trajs):
+            for dof in dofs:
+                if no_label:
+                    plt.plot(t, Q[:, k, dof - dsel.start], label="", linewidth=Lw, color=colors[clrs_index[dof]])
+                else:
+                    plt.plot(t, Q[:, k, dof - dsel.start], label=F"traj={tr} dof={dof}", linewidth=Lw, color=colors[clrs_index[dof]])
     else:
         res = 0
 
@@ -435,18 +471,17 @@ def add_momenta_vs_t(plt, hdf_file, plot_params_):
         res = 1
 
     if res == 1 and "time/data" in hdf_file.keys():
-        for tr in range(ntraj):
-            if tr in which_trajectories:
-                for dof in range(ndofs):
-                    if dof in which_dofs:
-                        if no_label:
-                            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["p/data"][:, tr, dof],
-                                     label="", linewidth=Lw,
-                                     color=colors[clrs_index[dof]])
-                        else:
-                            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["p/data"][:, tr, dof],
-                                     label=F"traj={tr} dof={dof}", linewidth=Lw,
-                                     color=colors[clrs_index[dof]])
+        # the time axis and the plotted trajectories in one read each - a strided hyperslab per curve scans the whole block
+        t = _time_axis(hdf_file)
+        trajs, tsel = _selected(which_trajectories, ntraj)
+        dofs, dsel = _span(which_dofs, ndofs)
+        P = hdf_file["p/data"][:, tsel, dsel]
+        for k, tr in enumerate(trajs):
+            for dof in dofs:
+                if no_label:
+                    plt.plot(t, P[:, k, dof - dsel.start], label="", linewidth=Lw, color=colors[clrs_index[dof]])
+                else:
+                    plt.plot(t, P[:, k, dof - dsel.start], label=F"traj={tr} dof={dof}", linewidth=Lw, color=colors[clrs_index[dof]])
     else:
         res = 0
 
@@ -501,18 +536,17 @@ def add_forces_vs_t(plt, hdf_file, plot_params_):
         res = 1
 
     if res == 1 and "time/data" in hdf_file.keys():
-        for tr in range(ntraj):
-            if tr in which_trajectories:
-                for dof in range(ndofs):
-                    if dof in which_dofs:
-                        if no_label:
-                            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["f/data"][:, tr, dof],
-                                     label="", linewidth=Lw,
-                                     color=colors[clrs_index[dof]])
-                        else:
-                            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["f/data"][:, tr, dof],
-                                     label=F"traj={tr} dof={dof}", linewidth=Lw,
-                                     color=colors[clrs_index[dof]])
+        # the time axis and the plotted trajectories in one read each - a strided hyperslab per curve scans the whole block
+        t = _time_axis(hdf_file)
+        trajs, tsel = _selected(which_trajectories, ntraj)
+        dofs, dsel = _span(which_dofs, ndofs)
+        Fr = hdf_file["f/data"][:, tsel, dsel]
+        for k, tr in enumerate(trajs):
+            for dof in dofs:
+                if no_label:
+                    plt.plot(t, Fr[:, k, dof - dsel.start], label="", linewidth=Lw, color=colors[clrs_index[dof]])
+                else:
+                    plt.plot(t, Fr[:, k, dof - dsel.start], label=F"traj={tr} dof={dof}", linewidth=Lw, color=colors[clrs_index[dof]])
     else:
         res = 0
 
@@ -566,18 +600,19 @@ def add_phase_space(plt, hdf_file, plot_params_):
         res = 1
 
     if res == 1:
-        for tr in range(ntraj):
-            if tr in which_trajectories:
-                for dof in range(ndofs):
-                    if dof in which_dofs:
-                        if no_label:
-                            plt.plot(hdf_file["q/data"][:, tr, dof], hdf_file["p/data"][:, tr, dof],
-                                     label="", linewidth=Lw,
-                                     color=colors[clrs_index[dof]])
-                        else:
-                            plt.plot(hdf_file["q/data"][:, tr, dof], hdf_file["p/data"][:, tr, dof],
-                                     label=F"traj={tr} dof={dof}", linewidth=Lw,
-                                     color=colors[clrs_index[dof]])
+        # the plotted trajectories of q and p in one read each
+        trajs, tsel = _selected(which_trajectories, ntraj)
+        dofs, dsel = _span(which_dofs, ndofs)
+        Q = hdf_file["q/data"][:, tsel, dsel]
+        P = hdf_file["p/data"][:, tsel, dsel]
+        for k, tr in enumerate(trajs):
+            for dof in dofs:
+                d = dof - dsel.start
+                if no_label:
+                    plt.plot(Q[:, k, d], P[:, k, d], label="", linewidth=Lw, color=colors[clrs_index[dof]])
+                else:
+                    plt.plot(Q[:, k, d], P[:, k, d], label=F"traj={tr} dof={dof}", linewidth=Lw,
+                             color=colors[clrs_index[dof]])
 
     plt.legend(fontsize=legend_fontsize)
     plt.tight_layout()
@@ -717,35 +752,21 @@ def add_populations(plt, hdf_file, plot_params_, pop_type):
 #    if pop_type in ["D_dia_raw", "D_adi_raw", "D_dia", "D_adi"]:
 
     res = 0
-    if pop_type in ["D_dia", "D_adi"]:
+    if pop_type in ["D_dia", "D_adi", "SH_pop", "se_pop_adi", "se_pop_dia", "sh_pop_adi", "sh_pop_dia",
+                    "sh_pop_adi_TR", "sh_pop_dia_TR", "mash_pop_adi", "mash_pop_dia"]:
         if F"{pop_type}/data" in hdf_file.keys():
             res = 1
-            indx = -1
-            for istate in range(nstates):
-                if istate in which_states:
-                    indx = indx + 1
-                    plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file[F"{pop_type}/data"][:, istate, istate],
-                             label=F"state {istate}", linewidth=Lw, color=colors[clrs_index[indx]])
-
-    elif pop_type in ["SH_pop"]:
-        if F"{pop_type}/data" in hdf_file.keys():
-            res = 1
-            indx = -1
-            for istate in range(nstates):
-                if istate in which_states:
-                    indx = indx + 1
-                    plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file[F"{pop_type}/data"][:, istate, 0],
-                             label=F"state {istate}", linewidth=Lw, color=colors[clrs_index[indx]])
-
-    elif pop_type in ["se_pop_adi", "se_pop_dia", "sh_pop_adi", "sh_pop_dia", "sh_pop_adi_TR", "sh_pop_dia_TR", "mash_pop_adi", "mash_pop_dia"]:
-        if F"{pop_type}/data" in hdf_file.keys():
-            res = 1
-            indx = -1
-            for istate in range(nstates):
-                if istate in which_states:
-                    indx = indx + 1
-                    plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file[F"{pop_type}/data"][:, istate],
-                             label=F"state {istate}", linewidth=Lw, color=colors[clrs_index[indx]])
+            # the time axis and the population block once, every state's series sliced from it
+            t = _time_axis(hdf_file)
+            P = hdf_file[F"{pop_type}/data"][:]
+            for indx, istate in enumerate(_selected(which_states, nstates)[0]):
+                if pop_type in ["D_dia", "D_adi"]:
+                    series = P[:, istate, istate]
+                elif pop_type == "SH_pop":
+                    series = P[:, istate, 0]
+                else:
+                    series = P[:, istate]
+                plt.plot(t, series, label=F"state {istate}", linewidth=Lw, color=colors[clrs_index[indx]])
 
     plt.legend(fontsize=legend_fontsize)
     plt.tight_layout()
@@ -803,25 +824,19 @@ def add_coherence_indicators(plt, hdf_file, plot_params_, coh_type):
     plt.ylabel('Magnitude', fontsize=axes_label_fontsize[1])
 
     res = 0
-    indx = -1
-    for istate in range(nstates):
-        if istate in which_states:
-            for istate2 in range(nstates):
-                if istate2 in which_states and istate > istate2:
-
+    if "time/data" in hdf_file.keys() and F"{coh_type}/data" in hdf_file.keys():
+        # the time axis and the coherence block once
+        t = _time_axis(hdf_file)
+        C = hdf_file[F"{coh_type}/data"][:]
+        states = _selected(which_states, nstates)[0]
+        indx = -1
+        for istate in states:
+            for istate2 in states:
+                if istate > istate2:
                     indx = indx + 1
-
                     lbl = rF"$\langle |\rho_{{{istate2}{istate}}}|^{2} \rangle $"
-
-                    if "time/data" in hdf_file.keys() and F"{coh_type}/data" in hdf_file.keys():
-                        plt.plot(hdf_file["time/data"][:] / units.fs2au,
-                                 hdf_file[F"{coh_type}/data"][:,
-                                 istate2,
-                                 istate],
-                                 label=lbl,
-                                 linewidth=Lw,
-                                 color=colors[clrs_index[indx]])
-                        res = 1
+                    plt.plot(t, C[:, istate2, istate], label=lbl, linewidth=Lw, color=colors[clrs_index[indx]])
+                    res = 1
 
     plt.legend(fontsize=legend_fontsize)
     plt.tight_layout()
@@ -884,17 +899,16 @@ def add_time_overlaps_projectors(plt, hdf_file, plot_params_, prop_type):
     plt.ylabel('Magnitude', fontsize=axes_label_fontsize[1])
 
     res = 0
-    indx = -1
-    for istate in range(nstates):
-        if istate in which_states:
-            indx = indx + 1
-            for tr in range(ntraj):
-                if tr in which_trajectories:
-                    if "time/data" in hdf_file.keys() and F"{prop_type}/data" in hdf_file.keys():
-                        plt.plot(hdf_file["time/data"][:] / units.fs2au,
-                                 hdf_file[F"{prop_type}/data"][:, tr, istate, istate],
-                                 label=F"state {istate}", linewidth=Lw, color=colors[clrs_index[indx]])
-                        res = 1
+    if "time/data" in hdf_file.keys() and F"{prop_type}/data" in hdf_file.keys():
+        # the time axis once and the plotted diagonal elements read in trajectory slabs
+        t = _time_axis(hdf_file)
+        states = _selected(which_states, nstates)[0]
+        trajs = _selected(which_trajectories, ntraj)[0]
+        M = _series(hdf_file[F"{prop_type}/data"], trajs, states, states)
+        for indx, istate in enumerate(states):
+            for k, tr in enumerate(trajs):
+                plt.plot(t, M[:, k, indx], label=F"state {istate}", linewidth=Lw, color=colors[clrs_index[indx]])
+                res = 1
 
     plt.legend(fontsize=legend_fontsize)
     plt.tight_layout()
@@ -942,24 +956,18 @@ def add_basis_transform(plt, hdf_file, plot_params_):
     plt.ylabel('Magnitude', fontsize=axes_label_fontsize[1])
 
     res = 0
-    indx = -1
-    for istate in range(nadi):
-        if istate in which_adi_states:
-            for istate2 in range(ndia):
-                if istate2 in which_dia_states:
-
-                    indx = indx + 1
-
-                    lbl = '$< \\psi^{dia}_{%i} | \\psi^{adi}_{%i} >$' % (istate2, istate)
-
-                    for tr in range(ntraj):
-                        if tr in which_trajectories:
-                            if "time/data" in hdf_file.keys() and "basis_transform/data" in hdf_file.keys():
-                                plt.plot(hdf_file["time/data"][:] / units.fs2au,
-                                         hdf_file["basis_transform/data"][:, tr, istate2, istate],
-                                         label=lbl, linewidth=Lw,
-                                         color=colors[clrs_index[indx]])
-                                res = 1
+    if "time/data" in hdf_file.keys() and "basis_transform/data" in hdf_file.keys():
+        # the time axis once and the plotted (dia, adi) elements read in trajectory slabs
+        t = _time_axis(hdf_file)
+        trajs = _selected(which_trajectories, ntraj)[0]
+        pairs = [(istate2, istate) for istate in _selected(which_adi_states, nadi)[0]
+                 for istate2 in _selected(which_dia_states, ndia)[0]]
+        U = _series(hdf_file["basis_transform/data"], trajs, [pr[0] for pr in pairs], [pr[1] for pr in pairs])
+        for indx, (istate2, istate) in enumerate(pairs):
+            lbl = '$< \\psi^{dia}_{%i} | \\psi^{adi}_{%i} >$' % (istate2, istate)
+            for k, tr in enumerate(trajs):
+                plt.plot(t, U[:, k, indx], label=lbl, linewidth=Lw, color=colors[clrs_index[indx]])
+                res = 1
 
     plt.legend(fontsize=legend_fontsize)
     plt.tight_layout()
@@ -1252,45 +1260,29 @@ def plot_dyn(plot_params):
     with h5py.File(F"{prefix}/{filename}", 'r') as f:
 
         _figsize = (24, 24)
+        # the time axis once per file - every panel below is plotted against it
+        t = f["time/data"][:]
 
         if output_level >= 1:
 
             # ========= Energies and their fluctuations =========
-
             plt.figure(num=None, figsize=(24, 12), dpi=300, frameon=False)
 
             plt.subplot(1, 2, 1)
             plt.title('t-Energies')
             plt.xlabel('Time, a.u.')
             plt.ylabel('Energy, a.u.')
-
-            plt.plot(f["time/data"][:], f["Ekin_ave/data"][:], label="Kinetic energy", linewidth=2, color=colors["11"])
-            plt.plot(
-                f["time/data"][:],
-                f["Epot_ave/data"][:],
-                label="Potential energy",
-                linewidth=2,
-                color=colors["21"])
-            plt.plot(f["time/data"][:], f["Etot_ave/data"][:], label="Total energy", linewidth=2, color=colors["31"])
+            plt.plot(t, f["Ekin_ave/data"][:], label="Kinetic energy", linewidth=2, color=colors["11"])
+            plt.plot(t, f["Epot_ave/data"][:], label="Potential energy", linewidth=2, color=colors["21"])
+            plt.plot(t, f["Etot_ave/data"][:], label="Total energy", linewidth=2, color=colors["31"])
 
             plt.subplot(1, 2, 2)
             plt.title('t-dEnergies')
             plt.xlabel('Time, a.u.')
             plt.ylabel('Energy fluctuation, a.u.')
-
-            plt.plot(
-                f["time/data"][:],
-                f["dEkin_ave/data"][:],
-                label="Kinetic energy",
-                linewidth=2,
-                color=colors["11"])
-            plt.plot(
-                f["time/data"][:],
-                f["dEpot_ave/data"][:],
-                label="Potential energy",
-                linewidth=2,
-                color=colors["21"])
-            plt.plot(f["time/data"][:], f["dEtot_ave/data"][:], label="Total energy", linewidth=2, color=colors["31"])
+            plt.plot(t, f["dEkin_ave/data"][:], label="Kinetic energy", linewidth=2, color=colors["11"])
+            plt.plot(t, f["dEpot_ave/data"][:], label="Potential energy", linewidth=2, color=colors["21"])
+            plt.plot(t, f["dEtot_ave/data"][:], label="Total energy", linewidth=2, color=colors["31"])
 
             _save("t-en")
             plt.show()
@@ -1308,9 +1300,10 @@ def plot_dyn(plot_params):
             plt.xlabel('Time, a.u.')
             plt.ylabel('State index')
 
-            for tr in range(ntraj):
-                if tr in which_trajectories:
-                    plt.plot(f["time/data"][:], f["states/data"][:, tr], label="", linewidth=2, color=colors["11"])
+            # the state indices of every trajectory in one read
+            S = f["states/data"][:]
+            for tr in _selected(which_trajectories, ntraj)[0]:
+                plt.plot(t, S[:, tr], label="", linewidth=2, color=colors["11"])
 
             _save("t-state_indices")
             plt.show()
@@ -1320,6 +1313,12 @@ def plot_dyn(plot_params):
             # ========= SH, adi SE and dia SE populations =========
             nadi = f["D_adi/data"].shape[1]  # attrs['dim'][1]
             ndia = f["D_dia/data"].shape[1]  # attrs['dim'][1]
+            # the three population blocks in one read each
+            SH = f["SH_pop/data"][:]
+            Dadi = f["D_adi/data"][:]
+            Ddia = f["D_dia/data"][:]
+            adi = _selected(which_adi_states, nadi)[0]
+            dia = _selected(which_dia_states, ndia)[0]
 
             plt.figure(num=None, figsize=(24, 8), dpi=300, frameon=False)
 
@@ -1329,12 +1328,8 @@ def plot_dyn(plot_params):
             plt.xlabel('Time, a.u.')
             plt.ylabel('Population, a.u.')
 
-            indx = -1
-            for istate in range(nadi):
-                if istate in which_adi_states:
-                    indx = indx + 1
-                    plt.plot(f["time/data"][:], f["SH_pop/data"][:, istate, 0],
-                             label=F"state {istate}", linewidth=2, color=colors[clrs_index[indx]])
+            for indx, istate in enumerate(adi):
+                plt.plot(t, SH[:, istate, 0], label=F"state {istate}", linewidth=2, color=colors[clrs_index[indx]])
 
             # ================ adi SE populations =============
             plt.subplot(1, 3, 2)
@@ -1342,12 +1337,8 @@ def plot_dyn(plot_params):
             plt.xlabel('Time, a.u.')
             plt.ylabel('Population, a.u.')
 
-            indx = -1
-            for istate in range(nadi):
-                if istate in which_adi_states:
-                    indx = indx + 1
-                    plt.plot(f["time/data"][:], f["D_adi/data"][:, istate, istate],
-                             label=F"state {istate}", linewidth=2, color=colors[clrs_index[indx]])
+            for indx, istate in enumerate(adi):
+                plt.plot(t, Dadi[:, istate, istate], label=F"state {istate}", linewidth=2, color=colors[clrs_index[indx]])
 
             # ================ dia SE populations =============
             plt.subplot(1, 3, 3)
@@ -1355,12 +1346,8 @@ def plot_dyn(plot_params):
             plt.xlabel('Time, a.u.')
             plt.ylabel('Population, a.u.')
 
-            indx = -1
-            for istate in range(ndia):
-                if istate in which_dia_states:
-                    indx = indx + 1
-                    plt.plot(f["time/data"][:], f["D_dia/data"][:, istate, istate],
-                             label=F"state {istate}", linewidth=2, color=colors[clrs_index[indx]])
+            for indx, istate in enumerate(dia):
+                plt.plot(t, Ddia[:, istate, istate], label=F"state {istate}", linewidth=2, color=colors[clrs_index[indx]])
 
             _save("t-pops")
             plt.show()
@@ -1370,6 +1357,11 @@ def plot_dyn(plot_params):
             # ========= SH, adi SE and dia SE populations =========
             nadi = f["D_adi_raw/data"].shape[1]  # attrs['dim'][1]
             ndia = f["D_dia_raw/data"].shape[1]  # attrs['dim'][1]
+            SHr = f["SH_pop_raw/data"][:]
+            Dadir = f["D_adi_raw/data"][:]
+            Ddiar = f["D_dia_raw/data"][:]
+            adi = _selected(which_adi_states, nadi)[0]
+            dia = _selected(which_dia_states, ndia)[0]
 
             plt.figure(num=None, figsize=(24, 8), dpi=300, frameon=False)
 
@@ -1379,12 +1371,8 @@ def plot_dyn(plot_params):
             plt.xlabel('Time, a.u.')
             plt.ylabel('Population, a.u.')
 
-            indx = -1
-            for istate in range(nadi):
-                if istate in which_adi_states:
-                    indx = indx + 1
-                    plt.plot(f["time/data"][:], f["SH_pop_raw/data"][:, istate, 0],
-                             label=F"state {istate}", linewidth=2, color=colors[clrs_index[indx]])
+            for indx, istate in enumerate(adi):
+                plt.plot(t, SHr[:, istate, 0], label=F"state {istate}", linewidth=2, color=colors[clrs_index[indx]])
 
             # ================ adi SE populations =============
             plt.subplot(1, 3, 2)
@@ -1392,12 +1380,8 @@ def plot_dyn(plot_params):
             plt.xlabel('Time, a.u.')
             plt.ylabel('Population, a.u.')
 
-            indx = -1
-            for istate in range(nadi):
-                if istate in which_adi_states:
-                    indx = indx + 1
-                    plt.plot(f["time/data"][:], f["D_adi_raw/data"][:, istate, istate],
-                             label=F"state {istate}", linewidth=2, color=colors[clrs_index[indx]])
+            for indx, istate in enumerate(adi):
+                plt.plot(t, Dadir[:, istate, istate], label=F"state {istate}", linewidth=2, color=colors[clrs_index[indx]])
 
             # ================ dia SE populations =============
             plt.subplot(1, 3, 3)
@@ -1405,12 +1389,8 @@ def plot_dyn(plot_params):
             plt.xlabel('Time, a.u.')
             plt.ylabel('Population, a.u.')
 
-            indx = -1
-            for istate in range(ndia):
-                if istate in which_dia_states:
-                    indx = indx + 1
-                    plt.plot(f["time/data"][:], f["D_dia_raw/data"][:, istate, istate],
-                             label=F"state {istate}", linewidth=2, color=colors[clrs_index[indx]])
+            for indx, istate in enumerate(dia):
+                plt.plot(t, Ddiar[:, istate, istate], label=F"state {istate}", linewidth=2, color=colors[clrs_index[indx]])
 
             _save("t-pops_raw")
             plt.show()
@@ -1420,6 +1400,11 @@ def plot_dyn(plot_params):
             # ========= Coordinates =========
             ntraj = f["q/data"].shape[1]  # attrs['dim'][1]
             ndof = f["q/data"].shape[2]  # attrs['dim'][2]
+            # the plotted trajectories of q and p in one read each
+            trajs, tsel = _selected(which_trajectories, ntraj)
+            dofs, dsel = _span(which_dofs, ndof)
+            Q = f["q/data"][:, tsel, dsel]
+            P = f["p/data"][:, tsel, dsel]
 
             plt.figure(num=None, figsize=(24, 12), dpi=300, frameon=False)
             plt.subplot(1, 2, 1)
@@ -1427,14 +1412,9 @@ def plot_dyn(plot_params):
             plt.xlabel('Time, a.u.')
             plt.ylabel('Coordiante, a.u.')
 
-            indx = -1
-            for idof in range(ndof):
-                if idof in which_dofs:
-                    indx = indx + 1
-                    for tr in range(ntraj):
-                        if tr in which_trajectories:
-                            plt.plot(f["time/data"][:], f["q/data"][:, tr, idof],
-                                     label="", linewidth=2, color=colors[clrs_index[indx]])
+            for indx, idof in enumerate(dofs):
+                for k, tr in enumerate(trajs):
+                    plt.plot(t, Q[:, k, idof - dsel.start], label="", linewidth=2, color=colors[clrs_index[indx]])
 
             # ========= Phase-space =========
             plt.subplot(1, 2, 2)
@@ -1442,14 +1422,9 @@ def plot_dyn(plot_params):
             plt.xlabel('Coordiante, a.u.')
             plt.ylabel('Momenta, a.u.')
 
-            indx = -1
-            for idof in range(ndof):
-                if idof in which_dofs:
-                    indx = indx + 1
-                    for tr in range(ntraj):
-                        if tr in which_trajectories:
-                            plt.plot(f["q/data"][:, tr, idof], f["p/data"][:, tr, idof],
-                                     label="", linewidth=2, color=colors[clrs_index[indx]])
+            for indx, idof in enumerate(dofs):
+                for k, tr in enumerate(trajs):
+                    plt.plot(Q[:, k, idof - dsel.start], P[:, k, idof - dsel.start], label="", linewidth=2, color=colors[clrs_index[indx]])
 
             _save("t-q-p")
             plt.show()
@@ -1459,6 +1434,12 @@ def plot_dyn(plot_params):
             ntraj = f["hvib_adi/data"].shape[1]  # attrs['dim'][1]
             nadi = f["hvib_adi/data"].shape[2]  # attrs['dim'][2]
             ndia = f["hvib_dia/data"].shape[2]  # attrs['dim'][2]
+            # the plotted diagonal energies read in trajectory slabs
+            trajs = _selected(which_trajectories, ntraj)[0]
+            adi = _selected(which_adi_states, nadi)[0]
+            dia = _selected(which_dia_states, ndia)[0]
+            Eadi = _series(f["hvib_adi/data"], trajs, adi, adi)
+            Edia = _series(f["hvib_dia/data"], trajs, dia, dia)
 
             # ============== Adiabatic energies =============
             plt.figure(num=None, figsize=(24, 12), dpi=300, frameon=False)
@@ -1467,14 +1448,9 @@ def plot_dyn(plot_params):
             plt.xlabel('Time, a.u.')
             plt.ylabel('Energy, a.u.')
 
-            indx = -1
-            for istate in range(nadi):
-                if istate in which_adi_states:
-                    indx = indx + 1
-                    for tr in range(ntraj):
-                        if tr in which_trajectories:
-                            plt.plot(f["time/data"][:], f["hvib_adi/data"][:, tr, istate, istate],
-                                     label="", linewidth=2, color=colors[clrs_index[indx]])
+            for indx, istate in enumerate(adi):
+                for k, tr in enumerate(trajs):
+                    plt.plot(t, Eadi[:, k, indx], label="", linewidth=2, color=colors[clrs_index[indx]])
 
             # ============== Diabatic energies =============
             plt.subplot(1, 2, 2)
@@ -1482,14 +1458,9 @@ def plot_dyn(plot_params):
             plt.xlabel('Time, a.u.')
             plt.ylabel('Energy, a.u.')
 
-            indx = -1
-            for istate in range(ndia):
-                if istate in which_dia_states:
-                    indx = indx + 1
-                    for tr in range(ntraj):
-                        if tr in which_trajectories:
-                            plt.plot(f["time/data"][:], f["hvib_dia/data"][:, tr, istate, istate],
-                                     label="", linewidth=2, color=colors[clrs_index[indx]])
+            for indx, istate in enumerate(dia):
+                for k, tr in enumerate(trajs):
+                    plt.plot(t, Edia[:, k, indx], label="", linewidth=2, color=colors[clrs_index[indx]])
 
             _save("t-hvib")
             plt.show()
@@ -1498,6 +1469,11 @@ def plot_dyn(plot_params):
 
             ntraj = f["St/data"].shape[1]  # attrs['dim'][1]
             nadi = f["St/data"].shape[2]  # attrs['dim'][2]
+            # the plotted diagonal time overlaps and projectors read in trajectory slabs
+            trajs = _selected(which_trajectories, ntraj)[0]
+            adi = _selected(which_adi_states, nadi)[0]
+            St = _series(f["St/data"], trajs, adi, adi)
+            Pr = _series(f["projector/data"], trajs, adi, adi)
 
             # ============== St diagonal matrix elements =============
             plt.figure(num=None, figsize=(24, 12), dpi=300, frameon=False)
@@ -1506,14 +1482,9 @@ def plot_dyn(plot_params):
             plt.xlabel('Time, a.u.')
             plt.ylabel('Time overlap')
 
-            indx = -1
-            for istate in range(nadi):
-                if istate in which_adi_states:
-                    indx = indx + 1
-                    for tr in range(ntraj):
-                        if tr in which_trajectories:
-                            plt.plot(f["time/data"][:], f["St/data"][:, tr, istate, istate],
-                                     label="", linewidth=2, color=colors[clrs_index[indx]])
+            for indx, istate in enumerate(adi):
+                for k, tr in enumerate(trajs):
+                    plt.plot(t, St[:, k, indx], label="", linewidth=2, color=colors[clrs_index[indx]])
 
             # ============== Projectors =============
             plt.subplot(1, 2, 2)
@@ -1521,14 +1492,9 @@ def plot_dyn(plot_params):
             plt.xlabel('Time, a.u.')
             plt.ylabel('Projectors')
 
-            indx = -1
-            for istate in range(nadi):
-                if istate in which_adi_states:
-                    indx = indx + 1
-                    for tr in range(ntraj):
-                        if tr in which_trajectories:
-                            plt.plot(f["time/data"][:], f["projector/data"][:, tr, istate, istate],
-                                     label="", linewidth=2, color=colors[clrs_index[indx]])
+            for indx, istate in enumerate(adi):
+                for k, tr in enumerate(trajs):
+                    plt.plot(t, Pr[:, k, indx], label="", linewidth=2, color=colors[clrs_index[indx]])
 
             _save("St-projector")
             plt.show()
@@ -1538,6 +1504,11 @@ def plot_dyn(plot_params):
             ntraj = f["basis_transform/data"].shape[1]  # attrs['dim'][1]
             ndia = f["basis_transform/data"].shape[2]  # attrs['dim'][2]
             nadi = f["basis_transform/data"].shape[3]  # attrs['dim'][3]
+            # the plotted (dia, adi) elements read in trajectory slabs
+            trajs = _selected(which_trajectories, ntraj)[0]
+            pairs = [(istate2, istate) for istate in _selected(which_adi_states, nadi)[0]
+                     for istate2 in _selected(which_dia_states, ndia)[0]]
+            U = _series(f["basis_transform/data"], trajs, [pr[0] for pr in pairs], [pr[1] for pr in pairs])
 
             # ============== dia-to-adia transformation matrix =============
             plt.figure(num=None, figsize=(24, 24), dpi=300, frameon=False)
@@ -1546,17 +1517,9 @@ def plot_dyn(plot_params):
             plt.xlabel('Time, a.u.')
             plt.ylabel('Basis transform')
 
-            indx = -1
-            for istate in range(nadi):
-                if istate in which_adi_states:
-                    for istate2 in range(ndia):
-                        if istate2 in which_dia_states:
-
-                            indx = indx + 1
-                            for tr in range(ntraj):
-                                if tr in which_trajectories:
-                                    plt.plot(f["time/data"][:], f["basis_transform/data"][:, tr, istate2,
-                                             istate], label="", linewidth=2, color=colors[clrs_index[indx]])
+            for indx, (istate2, istate) in enumerate(pairs):
+                for k, tr in enumerate(trajs):
+                    plt.plot(t, U[:, k, indx], label="", linewidth=2, color=colors[clrs_index[indx]])
 
             _save("basis_transform")
             plt.show()
@@ -1715,12 +1678,14 @@ def hdf2xyz(labels, filename, snaps, trajectories, atoms, unit_conversion_factor
 
             md_xyz = md_xyz + F"{natoms*ntraj}\nsnapshot {isnap}\n"
 
+            # the snapshot's coordinates in one read - three element reads per atom and trajectory before
+            q_snap = f["q/data"][isnap] * unit_conversion_factor
             for itraj in trajectories:
                 for iatom in atoms:
 
-                    x = f["q/data"][isnap, itraj, 3 * iatom + 0] * unit_conversion_factor
-                    y = f["q/data"][isnap, itraj, 3 * iatom + 1] * unit_conversion_factor
-                    z = f["q/data"][isnap, itraj, 3 * iatom + 2] * unit_conversion_factor
+                    x = q_snap[itraj, 3 * iatom + 0]
+                    y = q_snap[itraj, 3 * iatom + 1]
+                    z = q_snap[itraj, 3 * iatom + 2]
 
                     md_xyz = md_xyz + F"{labels[iatom] }  {x} {y} {z}\n"
 
@@ -1775,39 +1740,28 @@ def add_cooordinates_aux_vs_t(plt, hdf_file, plot_params_):
         res = 1
 
     if res == 1 and "time/data" in hdf_file.keys():
-        for tr in range(ntraj):
-            if tr in which_trajectories:
-                for dof in range(ndofs):
-                    if dof in which_dofs:
-                        if no_label:
-                            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["q/data"][:, tr, dof],
-                                     label="", linewidth=Lw,
-                                     color="black")
-                        else:
-                            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["q/data"][:, tr, dof],
-                                     label=F"Real, traj={tr} dof={dof}", linewidth=Lw,
-                                     color="black")
+        # the time axis and the plotted trajectories of q and q_aux in one read each
+        t = _time_axis(hdf_file)
+        trajs, tsel = _selected(which_trajectories, ntraj)
+        states = _selected(which_states, nstates)[0]
+        dofs, dsel = _span(which_dofs, ndofs)
+        Q = hdf_file["q/data"][:, tsel, dsel]
+        for k, tr in enumerate(trajs):
+            for dof in dofs:
+                if no_label:
+                    plt.plot(t, Q[:, k, dof - dsel.start], label="", linewidth=Lw, color="black")
+                else:
+                    plt.plot(t, Q[:, k, dof - dsel.start], label=F"Real, traj={tr} dof={dof}", linewidth=Lw, color="black")
 
-        for tr in range(ntraj):
-            if tr in which_trajectories:
-                indx = -1
-                for istate in range(nstates):
-                    if istate in which_states:
-                        indx = indx + 1
-                        for dof in range(ndofs):
-                            if dof in which_dofs:
-                                if no_label:
-                                    plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["q_aux/data"][:,
-                                             tr, istate, dof], label="", linewidth=Lw, color=colors[clrs_index[indx]])
-                                else:
-                                    plt.plot(hdf_file["time/data"][:] / units.fs2au,
-                                             hdf_file["q_aux/data"][:,
-                                                                    tr,
-                                                                    istate,
-                                                                    dof],
-                                             label=F"traj={tr} state={istate} dof={dof}",
-                                             linewidth=Lw,
-                                             color=colors[clrs_index[indx]])
+        Qa = hdf_file["q_aux/data"][:, tsel, :, dsel]
+        for k, tr in enumerate(trajs):
+            for indx, istate in enumerate(states):
+                for dof in dofs:
+                    if no_label:
+                        plt.plot(t, Qa[:, k, istate, dof - dsel.start], label="", linewidth=Lw, color=colors[clrs_index[indx]])
+                    else:
+                        plt.plot(t, Qa[:, k, istate, dof - dsel.start], label=F"traj={tr} state={istate} dof={dof}",
+                                 linewidth=Lw, color=colors[clrs_index[indx]])
     else:
         res = 0
 
@@ -1864,39 +1818,28 @@ def add_momenta_aux_vs_t(plt, hdf_file, plot_params_):
         res = 1
 
     if res == 1 and "time/data" in hdf_file.keys():
-        for tr in range(ntraj):
-            if tr in which_trajectories:
-                for dof in range(ndofs):
-                    if dof in which_dofs:
-                        if no_label:
-                            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["p/data"][:, tr, dof],
-                                     label="", linewidth=Lw,
-                                     color="black")
-                        else:
-                            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["p/data"][:, tr, dof],
-                                     label=F"Real, traj={tr} dof={dof}", linewidth=Lw,
-                                     color="black")
+        # the time axis and the plotted trajectories of p and p_aux in one read each
+        t = _time_axis(hdf_file)
+        trajs, tsel = _selected(which_trajectories, ntraj)
+        states = _selected(which_states, nstates)[0]
+        dofs, dsel = _span(which_dofs, ndofs)
+        P = hdf_file["p/data"][:, tsel, dsel]
+        for k, tr in enumerate(trajs):
+            for dof in dofs:
+                if no_label:
+                    plt.plot(t, P[:, k, dof - dsel.start], label="", linewidth=Lw, color="black")
+                else:
+                    plt.plot(t, P[:, k, dof - dsel.start], label=F"Real, traj={tr} dof={dof}", linewidth=Lw, color="black")
 
-        for tr in range(ntraj):
-            if tr in which_trajectories:
-                indx = -1
-                for istate in range(nstates):
-                    if istate in which_states:
-                        indx = indx + 1
-                        for dof in range(ndofs):
-                            if dof in which_dofs:
-                                if no_label:
-                                    plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["p_aux/data"][:,
-                                             tr, istate, dof], label="", linewidth=Lw, color=colors[clrs_index[indx]])
-                                else:
-                                    plt.plot(hdf_file["time/data"][:] / units.fs2au,
-                                             hdf_file["p_aux/data"][:,
-                                                                    tr,
-                                                                    istate,
-                                                                    dof],
-                                             label=F"traj={tr} state={istate} dof={dof}",
-                                             linewidth=Lw,
-                                             color=colors[clrs_index[indx]])
+        Pa = hdf_file["p_aux/data"][:, tsel, :, dsel]
+        for k, tr in enumerate(trajs):
+            for indx, istate in enumerate(states):
+                for dof in dofs:
+                    if no_label:
+                        plt.plot(t, Pa[:, k, istate, dof - dsel.start], label="", linewidth=Lw, color=colors[clrs_index[indx]])
+                    else:
+                        plt.plot(t, Pa[:, k, istate, dof - dsel.start], label=F"traj={tr} state={istate} dof={dof}",
+                                 linewidth=Lw, color=colors[clrs_index[indx]])
     else:
         res = 0
 
@@ -1953,26 +1896,20 @@ def add_nab_phase_vs_t(plt, hdf_file, plot_params_):
         res = 1
 
     if res == 1 and "time/data" in hdf_file.keys():
-        for tr in range(ntraj):
-            if tr in which_trajectories:
-                indx = -1
-                for istate in range(nstates):
-                    if istate in which_states:
-                        indx = indx + 1
-                        for dof in range(ndofs):
-                            if dof in which_dofs:
-                                if no_label:
-                                    plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["nab_phase/data"]
-                                             [:, tr, istate, dof], label="", linewidth=Lw, color=colors[clrs_index[indx]])
-                                else:
-                                    plt.plot(hdf_file["time/data"][:] / units.fs2au,
-                                             hdf_file["nab_phase/data"][:,
-                                                                        tr,
-                                                                        istate,
-                                                                        dof],
-                                             label=F"traj={tr} state={istate} dof={dof}",
-                                             linewidth=Lw,
-                                             color=colors[clrs_index[indx]])
+        # the time axis and the plotted trajectories' phases in one read each
+        t = _time_axis(hdf_file)
+        trajs, tsel = _selected(which_trajectories, ntraj)
+        states = _selected(which_states, nstates)[0]
+        dofs, dsel = _span(which_dofs, ndofs)
+        N = hdf_file["nab_phase/data"][:, tsel, :, dsel]
+        for k, tr in enumerate(trajs):
+            for indx, istate in enumerate(states):
+                for dof in dofs:
+                    if no_label:
+                        plt.plot(t, N[:, k, istate, dof - dsel.start], label="", linewidth=Lw, color=colors[clrs_index[indx]])
+                    else:
+                        plt.plot(t, N[:, k, istate, dof - dsel.start], label=F"traj={tr} state={istate} dof={dof}",
+                                 linewidth=Lw, color=colors[clrs_index[indx]])
     else:
         res = 0
 
@@ -2028,42 +1965,32 @@ def add_phase_space_aux(plt, hdf_file, plot_params_):
         res = 1
 
     if res == 1:
-        for tr in range(ntraj):
-            if tr in which_trajectories:
-                for dof in range(ndofs):
-                    if dof in which_dofs:
-                        if no_label:
-                            plt.plot(hdf_file["q/data"][:, tr, dof], hdf_file["p/data"][:, tr, dof],
-                                     label="", linewidth=Lw,
-                                     color="black")
-                        else:
-                            plt.plot(hdf_file["q/data"][:, tr, dof], hdf_file["p/data"][:, tr, dof],
-                                     label=F"Real, traj={tr} dof={dof}", linewidth=Lw,
-                                     color="black")
+        # the plotted trajectories of q, p and their auxiliary counterparts in one read each
+        trajs, tsel = _selected(which_trajectories, ntraj)
+        states = _selected(which_states, nstates)[0]
+        dofs, dsel = _span(which_dofs, ndofs)
+        Q = hdf_file["q/data"][:, tsel, dsel]
+        P = hdf_file["p/data"][:, tsel, dsel]
+        for k, tr in enumerate(trajs):
+            for dof in dofs:
+                d = dof - dsel.start
+                if no_label:
+                    plt.plot(Q[:, k, d], P[:, k, d], label="", linewidth=Lw, color="black")
+                else:
+                    plt.plot(Q[:, k, d], P[:, k, d], label=F"Real, traj={tr} dof={dof}", linewidth=Lw, color="black")
 
-        for tr in range(ntraj):
-            if tr in which_trajectories:
-                indx = -1
-                for istate in range(nstates):
-                    if istate in which_states:
-                        indx = indx + 1
-                        for dof in range(ndofs):
-                            if dof in which_dofs:
-                                if no_label:
-                                    plt.plot(hdf_file["q_aux/data"][:, tr, istate, dof], hdf_file["p_aux/data"]
-                                             [:, tr, istate, dof], label="", linewidth=Lw, color=colors[clrs_index[indx]])
-                                else:
-                                    plt.plot(hdf_file["q_aux/data"][:,
-                                                                    tr,
-                                                                    istate,
-                                                                    dof],
-                                             hdf_file["p_aux/data"][:,
-                                                                    tr,
-                                                                    istate,
-                                                                    dof],
-                                             label=F"traj={tr} state={istate} dof={dof}",
-                                             linewidth=Lw,
-                                             color=colors[clrs_index[indx]])
+        Qa = hdf_file["q_aux/data"][:, tsel, :, dsel]
+        Pa = hdf_file["p_aux/data"][:, tsel, :, dsel]
+        for k, tr in enumerate(trajs):
+            for indx, istate in enumerate(states):
+                for dof in dofs:
+                    d = dof - dsel.start
+                    if no_label:
+                        plt.plot(Qa[:, k, istate, d], Pa[:, k, istate, d], label="", linewidth=Lw,
+                                 color=colors[clrs_index[indx]])
+                    else:
+                        plt.plot(Qa[:, k, istate, d], Pa[:, k, istate, d],
+                                 label=F"traj={tr} state={istate} dof={dof}", linewidth=Lw, color=colors[clrs_index[indx]])
 
     plt.legend(fontsize=legend_fontsize)
     plt.tight_layout()
@@ -2116,18 +2043,17 @@ def add_p_quant_vs_t(plt, hdf_file, plot_params_):
         res = 1
 
     if res == 1 and "time/data" in hdf_file.keys():
-        for tr in range(ntraj):
-            if tr in which_trajectories:
-                for dof in range(ndofs):
-                    if dof in which_dofs:
-                        if no_label:
-                            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["p_quant/data"][:, tr, dof],
-                                     label="", linewidth=Lw,
-                                     color=colors[clrs_index[dof]])
-                        else:
-                            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["p_quant/data"][:, tr, dof],
-                                     label=F"traj={tr} dof={dof}", linewidth=Lw,
-                                     color=colors[clrs_index[dof]])
+        # the time axis and the plotted trajectories in one read each - a strided hyperslab per curve scans the whole block
+        t = _time_axis(hdf_file)
+        trajs, tsel = _selected(which_trajectories, ntraj)
+        dofs, dsel = _span(which_dofs, ndofs)
+        Pq = hdf_file["p_quant/data"][:, tsel, dsel]
+        for k, tr in enumerate(trajs):
+            for dof in dofs:
+                if no_label:
+                    plt.plot(t, Pq[:, k, dof - dsel.start], label="", linewidth=Lw, color=colors[clrs_index[dof]])
+                else:
+                    plt.plot(t, Pq[:, k, dof - dsel.start], label=F"traj={tr} dof={dof}", linewidth=Lw, color=colors[clrs_index[dof]])
     else:
         res = 0
 
@@ -2182,18 +2108,17 @@ def add_VP_vs_t(plt, hdf_file, plot_params_):
         res = 1
 
     if res == 1 and "time/data" in hdf_file.keys():
-        for tr in range(ntraj):
-            if tr in which_trajectories:
-                for dof in range(ndofs):
-                    if dof in which_dofs:
-                        if no_label:
-                            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["VP/data"][:, tr, dof],
-                                     label="", linewidth=Lw,
-                                     color=colors[clrs_index[dof]])
-                        else:
-                            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["VP/data"][:, tr, dof],
-                                     label=F"traj={tr} dof={dof}", linewidth=Lw,
-                                     color=colors[clrs_index[dof]])
+        # the time axis and the plotted trajectories in one read each - a strided hyperslab per curve scans the whole block
+        t = _time_axis(hdf_file)
+        trajs, tsel = _selected(which_trajectories, ntraj)
+        dofs, dsel = _span(which_dofs, ndofs)
+        V = hdf_file["VP/data"][:, tsel, dsel]
+        for k, tr in enumerate(trajs):
+            for dof in dofs:
+                if no_label:
+                    plt.plot(t, V[:, k, dof - dsel.start], label="", linewidth=Lw, color=colors[clrs_index[dof]])
+                else:
+                    plt.plot(t, V[:, k, dof - dsel.start], label=F"traj={tr} dof={dof}", linewidth=Lw, color=colors[clrs_index[dof]])
     else:
         res = 0
 
@@ -2248,18 +2173,17 @@ def add_f_xf_vs_t(plt, hdf_file, plot_params_):
         res = 1
 
     if res == 1 and "time/data" in hdf_file.keys():
-        for tr in range(ntraj):
-            if tr in which_trajectories:
-                for dof in range(ndofs):
-                    if dof in which_dofs:
-                        if no_label:
-                            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["f_xf/data"][:, tr, dof],
-                                     label="", linewidth=Lw,
-                                     color=colors[clrs_index[dof]])
-                        else:
-                            plt.plot(hdf_file["time/data"][:] / units.fs2au, hdf_file["f_xf/data"][:, tr, dof],
-                                     label=F"traj={tr} dof={dof}", linewidth=Lw,
-                                     color=colors[clrs_index[dof]])
+        # the time axis and the plotted trajectories in one read each - a strided hyperslab per curve scans the whole block
+        t = _time_axis(hdf_file)
+        trajs, tsel = _selected(which_trajectories, ntraj)
+        dofs, dsel = _span(which_dofs, ndofs)
+        Fx = hdf_file["f_xf/data"][:, tsel, dsel]
+        for k, tr in enumerate(trajs):
+            for dof in dofs:
+                if no_label:
+                    plt.plot(t, Fx[:, k, dof - dsel.start], label="", linewidth=Lw, color=colors[clrs_index[dof]])
+                else:
+                    plt.plot(t, Fx[:, k, dof - dsel.start], label=F"traj={tr} dof={dof}", linewidth=Lw, color=colors[clrs_index[dof]])
     else:
         res = 0
 
