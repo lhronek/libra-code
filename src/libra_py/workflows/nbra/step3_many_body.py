@@ -111,6 +111,9 @@ def get_step2_mb_sp_properties(_params):
     ci_energies_job, ci_basis_states_job, ci_coefficients_job = [], [], []
     spin_components_job = []
     sd_basis_states_unique = []
+    # the configurations already in the unique list, as hashable keys - one set lookup per configuration
+    # instead of a scan of the growing list (steps x states x configurations x SDs comparisons before)
+    seen = set()
 
     excitation_energies, ci_basis_raw, ci_coefficients_raw_unnorm, spin_components = step2_many_body.get_excitation_analysis_output(
         params)
@@ -142,7 +145,9 @@ def get_step2_mb_sp_properties(_params):
 
             sd_basis_state_and_spin = [ci_basis_raw[ci_basis_state_index][sd_basis_state_index],
                                        spin_components[ci_basis_state_index][sd_basis_state_index]]
-            if sd_basis_state_and_spin not in sd_basis_states_unique:
+            key = _conf_key(sd_basis_state_and_spin)
+            if key not in seen:
+                seen.add(key)
                 sd_basis_states_unique.append(sd_basis_state_and_spin)
 
     # print( "Slater determinant basis states = ", sd_basis_states_unique )
@@ -167,7 +172,9 @@ def get_step2_mb_sp_properties(_params):
 
                 sd_basis_state_and_spin = [ci_basis_raw[ci_basis_state_index][sd_basis_state_index],
                                            spin_components[ci_basis_state_index][sd_basis_state_index]]
-                if sd_basis_state_and_spin not in sd_basis_states_unique:
+                key = _conf_key(sd_basis_state_and_spin)
+                if key not in seen:
+                    seen.add(key)
                     sd_basis_states_unique.append(sd_basis_state_and_spin)
         # print( "Slater determinant basis states = ", sd_basis_states_unique )
 
