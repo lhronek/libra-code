@@ -33,6 +33,7 @@ import cmath
 import functools
 import math
 import os
+import re
 import time
 import glob
 import json
@@ -2823,11 +2824,26 @@ def sd_diabatization_step(sd_lists, P_frag, kind, dia_index=None, active_space=N
     return W, dia_index, pops_out, pops_hole
 
 
+def fragment_operator_count(res_dir, prefix, step):
+    """The number of step-2 fragment operators {prefix}{f}_ks_{step}.npz in res_dir - the fragment
+    index follows the prefix directly and the indices must be 0..n-1 (the prefixes of the POD family
+    share their stem, so a wildcard after the prefix would count the P_pod2l and P_pod2gs files as
+    pod fragments)."""
+    pattern = re.compile(F"{re.escape(prefix)}(\\d+)_ks_{int(step)}\\.npz")
+    found = sorted(int(hit.group(1)) for hit in (pattern.fullmatch(os.path.basename(path))
+                   for path in glob.glob(F"{res_dir}/{prefix}*_ks_{int(step)}.npz")) if hit)
+    if found != list(range(len(found))):
+        raise ValueError(F"the fragment operators {prefix}{{f}}_ks_{step}.npz in {res_dir} carry the fragment "
+                         F"indices {found} - 0..n-1 is needed")
+    return len(found)
+
+
 def _sd_diabatization_series(params, sd_sorted, active_space, start_time, finish_time, kind):
     """W, the diabatic index and the populations of every step start_time..finish_time-1,
     from the step-2 fragment operators sliced to the active space (Lowdin-orthonormalized
     when the SD overlaps are)."""
     res_dir_1 = params['path_to_npz_files']
+    # no prefix may equal another prefix followed by digits - the fragment index follows the prefix directly
     prefixes = {"mulliken": "P_frag", "pod": "P_pod", "pod2l": "P_pod2l", "pod2gs": "P_pod2gs", "pod_cp2k": "P_pod_cp2k"}
     operator = str(params['fragment_operator']).lower()
     if operator == "pod2":
@@ -2836,7 +2852,7 @@ def _sd_diabatization_series(params, sd_sorted, active_space, start_time, finish
     if operator not in prefixes:
         raise ValueError(F"fragment_operator {operator!r} - use 'mulliken', 'pod', 'pod2l', 'pod2gs' or 'pod_cp2k'")
     prefix = prefixes[operator]
-    nfrag = len(glob.glob(F'{res_dir_1}/{prefix}*_ks_{start_time}.npz'))
+    nfrag = fragment_operator_count(res_dir_1, prefix, start_time)
     if nfrag < 2:
         raise ValueError(F"diabatization needs the step-2 fragment operators "
                          F"{prefix}{{f}}_ks_{{step}}.npz of at least two fragments in {res_dir_1} "
