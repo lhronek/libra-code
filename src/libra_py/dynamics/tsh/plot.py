@@ -1301,7 +1301,7 @@ def plot_dyn(plot_params):
             # ========= State indices =========
 
             # ntraj = f["states"].attrs["dim"][0]
-            ntraj = f["time/data"].shape[0]
+            ntraj = f["states/data"].shape[1]
 
             plt.figure(num=None, figsize=(24, 24), dpi=300, frameon=False)
 
