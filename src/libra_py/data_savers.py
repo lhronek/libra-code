@@ -67,6 +67,22 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 import util.libutil as comn
 from . import units
 from . import data_read
+from . import data_conv
+
+
+def _matrix_block(data, dtype):
+    """The (C)MATRIX as one ndarray block for a dataset of dtype - a complex matrix into a real or integer
+    dataset is refused (the element assignment refused it too), a real matrix casts like its elements did."""
+    if isinstance(data, CMATRIX):
+        if not np.issubdtype(dtype, np.complexfloating):
+            raise TypeError(F"a CMATRIX cannot be saved into a {np.dtype(dtype).name} dataset")
+        return data_conv.MATRIX2nparray(data, np.complex128)
+    return data_conv.MATRIX2nparray(data, np.float64)
+
+
+def _vector_row(data):
+    """A 1D sequence (a list, a libra vector or an ndarray) as one ndarray row."""
+    return data if isinstance(data, np.ndarray) else np.asarray(list(data))
 
 _warned_locking = False
 
@@ -193,6 +209,15 @@ class mem_saver:
         if data_name in self.keywords and data_name in self.np_data.keys():
             self.np_data[data_name][istep, iscal] = _data
 
+    def save_vector(self, istep, data_name, _data):
+        """
+        Saves a 1D sequence (a list, a libra vector or an ndarray) into a row of a 2D array - one
+        assignment instead of a save_multi_scalar per element
+        """
+        if data_name in self.keywords and data_name in self.np_data.keys():
+            row = _vector_row(_data)
+            self.np_data[data_name][istep, :len(row)] = row
+
     def save_matrix(self, istep, data_name, _data):
         """
         Saves a matrix to a 3D array
@@ -207,9 +232,8 @@ class mem_saver:
 
         if data_name in self.keywords and data_name in self.np_data.keys():
             nx, ny = _data.num_of_rows, _data.num_of_cols
-            for i in range(nx):
-                for j in range(ny):
-                    self.np_data[data_name][istep, i, j] = _data.get(i, j)
+            target = self.np_data[data_name]
+            target[istep, :nx, :ny] = _matrix_block(_data, target.dtype)         # one bulk copy, not nx x ny element reads
 
     def save_multi_matrix(self, istep, imatrix, data_name, _data):
         """
@@ -225,9 +249,8 @@ class mem_saver:
 
         if data_name in self.keywords and data_name in self.np_data.keys():
             nx, ny = _data.num_of_rows, _data.num_of_cols
-            for i in range(nx):
-                for j in range(ny):
-                    self.np_data[data_name][istep, imatrix, i, j] = _data.get(i, j)
+            target = self.np_data[data_name]
+            target[istep, imatrix, :nx, :ny] = _matrix_block(_data, target.dtype)
 
     def save_multi_matrix2(self, istep, imatrix, imatrix2, data_name, _data):
         """
@@ -243,9 +266,8 @@ class mem_saver:
 
         if data_name in self.keywords and data_name in self.np_data.keys():
             nx, ny = _data.num_of_rows, _data.num_of_cols
-            for i in range(nx):
-                for j in range(ny):
-                    self.np_data[data_name][istep, imatrix, imatrix2, i, j] = _data.get(i, j)
+            target = self.np_data[data_name]
+            target[istep, imatrix, imatrix2, :nx, :ny] = _matrix_block(_data, target.dtype)
 
     def save_data(self, filename, data_names, mode):
         """
@@ -499,6 +521,17 @@ class hdf5_saver:
             with _open_hdf5(self.filename, "a") as f:
                 f[F"{data_name}/data"][istep, iscal] = data
 
+    def save_vector(self, istep, data_name, data):
+        """
+        Saves a 1D sequence (a list, a libra vector or an ndarray) into a row of a 2D dataset - one write
+        instead of a save_multi_scalar per element
+        """
+        if data_name in self.keywords:
+            row = _vector_row(data)
+            with _open_hdf5(self.filename, "a") as f:
+                dset = f[F"{data_name}/data"]
+                dset[istep, :len(row)] = row.astype(dset.dtype, copy=False)
+
     def save_matrix(self, istep, data_name, data):
         """
           Add a matrix
@@ -515,9 +548,8 @@ class hdf5_saver:
 
             with _open_hdf5(self.filename, "a") as f:
 
-                for i in range(nx):
-                    for j in range(ny):
-                        f[F"{data_name}/data"][istep, i, j] = data.get(i, j)
+                dset = f[F"{data_name}/data"]
+                dset[istep, :nx, :ny] = _matrix_block(data, dset.dtype).astype(dset.dtype, copy=False)   # one write, not nx x ny
 
     def save_multi_matrix(self, istep, imatrix, data_name, data):
         """
@@ -535,9 +567,8 @@ class hdf5_saver:
 
             with _open_hdf5(self.filename, "a") as f:
 
-                for i in range(nx):
-                    for j in range(ny):
-                        f[F"{data_name}/data"][istep, imatrix, i, j] = data.get(i, j)
+                dset = f[F"{data_name}/data"]
+                dset[istep, imatrix, :nx, :ny] = _matrix_block(data, dset.dtype).astype(dset.dtype, copy=False)
 
     def save_multi_matrix2(self, istep, imatrix, imatrix2, data_name, data):
         """
@@ -555,6 +586,5 @@ class hdf5_saver:
 
             with _open_hdf5(self.filename, "a") as f:
 
-                for i in range(nx):
-                    for j in range(ny):
-                        f[F"{data_name}/data"][istep, imatrix, imatrix2, i, j] = data.get(i, j)
+                dset = f[F"{data_name}/data"]
+                dset[istep, imatrix, imatrix2, :nx, :ny] = _matrix_block(data, dset.dtype).astype(dset.dtype, copy=False)
