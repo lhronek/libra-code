@@ -394,7 +394,7 @@ def conf2csf_matrix(
             if det_tuple not in all_confs:
                 raise ValueError(f"Determinant {det_tuple} not found in all_confs.")
             i = all_confs.index(det_tuple)
-            T.set(i, j, coeff * all_phases[i] * (1.0 + 0j))
+            T.set(i, j, complex(coeff * all_phases[i]))
     """
 
     # List to store non-zero entries
@@ -412,7 +412,7 @@ def conf2csf_matrix(
                 raise ValueError(f"Determinant {det_tuple} not found in all_confs.")
             rows.append(i)
             cols.append(j)
-            data.append(coeff * all_phases[i] * (1.0 + 0j))
+            data.append(complex(coeff * all_phases[i]))
 
     # Convert to a scipy sparse matrix (CSR)
     T_sparse = coo_matrix((data, (rows, cols)), shape=(nconfigs, ncsfs), dtype=np.complex128)

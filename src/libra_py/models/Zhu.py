@@ -102,15 +102,15 @@ def dual_RZD(q, params, full_id):
     dH01 = -2.0 * B * C * ((x - Z) * e_minus + (x + Z) * e_plus)
 
     Hdia.set(0, 0, (0.0 + 0.0j))
-    Hdia.set(0, 1, H01 * (1.0 + 0.0j))
-    Hdia.set(1, 0, H01 * (1.0 + 0.0j))
-    Hdia.set(1, 1, A * (1.0 + 0.0j))
+    Hdia.set(0, 1, complex(H01))
+    Hdia.set(1, 0, complex(H01))
+    Hdia.set(1, 1, complex(A))
 
     for i in [0]:
         #  d Hdia / dR_0
         d1ham_dia[i].set(0, 0, 0.0 + 0.0j)
-        d1ham_dia[i].set(0, 1, dH01 * (1.0 + 0.0j))
-        d1ham_dia[i].set(1, 0, dH01 * (1.0 + 0.0j))
+        d1ham_dia[i].set(0, 1, complex(dH01))
+        d1ham_dia[i].set(1, 0, complex(dH01))
         d1ham_dia[i].set(1, 1, 0.0 + 0.0j)
 
         #  <dia| d/dR_0| dia >
@@ -200,16 +200,16 @@ def dual_LZS(q, params, full_id):
     dH01 = -2.0 * C * D * e_d * x
 
     Hdia.set(0, 0, (0.0 + 0.0j))
-    Hdia.set(0, 1, H01 * (1.0 + 0.0j))
-    Hdia.set(1, 0, H01 * (1.0 + 0.0j))
-    Hdia.set(1, 1, H11 * (1.0 + 0.0j))
+    Hdia.set(0, 1, complex(H01))
+    Hdia.set(1, 0, complex(H01))
+    Hdia.set(1, 1, complex(H11))
 
     for i in [0]:
         #  d Hdia / dR_0
         d1ham_dia[i].set(0, 0, 0.0 + 0.0j)
-        d1ham_dia[i].set(0, 1, dH01 * (1.0 + 0.0j))
-        d1ham_dia[i].set(1, 0, dH01 * (1.0 + 0.0j))
-        d1ham_dia[i].set(1, 1, dH11 * (1.0 + 0.0j))
+        d1ham_dia[i].set(0, 1, complex(dH01))
+        d1ham_dia[i].set(1, 0, complex(dH01))
+        d1ham_dia[i].set(1, 1, complex(dH11))
 
         #  <dia| d/dR_0| dia >
         dc1_dia[i].set(0, 0, 0.0 + 0.0j)
@@ -296,17 +296,17 @@ def Renner_Teller(q, params, full_id):
     V = C * x2 * e
     dV = -2.0 * x * V + 2.0 * x * C * e
 
-    Hdia.set(0, 0, V11 * (1.0 + 0.0j))
-    Hdia.set(0, 1, V * (1.0 + 0.0j))
-    Hdia.set(1, 0, V * (1.0 + 0.0j))
-    Hdia.set(1, 1, V11 * (-1.0 + 0.0j))
+    Hdia.set(0, 0, complex(V11))
+    Hdia.set(0, 1, complex(V))
+    Hdia.set(1, 0, complex(V))
+    Hdia.set(1, 1, complex(-V11))
 
     for i in [0]:
         #  d Hdia / dR_0
-        d1ham_dia[i].set(0, 0, dV11 * (1.0 + 0.0j))
-        d1ham_dia[i].set(0, 1, dV * (1.0 + 0.0j))
-        d1ham_dia[i].set(1, 0, dV * (1.0 + 0.0j))
-        d1ham_dia[i].set(1, 1, dV11 * (-1.0 + 0.0j))
+        d1ham_dia[i].set(0, 0, complex(dV11))
+        d1ham_dia[i].set(0, 1, complex(dV))
+        d1ham_dia[i].set(1, 0, complex(dV))
+        d1ham_dia[i].set(1, 1, complex(-dV11))
 
         #  <dia| d/dR_0| dia >
         dc1_dia[i].set(0, 0, 0.0 + 0.0j)

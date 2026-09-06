@@ -91,17 +91,17 @@ def model1(q, params):
     Sdia.set(1, 0, 0.0 + 0.0j)
     Sdia.set(1, 1, 1.0 + 0.0j)
 
-    Hdia.set(0, 0, k * x * x * (1.0 + 0.0j))
-    Hdia.set(0, 1, V * (1.0 + 0.0j))
-    Hdia.set(1, 0, V * (1.0 + 0.0j))
-    Hdia.set(1, 1, (k * (x - x0)**2 + D) * (1.0 + 0.0j))
+    Hdia.set(0, 0, complex(k * x * x))
+    Hdia.set(0, 1, complex(V))
+    Hdia.set(1, 0, complex(V))
+    Hdia.set(1, 1, complex(k * (x - x0)**2 + D))
 
     for i in [0]:
         #  d Hdia / dR_0
-        d1ham_dia[i].set(0, 0, 2.0 * k * x * (1.0 + 0.0j))
+        d1ham_dia[i].set(0, 0, complex(2.0 * k * x))
         d1ham_dia[i].set(0, 1, 0.0 + 0.0j)
         d1ham_dia[i].set(1, 0, 0.0 + 0.0j)
-        d1ham_dia[i].set(1, 1, 2.0 * k * (x - x0) * (1.0 + 0.0j))
+        d1ham_dia[i].set(1, 1, complex(2.0 * k * (x - x0)))
 
         #  <dia| d/dR_0| dia >
         dc1_dia[i].set(0, 0, 0.0 + 0.0j)
@@ -161,17 +161,17 @@ def model1a(Hdia, Sdia, d1ham_dia, dc1_dia, q, params):
     Sdia.set(1, 0, 0.0 + 0.0j)
     Sdia.set(1, 1, 1.0 + 0.0j)
 
-    Hdia.set(0, 0, k * x * x * (1.0 + 0.0j))
-    Hdia.set(0, 1, V * (1.0 + 0.0j))
-    Hdia.set(1, 0, V * (1.0 + 0.0j))
-    Hdia.set(1, 1, (k * (x - x0)**2 + D) * (1.0 + 0.0j))
+    Hdia.set(0, 0, complex(k * x * x))
+    Hdia.set(0, 1, complex(V))
+    Hdia.set(1, 0, complex(V))
+    Hdia.set(1, 1, complex(k * (x - x0)**2 + D))
 
     for i in [0]:
         #  d Hdia / dR_0
-        d1ham_dia[i].set(0, 0, 2.0 * k * x * (1.0 + 0.0j))
+        d1ham_dia[i].set(0, 0, complex(2.0 * k * x))
         d1ham_dia[i].set(0, 1, 0.0 + 0.0j)
         d1ham_dia[i].set(1, 0, 0.0 + 0.0j)
-        d1ham_dia[i].set(1, 1, 2.0 * k * (x - x0) * (1.0 + 0.0j))
+        d1ham_dia[i].set(1, 1, complex(2.0 * k * (x - x0)))
 
         #  <dia| d/dR_0| dia >
         dc1_dia[i].set(0, 0, 0.0 + 0.0j)
@@ -381,22 +381,22 @@ def model2(q, params):
     Sdia.set(1, 0, 0.0 + 0.0j)
     Sdia.set(1, 1, 1.0 + 0.0j)
 
-    Hdia.set(0, 0, k * x * x * (1.0 + 0.0j))
-    Hdia.set(0, 1, V * (1.0 + 0.0j))
-    Hdia.set(1, 0, V * (1.0 + 0.0j))
-    Hdia.set(1, 1, (k * (x - x0)**2 + D) * (1.0 + 0.0j))
+    Hdia.set(0, 0, complex(k * x * x))
+    Hdia.set(0, 1, complex(V))
+    Hdia.set(1, 0, complex(V))
+    Hdia.set(1, 1, complex(k * (x - x0)**2 + D))
 
     for i in [0]:
         #  d Hdia / dR_0
-        d1ham_dia[i].set(0, 0, 2.0 * k * x * (1.0 + 0.0j))
+        d1ham_dia[i].set(0, 0, complex(2.0 * k * x))
         d1ham_dia[i].set(0, 1, 0.0 + 0.0j)
         d1ham_dia[i].set(1, 0, 0.0 + 0.0j)
-        d1ham_dia[i].set(1, 1, 2.0 * k * (x - x0) * (1.0 + 0.0j))
+        d1ham_dia[i].set(1, 1, complex(2.0 * k * (x - x0)))
 
         #  <dia| d/dR_0| dia >
         dc1_dia[i].set(0, 0, 0.0 + 0.0j)
-        dc1_dia[i].set(0, 1, nac * (1.0 + 0.0j))
-        dc1_dia[i].set(1, 0, nac * (-1.0 + 0.0j))
+        dc1_dia[i].set(0, 1, complex(nac))
+        dc1_dia[i].set(1, 0, complex(-nac))
         dc1_dia[i].set(1, 1, 0.0 + 0.0j)
 
     obj = tmp()
@@ -457,22 +457,22 @@ def model2a(Hdia, Sdia, d1ham_dia, dc1_dia, q, params):
     Sdia.set(1, 0, 0.0 + 0.0j)
     Sdia.set(1, 1, 1.0 + 0.0j)
 
-    Hdia.set(0, 0, k * x * x * (1.0 + 0.0j))
-    Hdia.set(0, 1, V * (1.0 + 0.0j))
-    Hdia.set(1, 0, V * (1.0 + 0.0j))
-    Hdia.set(1, 1, (k * (x - x0)**2 + D) * (1.0 + 0.0j))
+    Hdia.set(0, 0, complex(k * x * x))
+    Hdia.set(0, 1, complex(V))
+    Hdia.set(1, 0, complex(V))
+    Hdia.set(1, 1, complex(k * (x - x0)**2 + D))
 
     for i in [0]:
         #  d Hdia / dR_0
-        d1ham_dia[i].set(0, 0, 2.0 * k * x * (1.0 + 0.0j))
+        d1ham_dia[i].set(0, 0, complex(2.0 * k * x))
         d1ham_dia[i].set(0, 1, 0.0 + 0.0j)
         d1ham_dia[i].set(1, 0, 0.0 + 0.0j)
-        d1ham_dia[i].set(1, 1, 2.0 * k * (x - x0) * (1.0 + 0.0j))
+        d1ham_dia[i].set(1, 1, complex(2.0 * k * (x - x0)))
 
         #  <dia| d/dR_0| dia >
         dc1_dia[i].set(0, 0, 0.0 + 0.0j)
-        dc1_dia[i].set(0, 1, nac * (1.0 + 0.0j))
-        dc1_dia[i].set(1, 0, nac * (-1.0 + 0.0j))
+        dc1_dia[i].set(0, 1, complex(nac))
+        dc1_dia[i].set(1, 0, complex(-nac))
         dc1_dia[i].set(1, 1, 0.0 + 0.0j)
 
 
@@ -529,24 +529,24 @@ def model3(q, params):
 
     x = q.get(0)
 
-    ex = B * math.exp(-(x - 0.5 * x0)**2) * (1.0 + 0.0j)
+    ex = complex(B * math.exp(-(x - 0.5 * x0)**2))
 
     Sdia.set(0, 0, 1.0 + 0.0j)
     Sdia.set(0, 1, ex)
     Sdia.set(1, 0, ex)
     Sdia.set(1, 1, 1.0 + 0.0j)
 
-    Hdia.set(0, 0, k * x * x * (1.0 + 0.0j))
-    Hdia.set(0, 1, V * (1.0 + 0.0j))
-    Hdia.set(1, 0, V * (1.0 + 0.0j))
-    Hdia.set(1, 1, (k * (x - x0)**2 + D) * (1.0 + 0.0j))
+    Hdia.set(0, 0, complex(k * x * x))
+    Hdia.set(0, 1, complex(V))
+    Hdia.set(1, 0, complex(V))
+    Hdia.set(1, 1, complex(k * (x - x0)**2 + D))
 
     for i in [0]:
         #  d Hdia / dR_0
-        d1ham_dia[i].set(0, 0, 2.0 * k * x * (1.0 + 0.0j))
+        d1ham_dia[i].set(0, 0, complex(2.0 * k * x))
         d1ham_dia[i].set(0, 1, 0.0 + 0.0j)
         d1ham_dia[i].set(1, 0, 0.0 + 0.0j)
-        d1ham_dia[i].set(1, 1, 2.0 * k * (x - x0) * (1.0 + 0.0j))
+        d1ham_dia[i].set(1, 1, complex(2.0 * k * (x - x0)))
 
         #  <dia| d/dR_0| dia >  = 0.5 * dS/dR
         d = -(x - 0.5 * x0) * ex
@@ -608,24 +608,24 @@ def model3a(Hdia, Sdia, d1ham_dia, dc1_dia, q, params):
 
     x = q
 
-    ex = B * math.exp(-(x - 0.5 * x0)**2) * (1.0 + 0.0j)
+    ex = complex(B * math.exp(-(x - 0.5 * x0)**2))
 
     Sdia.set(0, 0, 1.0 + 0.0j)
     Sdia.set(0, 1, ex)
     Sdia.set(1, 0, ex)
     Sdia.set(1, 1, 1.0 + 0.0j)
 
-    Hdia.set(0, 0, k * x * x * (1.0 + 0.0j))
-    Hdia.set(0, 1, V * (1.0 + 0.0j))
-    Hdia.set(1, 0, V * (1.0 + 0.0j))
-    Hdia.set(1, 1, (k * (x - x0)**2 + D) * (1.0 + 0.0j))
+    Hdia.set(0, 0, complex(k * x * x))
+    Hdia.set(0, 1, complex(V))
+    Hdia.set(1, 0, complex(V))
+    Hdia.set(1, 1, complex(k * (x - x0)**2 + D))
 
     for i in [0]:
         #  d Hdia / dR_0
-        d1ham_dia[i].set(0, 0, 2.0 * k * x * (1.0 + 0.0j))
+        d1ham_dia[i].set(0, 0, complex(2.0 * k * x))
         d1ham_dia[i].set(0, 1, 0.0 + 0.0j)
         d1ham_dia[i].set(1, 0, 0.0 + 0.0j)
-        d1ham_dia[i].set(1, 1, 2.0 * k * (x - x0) * (1.0 + 0.0j))
+        d1ham_dia[i].set(1, 1, complex(2.0 * k * (x - x0)))
 
         #  <dia| d/dR_0| dia >
         d = -(x - 0.5 * x0) * ex
@@ -688,17 +688,17 @@ def model4(q, params):
     Sdia.set(1, 0, 0.0 + 0.0j)
     Sdia.set(1, 1, 1.0 + 0.0j)
 
-    Hdia.set(0, 0, k * math.cos(x * w) * (1.0 + 0.0j))
-    Hdia.set(0, 1, V * (1.0 + 0.0j))
-    Hdia.set(1, 0, V * (1.0 + 0.0j))
-    Hdia.set(1, 1, k * math.sin(x * w) * (1.0 + 0.0j))
+    Hdia.set(0, 0, complex(k * math.cos(x * w)))
+    Hdia.set(0, 1, complex(V))
+    Hdia.set(1, 0, complex(V))
+    Hdia.set(1, 1, complex(k * math.sin(x * w)))
 
     for i in [0]:
         #  d Hdia / dR_0
-        d1ham_dia[i].set(0, 0, -w * k * math.sin(x * w) * (1.0 + 0.0j))
+        d1ham_dia[i].set(0, 0, complex(-w * k * math.sin(x * w)))
         d1ham_dia[i].set(0, 1, 0.0 + 0.0j)
         d1ham_dia[i].set(1, 0, 0.0 + 0.0j)
-        d1ham_dia[i].set(1, 1, w * k * math.cos(x * w) * (1.0 + 0.0j))
+        d1ham_dia[i].set(1, 1, complex(w * k * math.cos(x * w)))
 
         #  <dia| d/dR_0| dia >
         dc1_dia[i].set(0, 0, 0.0 + 0.0j)
@@ -759,17 +759,17 @@ def model4a(Hdia, Sdia, d1ham_dia, dc1_dia, q, params):
     Sdia.set(1, 0, 0.0 + 0.0j)
     Sdia.set(1, 1, 1.0 + 0.0j)
 
-    Hdia.set(0, 0, k * math.cos(x * w) * (1.0 + 0.0j))
-    Hdia.set(0, 1, V * (1.0 + 0.0j))
-    Hdia.set(1, 0, V * (1.0 + 0.0j))
-    Hdia.set(1, 1, k * math.sin(x * w) * (1.0 + 0.0j) + D)
+    Hdia.set(0, 0, complex(k * math.cos(x * w)))
+    Hdia.set(0, 1, complex(V))
+    Hdia.set(1, 0, complex(V))
+    Hdia.set(1, 1, complex(k * math.sin(x * w)) + D)
 
     for i in [0]:
         #  d Hdia / dR_0
-        d1ham_dia[i].set(0, 0, -w * k * math.sin(x * w) * (1.0 + 0.0j))
+        d1ham_dia[i].set(0, 0, complex(-w * k * math.sin(x * w)))
         d1ham_dia[i].set(0, 1, 0.0 + 0.0j)
         d1ham_dia[i].set(1, 0, 0.0 + 0.0j)
-        d1ham_dia[i].set(1, 1, w * k * math.cos(x * w) * (1.0 + 0.0j))
+        d1ham_dia[i].set(1, 1, complex(w * k * math.cos(x * w)))
 
         #  <dia| d/dR_0| dia >
         dc1_dia[i].set(0, 0, 0.0 + 0.0j)
@@ -821,12 +821,12 @@ def model5(q, params):
     x2 = x * x
     y2 = y * y
 
-    Hdia.set(0, 0, (0.25 * (x2 * x2 + y2 * y2) - 0.5 * (x2 + y2)) * (1.0 + 0.0j))
+    Hdia.set(0, 0, complex(0.25 * (x2 * x2 + y2 * y2) - 0.5 * (x2 + y2)))
     Sdia.set(0, 0, 1.0 + 0.0j)
 
     #  d Hdia / dR_0
-    d1ham_dia[0].set(0, 0, x * (x2 - 1.0) * (1.0 + 0.0j))
-    d1ham_dia[1].set(0, 0, y * (y2 - 1.0) * (1.0 + 0.0j))
+    d1ham_dia[0].set(0, 0, complex(x * (x2 - 1.0)))
+    d1ham_dia[1].set(0, 0, complex(y * (y2 - 1.0)))
 
     #  <dia| d/dR_0| dia >
     dc1_dia[0].set(0, 0, 0.0 + 0.0j)
@@ -904,17 +904,17 @@ def model6(q, params):
     Sdia.set(1, 0, 0.0 + 0.0j)
     Sdia.set(1, 1, 1.0 + 0.0j)
 
-    Hdia.set(0, 0, (A0 * math.cos(w0 * x + delta0) + B0) * (1.0 + 0.0j))
-    Hdia.set(0, 1, V01 * (1.0 + 0.0j))
-    Hdia.set(1, 0, V01 * (1.0 + 0.0j))
-    Hdia.set(1, 1, (A1 * math.cos(w1 * x + delta1) + B1) * (1.0 + 0.0j))
+    Hdia.set(0, 0, complex(A0 * math.cos(w0 * x + delta0) + B0))
+    Hdia.set(0, 1, complex(V01))
+    Hdia.set(1, 0, complex(V01))
+    Hdia.set(1, 1, complex(A1 * math.cos(w1 * x + delta1) + B1))
 
     for i in [0]:
         #  d Hdia / dR_0
-        d1ham_dia[i].set(0, 0, -w0 * A0 * math.sin(w0 * x + delta0) * (1.0 + 0.0j))
+        d1ham_dia[i].set(0, 0, complex(-w0 * A0 * math.sin(w0 * x + delta0)))
         d1ham_dia[i].set(0, 1, 0.0 + 0.0j)
         d1ham_dia[i].set(1, 0, 0.0 + 0.0j)
-        d1ham_dia[i].set(1, 1, -w1 * A1 * math.sin(w1 * x + delta1) * (1.0 + 0.0j))
+        d1ham_dia[i].set(1, 1, complex(-w1 * A1 * math.sin(w1 * x + delta1)))
 
         #  <dia| d/dR_0| dia >
         dc1_dia[i].set(0, 0, 0.0 + 0.0j)
@@ -1007,31 +1007,31 @@ def model7(q, params):
     Sdia.set(2, 1, 0.0 + 0.0j)
     Sdia.set(2, 2, 1.0 + 0.0j)
 
-    Hdia.set(0, 0, (A0 * math.cos(w0 * x + delta0) + B0) * (1.0 + 0.0j))
-    Hdia.set(0, 1, V01 * (1.0 + 0.0j))
-    Hdia.set(0, 2, V02 * (1.0 + 0.0j))
+    Hdia.set(0, 0, complex(A0 * math.cos(w0 * x + delta0) + B0))
+    Hdia.set(0, 1, complex(V01))
+    Hdia.set(0, 2, complex(V02))
 
-    Hdia.set(1, 0, V01 * (1.0 + 0.0j))
-    Hdia.set(1, 1, (A1 * math.cos(w1 * x + delta1) + B1) * (1.0 + 0.0j))
-    Hdia.set(1, 2, V12 * (1.0 + 0.0j))
+    Hdia.set(1, 0, complex(V01))
+    Hdia.set(1, 1, complex(A1 * math.cos(w1 * x + delta1) + B1))
+    Hdia.set(1, 2, complex(V12))
 
-    Hdia.set(2, 0, V02 * (1.0 + 0.0j))
-    Hdia.set(2, 1, V12 * (1.0 + 0.0j))
-    Hdia.set(2, 2, (A2 * math.cos(w2 * x + delta2) + B2) * (1.0 + 0.0j))
+    Hdia.set(2, 0, complex(V02))
+    Hdia.set(2, 1, complex(V12))
+    Hdia.set(2, 2, complex(A2 * math.cos(w2 * x + delta2) + B2))
 
     for i in [0]:
         #  d Hdia / dR_0
-        d1ham_dia[i].set(0, 0, -w0 * A0 * math.sin(w0 * x + delta0) * (1.0 + 0.0j))
+        d1ham_dia[i].set(0, 0, complex(-w0 * A0 * math.sin(w0 * x + delta0)))
         d1ham_dia[i].set(0, 1, 0.0 + 0.0j)
         d1ham_dia[i].set(0, 2, 0.0 + 0.0j)
 
         d1ham_dia[i].set(1, 0, 0.0 + 0.0j)
-        d1ham_dia[i].set(1, 1, -w1 * A1 * math.sin(w1 * x + delta1) * (1.0 + 0.0j))
+        d1ham_dia[i].set(1, 1, complex(-w1 * A1 * math.sin(w1 * x + delta1)))
         d1ham_dia[i].set(1, 2, 0.0 + 0.0j)
 
         d1ham_dia[i].set(2, 0, 0.0 + 0.0j)
         d1ham_dia[i].set(2, 1, 0.0 + 0.0j)
-        d1ham_dia[i].set(2, 2, -w2 * A2 * math.sin(w2 * x + delta2) * (1.0 + 0.0j))
+        d1ham_dia[i].set(2, 2, complex(-w2 * A2 * math.sin(w2 * x + delta2)))
 
         #  <dia| d/dR_0| dia >
         dc1_dia[i].set(0, 0, 0.0 + 0.0j)

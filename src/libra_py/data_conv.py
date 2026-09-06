@@ -124,7 +124,7 @@ def unit_conversion(X, scaling_factor):
     # Default ones
     for i in range(0, nst):
         for j in range(0, nst):
-            scl.set(i, j, scaling_factor * (1.0 + 0.0j))
+            scl.set(i, j, complex(scaling_factor))
             shi.set(i, j, (0.0 + 0.0j))
     transform_data(X, {"shift2": shi, "scale": scl})
 
@@ -187,7 +187,7 @@ def scale_NACs(X, scaling_factor):
     for i in range(0, nst):
         for j in range(0, nst):
             if i != j:
-                scl.set(i, j, scaling_factor * (1.0 + 0.0j))
+                scl.set(i, j, complex(scaling_factor))
             else:
                 scl.set(i, j, (1.0 + 0.0j))
             shi.set(i, j, (0.0 + 0.0j))

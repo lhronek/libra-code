@@ -233,8 +233,8 @@ def Faist_Levine(q, params, full_id=None):
     dzdx += (-1.0 / rho_cov) * (A_cov + pb12) * e
     dzdx += 6.0 * C_cov * p6 / R
 
-    obj.ham_dia.set(0, 0, z * (1.0 + 0.0j))
-    obj.d1ham_dia[0].set(0, 0, dzdx * (1.0 + 0.0j))
+    obj.ham_dia.set(0, 0, complex(z))
+    obj.d1ham_dia[0].set(0, 0, complex(dzdx))
 
     # H_11
     e = math.exp(-R / rho_ion)
@@ -249,17 +249,17 @@ def Faist_Levine(q, params, full_id=None):
     dzdx += 2.0 * (alp_Mp + alp_Xm) * p4 / R
     dzdx += 14.0 * alp_Mp * alp_Xm * p8
 
-    obj.ham_dia.set(1, 1, z * (1.0 + 0.0j))
-    obj.d1ham_dia[0].set(1, 1, dzdx * (1.0 + 0.0j))
+    obj.ham_dia.set(1, 1, complex(z))
+    obj.d1ham_dia[0].set(1, 1, complex(dzdx))
 
     # H_01 and H_10
     z = A * math.exp(-R / rho)
     dzdx = (-1.0 / rho) * z
 
-    obj.ham_dia.set(0, 1, z * (1.0 + 0.0j))
-    obj.d1ham_dia[0].set(0, 1, dzdx * (1.0 + 0.0j))
+    obj.ham_dia.set(0, 1, complex(z))
+    obj.d1ham_dia[0].set(0, 1, complex(dzdx))
 
-    obj.ham_dia.set(1, 0, z * (1.0 + 0.0j))
-    obj.d1ham_dia[0].set(1, 0, dzdx * (1.0 + 0.0j))
+    obj.ham_dia.set(1, 0, complex(z))
+    obj.d1ham_dia[0].set(1, 0, complex(dzdx))
 
     return obj

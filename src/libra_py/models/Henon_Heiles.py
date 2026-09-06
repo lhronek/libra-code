@@ -87,12 +87,12 @@ def Henon_Heiles(q, params, full_id=None):
     y2 = y * y
     lam2 = lam * lam
 
-    Hdia.set(0, 0, (0.5 * (x2 + y2) + lam * (x * y2 - x * x2 / 3.0) + lam2 * ((x2 + y2)**2 / 16.0)) * (1.0 + 0.0j))
+    Hdia.set(0, 0, complex(0.5 * (x2 + y2) + lam * (x * y2 - x * x2 / 3.0) + lam2 * ((x2 + y2)**2 / 16.0)))
     Sdia.set(0, 0, 1.0 + 0.0j)
 
     #  d Hdia / dR_0
-    d1ham_dia[0].set(0, 0, (x + lam * (y2 - x2) + 0.25 * lam2 * (x2 + y2) * x) * (1.0 + 0.0j))
-    d1ham_dia[1].set(0, 0, (y + lam * 2.0 * y * x + 0.25 * lam2 * (x2 + y2) * y) * (1.0 + 0.0j))
+    d1ham_dia[0].set(0, 0, complex(x + lam * (y2 - x2) + 0.25 * lam2 * (x2 + y2) * x))
+    d1ham_dia[1].set(0, 0, complex(y + lam * 2.0 * y * x + 0.25 * lam2 * (x2 + y2) * y))
 
     #  <dia| d/dR_0| dia >
     dc1_dia[0].set(0, 0, 0.0 + 0.0j)

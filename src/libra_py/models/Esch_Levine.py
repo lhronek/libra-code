@@ -131,22 +131,22 @@ def JCP_2020(q, params, full_id):
 
     Sdia.identity()
 
-    Hdia.set(0, 0, -w0 * x * (1.0 + 0.0j))
+    Hdia.set(0, 0, complex(-w0 * x))
     for i in range(1, n):
         shift = 0.0
         if i >= i_crit:
             shift = eps
-        Hdia.set(i, i, (w1 * x - i * delta - shift) * (1.0 + 0.0j))
+        Hdia.set(i, i, complex(w1 * x - i * delta - shift))
 
     for i in range(1, n):
-        Hdia.set(0, i, V * (1.0 + 0.0j))
-        Hdia.set(i, 0, V * (1.0 + 0.0j))
+        Hdia.set(0, i, complex(V))
+        Hdia.set(i, 0, complex(V))
 
     for k in [0]:
         #  d Hdia / dR_0
-        d1ham_dia[k].set(0, 0, -w0 * (1.0 + 0.0j))
+        d1ham_dia[k].set(0, 0, complex(-w0))
         for i in range(1, n):
-            d1ham_dia[k].set(i, i, w1 * (1.0 + 0.0j))
+            d1ham_dia[k].set(i, i, complex(w1))
 
     obj = tmp()
     obj.ham_dia = Hdia
@@ -206,13 +206,13 @@ def general(q, params, full_id):
 
     for i in range(n):
         for j in range(n):
-            Hdia.set(i, j, (V[i][j] + w[i][j] * x) * (1.0 + 0.0j))
+            Hdia.set(i, j, complex(V[i][j] + w[i][j] * x))
 
     for k in [0]:
         #  d Hdia / dR_0
         for i in range(n):
             for j in range(n):
-                d1ham_dia[k].set(i, j, w[i][j] * (1.0 + 0.0j))
+                d1ham_dia[k].set(i, j, complex(w[i][j]))
 
     obj = tmp()
     obj.ham_dia = Hdia

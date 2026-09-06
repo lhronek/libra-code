@@ -354,9 +354,9 @@ def energy_mat_arb(SD, e, dE):
     elif isinstance(e, CMATRIX)==True or isinstance(e, MATRIX)==True:
         n = len(SD)
         E = CMATRIX(n,n)
-        E0 = energy_arb(SD[0], e) + dE[0]*(1.0+0.0j)
+        E0 = energy_arb(SD[0], e) + complex(dE[0])
         for i in range(0, n):
-            E.set(i,i, energy_arb(SD[i], e) + dE[i]*(1.0+0.0j) - E0 )
+            E.set(i,i, energy_arb(SD[i], e) + complex(dE[i]) - E0 )
 
     return E
 

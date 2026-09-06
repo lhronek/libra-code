@@ -3437,9 +3437,9 @@ def dftb_compute_adi(q, params, full_id):
         forces = read_all_forces(f"{wd}/FRC.DAT")
         for iatom in range(nat):
             for i in range(nstates):
-                obj.d1ham_adi[3 * iatom + 0].set(i, i, -forces[i, 0, iatom] * (1.0 + 0.0j))
-                obj.d1ham_adi[3 * iatom + 1].set(i, i, -forces[i, 1, iatom] * (1.0 + 0.0j))
-                obj.d1ham_adi[3 * iatom + 2].set(i, i, -forces[i, 2, iatom] * (1.0 + 0.0j))
+                obj.d1ham_adi[3 * iatom + 0].set(i, i, complex(-forces[i, 0, iatom]))
+                obj.d1ham_adi[3 * iatom + 1].set(i, i, complex(-forces[i, 1, iatom]))
+                obj.d1ham_adi[3 * iatom + 2].set(i, i, complex(-forces[i, 2, iatom]))
     else:
         # no StateCouplings-driven FRC.DAT (e.g. spin-polarized runs - NACVs
         # are closed-shell upstream): the tag files carry the ground-state
@@ -3462,11 +3462,11 @@ def dftb_compute_adi(q, params, full_id):
         for iatom in range(nat):
             for k in range(3):
                 if f_gs is not None:
-                    obj.d1ham_adi[3 * iatom + k].set(0, 0, -f_gs[k, iatom] * (1.0 + 0.0j))
+                    obj.d1ham_adi[3 * iatom + k].set(0, 0, complex(-f_gs[k, iatom]))
                 if f_ex is not None:
-                    obj.d1ham_adi[3 * iatom + k].set(soi_row, soi_row, -f_ex[k, iatom] * (1.0 + 0.0j))
+                    obj.d1ham_adi[3 * iatom + k].set(soi_row, soi_row, complex(-f_ex[k, iatom]))
                 for s, f_s in forces_all.items():
-                    obj.d1ham_adi[3 * iatom + k].set(s, s, -f_s[k, iatom] * (1.0 + 0.0j))
+                    obj.d1ham_adi[3 * iatom + k].set(s, s, complex(-f_s[k, iatom]))
 
     # ================= Derivative couplings ====================
     obj.dc1_adi = CMATRIXList()
@@ -3478,9 +3478,9 @@ def dftb_compute_adi(q, params, full_id):
         for iatom in range(nat):
             for i in range(nstates):
                 for j in range(nstates):
-                    obj.dc1_adi[3 * iatom + 0].set(i, j, nacv[i,j,0,iatom] * (1.0 + 0.0j))
-                    obj.dc1_adi[3 * iatom + 1].set(i, j, nacv[i,j,1,iatom] * (1.0 + 0.0j))
-                    obj.dc1_adi[3 * iatom + 2].set(i, j, nacv[i,j,2,iatom] * (1.0 + 0.0j))
+                    obj.dc1_adi[3 * iatom + 0].set(i, j, complex(nacv[i,j,0,iatom]))
+                    obj.dc1_adi[3 * iatom + 1].set(i, j, complex(nacv[i,j,1,iatom]))
+                    obj.dc1_adi[3 * iatom + 2].set(i, j, complex(nacv[i,j,2,iatom]))
 
     # ================= Compute derivative couplings =================
     # the HST couplings go into nac_adi as well: the engine reads nac_adi

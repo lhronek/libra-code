@@ -212,7 +212,7 @@ def GLVC(q, _params, full_id=None):
     # =========== Energies & Derivatives ===============
     for i in range(nstates):
         for j in range(nstates):
-            obj.ham_dia.set(i, j, Ham[i][j] * (1.0 + 0.0j))
+            obj.ham_dia.set(i, j, complex(Ham[i][j]))
 
     for n in range(nstates):
         x = 0.0
@@ -227,9 +227,9 @@ def GLVC(q, _params, full_id=None):
             y = w2 * q_f + coupl[n][f] * scl[n]
 
             # derivative w.r.t. q_nf:
-            obj.d1ham_dia[f].add(n, n, y * (1.0 + 0.0j))
+            obj.d1ham_dia[f].add(n, n, complex(y))
 
-        obj.ham_dia.add(n, n, x * (1.0 + 0.0j))
+        obj.ham_dia.add(n, n, complex(x))
 
     return obj
 

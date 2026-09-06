@@ -121,12 +121,12 @@ def pyscf_compute_adi(q, params, full_id):
 
     # ================= Populate Hamiltonian =================
     for i in range(nstates):
-        obj.ham_adi.set(i, i, energies[i] * (1.0+0.0j) )
-        obj.hvib_adi.set(i, i, energies[i] * (1.0+0.0j) )
+        obj.ham_adi.set(i, i, complex(energies[i]) )
+        obj.hvib_adi.set(i, i, complex(energies[i]) )
         obj.basis_transform.set(i, i, 1.0+0.0j)
 
         for j in range(nstates):
-            obj.time_overlap_adi.set(i, j, float(st_ci[i, j]) * (1.0+0.0j) )
+            obj.time_overlap_adi.set(i, j, complex(float(st_ci[i, j])) )
 
     # ================== Forces ===============================
     obj.d1ham_adi = CMATRIXList()
@@ -135,9 +135,9 @@ def pyscf_compute_adi(q, params, full_id):
 
     for iatom in range(nat):
         for i in range(nstates):
-            obj.d1ham_adi[3 * iatom + 0].set(i, i, grad[i][iatom, 0] * (1.0 + 0.0j))
-            obj.d1ham_adi[3 * iatom + 1].set(i, i, grad[i][iatom, 1] * (1.0 + 0.0j))
-            obj.d1ham_adi[3 * iatom + 2].set(i, i, grad[i][iatom, 2] * (1.0 + 0.0j))
+            obj.d1ham_adi[3 * iatom + 0].set(i, i, complex(grad[i][iatom, 0]))
+            obj.d1ham_adi[3 * iatom + 1].set(i, i, complex(grad[i][iatom, 1]))
+            obj.d1ham_adi[3 * iatom + 2].set(i, i, complex(grad[i][iatom, 2]))
 
     # ================= Compute derivative couplings =================
     for i in range(nstates):

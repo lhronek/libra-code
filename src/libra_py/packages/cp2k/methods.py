@@ -5360,9 +5360,9 @@ def cp2k_compute_adi_nbra(q, params, full_id):
         obj.d1ham_adi.append(CMATRIX(nstates, nstates))
 
     # for iatom in range(nat):
-    #     obj.d1ham_adi[3 * iatom + 0].set(act_state, act_state, -forces[0, iatom] * (1.0 + 0.0j))
-    #     obj.d1ham_adi[3 * iatom + 1].set(act_state, act_state, -forces[1, iatom] * (1.0 + 0.0j))
-    #     obj.d1ham_adi[3 * iatom + 2].set(act_state, act_state, -forces[2, iatom] * (1.0 + 0.0j))
+    #     obj.d1ham_adi[3 * iatom + 0].set(act_state, act_state, complex(-forces[0, iatom]))
+    #     obj.d1ham_adi[3 * iatom + 1].set(act_state, act_state, complex(-forces[1, iatom]))
+    #     obj.d1ham_adi[3 * iatom + 2].set(act_state, act_state, complex(-forces[2, iatom]))
 
     # ================= Derivative couplings containers =================
     obj.dc1_adi = CMATRIXList()
@@ -5374,9 +5374,9 @@ def cp2k_compute_adi_nbra(q, params, full_id):
     #     for iatom in range(nat):
     #         for i in range(nstates):
     #             for j in range(nstates):
-    #                 obj.dc1_adi[3 * iatom + 0].set(i, j, nacv[i, j, 0, iatom] * (1.0 + 0.0j))
-    #                 obj.dc1_adi[3 * iatom + 1].set(i, j, nacv[i, j, 1, iatom] * (1.0 + 0.0j))
-    #                 obj.dc1_adi[3 * iatom + 2].set(i, j, nacv[i, j, 2, iatom] * (1.0 + 0.0j))
+    #                 obj.dc1_adi[3 * iatom + 0].set(i, j, complex(nacv[i, j, 0, iatom]))
+    #                 obj.dc1_adi[3 * iatom + 1].set(i, j, complex(nacv[i, j, 1, iatom]))
+    #                 obj.dc1_adi[3 * iatom + 2].set(i, j, complex(nacv[i, j, 2, iatom]))
 
     # ================= Compute derivative couplings =================
     for i in range(nstates):
@@ -6116,11 +6116,11 @@ def cp2k_compute_adi_impl(q, params, full_id):
             obj.basis_transform.set(i, i, 1.0 + 0.0j)
 
     for i in range(nstates):
-        obj.ham_adi.set(i, i, float(E_mid[i]) * (1.0 + 0.0j))
-        obj.hvib_adi.set(i, i, float(E_mid[i]) * (1.0 + 0.0j))
+        obj.ham_adi.set(i, i, complex(float(E_mid[i])))
+        obj.hvib_adi.set(i, i, complex(float(E_mid[i])))
         obj.overlap_adi.set(i, i, 1.0 + 0.0j)
         for j in range(nstates):
-            obj.time_overlap_adi.set(i, j, float(st_ci[i, j]) * (1.0 + 0.0j))
+            obj.time_overlap_adi.set(i, j, complex(float(st_ci[i, j])))
     dt = float(params.get("dt", 41.0))    # the NBRA twin's default
     # off-diagonal couplings -i (St_ij - St_ji)/(2 dt), the NBRA-twin
     # convention: a diagonal-only supplied hvib armed the overwrite guard
@@ -6130,8 +6130,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
             dij = float(st_ci[i, j] - st_ci[j, i]) / (2.0 * dt)
             # the same couplings in nac_adi: read directly by the LZ
             # detectors, the NAC phase correction and the nac_adi saver
-            obj.nac_adi.set(i, j, dij * (1.0 + 0.0j))
-            obj.nac_adi.set(j, i, -dij * (1.0 + 0.0j))
+            obj.nac_adi.set(i, j, complex(dij))
+            obj.nac_adi.set(j, i, complex(-dij))
             obj.hvib_adi.set(i, j, -1j * dij)
             obj.hvib_adi.set(j, i, +1j * dij)
 
@@ -6146,14 +6146,14 @@ def cp2k_compute_adi_impl(q, params, full_id):
             if forces_all is not None:          # all diagonals, state-specific
                 for ist in range(nstates):
                     obj.d1ham_adi[3 * iat + k].set(ist, ist,
-                                                   -forces_all[ist, iat, k] * (1.0 + 0.0j))
+                                                   complex(-forces_all[ist, iat, k]))
             elif time_dependent and force_source == "active_state":   # mechanism A: active state only
                 obj.d1ham_adi[3 * iat + k].set(act_state, act_state,
-                                               -forces[iat, k] * (1.0 + 0.0j))
+                                               complex(-forces[iat, k]))
             else:  # GS mode / force_source "gs" or "none": GS forces on all diagonals
                 for ist in range(nstates):
                     obj.d1ham_adi[3 * iat + k].set(ist, ist,
-                                                   -forces[iat, k] * (1.0 + 0.0j))
+                                                   complex(-forces[iat, k]))
 
     # ---------------- store per-trajectory state ----------------
     params["mo_prev"][itraj] = mo_curr

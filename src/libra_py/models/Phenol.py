@@ -265,40 +265,40 @@ def Pollien_Arribas_Agostini(q, _params, full_id=None):
 
     # =========== Energies & Derivatives ===============
     # Hamiltonian matrix
-    obj.ham_dia.set(0, 0, V11 * (1.0 + 0.0j))
-    obj.ham_dia.set(0, 1, V12 * (1.0 + 0.0j))
-    obj.ham_dia.set(0, 2, V13 * (1.0 + 0.0j))
-    obj.ham_dia.set(1, 0, V12 * (1.0 + 0.0j))
-    obj.ham_dia.set(1, 1, V22 * (1.0 + 0.0j))
-    obj.ham_dia.set(1, 2, V23 * (1.0 + 0.0j))
-    obj.ham_dia.set(2, 0, V13 * (1.0 + 0.0j))
-    obj.ham_dia.set(2, 1, V23 * (1.0 + 0.0j))
-    obj.ham_dia.set(2, 2, V33 * (1.0 + 0.0j))
+    obj.ham_dia.set(0, 0, complex(V11))
+    obj.ham_dia.set(0, 1, complex(V12))
+    obj.ham_dia.set(0, 2, complex(V13))
+    obj.ham_dia.set(1, 0, complex(V12))
+    obj.ham_dia.set(1, 1, complex(V22))
+    obj.ham_dia.set(1, 2, complex(V23))
+    obj.ham_dia.set(2, 0, complex(V13))
+    obj.ham_dia.set(2, 1, complex(V23))
+    obj.ham_dia.set(2, 2, complex(V33))
 
     # Derivatives with respect to r
-    obj.d1ham_dia[0].set(0, 0, dV11_dr * (1.0 + 0.0j))
-    obj.d1ham_dia[0].set(0, 1, dV12_dr * (1.0 + 0.0j))
-    obj.d1ham_dia[0].set(0, 2, dV13_dr * (1.0 + 0.0j))
+    obj.d1ham_dia[0].set(0, 0, complex(dV11_dr))
+    obj.d1ham_dia[0].set(0, 1, complex(dV12_dr))
+    obj.d1ham_dia[0].set(0, 2, complex(dV13_dr))
 
-    obj.d1ham_dia[0].set(1, 0, dV12_dr * (1.0 + 0.0j))
-    obj.d1ham_dia[0].set(1, 1, dV22_dr * (1.0 + 0.0j))
-    obj.d1ham_dia[0].set(1, 2, dV23_dr * (1.0 + 0.0j))
+    obj.d1ham_dia[0].set(1, 0, complex(dV12_dr))
+    obj.d1ham_dia[0].set(1, 1, complex(dV22_dr))
+    obj.d1ham_dia[0].set(1, 2, complex(dV23_dr))
 
-    obj.d1ham_dia[0].set(2, 0, dV13_dr * (1.0 + 0.0j))
-    obj.d1ham_dia[0].set(2, 1, dV23_dr * (1.0 + 0.0j))
-    obj.d1ham_dia[0].set(2, 2, dV33_dr * (1.0 + 0.0j))
+    obj.d1ham_dia[0].set(2, 0, complex(dV13_dr))
+    obj.d1ham_dia[0].set(2, 1, complex(dV23_dr))
+    obj.d1ham_dia[0].set(2, 2, complex(dV33_dr))
 
     # Derivatives with respect to theta
-    obj.d1ham_dia[1].set(0, 0, dV11_dtheta * (1.0 + 0.0j))
-    obj.d1ham_dia[1].set(0, 1, dV12_dtheta * (1.0 + 0.0j))
-    obj.d1ham_dia[1].set(0, 2, dV13_dtheta * (1.0 + 0.0j))
+    obj.d1ham_dia[1].set(0, 0, complex(dV11_dtheta))
+    obj.d1ham_dia[1].set(0, 1, complex(dV12_dtheta))
+    obj.d1ham_dia[1].set(0, 2, complex(dV13_dtheta))
 
-    obj.d1ham_dia[1].set(1, 0, dV12_dtheta * (1.0 + 0.0j))
-    obj.d1ham_dia[1].set(1, 1, dV22_dtheta * (1.0 + 0.0j))
-    obj.d1ham_dia[1].set(1, 2, dV23_dtheta * (1.0 + 0.0j))
+    obj.d1ham_dia[1].set(1, 0, complex(dV12_dtheta))
+    obj.d1ham_dia[1].set(1, 1, complex(dV22_dtheta))
+    obj.d1ham_dia[1].set(1, 2, complex(dV23_dtheta))
 
-    obj.d1ham_dia[1].set(2, 0, dV13_dtheta * (1.0 + 0.0j))
-    obj.d1ham_dia[1].set(2, 1, dV23_dtheta * (1.0 + 0.0j))
-    obj.d1ham_dia[1].set(2, 2, dV33_dtheta * (1.0 + 0.0j))
+    obj.d1ham_dia[1].set(2, 0, complex(dV13_dtheta))
+    obj.d1ham_dia[1].set(2, 1, complex(dV23_dtheta))
+    obj.d1ham_dia[1].set(2, 2, complex(dV33_dtheta))
 
     return obj

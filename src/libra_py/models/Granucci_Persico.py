@@ -111,17 +111,17 @@ def model1(q, params):
     H_01 = e3 + gamm * si**2
     dH_01 = -2.0 * beta * (x - x_c) * e3 + gamma * 2.0 * si * cs
 
-    Hdia.set(0, 0, H_00 * (1.0 + 0.0j))
-    Hdia.set(0, 1, H_01 * (1.0 + 0.0j))
-    Hdia.set(1, 0, H_01 * (1.0 + 0.0j))
-    Hdia.set(1, 1, H_11 * (1.0 + 0.0j))
+    Hdia.set(0, 0, complex(H_00))
+    Hdia.set(0, 1, complex(H_01))
+    Hdia.set(1, 0, complex(H_01))
+    Hdia.set(1, 1, complex(H_11))
 
     for i in [0]:
         #  d Hdia / dR_0
-        d1ham_dia[i].set(0, 0, dH_00 * (1.0 + 0.0j))
-        d1ham_dia[i].set(0, 1, dH_01 * (1.0 + 0.0j))
-        d1ham_dia[i].set(1, 0, dH_01 * (1.0 + 0.0j))
-        d1ham_dia[i].set(1, 1, dH_11 * (1.0 + 0.0j))
+        d1ham_dia[i].set(0, 0, complex(dH_00))
+        d1ham_dia[i].set(0, 1, complex(dH_01))
+        d1ham_dia[i].set(1, 0, complex(dH_01))
+        d1ham_dia[i].set(1, 1, complex(dH_11))
 
         #  <dia| d/dR_0| dia >
         dc1_dia[i].set(0, 0, 0.0 + 0.0j)
@@ -218,10 +218,10 @@ def model2(q, params):
     H_11 = D2 * (e2**2 - 2.0 * e2) + delta2 + 0.5 * K * y**2
     H_01 = gamma * y * e3
 
-    Hdia.set(0, 0, H_00 * (1.0 + 0.0j))
-    Hdia.set(0, 1, H_01 * (1.0 + 0.0j))
-    Hdia.set(1, 0, H_01 * (1.0 + 0.0j))
-    Hdia.set(1, 1, H_11 * (1.0 + 0.0j))
+    Hdia.set(0, 0, complex(H_00))
+    Hdia.set(0, 1, complex(H_01))
+    Hdia.set(1, 0, complex(H_01))
+    Hdia.set(1, 1, complex(H_11))
 
     # Derivatives
     #  d Hdia / dR_0
@@ -233,20 +233,20 @@ def model2(q, params):
 
     dH_01 = -2.0 * beta1 * (x - x3) * H_01
 
-    d1ham_dia[0].set(0, 0, dH_00 * (1.0 + 0.0j))
-    d1ham_dia[0].set(0, 1, dH_01 * (1.0 + 0.0j))
-    d1ham_dia[0].set(1, 0, dH_01 * (1.0 + 0.0j))
-    d1ham_dia[0].set(1, 1, dH_11 * (1.0 + 0.0j))
+    d1ham_dia[0].set(0, 0, complex(dH_00))
+    d1ham_dia[0].set(0, 1, complex(dH_01))
+    d1ham_dia[0].set(1, 0, complex(dH_01))
+    d1ham_dia[0].set(1, 1, complex(dH_11))
 
     #  d Hdia / dR_1
     dH_00 = K * y
     dH_11 = dH_00
     dH_01 = gamma * e3 - 2.0 * beta * y * H_01
 
-    d1ham_dia[0].set(0, 0, dH_00 * (1.0 + 0.0j))
-    d1ham_dia[0].set(0, 1, dH_01 * (1.0 + 0.0j))
-    d1ham_dia[0].set(1, 0, dH_01 * (1.0 + 0.0j))
-    d1ham_dia[0].set(1, 1, dH_11 * (1.0 + 0.0j))
+    d1ham_dia[0].set(0, 0, complex(dH_00))
+    d1ham_dia[0].set(0, 1, complex(dH_01))
+    d1ham_dia[0].set(1, 0, complex(dH_01))
+    d1ham_dia[0].set(1, 1, complex(dH_11))
 
     obj = tmp()
     obj.ham_dia = Hdia

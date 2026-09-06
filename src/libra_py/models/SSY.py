@@ -92,7 +92,7 @@ def SSY(q, params, full_id):
     x, y = q.get(0, indx), q.get(1, indx)
 
     # H_00
-    obj.ham_dia.set(0, 0, E0 * (-1.0 + 0.0j))
+    obj.ham_dia.set(0, 0, complex(-E0))
     obj.d1ham_dia[0].set(0, 0, 0.0 + 0.0j)
     obj.d1ham_dia[1].set(0, 0, 0.0 + 0.0j)
 
@@ -100,21 +100,21 @@ def SSY(q, params, full_id):
     z = -A * math.exp(-B * (0.75 * (x + y)**2 + 0.25 * (x - y)**2))
     dzdx = -B * (1.5 * (x + y) + 0.5 * (x - y)) * z
     dzdy = -B * (1.5 * (x + y) - 0.5 * (x - y)) * z
-    obj.ham_dia.set(1, 1, z * (1.0 + 0.0j))
-    obj.d1ham_dia[0].set(1, 1, dzdx * (1.0 + 0.0j))
-    obj.d1ham_dia[1].set(1, 1, dzdy * (1.0 + 0.0j))
+    obj.ham_dia.set(1, 1, complex(z))
+    obj.d1ham_dia[0].set(1, 1, complex(dzdx))
+    obj.d1ham_dia[1].set(1, 1, complex(dzdy))
 
     # H_01 and H_10
     z = C * math.exp(-D * (0.25 * (x + y)**2 + 0.75 * (x - y)**2))
     dzdx = -D * (0.5 * (x + y) + 1.5 * (x - y)) * z
     dzdy = -D * (0.5 * (x + y) - 1.5 * (x - y)) * z
 
-    obj.ham_dia.set(0, 1, z * (1.0 + 0.0j))
-    obj.d1ham_dia[0].set(0, 1, dzdx * (1.0 + 0.0j))
-    obj.d1ham_dia[1].set(0, 1, dzdy * (1.0 + 0.0j))
+    obj.ham_dia.set(0, 1, complex(z))
+    obj.d1ham_dia[0].set(0, 1, complex(dzdx))
+    obj.d1ham_dia[1].set(0, 1, complex(dzdy))
 
-    obj.ham_dia.set(1, 0, z * (1.0 + 0.0j))
-    obj.d1ham_dia[0].set(1, 0, dzdx * (1.0 + 0.0j))
-    obj.d1ham_dia[1].set(1, 0, dzdy * (1.0 + 0.0j))
+    obj.ham_dia.set(1, 0, complex(z))
+    obj.d1ham_dia[0].set(1, 0, complex(dzdx))
+    obj.d1ham_dia[1].set(1, 0, complex(dzdy))
 
     return obj

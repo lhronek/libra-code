@@ -885,13 +885,13 @@ def mopac_compute_adi(q, params, full_id):
             #energ = float(0.5 * (data_prev[0][istate-1] + data_curr[0][istate-1]))
             energ = float(data_curr[0][istate-1])
 
-        obj.ham_adi.set(istate, istate, energ * (1.0 + 0.0j))
-        obj.hvib_adi.set(istate, istate, energ * (1.0 + 0.0j))
+        obj.ham_adi.set(istate, istate, complex(energ))
+        obj.hvib_adi.set(istate, istate, complex(energ))
         obj.basis_transform.set(istate, istate, 1.0 + 0.0j)  # assume identity
 
         for jstate in range(nstates):
-            obj.time_overlap_adi.set(istate, jstate, float(st_ci[istate, jstate]) * (1.0 + 0.0j))
-            obj.overlap_adi.set(istate,  jstate, float(s_ci[istate, jstate]) * (1.0 + 0.0j) )
+            obj.time_overlap_adi.set(istate, jstate, complex(float(st_ci[istate, jstate])))
+            obj.overlap_adi.set(istate,  jstate, complex(float(s_ci[istate, jstate])) )
 
     # Update the Hvib:
     for istate in range(nstates):

@@ -1272,7 +1272,7 @@ def sac_matrices(coeff, basis, S_ks):
     P2C = CMATRIX(n_phi, n_chi)
     for j in range(0, n_chi):
         for i in range(0, n_phi):
-            P2C.set(i, j, coeff[j][i] * (1.0 + 0.0j))
+            P2C.set(i, j, complex(coeff[j][i]))
 
     # Compute the overlaps of the SDs:
     #

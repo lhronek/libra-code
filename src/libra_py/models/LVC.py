@@ -102,32 +102,32 @@ def LVC(q, params, full_id=None):
         indx = Id[-1]
 
     # =========== Energies & Derivatives ===============
-    obj.ham_dia.set(0, 0, params["Delta1"] * (1.0 + 0.0j))
-    obj.ham_dia.set(1, 1, params["Delta2"] * (1.0 + 0.0j))
+    obj.ham_dia.set(0, 0, complex(params["Delta1"]))
+    obj.ham_dia.set(1, 1, complex(params["Delta2"]))
 
     for n in range(0, ndof):
         # Diagonal bath
         q_n = q.get(n, indx)
 
-        x = 0.5 * m[n] * w[n] * w[n] * q_n * q_n * (1.0 + 0.0j)
+        x = complex(0.5 * m[n] * w[n] * w[n] * q_n * q_n)
         obj.ham_dia.add(0, 0, x)
         obj.ham_dia.add(1, 1, x)
 
-        x = m[n] * w[n] * w[n] * q_n * (1.0 + 0.0j)
+        x = complex(m[n] * w[n] * w[n] * q_n)
         obj.d1ham_dia[n].add(0, 0, x)
         obj.d1ham_dia[n].add(1, 1, x)
 
         # Diagonal el-ph coupling
-        x = math.sqrt(m[n]) * q_n * (1.0 + 0.0j)
+        x = complex(math.sqrt(m[n]) * q_n)
         obj.ham_dia.add(0, 0, x * d1[n])
         obj.ham_dia.add(1, 1, x * d2[n])
 
-        x = math.sqrt(m[n]) * (1.0 + 0.0j)
+        x = complex(math.sqrt(m[n]))
         obj.d1ham_dia[n].add(0, 0, x * d1[n])
         obj.d1ham_dia[n].add(0, 0, x * d2[n])
 
         # Off-diagonal
-        x = math.sqrt(m[n]) * c[n] * (1.0 + 0.0j)
+        x = complex(math.sqrt(m[n]) * c[n])
         obj.ham_dia.add(0, 1, x * q.get(n, 0))
         obj.ham_dia.add(1, 0, x * q.get(n, 0))
 

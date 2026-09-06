@@ -101,17 +101,17 @@ def Tully1_py(q, params, full_id):
     V = C * e
     dV = -2.0 * x * C * D * e
 
-    Hdia.set(0, 0, V11 * (1.0 + 0.0j))
-    Hdia.set(0, 1, V * (1.0 + 0.0j))
-    Hdia.set(1, 0, V * (1.0 + 0.0j))
-    Hdia.set(1, 1, V11 * (-1.0 + 0.0j))
+    Hdia.set(0, 0, complex(V11))
+    Hdia.set(0, 1, complex(V))
+    Hdia.set(1, 0, complex(V))
+    Hdia.set(1, 1, complex(-V11))
 
     for i in [0]:
         #  d Hdia / dR_0
-        d1ham_dia[i].set(0, 0, dV11 * (1.0 + 0.0j))
-        d1ham_dia[i].set(0, 1, dV * (1.0 + 0.0j))
-        d1ham_dia[i].set(1, 0, dV * (1.0 + 0.0j))
-        d1ham_dia[i].set(1, 1, dV11 * (-1.0 + 0.0j))
+        d1ham_dia[i].set(0, 0, complex(dV11))
+        d1ham_dia[i].set(0, 1, complex(dV))
+        d1ham_dia[i].set(1, 0, complex(dV))
+        d1ham_dia[i].set(1, 1, complex(-dV11))
 
         #  <dia| d/dR_0| dia >
         dc1_dia[i].set(0, 0, 0.0 + 0.0j)
@@ -408,16 +408,16 @@ def chain_potential(q, params, full_id):
         dH_bath.append(2.0 * a2 * d + 3.0 * a3 * d2 + 4.0 * a4 * d3)
 
     for i in range(nstates):
-        Hdia.add(i, i, H_bath * (1.0 + 0.0j))
+        Hdia.add(i, i, complex(H_bath))
 
         k = 0
-        d1ham_dia[k].add(i, i, (dH_bath[k]) * (1.0 + 0.0j))
+        d1ham_dia[k].add(i, i, complex(dH_bath[k]))
 
         for k in range(1, ndof - 1):
-            d1ham_dia[k].add(i, i, (dH_bath[k] - dH_bath[k - 1]) * (1.0 + 0.0j))
+            d1ham_dia[k].add(i, i, complex(dH_bath[k] - dH_bath[k - 1]))
 
         k = ndof - 1
-        d1ham_dia[k].add(i, i, (-dH_bath[k - 1]) * (1.0 + 0.0j))
+        d1ham_dia[k].add(i, i, complex(-dH_bath[k - 1]))
 
     """
     for k in range(1, ndof):
@@ -429,9 +429,9 @@ def chain_potential(q, params, full_id):
 
 
         for i in range(nstates):
-            Hdia.add(i,i, H_bath*(1.0+0.0j) )
-            d1ham_dia[k].add(i, i, ( -dH_bath ) * (1.0+0.0j) )
-            d1ham_dia[0].add(i, i, (  dH_bath ) * (1.0+0.0j) )
+            Hdia.add(i,i, complex(H_bath) )
+            d1ham_dia[k].add(i, i, complex(-dH_bath) )
+            d1ham_dia[0].add(i, i, complex(dH_bath) )
 
     """
 
@@ -439,15 +439,15 @@ def chain_potential(q, params, full_id):
     x = X.get(0)
     for i in range(nstates):
         # Energies
-        Hdia.add(i, i, (E_n[i] + 0.5 * k_n[i] * (x - x_n[i])**2) * (1.0 + 0.0j))
+        Hdia.add(i, i, complex(E_n[i] + 0.5 * k_n[i] * (x - x_n[i])**2))
 
         for j in range(nstates):
             if i != j:
-                Hdia.add(i, j, V[i][j] * (1.0 + 0.0j))
+                Hdia.add(i, j, complex(V[i][j]))
 
         # Derivatives
         k = 0  # quantum DOF
-        d1ham_dia[k].add(i, i, (k_n[i] * (x - x_n[i])) * (1.0 + 0.0j))
+        d1ham_dia[k].add(i, i, complex(k_n[i] * (x - x_n[i])))
 
     obj = tmp()
     obj.ham_dia = Hdia

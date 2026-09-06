@@ -76,12 +76,12 @@ def Beswick_Jortner(q, params):
     r = q.get(0)
     R = q.get(1)
 
-    Hdia.set(0, 0, (T0 + 0.5 * k * (r - r0)**2 + A * exp(a * (r * m_c / (m_c + m_n) - R))) * (1.0 + 0.0j))
+    Hdia.set(0, 0, complex(T0 + 0.5 * k * (r - r0)**2 + A * exp(a * (r * m_c / (m_c + m_n) - R))))
     Sdia.set(0, 0, 1.0 + 0.0j)
 
     #  d Hdia / dR_0
-    d1ham_dia[0].set(0, 0, (x + lam * (y2 - x2) + 0.25 * lam2 * (x2 + y2) * x) * (1.0 + 0.0j))
-    d1ham_dia[1].set(0, 0, (y + lam * 2.0 * y * x + 0.25 * lam2 * (x2 + y2) * y) * (1.0 + 0.0j))
+    d1ham_dia[0].set(0, 0, complex(x + lam * (y2 - x2) + 0.25 * lam2 * (x2 + y2) * x))
+    d1ham_dia[1].set(0, 0, complex(y + lam * 2.0 * y * x + 0.25 * lam2 * (x2 + y2) * y))
 
     #  <dia| d/dR_0| dia >
     dc1_dia[0].set(0, 0, 0.0 + 0.0j)

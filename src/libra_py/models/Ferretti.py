@@ -130,10 +130,10 @@ def Ferretti(q, params, full_id=None):
     expy = math.exp(-beta * Y**2)
     H_12 = gamma * Y * expx * expy
 
-    obj.ham_dia.set(0, 0, H_11 * (1.0 + 0.0j))
-    obj.ham_dia.set(1, 1, H_22 * (1.0 + 0.0j))
-    obj.ham_dia.set(0, 1, H_12 * (1.0 + 0.0j))
-    obj.ham_dia.set(1, 0, H_12 * (1.0 + 0.0j))
+    obj.ham_dia.set(0, 0, complex(H_11))
+    obj.ham_dia.set(1, 1, complex(H_22))
+    obj.ham_dia.set(0, 1, complex(H_12))
+    obj.ham_dia.set(1, 0, complex(H_12))
 
     # dH/dX
     dH_11 = Kx * (X - X1)
@@ -141,10 +141,10 @@ def Ferretti(q, params, full_id=None):
     dexpx = -2.0 * alpha * (X - X3) * expx
     dH_12 = gamma * Y * dexpx * expy
 
-    obj.d1ham_dia[0].set(0, 0, dH_11 * (1.0 + 0.0j))
-    obj.d1ham_dia[0].set(1, 1, dH_22 * (1.0 + 0.0j))
-    obj.d1ham_dia[0].set(0, 1, dH_12 * (1.0 + 0.0j))
-    obj.d1ham_dia[0].set(1, 0, dH_12 * (1.0 + 0.0j))
+    obj.d1ham_dia[0].set(0, 0, complex(dH_11))
+    obj.d1ham_dia[0].set(1, 1, complex(dH_22))
+    obj.d1ham_dia[0].set(0, 1, complex(dH_12))
+    obj.d1ham_dia[0].set(1, 0, complex(dH_12))
 
     # dH/dY
     dH_11 = Ky * Y
@@ -152,10 +152,10 @@ def Ferretti(q, params, full_id=None):
     dexpy = -2.0 * beta * Y * expy
     dH_12 = gamma * Y * expx * dexpy + gamma * expx * expy
 
-    obj.d1ham_dia[1].set(0, 0, dH_11 * (1.0 + 0.0j))
-    obj.d1ham_dia[1].set(1, 1, dH_22 * (1.0 + 0.0j))
-    obj.d1ham_dia[1].set(0, 1, dH_12 * (1.0 + 0.0j))
-    obj.d1ham_dia[1].set(1, 0, dH_12 * (1.0 + 0.0j))
+    obj.d1ham_dia[1].set(0, 0, complex(dH_11))
+    obj.d1ham_dia[1].set(1, 1, complex(dH_22))
+    obj.d1ham_dia[1].set(0, 1, complex(dH_12))
+    obj.d1ham_dia[1].set(1, 0, complex(dH_12))
 
     # ========== Second derivatives =================
     # d^2H/dX^2
@@ -166,10 +166,10 @@ def Ferretti(q, params, full_id=None):
     d2expx = -2.0 * alpha * (expx + (X - X3) * dexpx)
     d2HdX2_12 = gamma * Y * d2expx * expy  # d^2H11/dX^2
 
-    obj.d2ham_dia[0].set(0, 0, d2HdX2_11 * (1.0 + 0.0j))
-    obj.d2ham_dia[0].set(1, 1, d2HdX2_22 * (1.0 + 0.0j))
-    obj.d2ham_dia[0].set(0, 1, d2HdX2_12 * (1.0 + 0.0j))
-    obj.d2ham_dia[0].set(1, 0, d2HdX2_12 * (1.0 + 0.0j))
+    obj.d2ham_dia[0].set(0, 0, complex(d2HdX2_11))
+    obj.d2ham_dia[0].set(1, 1, complex(d2HdX2_22))
+    obj.d2ham_dia[0].set(0, 1, complex(d2HdX2_12))
+    obj.d2ham_dia[0].set(1, 0, complex(d2HdX2_12))
 
     # d^2H/dXdY and d^2H/dYdX
     d2HdXdY_11 = 0.0
@@ -177,15 +177,15 @@ def Ferretti(q, params, full_id=None):
     # dexpx =  -2.0 * alpha * (X-X3) * expx
     # dH_12 = gamma * Y * dexpx * expy  = dH/dX
     d2HdXdY_12 = gamma * dexpx * (expy + Y * dexpy)
-    obj.d2ham_dia[1].set(0, 0, d2HdXdY_11 * (1.0 + 0.0j))
-    obj.d2ham_dia[1].set(1, 1, d2HdXdY_22 * (1.0 + 0.0j))
-    obj.d2ham_dia[1].set(0, 1, d2HdXdY_12 * (1.0 + 0.0j))
-    obj.d2ham_dia[1].set(1, 0, d2HdXdY_12 * (1.0 + 0.0j))
+    obj.d2ham_dia[1].set(0, 0, complex(d2HdXdY_11))
+    obj.d2ham_dia[1].set(1, 1, complex(d2HdXdY_22))
+    obj.d2ham_dia[1].set(0, 1, complex(d2HdXdY_12))
+    obj.d2ham_dia[1].set(1, 0, complex(d2HdXdY_12))
 
-    obj.d2ham_dia[2].set(0, 0, d2HdXdY_11 * (1.0 + 0.0j))
-    obj.d2ham_dia[2].set(1, 1, d2HdXdY_22 * (1.0 + 0.0j))
-    obj.d2ham_dia[2].set(0, 1, d2HdXdY_12 * (1.0 + 0.0j))
-    obj.d2ham_dia[2].set(1, 0, d2HdXdY_12 * (1.0 + 0.0j))
+    obj.d2ham_dia[2].set(0, 0, complex(d2HdXdY_11))
+    obj.d2ham_dia[2].set(1, 1, complex(d2HdXdY_22))
+    obj.d2ham_dia[2].set(0, 1, complex(d2HdXdY_12))
+    obj.d2ham_dia[2].set(1, 0, complex(d2HdXdY_12))
 
     # d^2H/dY^2
     d2HdY2_11 = Ky
@@ -194,9 +194,9 @@ def Ferretti(q, params, full_id=None):
     d2expy = -2.0 * beta * (Y * dexpy + expy)
     # dH_12 = gamma * Y * expx * dexpy + gamma * expx * expy
     d2HdY2_12 = gamma * expx * (dexpy + Y * d2expy + dexpy)
-    obj.d2ham_dia[3].set(0, 0, d2HdY2_11 * (1.0 + 0.0j))
-    obj.d2ham_dia[3].set(1, 1, d2HdY2_22 * (1.0 + 0.0j))
-    obj.d2ham_dia[3].set(0, 1, d2HdY2_12 * (1.0 + 0.0j))
-    obj.d2ham_dia[3].set(1, 0, d2HdY2_12 * (1.0 + 0.0j))
+    obj.d2ham_dia[3].set(0, 0, complex(d2HdY2_11))
+    obj.d2ham_dia[3].set(1, 1, complex(d2HdY2_22))
+    obj.d2ham_dia[3].set(0, 1, complex(d2HdY2_12))
+    obj.d2ham_dia[3].set(1, 0, complex(d2HdY2_12))
 
     return obj

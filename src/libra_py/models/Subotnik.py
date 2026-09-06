@@ -115,16 +115,16 @@ def dumbbell_geometry(q, params, full_id=None):
         H01 = B * (e_plus + (2.0 - e_minus))
         dH01 = -B * C * (e_plus - e_minus)
 
-    Hdia.set(0, 0, A * (1.0 + 0.0j))
-    Hdia.set(0, 1, H01 * (1.0 + 0.0j))
-    Hdia.set(1, 0, H01 * (1.0 + 0.0j))
-    Hdia.set(1, 1, A * (-1.0 + 0.0j))
+    Hdia.set(0, 0, complex(A))
+    Hdia.set(0, 1, complex(H01))
+    Hdia.set(1, 0, complex(H01))
+    Hdia.set(1, 1, complex(-A))
 
     for i in [0]:
         #  d Hdia / dR_0
         d1ham_dia[i].set(0, 0, 0.0 + 0.0j)
-        d1ham_dia[i].set(0, 1, dH01 * (1.0 + 0.0j))
-        d1ham_dia[i].set(1, 0, dH01 * (1.0 + 0.0j))
+        d1ham_dia[i].set(0, 1, complex(dH01))
+        d1ham_dia[i].set(1, 0, complex(dH01))
         d1ham_dia[i].set(1, 1, 0.0 + 0.0j)
 
         #  <dia| d/dR_0| dia >
@@ -229,16 +229,16 @@ def double_arch_geometry(q, params, full_id=None):
         H01 = B * (e_minus - e_plus)
         dH01 = -B * C * (e_minus - e_plus)
 
-    Hdia.set(0, 0, A * (1.0 + 0.0j))
-    Hdia.set(0, 1, H01 * (1.0 + 0.0j))
-    Hdia.set(1, 0, H01 * (1.0 + 0.0j))
-    Hdia.set(1, 1, A * (-1.0 + 0.0j))
+    Hdia.set(0, 0, complex(A))
+    Hdia.set(0, 1, complex(H01))
+    Hdia.set(1, 0, complex(H01))
+    Hdia.set(1, 1, complex(-A))
 
     for i in [0]:
         #  d Hdia / dR_0
         d1ham_dia[i].set(0, 0, 0.0 + 0.0j)
-        d1ham_dia[i].set(0, 1, dH01 * (1.0 + 0.0j))
-        d1ham_dia[i].set(1, 0, dH01 * (1.0 + 0.0j))
+        d1ham_dia[i].set(0, 1, complex(dH01))
+        d1ham_dia[i].set(1, 0, complex(dH01))
         d1ham_dia[i].set(1, 1, 0.0 + 0.0j)
 
         #  <dia| d/dR_0| dia >

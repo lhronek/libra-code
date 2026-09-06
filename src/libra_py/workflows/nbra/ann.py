@@ -657,7 +657,7 @@ def compute_model_nbra_ann(q, params, full_id):
         de = gap_scale * de + gap_shift
 
         ei = ei + de
-        ham_adi.set(i, i, ei * (1.0 + 0.0j))
+        ham_adi.set(i, i, complex(ei))
 
     # ============ NAC ===========
     nac_adi = CMATRIX(nadi, nadi)
@@ -681,8 +681,8 @@ def compute_model_nbra_ann(q, params, full_id):
 
             # print(F"w = {w} tau = {tau} nac = {nac}  nac_scale = {nac_scale}  nac_shift = {gap_shift}")
 
-            nac_adi.set(i, j, nac * (1.0 + 0.0j))
-            nac_adi.set(j, i, nac * (-1.0 + 0.0j))
+            nac_adi.set(i, j, complex(nac))
+            nac_adi.set(j, i, complex(-nac))
 
             cnt = cnt + 1
 

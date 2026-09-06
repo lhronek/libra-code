@@ -123,8 +123,8 @@ def get_mtx_matrices(filename, act_sp1=None, act_sp2=None):
             j = int(float(tmp[1])) - 1
             x = float(tmp[2])
 
-            X.set(i, j, x * (1.0 + 0.0j))
-            X.set(j, i, x * (1.0 + 0.0j))
+            X.set(i, j, complex(x))
+            X.set(j, i, complex(x))
 
     # Extract the sub-matrix of interest
     x_sub = CMATRIX(nstates1, nstates2)
@@ -341,7 +341,7 @@ def read_mo_unrestricted(nocc, nvirt, act_space=None):
         for j in range(nmo):
             tmp_a = data_read.get_data_from_file2(filenames[ac[j]], [0])[0]
             for i in range(nao):
-                mo[spin].set(i, j, tmp_a[i] * (1.0 + 0.0j))
+                mo[spin].set(i, j, complex(tmp_a[i]))
 
     return mo
 
@@ -453,7 +453,7 @@ def read_mo_restricted(nocc, nvirt, act_space=None):
         for j in range(nmo):
             tmp_a = data_read.get_data_from_file2(filenames[ac[j]], [0])[0]
             for i in range(nao):
-                mo[spin].set(i, j, tmp_a[i] * (1.0 + 0.0j))
+                mo[spin].set(i, j, complex(tmp_a[i]))
 
     return mo
 
@@ -492,6 +492,6 @@ def energies(en, nocc, nvirt, act_space=None):
 
     # Iterate over all entries in the active space
     for j in range(nmo):
-        E.set(j, j, en[ac[j] + (nocc - 1)] * (1.0 + 0.0j))
+        E.set(j, j, complex(en[ac[j] + (nocc - 1)]))
 
     return E

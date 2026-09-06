@@ -96,12 +96,12 @@ def model1(q, params, full_id=None):
     z = (2.0 * math.cosh(2.0 * x)) / (1.0 + math.cosh(4.0 * x))
     z2 = z * z
 
-    Hdia.set(0, 0, (Va * z2 + 0.5 * Vb * y * y) * (1.0 + 0.0j))
+    Hdia.set(0, 0, complex(Va * z2 + 0.5 * Vb * y * y))
     Sdia.set(0, 0, 1.0 + 0.0j)
 
     #  d Hdia / dR_0
-    d1ham_dia[0].set(0, 0, ((-4.0 * Va * math.tanh(2.0 * x) * z2)) * (1.0 + 0.0j))
-    d1ham_dia[1].set(0, 0, (Vb * y) * (1.0 + 0.0j))
+    d1ham_dia[0].set(0, 0, complex(-4.0 * Va * math.tanh(2.0 * x) * z2))
+    d1ham_dia[1].set(0, 0, complex(Vb * y))
 
     #  <dia| d/dR_0| dia >
     dc1_dia[0].set(0, 0, 0.0 + 0.0j)
@@ -185,13 +185,13 @@ def model2(q, params, full_id=None):
     z = (2.0 * math.cosh(2.0 * x)) / (1.0 + math.cosh(4.0 * x))
     z2 = z * z
 
-    Hdia.set(0, 0, (Va * z2 + 0.5 * Vb * (y + Vc * (x * x - 1.0))**2) * (1.0 + 0.0j))
+    Hdia.set(0, 0, complex(Va * z2 + 0.5 * Vb * (y + Vc * (x * x - 1.0))**2))
     Sdia.set(0, 0, 1.0 + 0.0j)
 
     #  d Hdia / dR_0
-    d1ham_dia[0].set(0, 0, ((-4.0 * Va * math.tanh(2.0 * x) * z2) +
-                     (2.0 * Vb * Vc * x * (y + Vc * x * x - Vc))) * (1.0 + 0.0j))
-    d1ham_dia[1].set(0, 0, (Vb * (y + Vc * (x * x - 1.0))) * (1.0 + 0.0j))
+    d1ham_dia[0].set(0, 0, complex((-4.0 * Va * math.tanh(2.0 * x) * z2) +
+                     (2.0 * Vb * Vc * x * (y + Vc * x * x - Vc))))
+    d1ham_dia[1].set(0, 0, complex(Vb * (y + Vc * (x * x - 1.0))))
 
     #  <dia| d/dR_0| dia >
     dc1_dia[0].set(0, 0, 0.0 + 0.0j)

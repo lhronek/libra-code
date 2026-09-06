@@ -183,11 +183,11 @@ def general(q, params, full_id):
     # Diagonals
     for i in range(n):
         bo = math.exp(-alpha[i] * (x - x_n[i]))
-        Hdia.set(i, i, (E[i] + D[i] * (1.0 - bo)**2) * (1.0 + 0.0j))
+        Hdia.set(i, i, complex(E[i] + D[i] * (1.0 - bo)**2))
 
         for k in [0]:
             #  d Hdia / dR_0
-            d1ham_dia[k].set(i, i, 2.0 * alpha[i] * D[i] * bo * (1.0 - bo) * (1.0 + 0.0j))
+            d1ham_dia[k].set(i, i, complex(2.0 * alpha[i] * D[i] * bo * (1.0 - bo)))
 
     # Off-diagonals
     for i in range(n):
@@ -195,10 +195,10 @@ def general(q, params, full_id):
             if i != j:
                 d = V[i][j] * math.exp(-beta[i][j] * (x - x_nm[i][j])**2)
 
-                Hdia.set(i, j, d * (1.0 + 0.0j))
+                Hdia.set(i, j, complex(d))
 
                 for k in [0]:
-                    d1ham_dia[k].set(i, j, -2.0 * beta[i][j] * (x - x_nm[i][j]) * d * (1.0 + 0.0j))
+                    d1ham_dia[k].set(i, j, complex(-2.0 * beta[i][j] * (x - x_nm[i][j]) * d))
 
     obj = tmp()
     obj.ham_dia = Hdia

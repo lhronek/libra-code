@@ -100,16 +100,16 @@ def Holstein_uncoupled(q, params):
 
     for i in range(0, N):
         x = q.get(i)
-        obj.ham_dia.set(i, i, Epot + alpha * x * (1.0 + 0.0j))
+        obj.ham_dia.set(i, i, Epot + complex(alpha * x))
 
     for i in range(0, N):
         for n in range(0, N):
             x = q.get(n)
 
             if (n == 0):
-                obj.d1ham_dia[n].set(i, i, (k * x + alpha) * (1.0 + 0.0j))  # dH(i,i)/dx_n
+                obj.d1ham_dia[n].set(i, i, complex(k * x + alpha))  # dH(i,i)/dx_n
             else:
-                obj.d1ham_dia[n].set(i, i, k * x * (1.0 + 0.0j))  # dH(i,i)/dx_n
+                obj.d1ham_dia[n].set(i, i, complex(k * x))  # dH(i,i)/dx_n
 
     return obj
 
@@ -200,16 +200,16 @@ def Holstein2(q, params, full_id):
     Sdia.identity()
 
     for i in range(n):
-        Hdia.set(i, i, (E_n[i] + 0.5 * k_n[i] * (x - x_n[i])**2) * (1.0 + 0.0j))
+        Hdia.set(i, i, complex(E_n[i] + 0.5 * k_n[i] * (x - x_n[i])**2))
 
     for i in range(n - 1):
-        Hdia.set(i, i + 1, V * (1.0 + 0.0j))
-        Hdia.set(i + 1, i, V * (1.0 + 0.0j))
+        Hdia.set(i, i + 1, complex(V))
+        Hdia.set(i + 1, i, complex(V))
 
     for k in [0]:
         #  d Hdia / dR_0
         for i in range(n):
-            d1ham_dia[k].set(i, i, (k_n[i] * (x - x_n[i])) * (1.0 + 0.0j))
+            d1ham_dia[k].set(i, i, complex(k_n[i] * (x - x_n[i])))
 
     obj = tmp()
     obj.ham_dia = Hdia
@@ -289,16 +289,16 @@ def Holstein3(q, params, full_id):
     Sdia.identity()
 
     for i in range(n):
-        Hdia.set(i, i, (E_n[i] + 0.5 * k_n[i] * (x - x_n[i])**2) * (1.0 + 0.0j))
+        Hdia.set(i, i, complex(E_n[i] + 0.5 * k_n[i] * (x - x_n[i])**2))
 
         for k in range(n):  # k = 'distance' between states
             if k != i:
-                Hdia.set(i, k, V_n[abs(i - k) - 1] * (1.0 + 0.0j))
+                Hdia.set(i, k, complex(V_n[abs(i - k) - 1]))
 
     for k in [0]:
         #  d Hdia / dR_0
         for i in range(n):
-            d1ham_dia[k].set(i, i, (k_n[i] * (x - x_n[i])) * (1.0 + 0.0j))
+            d1ham_dia[k].set(i, i, complex(k_n[i] * (x - x_n[i])))
 
     obj = tmp()
     obj.ham_dia = Hdia
@@ -364,17 +364,17 @@ def Holstein4(q, params, full_id):
     Sdia.identity()
 
     for i in range(n):
-        Hdia.set(i, i, (E_n[i] + 0.5 * k_n[i] * (x - x_n[i])**2) * (1.0 + 0.0j))
+        Hdia.set(i, i, complex(E_n[i] + 0.5 * k_n[i] * (x - x_n[i])**2))
 
     for i in range(n):
         for j in range(n):
             if i != j:
-                Hdia.set(i, j, V[i][j] * (1.0 + 0.0j))
+                Hdia.set(i, j, complex(V[i][j]))
 
     for k in [0]:
         #  d Hdia / dR_0
         for i in range(n):
-            d1ham_dia[k].set(i, i, (k_n[i] * (x - x_n[i])) * (1.0 + 0.0j))
+            d1ham_dia[k].set(i, i, complex(k_n[i] * (x - x_n[i])))
 
     obj = tmp()
     obj.ham_dia = Hdia
@@ -452,36 +452,36 @@ def Holstein5(q, params, full_id):
     Sdia.identity()
 
     for i in range(n):
-        Hdia.set(i, i, (E_n[i] + 0.5 * k_n[i] * (x - x_n[i])**2) * (1.0 + 0.0j))
+        Hdia.set(i, i, complex(E_n[i] + 0.5 * k_n[i] * (x - x_n[i])**2))
 
     for i in range(n):
         for j in range(n):
             if i != j:
-                Hdia.set(i, j, V[i][j] * math.exp(-alpha[i][j] * (x - x_nm[i][j])**2) * (1.0 + 0.0j))
+                Hdia.set(i, j, complex(V[i][j] * math.exp(-alpha[i][j] * (x - x_nm[i][j])**2)))
 
     for k in [0]:
         #  d Hdia / dR_0
         for i in range(n):
-            d1ham_dia[k].set(i, i, (k_n[i] * (x - x_n[i])) * (1.0 + 0.0j))
+            d1ham_dia[k].set(i, i, complex(k_n[i] * (x - x_n[i])))
 
     for k in [0]:
         for i in range(n):
             for j in range(n):
                 if i != j:
-                    d1ham_dia[k].set(i, j, -2.0 * alpha[i][j] * (x - x_nm[i][j]) * V[i][j] *
-                                     math.exp(-alpha[i][j] * (x - x_nm[i][j])**2) * (1.0 + 0.0j))
+                    d1ham_dia[k].set(i, j, complex(-2.0 * alpha[i][j] * (x - x_nm[i][j]) * V[i][j] *
+                                     math.exp(-alpha[i][j] * (x - x_nm[i][j])**2)))
 
     for k in [0]:
         #  d2 Hdia / dR_0 2
         for i in range(n):
-            d2ham_dia[k].set(i, i, k_n[i] * (1.0 + 0.0j))
+            d2ham_dia[k].set(i, i, complex(k_n[i]))
 
     for k in [0]:
         for i in range(n):
             for j in range(n):
                 if i != j:
-                    d2ham_dia[k].set(i, j, -2.0 * alpha[i][j] * V[i][j] * math.exp(-alpha[i][j] * \
-                                     (x - x_nm[i][j])**2) * (1.0 - 2.0 * alpha[i][j] * (x - x_nm[i][j])**2) * (1.0 + 0.0j))
+                    d2ham_dia[k].set(i, j, complex(-2.0 * alpha[i][j] * V[i][j] * math.exp(-alpha[i][j] * \
+                                     (x - x_nm[i][j])**2) * (1.0 - 2.0 * alpha[i][j] * (x - x_nm[i][j])**2)))
 
     obj = tmp()
     obj.ham_dia = Hdia
@@ -670,11 +670,11 @@ def Holstein_gen(_q, params, full_id=None):
             P1, dP1 = polynomial(q, A[i][j], B[i][j], C[i][j], T[i][j])
             P2, dP2 = polynomial(q, a[i][j], b[i][j], c[i][j], t[i][j])
             h_ij = P1 * math.exp(-P2)
-            obj.ham_dia.set(i, j, h_ij * (1.0 + 0.0j))
+            obj.ham_dia.set(i, j, complex(h_ij))
 
             der = dP1 * math.exp(-P2) - dP2 * h_ij  # MATRIX(ndof, 1)
             for k in range(ndof):
-                obj.d1ham_dia[k].set(i, j, der.get(k, 0) * (1.0 + 0.0j))
+                obj.d1ham_dia[k].set(i, j, complex(der.get(k, 0)))
 
     # ============= Diabatic overlaps ==========================
     obj.ovlp_dia = CMATRIX(n, n)

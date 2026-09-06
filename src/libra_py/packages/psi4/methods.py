@@ -173,11 +173,11 @@ def run_psi4_adi(q, params_, full_id):
 
             grad = np.asarray(gradient(grad_method_ex, ref_wfn=wfc))
 
-        obj.ham_adi.set(istate, istate, E * (1.0 + 0.0j))
-        obj.hvib_adi.set(istate, istate, E * (1.0 + 0.0j))
+        obj.ham_adi.set(istate, istate, complex(E))
+        obj.hvib_adi.set(istate, istate, complex(E))
         for iatom in range(natoms):
-            obj.d1ham_adi[3 * iatom + 0].set(istate, istate, grad[iatom, 0] * (1.0 + 0.0j))
-            obj.d1ham_adi[3 * iatom + 1].set(istate, istate, grad[iatom, 1] * (1.0 + 0.0j))
-            obj.d1ham_adi[3 * iatom + 2].set(istate, istate, grad[iatom, 2] * (1.0 + 0.0j))
+            obj.d1ham_adi[3 * iatom + 0].set(istate, istate, complex(grad[iatom, 0]))
+            obj.d1ham_adi[3 * iatom + 1].set(istate, istate, complex(grad[iatom, 1]))
+            obj.d1ham_adi[3 * iatom + 2].set(istate, istate, complex(grad[iatom, 2]))
 
     return obj
