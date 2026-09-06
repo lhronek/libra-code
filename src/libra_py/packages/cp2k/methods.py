@@ -5046,6 +5046,52 @@ class tmp:
     pass
 
 
+def _identity_cmatrix(n):
+    """A CMATRIX identity of size n."""
+    M = CMATRIX(n, n)
+    M.identity()
+    return M
+
+
+def fill_adiabatic_hamiltonians(obj, E, st_ci, dt, s_ci=None, nac=True):
+    """The adiabatic Hamiltonian objects of a driver step, each matrix through one bulk conversion instead of
+    an element loop: ham_adi = diag(E), hvib_adi = diag(E) - i D with the couplings D = (St - St^T) / (2 dt),
+    nac_adi = D when nac is set, time_overlap_adi = St and overlap_adi = s_ci when given (the NBRA twin's
+    Lowdin-orthonormalized CI overlap) or the identity. The CI overlaps of the drivers are real - a complex
+    one is refused, as the former element casts float(...) refused it."""
+    if np.iscomplexobj(st_ci) or (s_ci is not None and np.iscomplexobj(s_ci)):
+        raise TypeError("a complex CI overlap reached the adiabatic Hamiltonian fill - the drivers' overlaps are real")
+    E = np.asarray(E, dtype=np.float64)
+    n = E.shape[0]
+    # the CI data may carry more states than the propagated ones - the former loops filled the n x n block
+    St = np.asarray(st_ci, dtype=np.float64)[:n, :n]
+    D = (St - St.T) / (2.0 * dt)
+    H = np.diag(E).astype(np.complex128)
+    H.imag = 0.0 - D                                   # -D with a +0.0 diagonal, as the element casts wrote it
+    obj.ham_adi = data_conv.nparray2CMATRIX(np.diag(E).astype(np.complex128))
+    obj.hvib_adi = data_conv.nparray2CMATRIX(H)
+    if nac:
+        obj.nac_adi = data_conv.nparray2CMATRIX(D.astype(np.complex128))
+    obj.time_overlap_adi = data_conv.nparray2CMATRIX(St.astype(np.complex128))
+    if s_ci is None:
+        obj.overlap_adi = _identity_cmatrix(n)
+    else:
+        obj.overlap_adi = data_conv.nparray2CMATRIX(np.asarray(s_ci, dtype=np.float64)[:n, :n].astype(np.complex128))
+
+
+def fill_diagonal_forces(obj, diagonals):
+    """d1ham_adi of a driver step from an (ndof, nstates) array of the diagonal force terms -dE_i/dx: one
+    diagonal CMATRIX per degree of freedom through one bulk conversion each, in place of nstates element sets
+    per degree of freedom, and dc1_adi as the zero matrices of the same size."""
+    diagonals = np.asarray(diagonals, dtype=np.float64)
+    ndof, nstates = diagonals.shape
+    obj.d1ham_adi = CMATRIXList()
+    obj.dc1_adi = CMATRIXList()
+    for idof in range(ndof):
+        obj.d1ham_adi.append(data_conv.nparray2CMATRIX(np.diag(diagonals[idof]).astype(np.complex128)))
+        obj.dc1_adi.append(CMATRIX(nstates, nstates))
+
+
 def cp2k_compute_adi_nbra(q, params, full_id):
     """
     Compute adiabatic electronic properties and derivative couplings
@@ -5275,12 +5321,9 @@ def cp2k_compute_adi_nbra(q, params, full_id):
 
     # ================= Build object =================
     obj = tmp()
-    obj.ham_adi = CMATRIX(nstates, nstates)
+    # the Hamiltonians, the overlaps and the identity basis_transform are filled below - nac_adi stays this
+    # zero matrix, the couplings of the NBRA twin sit in hvib_adi only
     obj.nac_adi = CMATRIX(nstates, nstates)
-    obj.hvib_adi = CMATRIX(nstates, nstates)
-    obj.basis_transform = CMATRIX(nstates, nstates)
-    obj.time_overlap_adi = CMATRIX(nstates, nstates)
-    obj.overlap_adi = CMATRIX(nstates, nstates)
 
     # ================= Compute overlaps =================
     st_mo = sp.load_npz(time_overlap_filename)
@@ -5350,19 +5393,12 @@ def cp2k_compute_adi_nbra(q, params, full_id):
 
 
     # ================= Populate Hamiltonian =================
-    for i in range(nstates):
-
-        energy = 0.0 if i == 0 else 0.5 * (
-            data_prev[0][i - 1] + data_curr[0][i - 1]
-        )
-
-        obj.ham_adi.set(i, i, energy)
-        obj.hvib_adi.set(i, i, energy)
-        obj.basis_transform.set(i, i, 1.0)
-
-        for j in range(nstates):
-            obj.time_overlap_adi.set(i, j, float(st_ci[i, j]))
-            obj.overlap_adi.set(i,  j, float(s_ci[i,j]) )
+    # the midpoint excitation energies above the ground state (E_0 = 0), the Lowdin-orthonormalized CI
+    # overlaps and the couplings -i (St_ij - St_ji) / (2 dt) in hvib_adi - one bulk conversion per matrix
+    E = np.zeros(nstates)
+    E[1:] = 0.5 * (np.asarray(data_prev[0][:nstates - 1], dtype=np.float64) + np.asarray(data_curr[0][:nstates - 1], dtype=np.float64))
+    fill_adiabatic_hamiltonians(obj, E, st_ci, dt, s_ci=s_ci, nac=False)
+    obj.basis_transform = _identity_cmatrix(nstates)
 
     # ================= Forces =================
     obj.d1ham_adi = CMATRIXList()
@@ -5388,17 +5424,8 @@ def cp2k_compute_adi_nbra(q, params, full_id):
     #                 obj.dc1_adi[3 * iatom + 1].set(i, j, complex(nacv[i, j, 1, iatom]))
     #                 obj.dc1_adi[3 * iatom + 2].set(i, j, complex(nacv[i, j, 2, iatom]))
 
-    # ================= Compute derivative couplings =================
-    for i in range(nstates):
-        for j in range(i + 1, nstates):
-
-            dij = (
-                obj.time_overlap_adi.get(i, j)
-                - obj.time_overlap_adi.get(j, i)
-            ) / (2.0 * dt)
-
-            obj.hvib_adi.set(i, j, complex(0.0, -dij))
-            obj.hvib_adi.set(j, i, complex(0.0, dij))
+    # ================= Derivative couplings =================
+    # in hvib_adi from fill_adiabatic_hamiltonians above: -i (St_ij - St_ji) / (2 dt), nac_adi stays zero here
 
     # ================= Store state =================
     # params["MO_prev"][itraj] = MO_curr.copy()
@@ -6083,11 +6110,6 @@ def cp2k_compute_adi_impl(q, params, full_id):
 
     # ---------------- build the returned object ----------------
     obj = tmp()
-    obj.ham_adi = CMATRIX(nstates, nstates)
-    obj.hvib_adi = CMATRIX(nstates, nstates)
-    obj.nac_adi = CMATRIX(nstates, nstates)
-    obj.time_overlap_adi = CMATRIX(nstates, nstates)
-    obj.overlap_adi = CMATRIX(nstates, nstates)
 
     if dia_basis == "sd":
         # the SD basis is declared as the DIABATIC basis: U[dia, adi] =
@@ -6100,9 +6122,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
         # ndia = 1 + len(sd_unique) and nadi = nstates
         obj.basis_transform = data_conv.nparray2CMATRIX(np.asarray(T_dia, dtype=complex))
         ndia_sd = T_dia.shape[0]
-        obj.ovlp_dia = CMATRIX(ndia_sd, ndia_sd)
-        for i in range(ndia_sd):
-            obj.ovlp_dia.set(i, i, 1.0 + 0.0j)
+        obj.ovlp_dia = _identity_cmatrix(ndia_sd)
         # frame-corrected diabatic vibronic Hamiltonian: H_SD - i D_SD,
         # with the HST drift D_SD = (St_SD - St_SD^T)/(2 dt) from the SD
         # time-overlaps - removes the SD-frame-drift part of the
@@ -6121,49 +6141,27 @@ def cp2k_compute_adi_impl(q, params, full_id):
             D_sd = (np.asarray(st_sd) - np.asarray(st_sd).T) / (2.0 * dt_c)
             obj.hvib_dia = data_conv.nparray2CMATRIX(H_sd - 1j * D_sd)
     else:
-        obj.basis_transform = CMATRIX(nstates, nstates)
-        for i in range(nstates):
-            obj.basis_transform.set(i, i, 1.0 + 0.0j)
+        obj.basis_transform = _identity_cmatrix(nstates)
 
-    for i in range(nstates):
-        obj.ham_adi.set(i, i, complex(float(E_mid[i])))
-        obj.hvib_adi.set(i, i, complex(float(E_mid[i])))
-        obj.overlap_adi.set(i, i, 1.0 + 0.0j)
-        for j in range(nstates):
-            obj.time_overlap_adi.set(i, j, complex(float(st_ci[i, j])))
     dt = float(params.get("dt", 41.0))    # the NBRA twin's default
     # off-diagonal couplings -i (St_ij - St_ji)/(2 dt), the NBRA-twin
     # convention: a diagonal-only supplied hvib armed the overwrite guard
     # against any engine rebuild and carried no couplings to consume
-    for i in range(nstates):
-        for j in range(i + 1, nstates):
-            dij = float(st_ci[i, j] - st_ci[j, i]) / (2.0 * dt)
-            # the same couplings in nac_adi: read directly by the LZ
-            # detectors, the NAC phase correction and the nac_adi saver
-            obj.nac_adi.set(i, j, complex(dij))
-            obj.nac_adi.set(j, i, complex(-dij))
-            obj.hvib_adi.set(i, j, complex(0.0, -dij))
-            obj.hvib_adi.set(j, i, complex(0.0, dij))
+    # the same couplings in nac_adi: read directly by the LZ detectors, the NAC phase correction and the
+    # nac_adi saver - ham_adi, hvib_adi, nac_adi, time_overlap_adi and the identity overlap_adi in one pass
+    fill_adiabatic_hamiltonians(obj, E_mid[:nstates], st_ci, dt, nac=True)
 
-    obj.d1ham_adi = CMATRIXList()
-    obj.dc1_adi = CMATRIXList()
-    for _ in range(ndof):
-        obj.d1ham_adi.append(CMATRIX(nstates, nstates))
-        obj.dc1_adi.append(CMATRIX(nstates, nstates))
+    # the diagonal force terms of every degree of freedom (row 3 iat + k) as one array, then one diagonal
+    # CMATRIX per degree of freedom through the bulk transfer
     forces_all = res.get("forces_all", None)   # mechanism B: per-state forces
-    for iat in range(nat):
-        for k in range(3):
-            if forces_all is not None:          # all diagonals, state-specific
-                for ist in range(nstates):
-                    obj.d1ham_adi[3 * iat + k].set(ist, ist,
-                                                   complex(-forces_all[ist, iat, k]))
-            elif time_dependent and force_source == "active_state":   # mechanism A: active state only
-                obj.d1ham_adi[3 * iat + k].set(act_state, act_state,
-                                               complex(-forces[iat, k]))
-            else:  # GS mode / force_source "gs" or "none": GS forces on all diagonals
-                for ist in range(nstates):
-                    obj.d1ham_adi[3 * iat + k].set(ist, ist,
-                                                   complex(-forces[iat, k]))
+    diagonals = np.zeros((ndof, nstates))
+    if forces_all is not None:          # all diagonals, state-specific
+        diagonals[:3 * nat] = -np.asarray(forces_all, dtype=np.float64).transpose(1, 2, 0).reshape(3 * nat, nstates)
+    elif time_dependent and force_source == "active_state":   # mechanism A: active state only
+        diagonals[:3 * nat, act_state] = -np.asarray(forces, dtype=np.float64).reshape(3 * nat)
+    else:  # GS mode / force_source "gs" or "none": GS forces on all diagonals
+        diagonals[:3 * nat] = -np.asarray(forces, dtype=np.float64).reshape(3 * nat, 1)
+    fill_diagonal_forces(obj, diagonals)
 
     # ---------------- store per-trajectory state ----------------
     params["mo_prev"][itraj] = mo_curr
