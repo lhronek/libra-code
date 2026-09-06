@@ -348,12 +348,12 @@ def cmat_stat2(X, opt):
                 elif opt == 1:
                     re = math.fabs(X[idata].get(i, j).real)
                     im = math.fabs(X[idata].get(i, j).imag)
-                    res.add(i, j, re + 1.0j * im)
+                    res.add(i, j, complex(re, im))
 
                 elif opt == 2:
                     re = math.fabs(X[idata].get(i, j).real)
                     im = math.fabs(X[idata].get(i, j).imag)
-                    res.add(i, j, re * re + 1.0j * im * im)
+                    res.add(i, j, complex(re * re, im * im))
 
                 elif opt == 3:
                     re = math.fabs(X[idata].get(i, j).real)
@@ -368,7 +368,7 @@ def cmat_stat2(X, opt):
             if opt == 2:
                 re = math.sqrt(res.get(i, j).real)
                 im = math.sqrt(res.get(i, j).imag)
-                res.set(i, j, re + 1.0j * im)
+                res.set(i, j, complex(re, im))
 
     return res
 

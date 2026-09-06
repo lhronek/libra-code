@@ -3491,8 +3491,8 @@ def dftb_compute_adi(q, params, full_id):
             dij = ( obj.time_overlap_adi.get(i, j) - obj.time_overlap_adi.get(j, i) ) / (2.0 * dt)
             obj.nac_adi.set(i, j, dij)
             obj.nac_adi.set(j, i, -dij)
-            obj.hvib_adi.set(i, j, -1j * dij)
-            obj.hvib_adi.set(j, i, +1j * dij)            
+            obj.hvib_adi.set(i, j, complex(0.0, -dij))
+            obj.hvib_adi.set(j, i, complex(0.0, dij))            
             
     # ================= Store state =================
     params["MO_prev"][itraj] = copy.deepcopy(MO_curr)

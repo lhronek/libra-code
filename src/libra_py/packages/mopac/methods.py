@@ -901,8 +901,8 @@ def mopac_compute_adi(q, params, full_id):
             # the NAC phase correction and the nac_adi saver)
             obj.nac_adi.set(istate, jstate, dij)
             obj.nac_adi.set(jstate, istate, -dij)
-            obj.hvib_adi.set(istate, jstate, dij * (0.0 - 1.0j))
-            obj.hvib_adi.set(jstate, istate, dij * (0.0 + 1.0j))
+            obj.hvib_adi.set(istate, jstate, complex(0.0, -dij))
+            obj.hvib_adi.set(jstate, istate, complex(0.0, dij))
 
     # Now, make the current the previous and reset the flag `is_first_time` to False
     # Note - we directly modify the input parameters

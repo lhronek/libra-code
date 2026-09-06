@@ -675,7 +675,7 @@ def wf_calc_nD(_params):
                         idata += 1
 
                         q = pt[dof]
-                        gaus *= (aj / np.pi)**0.25 * np.exp(-0.5 * aj * (q - qj)**2 + 1j * pj * (q - qj))
+                        gaus *= (aj / np.pi)**0.25 * np.exp(-0.5 * aj * (q - qj)**2 + complex(0.0, pj * (q - qj)))
 
                     wf += coeff * gaus
                 outfile.write(str(abs(wf)**2) + " ")

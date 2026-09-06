@@ -222,12 +222,12 @@ def run_dynamics(wfc, _params, model_params, savers):
         T = wfc.operator_T(Py2Cpp_int([1]), masses, 1.0 + 0.0j)
 
         expT = CMATRIX(wfc.Npts, wfc.Npts)
-        exp_matrix(expT, T, -dt * 1.0j, 0)
+        exp_matrix(expT, T, complex(0.0, -dt), 0)
 
         expV = CMATRIXList()
         for ipt in range(wfc.Npts):
             expv = CMATRIX(wfc.nstates, wfc.nstates)
-            exp_matrix(expv, wfc.Hdia[ipt], -dt * 0.5j, 0)
+            exp_matrix(expv, wfc.Hdia[ipt], complex(0.0, -0.5 * dt), 0)
             expV.append(CMATRIX(expv))
 
     if not os.path.exists(wfc_prefix):

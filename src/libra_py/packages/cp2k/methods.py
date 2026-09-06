@@ -5387,8 +5387,8 @@ def cp2k_compute_adi_nbra(q, params, full_id):
                 - obj.time_overlap_adi.get(j, i)
             ) / (2.0 * dt)
 
-            obj.hvib_adi.set(i, j, -1j * dij)
-            obj.hvib_adi.set(j, i, +1j * dij)
+            obj.hvib_adi.set(i, j, complex(0.0, -dij))
+            obj.hvib_adi.set(j, i, complex(0.0, dij))
 
     # ================= Store state =================
     # params["MO_prev"][itraj] = MO_curr.copy()
@@ -6132,8 +6132,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
             # detectors, the NAC phase correction and the nac_adi saver
             obj.nac_adi.set(i, j, complex(dij))
             obj.nac_adi.set(j, i, complex(-dij))
-            obj.hvib_adi.set(i, j, -1j * dij)
-            obj.hvib_adi.set(j, i, +1j * dij)
+            obj.hvib_adi.set(i, j, complex(0.0, -dij))
+            obj.hvib_adi.set(j, i, complex(0.0, dij))
 
     obj.d1ham_adi = CMATRIXList()
     obj.dc1_adi = CMATRIXList()

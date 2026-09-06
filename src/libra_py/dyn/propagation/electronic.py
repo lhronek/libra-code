@@ -58,7 +58,7 @@ def euler_propagator(C, H, dt, backend=backend_default):
     First-order Euler TDSE integrator (debug / weak coupling only)
     """
     HC = _apply_matrix_to_state(H, C, backend)
-    return C - 1j * dt * HC
+    return C - complex(0.0, dt) * HC
 
 
 def split_step_propagator(C, H_prev, H, dt, backend=backend_default):

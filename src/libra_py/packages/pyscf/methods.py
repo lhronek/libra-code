@@ -147,8 +147,8 @@ def pyscf_compute_adi(q, params, full_id):
             # the NAC phase correction and the nac_adi saver)
             obj.nac_adi.set(i, j, dij)
             obj.nac_adi.set(j, i, -dij)
-            obj.hvib_adi.set(i, j, -1j * dij)
-            obj.hvib_adi.set(j, i, +1j * dij)            
+            obj.hvib_adi.set(i, j, complex(0.0, -dij))
+            obj.hvib_adi.set(j, i, complex(0.0, dij))            
             
     # ================= Store state =================
     params["pyscf_obj"][itraj] = copy.deepcopy(pyscf_obj)

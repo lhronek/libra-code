@@ -325,7 +325,7 @@ def file2cmatrix(filename, nrows, ncols):
             for b in range(ncols):
                 re = float(tmp[cnt])
                 im = float(tmp[cnt + 1])
-                res_i.set(a, b, re + 1j * im)
+                res_i.set(a, b, complex(re, im))
                 cnt += 2
 
         res.append(res_i)

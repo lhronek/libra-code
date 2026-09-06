@@ -119,7 +119,7 @@ def ft2(X, wmin, wmax, dw, dt):
         J_im[iw] *= dt
 
         W[iw] = w
-        J[iw] = J_re[iw] + 1j * J_im[iw]
+        J[iw] = complex(J_re[iw], J_im[iw])
         I[iw] = abs(J[iw])
         I2[iw] = I[iw]**2
 
