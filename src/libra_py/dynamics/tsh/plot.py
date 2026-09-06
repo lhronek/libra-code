@@ -187,6 +187,15 @@ def _series(dset, trajs, rows, cols, slab_bytes=1 << 28):
     return out
 
 
+def _color(colors, clrs_index, indx):
+    """The color of the indx-th plotted curve: the palette entry while the palette lasts, then hues stepped by the
+    golden ratio around the hsv wheel so that neighbouring extra curves stay apart - direct indexing raised
+    IndexError past the palette, and a repeated palette gave the same color to different states."""
+    if indx < len(clrs_index):
+        return colors[clrs_index[indx]]
+    return plt.get_cmap("hsv")(((indx - len(clrs_index)) * 0.618033988749895) % 1.0)
+
+
 def add_energies(plt, hdf_file, plot_params_, property_type):
     """
     Adds the plotting of the ensemble-averaged kinetic, potential, and total energies
@@ -238,33 +247,33 @@ def add_energies(plt, hdf_file, plot_params_, property_type):
     if property_type == "energies":
         if "potential" in which_energies and "Epot_ave/data" in hdf_file.keys() and t is not None:
             plt.plot(t, hdf_file["Epot_ave/data"][:],
-                     label="Potential energy", linewidth=Lw, color=colors[clrs_index[0]])
+                     label="Potential energy", linewidth=Lw, color=_color(colors, clrs_index, 0))
             res = 1
         if "kinetic" in which_energies and "Ekin_ave/data" in hdf_file.keys() and t is not None:
             plt.plot(t, hdf_file["Ekin_ave/data"][:],
-                     label="Kinetic energy", linewidth=Lw, color=colors[clrs_index[1]])
+                     label="Kinetic energy", linewidth=Lw, color=_color(colors, clrs_index, 1))
             res = 1
         if "total" in which_energies and "Etot_ave/data" in hdf_file.keys() and t is not None:
             plt.plot(t, hdf_file["Etot_ave/data"][:],
-                     label="Total energy", linewidth=Lw, color=colors[clrs_index[2]])
+                     label="Total energy", linewidth=Lw, color=_color(colors, clrs_index, 2))
             res = 1
         if "extended" in which_energies and "E_NHC/data" in hdf_file.keys() and t is not None:
             plt.plot(t, hdf_file["E_NHC/data"][:],
-                     label="Extended energy", linewidth=Lw, color=colors[clrs_index[3]])
+                     label="Extended energy", linewidth=Lw, color=_color(colors, clrs_index, 3))
             res = 1
 
     elif property_type == "energy_fluctuations":
         if "potential" in which_energies and "dEpot_ave/data" in hdf_file.keys() and t is not None:
             plt.plot(t, hdf_file["dEpot_ave/data"][:],
-                     label="Potential energy", linewidth=Lw, color=colors[clrs_index[0]])
+                     label="Potential energy", linewidth=Lw, color=_color(colors, clrs_index, 0))
             res = 1
         if "kinetic" in which_energies and "dEkin_ave/data" in hdf_file.keys() and t is not None:
             plt.plot(t, hdf_file["dEkin_ave/data"][:],
-                     label="Kinetic energy", linewidth=Lw, color=colors[clrs_index[1]])
+                     label="Kinetic energy", linewidth=Lw, color=_color(colors, clrs_index, 1))
             res = 1
         if "total" in which_energies and "dEtot_ave/data" in hdf_file.keys() and t is not None:
             plt.plot(t, hdf_file["dEtot_ave/data"][:],
-                     label="Total energy", linewidth=Lw, color=colors[clrs_index[2]])
+                     label="Total energy", linewidth=Lw, color=_color(colors, clrs_index, 2))
             res = 1
         # This one is not yet present
         # if "extended" in which_energies:
@@ -349,10 +358,10 @@ def add_trajectory_resolved_ham_property(plt, hdf_file, plot_params_, ham_proper
         for indx, istate in enumerate(states):
             for k, tr in enumerate(trajs):
                 if no_label:
-                    plt.plot(t, E[:, k, indx], label="", linewidth=Lw, color=colors[clrs_index[indx]])
+                    plt.plot(t, E[:, k, indx], label="", linewidth=Lw, color=_color(colors, clrs_index, indx))
                 else:
                     plt.plot(t, E[:, k, indx], label=F"traj={tr}, state={istate}",
-                             linewidth=Lw, color=colors[clrs_index[indx]])
+                             linewidth=Lw, color=_color(colors, clrs_index, indx))
                 res = 1
 
     plt.legend(fontsize=legend_fontsize)
@@ -414,9 +423,9 @@ def add_cooordinates_vs_t(plt, hdf_file, plot_params_):
         for k, tr in enumerate(trajs):
             for dof in dofs:
                 if no_label:
-                    plt.plot(t, Q[:, k, dof - dsel.start], label="", linewidth=Lw, color=colors[clrs_index[dof]])
+                    plt.plot(t, Q[:, k, dof - dsel.start], label="", linewidth=Lw, color=_color(colors, clrs_index, dof))
                 else:
-                    plt.plot(t, Q[:, k, dof - dsel.start], label=F"traj={tr} dof={dof}", linewidth=Lw, color=colors[clrs_index[dof]])
+                    plt.plot(t, Q[:, k, dof - dsel.start], label=F"traj={tr} dof={dof}", linewidth=Lw, color=_color(colors, clrs_index, dof))
     else:
         res = 0
 
@@ -479,9 +488,9 @@ def add_momenta_vs_t(plt, hdf_file, plot_params_):
         for k, tr in enumerate(trajs):
             for dof in dofs:
                 if no_label:
-                    plt.plot(t, P[:, k, dof - dsel.start], label="", linewidth=Lw, color=colors[clrs_index[dof]])
+                    plt.plot(t, P[:, k, dof - dsel.start], label="", linewidth=Lw, color=_color(colors, clrs_index, dof))
                 else:
-                    plt.plot(t, P[:, k, dof - dsel.start], label=F"traj={tr} dof={dof}", linewidth=Lw, color=colors[clrs_index[dof]])
+                    plt.plot(t, P[:, k, dof - dsel.start], label=F"traj={tr} dof={dof}", linewidth=Lw, color=_color(colors, clrs_index, dof))
     else:
         res = 0
 
@@ -544,9 +553,9 @@ def add_forces_vs_t(plt, hdf_file, plot_params_):
         for k, tr in enumerate(trajs):
             for dof in dofs:
                 if no_label:
-                    plt.plot(t, Fr[:, k, dof - dsel.start], label="", linewidth=Lw, color=colors[clrs_index[dof]])
+                    plt.plot(t, Fr[:, k, dof - dsel.start], label="", linewidth=Lw, color=_color(colors, clrs_index, dof))
                 else:
-                    plt.plot(t, Fr[:, k, dof - dsel.start], label=F"traj={tr} dof={dof}", linewidth=Lw, color=colors[clrs_index[dof]])
+                    plt.plot(t, Fr[:, k, dof - dsel.start], label=F"traj={tr} dof={dof}", linewidth=Lw, color=_color(colors, clrs_index, dof))
     else:
         res = 0
 
@@ -609,10 +618,10 @@ def add_phase_space(plt, hdf_file, plot_params_):
             for dof in dofs:
                 d = dof - dsel.start
                 if no_label:
-                    plt.plot(Q[:, k, d], P[:, k, d], label="", linewidth=Lw, color=colors[clrs_index[dof]])
+                    plt.plot(Q[:, k, d], P[:, k, d], label="", linewidth=Lw, color=_color(colors, clrs_index, dof))
                 else:
                     plt.plot(Q[:, k, d], P[:, k, d], label=F"traj={tr} dof={dof}", linewidth=Lw,
-                             color=colors[clrs_index[dof]])
+                             color=_color(colors, clrs_index, dof))
 
     plt.legend(fontsize=legend_fontsize)
     plt.tight_layout()
@@ -663,7 +672,7 @@ def add_populations(plt, hdf_file, plot_params_, pop_type):
     ylim = plot_params["ylim"]
     Lw = plot_params["linewidth"]
     colors = plot_params["colors"]
-    clrs_index = plot_params["clrs_index"] * 10
+    clrs_index = plot_params["clrs_index"]
 
     nstates, which_states = 0, []
 
@@ -766,7 +775,7 @@ def add_populations(plt, hdf_file, plot_params_, pop_type):
                     series = P[:, istate, 0]
                 else:
                     series = P[:, istate]
-                plt.plot(t, series, label=F"state {istate}", linewidth=Lw, color=colors[clrs_index[indx]])
+                plt.plot(t, series, label=F"state {istate}", linewidth=Lw, color=_color(colors, clrs_index, indx))
 
     plt.legend(fontsize=legend_fontsize)
     plt.tight_layout()
@@ -835,7 +844,7 @@ def add_coherence_indicators(plt, hdf_file, plot_params_, coh_type):
                 if istate > istate2:
                     indx = indx + 1
                     lbl = rF"$\langle |\rho_{{{istate2}{istate}}}|^{2} \rangle $"
-                    plt.plot(t, C[:, istate2, istate], label=lbl, linewidth=Lw, color=colors[clrs_index[indx]])
+                    plt.plot(t, C[:, istate2, istate], label=lbl, linewidth=Lw, color=_color(colors, clrs_index, indx))
                     res = 1
 
     plt.legend(fontsize=legend_fontsize)
@@ -907,7 +916,7 @@ def add_time_overlaps_projectors(plt, hdf_file, plot_params_, prop_type):
         M = _series(hdf_file[F"{prop_type}/data"], trajs, states, states)
         for indx, istate in enumerate(states):
             for k, tr in enumerate(trajs):
-                plt.plot(t, M[:, k, indx], label=F"state {istate}", linewidth=Lw, color=colors[clrs_index[indx]])
+                plt.plot(t, M[:, k, indx], label=F"state {istate}", linewidth=Lw, color=_color(colors, clrs_index, indx))
                 res = 1
 
     plt.legend(fontsize=legend_fontsize)
@@ -966,7 +975,7 @@ def add_basis_transform(plt, hdf_file, plot_params_):
         for indx, (istate2, istate) in enumerate(pairs):
             lbl = '$< \\psi^{dia}_{%i} | \\psi^{adi}_{%i} >$' % (istate2, istate)
             for k, tr in enumerate(trajs):
-                plt.plot(t, U[:, k, indx], label=lbl, linewidth=Lw, color=colors[clrs_index[indx]])
+                plt.plot(t, U[:, k, indx], label=lbl, linewidth=Lw, color=_color(colors, clrs_index, indx))
                 res = 1
 
     plt.legend(fontsize=legend_fontsize)
@@ -1329,7 +1338,7 @@ def plot_dyn(plot_params):
             plt.ylabel('Population, a.u.')
 
             for indx, istate in enumerate(adi):
-                plt.plot(t, SH[:, istate, 0], label=F"state {istate}", linewidth=2, color=colors[clrs_index[indx]])
+                plt.plot(t, SH[:, istate, 0], label=F"state {istate}", linewidth=2, color=_color(colors, clrs_index, indx))
 
             # ================ adi SE populations =============
             plt.subplot(1, 3, 2)
@@ -1338,7 +1347,7 @@ def plot_dyn(plot_params):
             plt.ylabel('Population, a.u.')
 
             for indx, istate in enumerate(adi):
-                plt.plot(t, Dadi[:, istate, istate], label=F"state {istate}", linewidth=2, color=colors[clrs_index[indx]])
+                plt.plot(t, Dadi[:, istate, istate], label=F"state {istate}", linewidth=2, color=_color(colors, clrs_index, indx))
 
             # ================ dia SE populations =============
             plt.subplot(1, 3, 3)
@@ -1347,7 +1356,7 @@ def plot_dyn(plot_params):
             plt.ylabel('Population, a.u.')
 
             for indx, istate in enumerate(dia):
-                plt.plot(t, Ddia[:, istate, istate], label=F"state {istate}", linewidth=2, color=colors[clrs_index[indx]])
+                plt.plot(t, Ddia[:, istate, istate], label=F"state {istate}", linewidth=2, color=_color(colors, clrs_index, indx))
 
             _save("t-pops")
             plt.show()
@@ -1372,7 +1381,7 @@ def plot_dyn(plot_params):
             plt.ylabel('Population, a.u.')
 
             for indx, istate in enumerate(adi):
-                plt.plot(t, SHr[:, istate, 0], label=F"state {istate}", linewidth=2, color=colors[clrs_index[indx]])
+                plt.plot(t, SHr[:, istate, 0], label=F"state {istate}", linewidth=2, color=_color(colors, clrs_index, indx))
 
             # ================ adi SE populations =============
             plt.subplot(1, 3, 2)
@@ -1381,7 +1390,7 @@ def plot_dyn(plot_params):
             plt.ylabel('Population, a.u.')
 
             for indx, istate in enumerate(adi):
-                plt.plot(t, Dadir[:, istate, istate], label=F"state {istate}", linewidth=2, color=colors[clrs_index[indx]])
+                plt.plot(t, Dadir[:, istate, istate], label=F"state {istate}", linewidth=2, color=_color(colors, clrs_index, indx))
 
             # ================ dia SE populations =============
             plt.subplot(1, 3, 3)
@@ -1390,7 +1399,7 @@ def plot_dyn(plot_params):
             plt.ylabel('Population, a.u.')
 
             for indx, istate in enumerate(dia):
-                plt.plot(t, Ddiar[:, istate, istate], label=F"state {istate}", linewidth=2, color=colors[clrs_index[indx]])
+                plt.plot(t, Ddiar[:, istate, istate], label=F"state {istate}", linewidth=2, color=_color(colors, clrs_index, indx))
 
             _save("t-pops_raw")
             plt.show()
@@ -1414,7 +1423,7 @@ def plot_dyn(plot_params):
 
             for indx, idof in enumerate(dofs):
                 for k, tr in enumerate(trajs):
-                    plt.plot(t, Q[:, k, idof - dsel.start], label="", linewidth=2, color=colors[clrs_index[indx]])
+                    plt.plot(t, Q[:, k, idof - dsel.start], label="", linewidth=2, color=_color(colors, clrs_index, indx))
 
             # ========= Phase-space =========
             plt.subplot(1, 2, 2)
@@ -1424,7 +1433,7 @@ def plot_dyn(plot_params):
 
             for indx, idof in enumerate(dofs):
                 for k, tr in enumerate(trajs):
-                    plt.plot(Q[:, k, idof - dsel.start], P[:, k, idof - dsel.start], label="", linewidth=2, color=colors[clrs_index[indx]])
+                    plt.plot(Q[:, k, idof - dsel.start], P[:, k, idof - dsel.start], label="", linewidth=2, color=_color(colors, clrs_index, indx))
 
             _save("t-q-p")
             plt.show()
@@ -1450,7 +1459,7 @@ def plot_dyn(plot_params):
 
             for indx, istate in enumerate(adi):
                 for k, tr in enumerate(trajs):
-                    plt.plot(t, Eadi[:, k, indx], label="", linewidth=2, color=colors[clrs_index[indx]])
+                    plt.plot(t, Eadi[:, k, indx], label="", linewidth=2, color=_color(colors, clrs_index, indx))
 
             # ============== Diabatic energies =============
             plt.subplot(1, 2, 2)
@@ -1460,7 +1469,7 @@ def plot_dyn(plot_params):
 
             for indx, istate in enumerate(dia):
                 for k, tr in enumerate(trajs):
-                    plt.plot(t, Edia[:, k, indx], label="", linewidth=2, color=colors[clrs_index[indx]])
+                    plt.plot(t, Edia[:, k, indx], label="", linewidth=2, color=_color(colors, clrs_index, indx))
 
             _save("t-hvib")
             plt.show()
@@ -1484,7 +1493,7 @@ def plot_dyn(plot_params):
 
             for indx, istate in enumerate(adi):
                 for k, tr in enumerate(trajs):
-                    plt.plot(t, St[:, k, indx], label="", linewidth=2, color=colors[clrs_index[indx]])
+                    plt.plot(t, St[:, k, indx], label="", linewidth=2, color=_color(colors, clrs_index, indx))
 
             # ============== Projectors =============
             plt.subplot(1, 2, 2)
@@ -1494,7 +1503,7 @@ def plot_dyn(plot_params):
 
             for indx, istate in enumerate(adi):
                 for k, tr in enumerate(trajs):
-                    plt.plot(t, Pr[:, k, indx], label="", linewidth=2, color=colors[clrs_index[indx]])
+                    plt.plot(t, Pr[:, k, indx], label="", linewidth=2, color=_color(colors, clrs_index, indx))
 
             _save("St-projector")
             plt.show()
@@ -1519,7 +1528,7 @@ def plot_dyn(plot_params):
 
             for indx, (istate2, istate) in enumerate(pairs):
                 for k, tr in enumerate(trajs):
-                    plt.plot(t, U[:, k, indx], label="", linewidth=2, color=colors[clrs_index[indx]])
+                    plt.plot(t, U[:, k, indx], label="", linewidth=2, color=_color(colors, clrs_index, indx))
 
             _save("basis_transform")
             plt.show()
@@ -1758,10 +1767,10 @@ def add_cooordinates_aux_vs_t(plt, hdf_file, plot_params_):
             for indx, istate in enumerate(states):
                 for dof in dofs:
                     if no_label:
-                        plt.plot(t, Qa[:, k, istate, dof - dsel.start], label="", linewidth=Lw, color=colors[clrs_index[indx]])
+                        plt.plot(t, Qa[:, k, istate, dof - dsel.start], label="", linewidth=Lw, color=_color(colors, clrs_index, indx))
                     else:
                         plt.plot(t, Qa[:, k, istate, dof - dsel.start], label=F"traj={tr} state={istate} dof={dof}",
-                                 linewidth=Lw, color=colors[clrs_index[indx]])
+                                 linewidth=Lw, color=_color(colors, clrs_index, indx))
     else:
         res = 0
 
@@ -1836,10 +1845,10 @@ def add_momenta_aux_vs_t(plt, hdf_file, plot_params_):
             for indx, istate in enumerate(states):
                 for dof in dofs:
                     if no_label:
-                        plt.plot(t, Pa[:, k, istate, dof - dsel.start], label="", linewidth=Lw, color=colors[clrs_index[indx]])
+                        plt.plot(t, Pa[:, k, istate, dof - dsel.start], label="", linewidth=Lw, color=_color(colors, clrs_index, indx))
                     else:
                         plt.plot(t, Pa[:, k, istate, dof - dsel.start], label=F"traj={tr} state={istate} dof={dof}",
-                                 linewidth=Lw, color=colors[clrs_index[indx]])
+                                 linewidth=Lw, color=_color(colors, clrs_index, indx))
     else:
         res = 0
 
@@ -1906,10 +1915,10 @@ def add_nab_phase_vs_t(plt, hdf_file, plot_params_):
             for indx, istate in enumerate(states):
                 for dof in dofs:
                     if no_label:
-                        plt.plot(t, N[:, k, istate, dof - dsel.start], label="", linewidth=Lw, color=colors[clrs_index[indx]])
+                        plt.plot(t, N[:, k, istate, dof - dsel.start], label="", linewidth=Lw, color=_color(colors, clrs_index, indx))
                     else:
                         plt.plot(t, N[:, k, istate, dof - dsel.start], label=F"traj={tr} state={istate} dof={dof}",
-                                 linewidth=Lw, color=colors[clrs_index[indx]])
+                                 linewidth=Lw, color=_color(colors, clrs_index, indx))
     else:
         res = 0
 
@@ -1987,10 +1996,10 @@ def add_phase_space_aux(plt, hdf_file, plot_params_):
                     d = dof - dsel.start
                     if no_label:
                         plt.plot(Qa[:, k, istate, d], Pa[:, k, istate, d], label="", linewidth=Lw,
-                                 color=colors[clrs_index[indx]])
+                                 color=_color(colors, clrs_index, indx))
                     else:
                         plt.plot(Qa[:, k, istate, d], Pa[:, k, istate, d],
-                                 label=F"traj={tr} state={istate} dof={dof}", linewidth=Lw, color=colors[clrs_index[indx]])
+                                 label=F"traj={tr} state={istate} dof={dof}", linewidth=Lw, color=_color(colors, clrs_index, indx))
 
     plt.legend(fontsize=legend_fontsize)
     plt.tight_layout()
@@ -2051,9 +2060,9 @@ def add_p_quant_vs_t(plt, hdf_file, plot_params_):
         for k, tr in enumerate(trajs):
             for dof in dofs:
                 if no_label:
-                    plt.plot(t, Pq[:, k, dof - dsel.start], label="", linewidth=Lw, color=colors[clrs_index[dof]])
+                    plt.plot(t, Pq[:, k, dof - dsel.start], label="", linewidth=Lw, color=_color(colors, clrs_index, dof))
                 else:
-                    plt.plot(t, Pq[:, k, dof - dsel.start], label=F"traj={tr} dof={dof}", linewidth=Lw, color=colors[clrs_index[dof]])
+                    plt.plot(t, Pq[:, k, dof - dsel.start], label=F"traj={tr} dof={dof}", linewidth=Lw, color=_color(colors, clrs_index, dof))
     else:
         res = 0
 
@@ -2116,9 +2125,9 @@ def add_VP_vs_t(plt, hdf_file, plot_params_):
         for k, tr in enumerate(trajs):
             for dof in dofs:
                 if no_label:
-                    plt.plot(t, V[:, k, dof - dsel.start], label="", linewidth=Lw, color=colors[clrs_index[dof]])
+                    plt.plot(t, V[:, k, dof - dsel.start], label="", linewidth=Lw, color=_color(colors, clrs_index, dof))
                 else:
-                    plt.plot(t, V[:, k, dof - dsel.start], label=F"traj={tr} dof={dof}", linewidth=Lw, color=colors[clrs_index[dof]])
+                    plt.plot(t, V[:, k, dof - dsel.start], label=F"traj={tr} dof={dof}", linewidth=Lw, color=_color(colors, clrs_index, dof))
     else:
         res = 0
 
@@ -2181,9 +2190,9 @@ def add_f_xf_vs_t(plt, hdf_file, plot_params_):
         for k, tr in enumerate(trajs):
             for dof in dofs:
                 if no_label:
-                    plt.plot(t, Fx[:, k, dof - dsel.start], label="", linewidth=Lw, color=colors[clrs_index[dof]])
+                    plt.plot(t, Fx[:, k, dof - dsel.start], label="", linewidth=Lw, color=_color(colors, clrs_index, dof))
                 else:
-                    plt.plot(t, Fx[:, k, dof - dsel.start], label=F"traj={tr} dof={dof}", linewidth=Lw, color=colors[clrs_index[dof]])
+                    plt.plot(t, Fx[:, k, dof - dsel.start], label=F"traj={tr} dof={dof}", linewidth=Lw, color=_color(colors, clrs_index, dof))
     else:
         res = 0
 
