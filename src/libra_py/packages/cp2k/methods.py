@@ -5092,6 +5092,24 @@ def fill_diagonal_forces(obj, diagonals):
         obj.dc1_adi.append(CMATRIX(nstates, nstates))
 
 
+def force_diagonals(nstates, ndof, nat, forces, forces_all=None, active_state=None):
+    """The (ndof, nstates) array of the diagonal force terms -dE_i/dx of a driver step, row 3 iat + k: every
+    state's own forces from forces_all (nstates_all, nat, 3) when given - its first nstates states, a CP2K run
+    may carry more excited states than are propagated - the forces (nat, 3) on the active state alone when
+    active_state is given, the same forces on every state otherwise. Rows beyond 3 nat stay zero."""
+    diagonals = np.zeros((ndof, nstates))
+    if forces_all is not None:
+        forces_all = np.asarray(forces_all, dtype=np.float64)
+        if forces_all.shape[0] < nstates:
+            raise ValueError(F"per-state forces for {forces_all.shape[0]} states cannot fill {nstates} propagated states")
+        diagonals[:3 * nat] = -forces_all[:nstates].transpose(1, 2, 0).reshape(3 * nat, nstates)
+    elif active_state is not None:
+        diagonals[:3 * nat, active_state] = -np.asarray(forces, dtype=np.float64).reshape(3 * nat)
+    else:
+        diagonals[:3 * nat] = -np.asarray(forces, dtype=np.float64).reshape(3 * nat, 1)
+    return diagonals
+
+
 def cp2k_compute_adi_nbra(q, params, full_id):
     """
     Compute adiabatic electronic properties and derivative couplings
@@ -6151,17 +6169,12 @@ def cp2k_compute_adi_impl(q, params, full_id):
     # nac_adi saver - ham_adi, hvib_adi, nac_adi, time_overlap_adi and the identity overlap_adi in one pass
     fill_adiabatic_hamiltonians(obj, E_mid[:nstates], st_ci, dt, nac=True)
 
-    # the diagonal force terms of every degree of freedom (row 3 iat + k) as one array, then one diagonal
-    # CMATRIX per degree of freedom through the bulk transfer
-    forces_all = res.get("forces_all", None)   # mechanism B: per-state forces
-    diagonals = np.zeros((ndof, nstates))
-    if forces_all is not None:          # all diagonals, state-specific
-        diagonals[:3 * nat] = -np.asarray(forces_all, dtype=np.float64).transpose(1, 2, 0).reshape(3 * nat, nstates)
-    elif time_dependent and force_source == "active_state":   # mechanism A: active state only
-        diagonals[:3 * nat, act_state] = -np.asarray(forces, dtype=np.float64).reshape(3 * nat)
-    else:  # GS mode / force_source "gs" or "none": GS forces on all diagonals
-        diagonals[:3 * nat] = -np.asarray(forces, dtype=np.float64).reshape(3 * nat, 1)
-    fill_diagonal_forces(obj, diagonals)
+    # the diagonal force terms of every degree of freedom as one array, then one diagonal CMATRIX per degree of
+    # freedom through the bulk transfer
+    forces_all = res.get("forces_all", None)   # mechanism B: per-state forces, the first nstates of them
+    # mechanism A: the active state alone - GS mode and force_source "gs" / "none" put the GS forces on every diagonal
+    active = act_state if (time_dependent and force_source == "active_state") else None
+    fill_diagonal_forces(obj, force_diagonals(nstates, ndof, nat, forces, forces_all, active))
 
     # ---------------- store per-trajectory state ----------------
     params["mo_prev"][itraj] = mo_curr
