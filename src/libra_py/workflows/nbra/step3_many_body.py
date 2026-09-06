@@ -244,6 +244,13 @@ def compute_ci_energies_midpoint(ci_energies, _params):
     return ci_midpoint_energies
 
 
+def _kernel_input(M):
+    """The two-spinor MO matrix of a step as the ndarray the SD-overlap kernels take - real when its
+    imaginary part vanishes (the real LAPACK and BLAS paths), complex otherwise."""
+    a = data_conv.MATRIX2nparray(M, np.complex128)
+    return a if np.any(a.imag) else a.real.copy()
+
+
 def make_T_matrices(ci_coefficients, ci_basis_states, spin_components, sd_states_unique_sorted, _params):
     """
     This function makes the "T"ransformation matricies that convert between the SD basis to the CI-like (or many-body (MB)) basis.
@@ -505,6 +512,9 @@ def run(_params):
 
     Args:
        _params (dict): control parameters
+           * **_params["sd_overlap_kernel"]** (string): the SD-overlap kernel (mapping.sd_overlap_kernel) - "auto"
+             (the determinant lemma on the libra kernels with the batched fallback), "batched", "lemma" or
+             "per_pair" (the legacy ovlp_mat_arb loop) [ default: "auto" ]
 
     Returns:
        None
@@ -532,6 +542,7 @@ def run(_params):
                       "state_normalization": True, "state_phase_correction": True,
                       "do_state_reordering": 2, "state_reordering_alpha": 0,
                       "sorting_type": "identity", "dt": 1.0 * units.fs2au,
+                      "sd_overlap_kernel": "auto",
                       "outdir": F"{path}/res_mb_sp/"
                       }
 
@@ -624,13 +635,16 @@ def run(_params):
 
     # FIXME:  these instructions are for a single data set so far
     # 3.1.1. Overlaps
+    # the kernel choice of run_step3_sd_nacs_libint - 'auto' runs the determinant lemma on the libra
+    # kernels with the batched fallback, 'per_pair' the legacy ovlp_mat_arb loop
+    ovlp = mapping.sd_overlap_kernel(params["sd_overlap_kernel"])
     S_sd = []
     for step in range(nsteps):
         # Re-indexed SD basis functions for bra and ket SDs
         bra = sd_states_reindexed_sorted[step]
         ket = sd_states_reindexed_sorted[step]
-        # ovlp_mat_arb returns an ndarray - lift it for the CMATRIX algebra below
-        s_sd = data_conv.nparray2CMATRIX(np.asarray(mapping.ovlp_mat_arb(bra, ket, S[0][step], None, False)).astype(complex))
+        # the kernels return an ndarray - lift it for the CMATRIX algebra below
+        s_sd = data_conv.nparray2CMATRIX(np.asarray(ovlp(bra, ket, _kernel_input(S[0][step]), None)).astype(complex))
         S_sd.append(s_sd)
         s_sd.real().show_matrix("%s/S_sd_%d_re" % (res_dir, int(start_time + step)))
 
@@ -640,7 +654,7 @@ def run(_params):
         # Re-indexed SD basis functions for bra and ket SDs
         bra = sd_states_reindexed_sorted[step]
         ket = sd_states_reindexed_sorted[step + 1]
-        st_sd = data_conv.nparray2CMATRIX(np.asarray(mapping.ovlp_mat_arb(bra, ket, St[0][step], None, False)).astype(complex))
+        st_sd = data_conv.nparray2CMATRIX(np.asarray(ovlp(bra, ket, _kernel_input(St[0][step]), None)).astype(complex))
         St_sd.append(st_sd)
         st_sd.real().show_matrix("%s/St_sd_%d_re" % (res_dir, int(start_time + step)))
 
