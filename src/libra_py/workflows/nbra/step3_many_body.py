@@ -367,7 +367,9 @@ def make_T_matrices(ci_coefficients, ci_basis_states, spin_components, sd_states
 
                     # ok, it has found a match, now what is the index of the SD in the list of unique SDs?
                     item_index = tmp_ci_basis_state_and_spin.index(sd_states_unique_sorted[step][j])
-                    val = float(ci_coefficients[step][i][item_index]) * (1.0 + 0.0j)
+                    # the coefficient enters as a complex with a +0.0 imaginary part (a float times (1.0 + 0.0j)
+                    # carries -0.0 for a negative float under the mixed-mode rules)
+                    val = complex(ci_coefficients[step][i][item_index])
 
                     if verbosity >= 4:
                         print(
@@ -376,7 +378,7 @@ def make_T_matrices(ci_coefficients, ci_basis_states, spin_components, sd_states
 
                     # ci_coefficients_libra[step][i+1][j+1] =
                     # float(ci_coefficients[step][i][item_index])  # deprecate - AVA 7/8
-                    T[j + 1, i + 1] = float(ci_coefficients[step][i][item_index]) * 1.0 + 0.0j
+                    T[j + 1, i + 1] = val
 
         if verbosity >= 2:
             print("Matrix before the normalization")
@@ -480,7 +482,9 @@ def make_T_matrices_fast(ci_coefficients, ci_basis_states, spin_components, sd_b
 
                 if conf in sd_basis_states_unique:
                     indx = sd_basis_states_unique.index(conf)
-                    val = ci_coefficients[step][i][k] * (1.0 + 0.0j)
+                    # a complex with a +0.0 imaginary part (a float times (1.0 + 0.0j) carries -0.0 for a
+                    # negative float under the mixed-mode rules)
+                    val = complex(ci_coefficients[step][i][k])
 
                     T[indx + 1, i + 1] = val
 
