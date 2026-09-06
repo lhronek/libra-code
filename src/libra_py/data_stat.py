@@ -21,6 +21,7 @@ import os
 import sys
 import math
 import copy
+import numpy as np
 
 if sys.platform == "cygwin":
     from cyglibra_core import *
@@ -29,6 +30,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 
 # import common_utils as comn
 import util.libutil as comn
+from libra_py import data_conv
 
 
 def vec_average(data):
@@ -227,49 +229,23 @@ def mat_stat(X):
 
     """
 
-    N = len(X)
-    res = MATRIX(X[0])
-    res *= 0.0
+    # the series as one (N, rows, cols) stack through the bulk transfer (a CMATRIX contributes its real part)
+    stack = np.stack([data_conv.MATRIX2nparray(x, np.float64) for x in X])
+    res, res2, dw_bound, up_bound = stat_arrays(stack)
+    return (data_conv.nparray2MATRIX(res), data_conv.nparray2MATRIX(res2),
+            data_conv.nparray2MATRIX(dw_bound), data_conv.nparray2MATRIX(up_bound))
 
-    # ===== Average ====
-    for i in range(0, N):
-        res = res + X[i]
-    res = res / float(N)
 
-    # ===== Std ========
-    res2 = MATRIX(X[0])
-    res2 *= 0.0
-
-    for a in range(0, res2.num_of_rows):
-        for b in range(0, res2.num_of_cols):
-
-            tmp = 0.0
-            for i in range(0, N):
-                tmp = tmp + (X[i].get(a, b) - res.get(a, b))**2
-            tmp = math.sqrt(tmp / float(N))
-
-            res2.set(a, b, tmp)
-
-    # Find maximal and minimal values
-    up_bound = MATRIX(X[0])
-    up_bound *= 0.0
-    dw_bound = MATRIX(X[0])
-    dw_bound *= 0.0
-
-    for a in range(0, res2.num_of_rows):
-        for b in range(0, res2.num_of_cols):
-
-            up_bound.set(a, b, X[0].get(a, b))
-            dw_bound.set(a, b, X[0].get(a, b))
-
-            for i in range(0, N):
-                xab = X[i].get(a, b)
-                if xab > up_bound.get(a, b):
-                    up_bound.set(a, b, xab)
-                if xab < dw_bound.get(a, b):
-                    dw_bound.set(a, b, xab)
-
-    return res, res2, dw_bound, up_bound
+def stat_arrays(stack):
+    """The average, standard deviation, lower and upper bound over the first axis of an (N, ...) stack -
+    the sums run in the order of the former element loops (member by member, first to last), so the
+    averages and bounds equal the loops bit for bit and the deviations to the last bit."""
+    N = stack.shape[0]
+    res = np.add.reduce(stack, axis=0) / float(N)
+    # the squares are rounded correctly here - the former loop's float power went through libm pow, which
+    # misses that rounding in about one case per thousand, so the deviations may differ in the last bit
+    res2 = np.sqrt(np.add.reduce((stack - res) ** 2, axis=0) / float(N))
+    return res, res2, np.minimum.reduce(stack, axis=0), np.maximum.reduce(stack, axis=0)
 
 
 def cmat_stat(X):
