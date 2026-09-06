@@ -592,94 +592,70 @@ def save_hdf5_2D_new(saver, i, dyn_var, ham, txt_type=0):
     if _has_slot(saver, "states"):
         # Trajectory-resolved instantaneous adiabatic states
         # Format: saver.add_dataset("states", (_nsteps, _ntraj), "I")
-        ntraj = dyn_var.ntraj
-        for itraj in range(ntraj):
-            saver.save_multi_scalar(t, itraj, "states", dyn_var.act_states[itraj])
+        saver.save_vector(t, "states", dyn_var.act_states)
 
     if _has_slot(saver, "states_dia"):
         # Trajectory-resolved instantaneous diabatic states
         # Format: saver.add_dataset("states", (_nsteps, _ntraj), "I")
-        ntraj = dyn_var.ntraj
-        for itraj in range(ntraj):
-            saver.save_multi_scalar(t, itraj, "states_dia", dyn_var.act_states_dia[itraj])
+        saver.save_vector(t, "states_dia", dyn_var.act_states_dia)
 
     if _has_slot(saver, "se_pop_dia"):
         # Average diabatic SE populations
         # Format: saver.add_dataset("se_pop_dia", (_nsteps, _ndia), "R")
         pops_se0 = dyn_var.compute_average_se_pop(0)
-        ndia = dyn_var.ndia
-        for ist in range(ndia):
-            saver.save_multi_scalar(t, ist, "se_pop_dia", pops_se0[ist])
+        saver.save_vector(t, "se_pop_dia", pops_se0)
 
     if _has_slot(saver, "se_pop_adi"):
         # Average adiabatic SE populations
         # Format: saver.add_dataset("se_pop_adi", (_nsteps, _nadi), "R")
         pops_se1 = dyn_var.compute_average_se_pop(1)
-        nadi = dyn_var.nadi
-        for ist in range(nadi):
-            saver.save_multi_scalar(t, ist, "se_pop_adi", pops_se1[ist])
+        saver.save_vector(t, "se_pop_adi", pops_se1)
 
     if _has_slot(saver, "sh_pop_dia"):
         # Average diabatic SH populations
         # Format: saver.add_dataset("sh_pop_dia", (_nsteps, _ndia), "R")
         pops_sh0 = dyn_var.compute_average_sh_pop(0)
-        ndia = dyn_var.ndia
-        for ist in range(ndia):
-            saver.save_multi_scalar(t, ist, "sh_pop_dia", pops_sh0[ist])
+        saver.save_vector(t, "sh_pop_dia", pops_sh0)
 
     if _has_slot(saver, "sh_pop_adi"):
         # Average adiabatic SH populations
         # Format: saver.add_dataset("sh_pop_adi", (_nsteps, _nadi), "R")
         pops_sh1 = dyn_var.compute_average_sh_pop(1)
-        nadi = dyn_var.nadi
-        for ist in range(nadi):
-            saver.save_multi_scalar(t, ist, "sh_pop_adi", pops_sh1[ist])
+        saver.save_vector(t, "sh_pop_adi", pops_sh1)
 
     if _has_slot(saver, "sh_pop_dia_TR"):
         # Average diabatic SH populations
         # Format: saver.add_dataset("sh_pop_dia", (_nsteps, _ndia), "R")
         pops_sh0 = dyn_var.compute_average_sh_pop_TR(0)
-        ndia = dyn_var.ndia
-        for ist in range(ndia):
-            saver.save_multi_scalar(t, ist, "sh_pop_dia_TR", pops_sh0[ist])
+        saver.save_vector(t, "sh_pop_dia_TR", pops_sh0)
 
     if _has_slot(saver, "sh_pop_adi_TR"):
         # Average adiabatic SH populations
         # Format: saver.add_dataset("sh_pop_adi", (_nsteps, _nadi), "R")
         pops_sh1 = dyn_var.compute_average_sh_pop_TR(1)
-        nadi = dyn_var.nadi
-        for ist in range(nadi):
-            saver.save_multi_scalar(t, ist, "sh_pop_adi_TR", pops_sh1[ist])
+        saver.save_vector(t, "sh_pop_adi_TR", pops_sh1)
 
     if _has_slot(saver, "mash_pop_dia"):
         # Average diabatic MASH populations
         # Format: saver.add_dataset("mash_pop_dia", (_nsteps, _ndia), "R")
         pops_sh0 = dyn_var.compute_average_mash_pop(0)
-        ndia = dyn_var.ndia
-        for ist in range(ndia):
-            saver.save_multi_scalar(t, ist, "mash_pop_dia", pops_sh0[ist])
+        saver.save_vector(t, "mash_pop_dia", pops_sh0)
 
     if _has_slot(saver, "mash_pop_adi"):
         # Average adiabatic MASH populations
         # Format: saver.add_dataset("mash_pop_adi", (_nsteps, _nadi), "R")
         pops_sh1 = dyn_var.compute_average_mash_pop(1)
-        nadi = dyn_var.nadi
-        for ist in range(nadi):
-            saver.save_multi_scalar(t, ist, "mash_pop_adi", pops_sh1[ist])
+        saver.save_vector(t, "mash_pop_adi", pops_sh1)
 
     if _has_slot(saver, "sqc_pop_dia"):
         # SQC populations, diabatic windows
         pops_sh0 = dyn_var.compute_average_sqc_pop(0)
-        ndia = dyn_var.ndia
-        for ist in range(ndia):
-            saver.save_multi_scalar(t, ist, "sqc_pop_dia", pops_sh0[ist])
+        saver.save_vector(t, "sqc_pop_dia", pops_sh0)
 
     if _has_slot(saver, "sqc_pop_adi"):
         # SQC populations, adiabatic windows
         pops_sh1 = dyn_var.compute_average_sqc_pop(1)
-        nadi = dyn_var.nadi
-        for ist in range(nadi):
-            saver.save_multi_scalar(t, ist, "sqc_pop_adi", pops_sh1[ist])
+        saver.save_vector(t, "sqc_pop_adi", pops_sh1)
 
     if _has_slot(saver, "fssh3_average_errors"):
         # Average errors in FSSH3
