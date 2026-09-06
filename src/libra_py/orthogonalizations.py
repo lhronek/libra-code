@@ -22,6 +22,7 @@ import hashlib
 import pickle
 
 import numpy as np
+from libra_py import linalg_kernels
 from scipy.linalg import fractional_matrix_power
 
 
@@ -149,7 +150,7 @@ def lowdin_inverse_sqrt(S, thresh=1e-10):
     # Enforce Hermiticity 
     S = 0.5 * (S + S.conj().T)
 
-    eigvals, eigvecs = np.linalg.eigh(S)
+    eigvals, eigvecs = linalg_kernels.eigh(S)
 
     # a Gram matrix is positive semi-definite: eigenvalues below -noise are
     # corruption, not linear dependency - refuse to silently project them out
@@ -188,7 +189,7 @@ def get_Lowdin_scipy(S):
     # a non-PSD input would make the inverse square root silently complex
     validate_overlap_matrix(S, "get_Lowdin_scipy")
     S_h = 0.5 * (np.asarray(S) + np.asarray(S).conj().T)
-    w, V = np.linalg.eigh(S_h)
+    w, V = linalg_kernels.eigh(S_h)
     if float(w.min()) < -1e-8:
         raise ValueError(F"get_Lowdin_scipy: the overlap matrix has a negative "
                          F"eigenvalue ({w.min():.3e}) - not a valid Gram matrix; "
