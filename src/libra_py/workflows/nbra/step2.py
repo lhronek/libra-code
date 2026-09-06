@@ -388,12 +388,12 @@ def _check_homo_bracket(step, isxTB, isUKS, lowest_orbital, highest_orbital):
 def _window_mo_matrix(C_bra, AO, C_ket, lowest_orbital, highest_orbital):
     """C_bra[w] AO C_ket[w]^T over the MO window w = [lowest_orbital - 1, highest_orbital) as an ndarray:
     the window rows enter the MATRIX products (dgemm), the bilinear form of the other stored MOs is never
-    formed. AO is the ndarray of the AO integrals, C_bra / C_ket the MO coefficient rows (nmo x nao), the
-    same object for a same-time matrix."""
+    formed. AO is the libint MATRIX of the AO integrals, C_bra / C_ket the MO coefficient rows (nmo x nao),
+    the same object for a same-time matrix."""
     lo, hi = lowest_orbital - 1, highest_orbital
     Cb = data_conv.nparray2MATRIX(C_bra[lo:hi])
     Ck = Cb if C_ket is C_bra else data_conv.nparray2MATRIX(C_ket[lo:hi])
-    return data_conv.MATRIX2nparray(Cb * data_conv.nparray2MATRIX(AO) * Ck.T(), np.float64)
+    return data_conv.MATRIX2nparray(Cb * AO * Ck.T(), np.float64)
 
 
 def run_cp2k_libint_step2(params):
@@ -940,16 +940,8 @@ def run_cp2k_libint_step2(params):
                         AO_S += compute_overlaps(shell_1, shell_1p, nprocs)
 
             print('Done with computing atomic orbital overlaps. Elapsed time:', time.time() - t1)
-            t1 = time.time()
-            print('Turning the MATRIX to numpy array...')
-            if params['use_emultipole']:
-                AO_c_all_numpy = []
-                for counter1 in emultipole_index:
-                    AO_c_all_numpy.append(data_conv.MATRIX2nparray(AO_c_all[counter1]))
-            else:
-                AO_S = data_conv.MATRIX2nparray(AO_S)
-            # scipy.sparse.save_npz(params['res_dir']+'/AO_S.npz', scipy.sparse.csc_matrix(AO_S))
-            print('Done with transforming MATRIX 2 numpy array. Elapsed time:', time.time() - t1)
+            # the AO matrices stay MATRIX - the window contractions below are MATRIX products
+            # scipy.sparse.save_npz(params['res_dir']+'/AO_S.npz', scipy.sparse.csc_matrix(data_conv.MATRIX2nparray(AO_S)))
             # Now, we need to resort the eigenvectors based on the new indices
             print('Resorting eigenvectors elements...')
             t1 = time.time()
@@ -1006,8 +998,8 @@ def run_cp2k_libint_step2(params):
                     # component writes the standard S_ks file name, so the
                     # emultipole route stays a superset of the plain one
                     for counter1 in range(len(emultipole_labels)):
-                        A_alpha = _window_mo_matrix(alpha_eigenvectors_1, AO_c_all_numpy[counter1], alpha_eigenvectors_1, lowest_orbital, highest_orbital)
-                        A_beta = _window_mo_matrix(beta_eigenvectors_1, AO_c_all_numpy[counter1], beta_eigenvectors_1, lowest_orbital, highest_orbital)
+                        A_alpha = _window_mo_matrix(alpha_eigenvectors_1, AO_c_all[emultipole_index[counter1]], alpha_eigenvectors_1, lowest_orbital, highest_orbital)
+                        A_beta = _window_mo_matrix(beta_eigenvectors_1, AO_c_all[emultipole_index[counter1]], beta_eigenvectors_1, lowest_orbital, highest_orbital)
                         zero_mat = np.zeros((len(A_alpha), len(A_beta)))
                         A_step = data_conv.form_block_matrix(A_alpha, zero_mat, zero_mat.T, A_beta)
                         scipy.sparse.save_npz(params['res_dir'] +
@@ -1048,7 +1040,7 @@ def run_cp2k_libint_step2(params):
                 if params['use_emultipole']:
                     for counter1 in range(len(emultipole_labels)):
                         # I'll keep the same naming for matrices as it is more convenient
-                        S = _window_mo_matrix(eigenvectors_1, AO_c_all_numpy[counter1], eigenvectors_1, lowest_orbital, highest_orbital)
+                        S = _window_mo_matrix(eigenvectors_1, AO_c_all[emultipole_index[counter1]], eigenvectors_1, lowest_orbital, highest_orbital)
                         mat_block_size = len(S)
                         zero_mat = np.zeros((mat_block_size, mat_block_size))
                         S_step = data_conv.form_block_matrix(S, zero_mat, zero_mat, S)
@@ -1136,18 +1128,7 @@ def run_cp2k_libint_step2(params):
                         AO_St += compute_overlaps(shell_1, shell_2p, nprocs)
 
             print('Done with computing atomic orbital overlaps. Elapsed time:', time.time() - t1)
-            t1 = time.time()
-            print('Turning the MATRIX to numpy array...')
-            if params['use_emultipole']:
-                AO_c_all_numpy = []
-                AO_t_all_numpy = []
-                for counter1 in emultipole_index:
-                    AO_c_all_numpy.append(data_conv.MATRIX2nparray(AO_c_all[counter1]))
-                    AO_t_all_numpy.append(data_conv.MATRIX2nparray(AO_t_all[counter1]))
-            else:
-                AO_S = data_conv.MATRIX2nparray(AO_S)
-                AO_St = data_conv.MATRIX2nparray(AO_St)
-            print('Done with transforming MATRIX 2 numpy array. Elapsed time:', time.time() - t1)
+            # the AO matrices stay MATRIX - the window contractions below are MATRIX products
             # Now, we need to resort the eigenvectors based on the new indices
             print('Resorting eigenvectors elements...')
             t1 = time.time()
@@ -1209,10 +1190,10 @@ def run_cp2k_libint_step2(params):
                     # previous step's channel as the bra; the 'S' component
                     # writes the standard S_ks/St_ks file names
                     for counter1 in range(len(emultipole_labels)):
-                        A_alpha = _window_mo_matrix(alpha_eigenvectors_2, AO_c_all_numpy[counter1], alpha_eigenvectors_2, lowest_orbital, highest_orbital)
-                        A_beta = _window_mo_matrix(beta_eigenvectors_2, AO_c_all_numpy[counter1], beta_eigenvectors_2, lowest_orbital, highest_orbital)
-                        At_alpha = _window_mo_matrix(alpha_eigenvectors_1, AO_t_all_numpy[counter1], alpha_eigenvectors_2, lowest_orbital, highest_orbital)
-                        At_beta = _window_mo_matrix(beta_eigenvectors_1, AO_t_all_numpy[counter1], beta_eigenvectors_2, lowest_orbital, highest_orbital)
+                        A_alpha = _window_mo_matrix(alpha_eigenvectors_2, AO_c_all[emultipole_index[counter1]], alpha_eigenvectors_2, lowest_orbital, highest_orbital)
+                        A_beta = _window_mo_matrix(beta_eigenvectors_2, AO_c_all[emultipole_index[counter1]], beta_eigenvectors_2, lowest_orbital, highest_orbital)
+                        At_alpha = _window_mo_matrix(alpha_eigenvectors_1, AO_t_all[emultipole_index[counter1]], alpha_eigenvectors_2, lowest_orbital, highest_orbital)
+                        At_beta = _window_mo_matrix(beta_eigenvectors_1, AO_t_all[emultipole_index[counter1]], beta_eigenvectors_2, lowest_orbital, highest_orbital)
                         zero_mat = np.zeros((len(A_alpha), len(A_beta)))
                         A_step = data_conv.form_block_matrix(A_alpha, zero_mat, zero_mat.T, A_beta)
                         At_step = data_conv.form_block_matrix(At_alpha, zero_mat, zero_mat.T, At_beta)
@@ -1268,7 +1249,7 @@ def run_cp2k_libint_step2(params):
                         # computed over shell_2, so the contraction must use the current
                         # MOs (eigenvectors_1 still holds the previous step's here -
                         # it rotates only at the end of the loop)
-                        S = _window_mo_matrix(eigenvectors_2, AO_c_all_numpy[counter1], eigenvectors_2, lowest_orbital, highest_orbital)
+                        S = _window_mo_matrix(eigenvectors_2, AO_c_all[emultipole_index[counter1]], eigenvectors_2, lowest_orbital, highest_orbital)
                         mat_block_size = len(S)
                         zero_mat = np.zeros((mat_block_size, mat_block_size))
                         S_step = data_conv.form_block_matrix(S, zero_mat, zero_mat, S)
@@ -1276,7 +1257,7 @@ def run_cp2k_libint_step2(params):
                         S_step_sparse = scipy.sparse.csc_matrix(S_step)
                         scipy.sparse.save_npz(params['res_dir'] +
                                               F'/{emultipole_labels[counter1]}_ks_{step}.npz', S_step_sparse)
-                        St = _window_mo_matrix(eigenvectors_1, AO_t_all_numpy[counter1], eigenvectors_2, lowest_orbital, highest_orbital)
+                        St = _window_mo_matrix(eigenvectors_1, AO_t_all[emultipole_index[counter1]], eigenvectors_2, lowest_orbital, highest_orbital)
                         St_step = data_conv.form_block_matrix(St, zero_mat, zero_mat, St)
                         St_step_sparse = scipy.sparse.csc_matrix(St_step)
                         scipy.sparse.save_npz(params['res_dir'] +
