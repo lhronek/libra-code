@@ -66,27 +66,22 @@ def convolve(X0, Y0, dx0, dx, var):
     nproj = Y0.num_of_cols     # how many components
     N = N0 * mult               # how many new grid points
 
-    X = MATRIX(N, 1)           # new X axis
-    Y = MATRIX(N, nproj)       # new Y axes
-
-    for i in range(0, N):
-        X.set(i, 0, X0.get(0, 0) + i * dx)
-
     area = var * math.sqrt(2.0 * math.pi)  # area under Gaussian of type exp( -(x - x0)^2 / 2*var^2 )
     alp = 0.5 / (var**2)
 
-    for j in range(0, nproj):
-
-        for i0 in range(0, N0):   # all initial grid points
-            x0 = X0.get(i0, 0)
-            y0 = Y0.get(i0, j)
-
-            area0 = dx0 * y0      # initial area
-            w = area0 / area
-
-            for i in range(0, N):
-                x = X.get(i, 0)
-                Y.add(i, j, w * math.exp(-alp * (x0 - x)**2))
+    # the Gaussian of every original point on the new grid as one kernel applied to all projections at once, in
+    # blocks of new-grid rows that keep the kernel under 64 MB - the former element loop evaluated N0 x N x nproj
+    # exponentials one at a time
+    x0 = data_conv.MATRIX2nparray(X0, np.float64)[:, 0]
+    weights = dx0 * data_conv.MATRIX2nparray(Y0, np.float64) / area     # the area of each original point relative to the Gaussian's
+    x = x0[0] + np.arange(N) * dx
+    y = np.empty((N, nproj))
+    block = max(1, (8 << 20) // N0)
+    for a in range(0, N, block):
+        kernel = np.exp(-alp * (x0[np.newaxis, :] - x[a:a + block, np.newaxis]) ** 2)
+        y[a:a + block] = kernel @ weights
+    X = data_conv.nparray2MATRIX(x.reshape(N, 1))          # new X axis
+    Y = data_conv.nparray2MATRIX(y)                        # new Y axes
 
     return X, Y
 
