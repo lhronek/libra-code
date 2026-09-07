@@ -185,7 +185,7 @@ def compute_trpes(_params):
                 for j, e_j in enumerate(e_grid):
                     for state in range(nstates):
                         e = E_eff[i, state] * units.au2ev
-                        smear = np.exp(-(e_j - e) ** 2) / (2 * sigma_e ** 2)
+                        smear = np.exp(-(e_j - e) ** 2 / (2 * sigma_e ** 2))
                         TRPES_traj[i, j] += sh_pop[i, state] * de * smear
                         
             TRPES += TRPES_traj
