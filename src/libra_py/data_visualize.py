@@ -53,6 +53,16 @@ colors.update({"41": "#2F4F4F"})  # darkslategray
 clrs_index = ["11", "21", "31", "41", "12", "22", "32", "13", "23", "14", "24"]
 
 
+def curve_color(colors, clrs_index, indx):
+    """The color of the indx-th plotted curve: the palette entry while the palette lasts, then hues stepped by the
+    golden ratio around the hsv wheel so that neighbouring extra curves stay apart - direct indexing raised
+    IndexError past the palette, and a repeated palette gave the same color to different states."""
+    if indx < len(clrs_index):
+        return colors[clrs_index[indx]]
+    from matplotlib import colormaps
+    return colormaps["hsv"](((indx - len(clrs_index)) * 0.618033988749895) % 1.0)
+
+
 def plot_map(ax, x_grid, y_grid, z_values, colormap="plasma", resolution=30j, savefig=0, figure_name=None):
     """
     This is a function to plot 2D functions

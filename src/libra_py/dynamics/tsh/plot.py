@@ -188,12 +188,8 @@ def _series(dset, trajs, rows, cols, slab_bytes=1 << 28):
 
 
 def _color(colors, clrs_index, indx):
-    """The color of the indx-th plotted curve: the palette entry while the palette lasts, then hues stepped by the
-    golden ratio around the hsv wheel so that neighbouring extra curves stay apart - direct indexing raised
-    IndexError past the palette, and a repeated palette gave the same color to different states."""
-    if indx < len(clrs_index):
-        return colors[clrs_index[indx]]
-    return plt.get_cmap("hsv")(((indx - len(clrs_index)) * 0.618033988749895) % 1.0)
+    """The color of the indx-th plotted curve - the shared palette rule of data_visualize.curve_color."""
+    return davis.curve_color(colors, clrs_index, indx)
 
 
 def add_energies(plt, hdf_file, plot_params_, property_type):
