@@ -2839,7 +2839,20 @@ def _sd_diabatization_series(params, sd_sorted, active_space, start_time, finish
     """W, the diabatic index and the populations of every step start_time..finish_time-1,
     from the step-2 fragment operators sliced to the active space (Lowdin-orthonormalized
     when the SD overlaps are)."""
-    res_dir_1 = params['path_to_npz_files']
+    prefix, nfrag = _fragment_operator_prefix(params, params['path_to_npz_files'], start_time)
+    W_list, pops_list, hole_list, dia_index = [], [], [], None
+    for i, step in enumerate(range(start_time, finish_time)):
+        P_frag = _fragment_operators_of_step(params, prefix, nfrag, step, active_space)
+        W, dia_index, pops, pops_hole = sd_diabatization_step(sd_sorted[i], P_frag, kind, dia_index,
+                                                              active_space, params['data_dim'])
+        W_list.append(W)
+        pops_list.append(pops)
+        hole_list.append(pops_hole)
+    return W_list, dia_index, pops_list, hole_list
+
+
+def _fragment_operator_prefix(params, res_dir_1, start_time):
+    """The step-2 file prefix of the requested fragment operators and their count - at least two fragments."""
     # no prefix may equal another prefix followed by digits - the fragment index follows the prefix directly
     prefixes = {"mulliken": "P_frag", "pod": "P_pod", "pod2l": "P_pod2l", "pod2gs": "P_pod2gs", "pod_cp2k": "P_pod_cp2k"}
     operator = str(params['fragment_operator']).lower()
@@ -2853,33 +2866,211 @@ def _sd_diabatization_series(params, sd_sorted, active_space, start_time, finish
     if nfrag < 2:
         raise ValueError(F"diabatization needs the step-2 fragment operators "
                          F"{prefix}{{f}}_ks_{{step}}.npz of at least two fragments in {res_dir_1} "
-                         F"({dict(mulliken='fragment_atom_lists', pod='compute_pod', pod2l='compute_pod with pod_schemes', pod2gs='compute_pod with pod_schemes', pod_cp2k='read_pod_cp2k_files')[operator]} of "
+                         F"({dict(mulliken='fragment_atom_lists', pod='compute_pod', pod2l='compute_pod with pod_schemes', pod2gs='compute_pod with pod_schemes', pod_cp2k='pod_cp2k_operators')[operator]} in "
                          F"step2), found {nfrag}")
-    mode = params['apply_orthonormalization']
-    W_list, pops_list, hole_list, dia_index = [], [], [], None
+    return prefix, nfrag
+
+
+def _fragment_operators_of_step(params, prefix, nfrag, step, active_space):
+    """The step-2 fragment operators of one step sliced to the active space, Lowdin-orthonormalized when the SD
+    overlaps are (the orthonormal-orbital layout sd_diabatization_step and sd_fragment_operators read)."""
+    res_dir_1 = params['path_to_npz_files']
+    P_frag = [np.array(sp.load_npz(F'{res_dir_1}/{prefix}{f}_ks_{step}.npz').todense()
+                       [active_space, :][:, active_space]).real for f in range(nfrag)]
+    if params['apply_orthonormalization'] != "none":
+        s_ks = np.array(sp.load_npz(F'{res_dir_1}/S_ks_{step}.npz').todense()
+                        [active_space, :][:, active_space]).real
+        X = orthogonalizations.get_Lowdin_scipy(s_ks)
+        P_frag = [X.T @ P @ X for P in P_frag]
+    return P_frag
+
+
+def _single_excitations(sd_lists):
+    """
+    The single excitations of an SD basis: the reference row (the lowest orbital sum) and, for every
+    row that differs from it in exactly one occupied and one virtual spin-orbital, (hole, particle, tau) -
+    tau the parity between the row's list and the in-place determinant a+_particle a_hole |ref> (the hole's
+    slot of the reference list taken by the particle), so that tau_k |SD_k> is that in-place determinant.
+    Rows that are the reference or not single excitations are absent from the dict.
+    """
+    sets = [frozenset(int(o) for o in sd) for sd in sd_lists]
+    gs = min(range(len(sets)), key=lambda k: sum(abs(o) for o in sets[k]))
+    ref, ref_list = sets[gs], [int(o) for o in sd_lists[gs]]
+    singles = {}
+    for k, occ in enumerate(sets):
+        if k == gs:
+            continue
+        hole, part = ref - occ, occ - ref
+        if len(hole) != 1 or len(part) != 1:
+            continue
+        h, pt = next(iter(hole)), next(iter(part))
+        in_place = list(ref_list)
+        in_place[in_place.index(h)] = pt
+        singles[k] = (h, pt, slatdet.permutation_parity(in_place, [int(o) for o in sd_lists[k]]))
+    return gs, singles
+
+
+def sd_fragment_operators(sd_lists, P_frag):
+    """
+    The fragment population operators of the hole and of the excited electron in an SD basis of single
+    excitations, as matrices over the SD rows: between a+_a a_i |ref> and a+_b a_j |ref> the hole operator is
+    delta_ab <i|P_F|j> and the electron operator delta_ij <a|P_F|b> (one-body operators, Slater-Condon), the
+    in-place parities tau of the rows attached. Rows that are the reference or not single excitations carry zeros.
+
+    Args:
+        sd_lists (list of lists of int): the SDs of one step in the signed reindexed spin-orbital notation
+        P_frag (list of arrays): the fragment operators in the active-space 2-block layout (orthonormal orbitals)
+
+    Returns:
+        O_hole, O_elec (lists of arrays (nsd, nsd)): one pair per fragment
+    """
+    nsd = len(sd_lists)
+    nact = P_frag[0].shape[0] // 2
+    gs, singles = _single_excitations(sd_lists)
+    rows = sorted(singles)
+    holes = [_sd_block_index(singles[k][0], nact) for k in rows]
+    parts = [_sd_block_index(singles[k][1], nact) for k in rows]
+    tau = np.array([singles[k][2] for k in rows], dtype=float)
+    same_part = np.equal.outer(parts, parts)
+    same_hole = np.equal.outer(holes, holes)
+    O_hole, O_elec = [], []
+    for P in P_frag:
+        B = 0.5 * (np.asarray(P, dtype=float) + np.asarray(P, dtype=float).T)
+        block_h = B[np.ix_(holes, holes)] * same_part * np.outer(tau, tau)
+        block_e = B[np.ix_(parts, parts)] * same_hole * np.outer(tau, tau)
+        Oh, Oe = np.zeros((nsd, nsd)), np.zeros((nsd, nsd))
+        Oh[np.ix_(rows, rows)] = block_h
+        Oe[np.ix_(rows, rows)] = block_e
+        O_hole.append(Oh)
+        O_elec.append(Oe)
+    return O_hole, O_elec
+
+
+def ci_diabatization_step(T, O_hole, O_elec, kind, dia_index=None):
+    """
+    The CI -> diabatic coefficients V of one step, |Lambda_A> = sum_I |Psi_I> V_IA: the ground state (column 0 of
+    T) maps onto itself, the excited CI states onto fragment-localized states of their own span - the hole and
+    electron fragment operators carried into the CI space through T (O_ci = T_exc^T O_sd T_exc) and localized by
+    the sequential projection of localize_fragment_block: "hole" localizes the hole, "particle" the electron,
+    "joint" the hole first and the electron within every hole-fragment block.
+
+    Args:
+        T (array (nsd, nci + 1)): the SD -> CI coefficients of the step, column 0 the ground state
+        O_hole, O_elec (lists of arrays (nsd, nsd)): sd_fragment_operators of the step
+        kind (str): "particle", "hole" or "joint"
+        dia_index (list, optional): the diabatic-state index of an earlier step - the columns keep its order,
+            None builds it (the ground state first, then fragment-major - hole-major then electron for "joint")
+
+    Returns:
+        V (array (nci + 1, nci + 1)), dia_index (list), pops (array (nci + 1, nfrag)), pops_hole (array
+        (nci + 1, nfrag)): fragment populations of every diabatic state's electron and hole (nan where the kind
+        does not localize it, and for the ground state)
+
+    Raises ValueError when the CI space does not hold whole localization manifolds (a fragment then carries a
+    non-integer number of states - include the complete set of excitations of every hole x particle manifold in
+    number_of_states), when the fragment counts change along the trajectory, and when V is not orthogonal.
+    """
+    if kind not in ("particle", "hole", "joint"):
+        raise ValueError(F"diabatization {kind!r} - use 'none', 'particle', 'hole' or 'joint'")
+    T = np.asarray(T)
+    if np.iscomplexobj(T):
+        # the T matrices of the runner are complex-typed with zero imaginary parts
+        T = T.real
+    T = np.asarray(T, dtype=float)
+    nci = T.shape[1] - 1
+    nfrag = len(O_hole)
+    Te = T[:, 1:]
+    hint = (" - the CI space must hold whole hole x particle manifolds, include the complete set of their "
+            "excitations in number_of_states")
+    try:
+        if kind in ("hole", "joint"):
+            Oh = [Te.T @ O @ Te for O in O_hole]
+            wh, frag_h, ph = localize_fragment_block(Oh, list(range(nci)))
+        if kind in ("particle", "joint"):
+            Oe = [Te.T @ O @ Te for O in O_elec]
+    except ValueError as err:
+        raise ValueError(F"many-body diabatization: {err}{hint}") from err
+    cols, labels = [], []
+    if kind == "joint":
+        for f_h in range(nfrag):
+            block = [c for c in range(nci) if frag_h[c] == f_h]
+            if not block:
+                continue
+            wb = wh[:, block]
+            try:
+                wp, frag_p, pp = localize_fragment_block([wb.T @ O @ wb for O in Oe], list(range(len(block))))
+            except ValueError as err:
+                raise ValueError(F"many-body diabatization, electrons of the hole-on-fragment-{f_h} states: {err}{hint}") from err
+            ranks_h = {}
+            for c, f_p in enumerate(frag_p):
+                ranks_h[f_p] = ranks_h.get(f_p, -1) + 1
+                cols.append(wb @ wp[:, c])
+                labels.append(("joint", 1, f_h, 0, f_p, ranks_h[f_p]))
+    elif kind == "hole":
+        for c, f in enumerate(frag_h):
+            cols.append(wh[:, c])
+            labels.append(("loc", 0, f, sum(1 for x in frag_h[:c] if x == f)))
+    else:
+        try:
+            wp, frag_p, pp = localize_fragment_block(Oe, list(range(nci)))
+        except ValueError as err:
+            raise ValueError(F"many-body diabatization: {err}{hint}") from err
+        for c, f in enumerate(frag_p):
+            cols.append(wp[:, c])
+            labels.append(("loc", 0, f, sum(1 for x in frag_p[:c] if x == f)))
+    Vexc = np.stack(cols, axis=1) if cols else np.zeros((nci, 0))
+    order = list(range(len(labels)))
+    if dia_index is None:
+        dia_index = [("gs",)] + labels
+    else:
+        if len(dia_index) != nci + 1 or dia_index[0] != ("gs",) or sorted(dia_index[1:]) != sorted(labels):
+            raise ValueError("the fragment counts of the many-body diabatization changed along the trajectory - "
+                             F"{dia_index[1:]} indexed, {labels} at this step")
+        order = [labels.index(entry) for entry in dia_index[1:]]
+    V = np.zeros((nci + 1, nci + 1))
+    V[0, 0] = 1.0
+    V[1:, 1:] = Vexc[:, order]
+    pops = np.full((nci + 1, nfrag), np.nan)
+    pops_hole = np.full((nci + 1, nfrag), np.nan)
+    for a in range(nci):
+        v = V[1:, a + 1]
+        if kind in ("particle", "joint"):
+            pops[a + 1] = [v @ O @ v for O in Oe]
+        if kind in ("hole", "joint"):
+            pops_hole[a + 1] = [v @ O @ v for O in Oh]
+    dev = float(np.abs(V.T @ V - np.eye(nci + 1)).max())
+    if dev > 1e-8:
+        raise ValueError(F"the many-body diabatic transformation is not orthogonal (|V^T V - 1| = {dev:.2e})")
+    return V, dia_index, pops, pops_hole
+
+
+def _ci_diabatization_series(params, sd_sorted, SD2CI, active_space, start_time, finish_time, kind):
+    """V, the diabatic index and the populations of every step start_time..finish_time-1 in the CI basis: the
+    step-2 fragment operators as SD-space hole / electron operators (sd_fragment_operators), carried through the
+    T matrices and localized (ci_diabatization_step)."""
+    prefix, nfrag = _fragment_operator_prefix(params, params['path_to_npz_files'], start_time)
+    V_list, pops_list, hole_list, dia_index = [], [], [], None
     for i, step in enumerate(range(start_time, finish_time)):
-        P_frag = [np.array(sp.load_npz(F'{res_dir_1}/{prefix}{f}_ks_{step}.npz').todense()
-                           [active_space, :][:, active_space]).real for f in range(nfrag)]
-        if mode != "none":
-            s_ks = np.array(sp.load_npz(F'{res_dir_1}/S_ks_{step}.npz').todense()
-                            [active_space, :][:, active_space]).real
-            X = orthogonalizations.get_Lowdin_scipy(s_ks)
-            P_frag = [X.T @ P @ X for P in P_frag]
-        W, dia_index, pops, pops_hole = sd_diabatization_step(sd_sorted[i], P_frag, kind, dia_index,
-                                                              active_space, params['data_dim'])
-        W_list.append(W)
+        P_frag = _fragment_operators_of_step(params, prefix, nfrag, step, active_space)
+        O_hole, O_elec = sd_fragment_operators(sd_sorted[i], P_frag)
+        V, dia_index, pops, pops_hole = ci_diabatization_step(SD2CI[i], O_hole, O_elec, kind, dia_index)
+        V_list.append(V)
         pops_list.append(pops)
         hole_list.append(pops_hole)
-    return W_list, dia_index, pops_list, hole_list
+    return V_list, dia_index, pops_list, hole_list
 
 
-def _write_diabatization_records(res_dir, kind, dia_index, pops_list, hole_list, start_time, operator="mulliken"):
-    """U_sd_labels.json (the meaning of every diabatic state) and U_sd_pops.txt (per step,
+def _write_diabatization_records(res_dir, kind, dia_index, pops_list, hole_list, start_time, operator="mulliken",
+                                 basis="sd"):
+    """U_{basis}_labels.json (the meaning of every diabatic state) and U_{basis}_pops.txt (per step,
     the fragment populations of every diabatic state's localized electron orbital, then of
-    its localized hole - nan where the state has none)."""
+    its localized hole - nan where the state has none) - basis "sd" for the SD-level states,
+    "ci" for the many-body ones (whose untransformed state is the ground state)."""
     states = []
     for col, entry in enumerate(dia_index):
-        if entry[0] == "sd":
+        if entry[0] == "gs":
+            states.append({"index": col, "type": "gs"})
+        elif entry[0] == "sd":
             states.append({"index": col, "type": "sd", "sd": sorted(entry[1])})
         elif entry[0] == "joint":
             states.append({"index": col, "type": "joint", "channel": int(entry[1]),
@@ -2888,8 +3079,8 @@ def _write_diabatization_records(res_dir, kind, dia_index, pops_list, hole_list,
         else:
             states.append({"index": col, "type": "localized", "manifold": int(entry[1]),
                            "fragment": int(entry[2]), "rank": int(entry[3])})
-    with open(F'{res_dir}/U_sd_labels.json', 'w') as f:
-        json.dump({"kind": kind, "fragment_operator": operator,
+    with open(F'{res_dir}/U_{basis}_labels.json', 'w') as f:
+        json.dump({"kind": kind, "fragment_operator": operator, "basis": basis,
                    "note": "particle: the excited electron of the manifold (shared hole = "
                            "manifold) sits on 'fragment', hole: the hole (shared particle = "
                            "manifold) sits on 'fragment', joint: the hole sits on "
@@ -2903,15 +3094,20 @@ def _write_diabatization_records(res_dir, kind, dia_index, pops_list, hole_list,
             for i in range(len(pops_list))]
     header = ("step " + " ".join(F"p_e(state{c},frag{f})" for c in range(nst) for f in range(nfrag))
               + " " + " ".join(F"p_h(state{c},frag{f})" for c in range(nst) for f in range(nfrag)))
-    np.savetxt(F'{res_dir}/U_sd_pops.txt', np.array(rows), header=header, fmt="%.6g")
+    np.savetxt(F'{res_dir}/U_{basis}_pops.txt', np.array(rows), header=header, fmt="%.6g")
+
+
+def _save_u(res_dir, W, cum_phase, step, basis="sd"):
+    """U_{basis} = (W F)^T: rows = diabatic states, columns = the saved (phase-corrected) SDs or CI states."""
+    Wf = np.asarray(W, dtype=float)
+    if cum_phase is not None:
+        Wf = Wf * np.asarray(cum_phase, dtype=float).reshape(-1, 1)
+    sp.save_npz(F'{res_dir}/U_{basis}_{step}.npz', sp.csc_matrix(Wf.T))
 
 
 def _save_u_sd(res_dir, W, cum_phase, step):
     """U_sd = (W F)^T: rows = diabatic states, columns = the saved (phase-corrected) SDs."""
-    Wf = np.asarray(W, dtype=float)
-    if cum_phase is not None:
-        Wf = Wf * np.asarray(cum_phase, dtype=float).reshape(-1, 1)
-    sp.save_npz(F'{res_dir}/U_sd_{step}.npz', sp.csc_matrix(Wf.T))
+    _save_u(res_dir, W, cum_phase, step, "sd")
 
 
 @_with_parent_blas_cap
@@ -2975,7 +3171,12 @@ def run_step3_sd_nacs_libint(params):
                 saved SD states, in the gauge of Hvib_sd/St_sd - sorted, reordered, phase-corrected)
                 with U_sd_labels.json (what every diabatic state is) and U_sd_pops.txt (fragment
                 populations of the localized orbitals per step). A runner hands U_sd_{step} to
-                obj.basis_transform.
+                obj.basis_transform. With is_many_body the same fragment operators are carried into
+                the CI space through the T matrices (hole and electron operators of the SD basis,
+                sd_fragment_operators, ci_diabatization_step) and U_ci_{step}.npz (rows: the ground
+                state and the diabatic many-body states, columns: the saved CI states in the gauge of
+                Hvib_ci/St_ci) is written with U_ci_labels.json and U_ci_pops.txt - the CI space must
+                hold whole hole x particle manifolds (number_of_states closes every manifold).
             * **params['npz_file_ks_homo_index']** (integer): the KS HOMO index of the raw npz files.
             * **params['is_many_body']** (bool): a True or False flag for computing the overlaps and energies
                                                  for many-body states
@@ -3326,6 +3527,16 @@ def run_step3_sd_nacs_libint(params):
         for i in range(len(SD2CI)):
             SD2CI[i] = data_conv.MATRIX2nparray(SD2CI[i].real())
 
+        # the many-body diabatization: the same fragment operators carried into the CI space through the T
+        # matrices and localized there - U_ci next to U_sd
+        V_dia = None
+        if W_dia is not None:
+            V_dia, ci_dia_index, ci_pops, ci_hole = _ci_diabatization_series(params, sd_states_reindexed_sorted,
+                                                                             SD2CI, ks_active_space, start_time,
+                                                                             finish_time, diabatization)
+            _write_diabatization_records(res_dir_2, diabatization, ci_dia_index, ci_pops, ci_hole, start_time,
+                                         str(params['fragment_operator']).lower(), basis="ci")
+
         # We create the var_pool whether we use the multiprocessing or not
         var_pool = make_var_pool(params, sd_states_reindexed_sorted, start_time, finish_time)
     else:
@@ -3428,7 +3639,10 @@ def run_step3_sd_nacs_libint(params):
 
             # if params['do_state_reordering']==2 or params['do_state_reordering']==1:
             print('Applying state-reordering to St_ci...\n')
-            apply_state_reordering_general(St_cis_cmatrix, E_cis_cmatrix, params)
+            perms_ci = apply_state_reordering_general(St_cis_cmatrix, E_cis_cmatrix, params)
+            if V_dia is not None:
+                # the relabeled CI states are the rows of V
+                V_dia = [_permute_rows(V_dia[i], perms_ci[i]) for i in range(len(V_dia))]
             # the relabeled CI energies replace the midpoints saved above
             for i in range(1, len(E_cis_cmatrix)):
                 E_ci_prev = data_conv.MATRIX2nparray(E_cis_cmatrix[i - 1].real(), np.float64)
@@ -3452,6 +3666,13 @@ def run_step3_sd_nacs_libint(params):
                 # finish_time - 2 by the energy loop above), so every iteration
                 # overwrote the same file
                 sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/St_ci_{i+start_time}_re.npz', sp.csc_matrix(St_ci))
+
+        if V_dia is not None:
+            # the localization eigenvectors carry arbitrary signs - the diabatic CI states follow the
+            # trajectory through the CI time overlaps of their own (relabeled) basis
+            for i in range(len(St_cis)):
+                O = V_dia[i].T @ np.asarray(St_cis[i].todense()).real @ V_dia[i + 1]
+                V_dia[i + 1] = V_dia[i + 1] * np.where(np.diag(O) < 0.0, -1.0, 1.0)
 
     # Now, we move to applying phase-corrections
     if params['apply_phase_correction']:
@@ -3501,6 +3722,10 @@ def run_step3_sd_nacs_libint(params):
                     cum_phase_aa = np.ones((nstates, 1))
                     cum_phase_bb = np.ones((nstates, 1))
 
+                if V_dia is not None:
+                    # U_ci(n) refers to the phase-corrected CI states F(n)|Psi(n)>: the cumulative
+                    # phases BEFORE this step's update
+                    _save_u(res_dir_2, V_dia[step], cum_phase_aa, step + start_time, "ci")
                 St_ci_step_phase_corrected, cum_phase_aa, cum_phase_bb = apply_phase_correction_scipy(
                     St_cis[step].real, step, cum_phase_aa, cum_phase_bb, two_spinor_format=False)
                 if nac_algo == 0:
@@ -3524,6 +3749,8 @@ def run_step3_sd_nacs_libint(params):
                     F'{params["path_to_save_sd_Hvibs"]}/St_ci_{step+start_time}_re.npz',
                     sp.csc_matrix(St_ci_step_phase_corrected))
                 c += 1
+            if V_dia is not None:
+                _save_u(res_dir_2, V_dia[len(St_cis)], cum_phase_aa, len(St_cis) + start_time, "ci")
             print('Done with applying phase-correction to St_ci matrices. Elapsed time:', time.time() - t3)
 
     else:
@@ -3563,6 +3790,9 @@ def run_step3_sd_nacs_libint(params):
                 sp.save_npz(
                     F'{params["path_to_save_sd_Hvibs"]}/St_ci_{step+start_time}_re.npz',
                     sp.csc_matrix(St_ci_step))
+            if V_dia is not None:
+                for i in range(len(V_dia)):
+                    _save_u(res_dir_2, V_dia[i], None, i + start_time, "ci")
 
 
 def make_var_pool(params, sd_states_reindexed_sorted, start_time, finish_time):
