@@ -438,7 +438,7 @@ def get_all_data(params):
             print('Reading the data of step', step)
             filename_re = F'{path_to_res_files}/{hvib_re_prefix}{step}{hvib_re_suffix}'
             filename_im = F'{path_to_res_files}/{hvib_im_prefix}{step}{hvib_im_suffix}'
-            hvib = data_read.get_matrix(nstates, nstates, filename_re, filename_im, list(range(nstates)), 1, 1)
+            hvib = get_matrix(nstates, nstates, filename_re, filename_im, list(range(nstates)), 1, 1)
             Hvib.append(hvib)
 
             # Hadi
@@ -452,7 +452,7 @@ def get_all_data(params):
             # St is stored real-only in this layout (the sparse branch reads
             # CMATRIX(st_re, 0) too); the old line referenced never-assigned
             # st_im_prefix/st_im_suffix and raised NameError
-            st = data_read.get_matrix(nstates, nstates, filename_re, filename_re, list(range(nstates)), 1, 0)
+            st = get_matrix(nstates, nstates, filename_re, filename_re, list(range(nstates)), 1, 0)
             St.append(st)
 
     return Hadi, Hvib, nac, St, nstates
