@@ -179,15 +179,13 @@ def compute_trpes(_params):
             with h5py.File(F'{dprefix}{icond}{dsuffix}', 'r') as F:
                 sh_pop = np.array(F['sh_pop_adi/data'])
 
-            E_eff = np.roll(E_ext, -(icond-istep), 0)
+            E_eff = np.roll(E_ext, -(icond-istep), 0) * units.au2ev    # eV, the energies this condition's trajectory sees
             TRPES_traj = np.zeros((nsteps, n_e_grid_pts))    # this initial condition's map alone - the ensemble average adds it once
-            for i in range(nsteps):                
-                for j, e_j in enumerate(e_grid):
-                    for state in range(nstates):
-                        e = E_eff[i, state] * units.au2ev
-                        smear = np.exp(-(e_j - e) ** 2 / (2 * sigma_e ** 2))
-                        TRPES_traj[i, j] += sh_pop[i, state] * de * smear
-                        
+            # one Gaussian ridge per state over the whole (time, energy) grid, the states added in order as the former
+            # element loop added them - the loop evaluated nsteps x grid x nstates exponentials one at a time
+            for state in range(nstates):
+                TRPES_traj += sh_pop[:nsteps, state:state + 1] * de * np.exp(-(e_grid[np.newaxis, :] - E_eff[:, state:state + 1]) ** 2 / (2 * sigma_e ** 2))
+
             TRPES += TRPES_traj
             count += 1
 
