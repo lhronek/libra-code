@@ -201,7 +201,7 @@ def plot_mem(res, _params, model_params, plot_params):
             qi = list(res.np_data["q_dia"][:, idof, 0])
             pi = list(res.np_data["p_dia"][:, idof, 0])
 
-            plt.plot(qi, pi, label='', linewidth=10, color=colors[clrs_index[i]])
+            plt.plot(qi, pi, label='', linewidth=10, color=colors[clrs_index[idof]])
             plt.legend()
 
     plt.subplot(1, 2, 2)
@@ -399,7 +399,7 @@ def plot_hdf5(plot_params, ax=plt, use_default_ax=True):
                     qi = list(f["q_dia/data"][:, idof, 0])
                     pi = list(f["p_dia/data"][:, idof, 0])
 
-                    ax.plot(qi, pi, label='', linewidth=10, color=colors[clrs_index[i]])
+                    ax.plot(qi, pi, label='', linewidth=10, color=colors[clrs_index[idof]])
                     ax.legend()
 
         ax.subplot(1, 2, 2)
