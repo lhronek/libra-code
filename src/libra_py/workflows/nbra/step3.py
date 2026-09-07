@@ -2526,13 +2526,10 @@ def _sd_block_index(orb, nact):
 
 
 def _permute_rows(W, perm):
-    """Row permutation of a numpy matrix in the CMATRIX.permute_rows convention."""
-    Wc = data_conv.nparray2CMATRIX(np.asarray(W, dtype=float))
-    p = intList()
-    for k in perm:
-        p.append(int(k))
-    Wc.permute_rows(p)
-    return data_conv.MATRIX2nparray(Wc.real(), np.float64)
+    """Row permutation of a numpy matrix in the CMATRIX.permute_rows convention: row k of the result is
+    row perm[k] of W, the same relabeling apply_state_reordering_general applies to the overlaps. The dtype
+    is kept (the T matrices are complex-typed with zero imaginary parts)."""
+    return np.asarray(W)[np.asarray(perm, dtype=int), :]
 
 
 def _spin_partner(orb, active_space, data_dim):
@@ -3398,6 +3395,10 @@ def run_step3_sd_nacs_libint(params):
             # Since we have performed state-reordering we need to
             # convert to scipy npz format now
             t2 = time.time()
+            # the relabeled SD overlaps carry the labels of perms - the rows of the T matrices
+            # (the sorted SDs of every step) follow them, St_ci is then invariant to the relabeling
+            for i in range(len(SD2CI)):
+                SD2CI[i] = _permute_rows(SD2CI[i], perms[i])
             for i in range(len(St_sds_cmatrix)):
                 sd2ci_prev = SD2CI[i]
                 sd2ci_curr = SD2CI[i + 1]
