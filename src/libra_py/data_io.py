@@ -393,12 +393,14 @@ def sort_hvib_file_names(files):
     steps = []
     kept = []
     for file in files:
-        number = ''.join(ch for ch in file if ch.isdigit())
+        # the step is the last run of digits of the file NAME - every digit of the full path went into the key
+        # before, so files from directories with different digits (or a basis name with digits) sorted wrongly
+        numbers = re.findall(r"\d+", os.path.basename(file))
         # entries without a step number (e.g. hvib_convention.json swept in
         # by a broad glob) cannot be sorted - exclude them instead of crashing
-        if number == '':
+        if not numbers:
             continue
-        steps.append(int(number))
+        steps.append(int(numbers[-1]))
         kept.append(file)
     order = np.argsort(np.array(steps))
     files_sorted = []
