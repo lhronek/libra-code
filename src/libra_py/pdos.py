@@ -28,6 +28,7 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 from . import units, data_conv
+import libra_py.packages.cp2k.methods as CP2K_methods
 import util.libutil as comn
 import numpy as np
 
@@ -474,35 +475,33 @@ def cp2k_pdos(_params):
             for Elt in elements:  # for given atom names
                 at_indx = elt_mapping[Elt]
 
-                filename = F"{prefix}-{snap}-k{at_indx}-1.pdos"  # file
+                base = F"{prefix}-{snap}-k{at_indx}-1"
+                # the .pdos_raw of CP2K 2026 holds the per-MO table, the .pdos of the older versions
+                filename = base + ".pdos_raw" if os.path.exists(base + ".pdos_raw") else base + ".pdos"
                 if not os.path.exists(filename):
                     print(F"The file {filename} is not found.")
-
                 if os.path.exists(filename):
-
-                    fa = open(filename, "r")
-                    B = fa.readlines()
-                    check = B[0].split()
-                    fa.close()
-
-                    # the second to the last entry of the first line contains Fermi energy in a.u.
-                    Ef = float(check[-2]) * units.au2ev
+                    block = CP2K_methods.read_cp2k_pdos(filename)
+                    Ef = block["e_fermi"] * units.au2ev
                     # convert to eV
                     # For debug
                     # print(F" snap = {snap}  proj = {proj_indx} elt = {Elt}  Ef = {Ef}")
-
-                    for lin in B[2:]:  # read all lines, except for the 2 header lines
-                        tmp = lin.split()
-
-                        e = float(tmp[1]) * units.au2ev  # energy in a.u. - convert to eV
+                    for e_au, row in zip(block["energies"], block["projections"]):
+                        e = e_au * units.au2ev  # energy in a.u. - convert to eV
                         if e < Ef + emin or e > Ef + emax:
                             pass
                         else:
                             state_indx = int(math.floor((e - (Ef + emin)) / de))
-
                             for symb in ang_mom:  # for given angular momentum labels
-                                ang_mom_indx = ang_mom_mapping[symb]
-                                dosa.add(state_indx, proj_indx, float(tmp[ang_mom_indx]) / nsnaps)
+                                if symb in block["components"]:
+                                    ang_mom_indx = block["components"].index(symb)
+                                else:
+                                    cols = CP2K_methods.cp2k_pdos_component_columns(block, [ang_mom_mapping[symb]])
+                                    if not cols:
+                                        raise ValueError(F"{filename} has no {symb} projection (components "
+                                                         F"{block['components']})")
+                                    ang_mom_indx = cols[0]
+                                dosa.add(state_indx, proj_indx, float(row[ang_mom_indx]) / nsnaps)
 
     # ============= Optional convolution =================
 
@@ -669,99 +668,37 @@ def convolve_cp2k_pdos(params: dict):
     # The angular momentum columns in the .pdos files
     angular_momentum_cols = params["angular_momentum_cols"]
 
-    # Opening the file
-    file = open(cp2k_pdos_file, 'r')
-    lines = file.readlines()
-    file.close()
-
-    # Lines with 'DOS'
-    lines_with_dos = []
-
-    # Finding the lines with 'DOS'
-    for i in range(0, len(lines)):
-        if 'DOS'.lower() in lines[i].lower().split():
-            lines_with_dos.append(i)
-
-    # Finding the first and last index of PDOS for each time step
-    if len(lines_with_dos) == 1:
-        # First index
-        first_index = 2
-        # Last index
-        last_index = int(lines[len(lines) - 1].split()[0])
-    elif len(lines_with_dos) > 1:
-        # First index
-        first_index = 2
-        # Last index
-        last_index = int(lines_with_dos[1] - 1)
-
-    # Find the number of columns in the PDOS file showing the number
-    # of orbital components, energy, and occupation column.
-    num_cols = len(lines[first_index].split())
-
+    # The per-MO tables of the file (one block per appended iteration in the CP2K <= 2025 files)
+    blocks = CP2K_methods.read_cp2k_pdos_blocks(cp2k_pdos_file)
+    if time_step >= len(blocks):
+        raise ValueError(F"{cp2k_pdos_file} holds {len(blocks)} block(s), time_step {time_step} is out of range")
+    block = blocks[time_step]
     # Number of energy levels considered for PDOS
-    num_levels = last_index - first_index + 1
-
-    # Finding the homo and lumo energy level by appending the
-    # pdos numerical values of unoccupied states only
-    pdos_unocc = []
-    # Energy levels
-    energy_levels = []
-    for i in range(first_index, last_index + 1):
-        energy_levels.append(float(lines[i].split()[1]) * energy_conversion)
-        if float(lines[i].split()[2]) == 0:
-            pdos_unocc.append(i)
-    # HOMO energy level
-    homo_level = int(lines[min(pdos_unocc)].split()[0])
+    num_levels = len(block["energies"])
+    # The energies of the levels in the requested unit
+    energy_levels = block["energies"] * energy_conversion
+    # The HOMO is the level before the first unoccupied one
+    unoccupied = np.where(block["occupations"] == 0)[0]
+    homo_level = int(unoccupied.min()) - 1 if unoccupied.size > 0 else num_levels - 1
     # HOMO energy
-    homo_energy = float(lines[homo_level].split()[1]) * energy_conversion
+    homo_energy = energy_levels[homo_level]
     # Minimum energy level
-    min_energy = float(lines[first_index].split()[1]) * energy_conversion
+    min_energy = energy_levels[0]
     # Maximum energy level
-    max_energy = float(lines[last_index].split()[1]) * energy_conversion
-
+    max_energy = energy_levels[-1]
     # Now we make an equispaced energy vector from min_energy ad max_energy with npoints.
     energy_grid = np.linspace(min_energy - 2, max_energy + 2, npoints)
     energy_grid = np.array(energy_grid)
-
-    # Appending the energy lines with their component densities of states
-    energy_lines = []
-    # The initial line in the .pdos file of step 'time_step'
-    init_line = time_step * (num_levels + 2) + 2
-    # The final line in the .pdos file of step 'time_step'
-    final_line = (time_step + 1) * (num_levels + 2)
-    for i in range(init_line, final_line):
-        # Appending the energy lines into enrgy_lines
-        energy_lines.append(lines[i].split())
-
-    for i in range(0, len(energy_lines)):
-
-        for j in range(0, len(energy_lines[0])):
-
-            energy_lines[i][j] = float(energy_lines[i][j])
-
-    energy_lines = np.array(energy_lines)
-
-    # Now we sum the PDOSs defined in angular_momentum_cols by user
+    # Now we sum the PDOSs defined in angular_momentum_cols by user (the column numbering of the
+    # CP2K <= 2025 files, 3 = the first component)
     pdos_sum = []
-    for k in range(0, len(energy_lines)):
-
+    for k in range(0, num_levels):
         # A temporary vector for summation of the PDOS
         tmp_vec = []
-        tmp_vec.append(energy_lines[k][1])
-
+        tmp_vec.append(block["energies"][k])
         for i in range(0, len(angular_momentum_cols)):
-            # Initializing a new sum variable
-            # print("angular_momentum_cols[i]",angular_momentum_cols[i])
-            tmp_sum = 0
-            for j in angular_momentum_cols[i]:
-
-                # If j is less than the number of columns
-                # then sum the PDOS
-                if j <= num_cols:
-                    tmp_sum += energy_lines[k][j]
-            # Appending tmp_sum into tmp_vec
-            tmp_vec.append(tmp_sum)
-
+            cols = CP2K_methods.cp2k_pdos_component_columns(block, angular_momentum_cols[i])
+            tmp_vec.append(float(np.sum(block["projections"][k, cols])) if cols else 0.0)
         # Now append tmp_vec into pdos_sum, we will
         # then use this pdos_sum for convolution
         pdos_sum.append(tmp_vec)

@@ -17,7 +17,7 @@
 """
 
 
-import os, sys, math, re, copy, time, glob, shlex, subprocess, atexit
+import os, sys, math, re, copy, time, glob, shlex, shutil, subprocess, atexit
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import numpy as np
@@ -2377,6 +2377,150 @@ def gaussian_function_vector(a_vec, mu_vec, sigma, num_points, x_min, x_max):
     return x, sum_vec
 
 
+def _cp2k_pdos_block(filename, header, data):
+    """One projected-DOS table (a header and its rows) in the canonical form of read_cp2k_pdos_blocks."""
+    first = header[0]
+    m = re.search(r"Projected DOS for (.*?),?\s+at iteration step i\s*=\s*(\d+)", first)
+    label = m.group(1).strip().rstrip(",") if m else first.lstrip("# ").strip()
+    step = int(m.group(2)) if m else 0
+    columns = header[-1].replace("#", " ").split()
+    if not columns or columns[0] != "MO":
+        raise ValueError(F"{filename}: not a per-MO projected-DOS table (the broadened DOS curves of CP2K 2026 "
+                         F"have no MO column) - read the .pdos_raw file")
+    e_fermi, e_homo, zero = None, None, "ABSOLUTE"
+    for h in header[:-1]:
+        m = re.search(r"E\(Fermi\)\s*=\s*(\S+)\s*a\.u\.", h)
+        if m:
+            e_fermi = float(m.group(1))
+        m = re.search(r"E\(HOCO\)\s*=\s*(\S+)\s*a\.u\.", h)
+        if m:
+            e_homo = float(m.group(1))
+        m = re.search(r"Energy zero:\s*(.*)$", h)
+        if m:
+            zero = m.group(1).strip()
+    occ = columns.index("Occupation")
+    unit = 1.0
+    layout = "cp2k_2025"
+    if columns[1].startswith("Energy["):
+        layout = "cp2k_2026_raw"
+        if "eV" in columns[1]:
+            unit = 1.0 / units.au2ev
+    components = columns[occ + 1:]
+    has_total = bool(components) and components[0] == "Total"
+    if has_total:
+        components = components[1:]
+    data = np.atleast_2d(np.asarray(data, dtype=float))
+    energies = data[:, 1] * unit
+    shift = 0.0
+    if "HOCO" in zero:
+        if e_homo is None:
+            raise ValueError(F"{filename}: the energy zero is the HOCO but the header has no E(HOCO)")
+        shift = e_homo
+    elif "FERMI" in zero:
+        if e_fermi is None:
+            raise ValueError(F"{filename}: the energy zero is the Fermi level but the header has no E(Fermi)")
+        shift = e_fermi
+    first_comp = 3 + (1 if has_total else 0)
+    projections = data[:, first_comp:]
+    total = data[:, 3] if has_total else projections.sum(axis=1)
+    return {"step": step, "label": label, "e_fermi": e_fermi, "e_homo": e_homo, "energy_zero": zero,
+            "energies": energies + shift, "occupations": data[:, 2], "total": total,
+            "projections": projections, "components": components, "layout": layout}
+
+
+def read_cp2k_pdos_blocks(filename):
+    """
+    The per-MO projected-DOS tables of one CP2K PDOS file, one block per iteration stored in the file, in
+    either layout:
+
+      * CP2K <= 2025 (.pdos): "# Projected DOS for ... at iteration step i = N, E(Fermi) = x a.u." then
+        "# MO Eigenvalue [a.u.] Occupation <components>", absolute eigenvalues, several blocks with APPEND
+      * CP2K 2026 (.pdos_raw): "# Projected DOS for ... at iteration step i = N", "# E(Fermi) = x a.u. = y eV",
+        "# E(HOCO) = x a.u. = y eV", "# Energy zero: ABSOLUTE | FERMI | HOCO | AUTO -> ...", then
+        "# MO Energy[a.u.|eV] Occupation Total <components>" with the energies relative to that zero
+
+    The broadened .pdos and .dos curves of CP2K 2026 carry no MO column and are refused.
+
+    Args:
+        filename (str): the .pdos or .pdos_raw file
+
+    Returns:
+        list of dicts, one per block: step (int), label (str, "atomic kind C" or "list 1 of 6 atoms"),
+        e_fermi (a.u. or None), e_homo (a.u. or None), energy_zero (str), energies (absolute, a.u.),
+        occupations, total (the sum of the components), projections (nmo x ncomp), components (the labels,
+        "s", "py", ... or "s", "p", ... without COMPONENTS), layout ("cp2k_2025" or "cp2k_2026_raw")
+    """
+    with open(filename) as f:
+        lines = f.read().splitlines()
+    blocks = []
+    i, n = 0, len(lines)
+    while i < n:
+        stripped = lines[i].strip()
+        if not stripped.startswith("#"):
+            i += 1
+            continue
+        header = []
+        while i < n and lines[i].strip().startswith("#"):
+            header.append(lines[i].strip())
+            i += 1
+        rows = []
+        while i < n and lines[i].strip() and not lines[i].strip().startswith("#"):
+            rows.append([float(x) for x in lines[i].split()])
+            i += 1
+        blocks.append(_cp2k_pdos_block(filename, header, rows))
+    if not blocks:
+        raise ValueError(F"{filename}: no projected-DOS table found")
+    return blocks
+
+
+def read_cp2k_pdos(filename, block=-1):
+    """One block of read_cp2k_pdos_blocks - by default the last one stored in the file."""
+    return read_cp2k_pdos_blocks(filename)[block]
+
+
+def _cp2k_pdos_is_table(filename):
+    """Whether the file holds per-MO projected-DOS tables (a column header starting with MO)."""
+    with open(filename) as f:
+        for _ in range(12):
+            line = f.readline()
+            if not line:
+                break
+            tokens = line.replace("#", " ").split()
+            if line.strip().startswith("#") and tokens and tokens[0] == "MO":
+                return True
+    return False
+
+
+def find_cp2k_pdos_files(directory, core="*"):
+    """
+    The per-MO projected-DOS files of a directory whose names match `core` (a glob without the extension,
+    e.g. "*k1*" or "*ALPHA*k2*"): the .pdos_raw files of CP2K 2026 when there are any, otherwise the .pdos
+    files that hold per-MO tables (the broadened .pdos curves of CP2K 2026 are skipped).
+    """
+    raw = sorted(glob.glob(os.path.join(directory, F"{core}.pdos_raw")))
+    if raw:
+        return raw
+    return [f for f in sorted(glob.glob(os.path.join(directory, F"{core}.pdos"))) if _cp2k_pdos_is_table(f)]
+
+
+def cp2k_pdos_component_columns(block, cols):
+    """
+    The projection columns of a block addressed in the column numbering of the CP2K <= 2025 files (3 = the
+    first component, 4 the second, ...), the numbering the orbitals_cols / angular_momentum_cols parameters
+    use - the same components of either layout. Columns beyond the file's components are dropped.
+    """
+    ncomp = block["projections"].shape[1]
+    return [c - 3 for c in cols if 3 <= c < 3 + ncomp]
+
+
+def collect_pdos_files(destination):
+    """Move the DOS prints of the working directory into `destination`: the .pdos files, the .pdos_raw files
+    (CP2K 2026 writes the per-MO projections there and broadened curves to .pdos) and the .dos files."""
+    os.makedirs(destination, exist_ok=True)
+    for f in sorted(glob.glob("*pdos") + glob.glob("*pdos_raw") + glob.glob("*.dos")):
+        shutil.move(f, os.path.join(destination, os.path.basename(f)))
+
+
 def aux_pdos(
         c1,
         atoms,
@@ -2392,42 +2536,39 @@ def aux_pdos(
     """
     c1 - index of the atom kinds
     atoms - the
-    pdos_files (list of strings): names of the files containing pdos data
+    pdos_files (list of strings): names of the files containing pdos data (.pdos of CP2K <= 2025 or .pdos_raw of
+        CP2K 2026, read by read_cp2k_pdos - the last block of each file)
     shift (double): the amount of "padding" around the minimal and maximal values of the energy scale [units: eV]
     homo_occ (double): occupancy of the HOMO: 2 - for non-polarized, 1 - for polarized
     orbital_cols (list of lists of integers): integers that define which columns correspond to which types of orbitals
+        (the column numbering of the CP2K <= 2025 files: 3 = the first component)
     sigma (double): broadening of the pDOS
     npoints (int): how many points to use to compte the convolved pDOS
 
     """
 
-    pdos_ave = np.zeros(np.loadtxt(pdos_files[0]).shape)
+    blocks = [read_cp2k_pdos(pdos_file) for pdos_file in pdos_files]
+    cnt = len(blocks)
+    energies = sum(b["energies"] for b in blocks) / cnt * units.au2ev
+    occupations = sum(b["occupations"] for b in blocks) / cnt
+    projections = sum(b["projections"] for b in blocks) / cnt
 
-    cnt = len(pdos_files)
-    for c2, pdos_file in enumerate(pdos_files):
-        pdos_mat = np.loadtxt(pdos_file)
-        if c2 == 0:
-            pdos_ave = np.zeros(pdos_mat.shape)
-        pdos_ave += pdos_mat
-    pdos_ave /= cnt
-
-    pdos_ave[:, 1] *= units.au2ev
-    e_min = np.min(pdos_ave[:, 1]) - margin
-    e_max = np.max(pdos_ave[:, 1]) + margin
-    homo_level = np.max(np.where(pdos_ave[:, 2] == homo_occ))
-    homo_energy = pdos_ave[:, 1][homo_level]
+    e_min = np.min(energies) - margin
+    e_max = np.max(energies) + margin
+    homo_level = np.max(np.where(occupations == homo_occ))
+    homo_energy = energies[homo_level]
     # labels = []
 
     for c3, orbital_cols in enumerate(orbitals_cols):
-        try:
-            sum_pdos_ave = np.sum(pdos_ave[:, orbital_cols], axis=1)
-            ave_energy_grid, ave_pdos_convolved = gaussian_function_vector(
-                sum_pdos_ave, pdos_ave[:, 1], sigma, npoints, e_min, e_max)
-            ave_pdos_convolved_all.append(ave_pdos_convolved)
-            pdos_label = F"{atoms[1][c1]}, {orbitals[c3]}"
-            labels.append(pdos_label)
-        except BaseException:
-            pass
+        cols = cp2k_pdos_component_columns(blocks[0], orbital_cols)
+        if not cols:
+            continue
+        sum_pdos_ave = np.sum(projections[:, cols], axis=1)
+        ave_energy_grid, ave_pdos_convolved = gaussian_function_vector(
+            sum_pdos_ave, energies, sigma, npoints, e_min, e_max)
+        ave_pdos_convolved_all.append(ave_pdos_convolved)
+        pdos_label = F"{atoms[1][c1]}, {orbitals[c3]}"
+        labels.append(pdos_label)
 
     return ave_energy_grid, homo_energy, ave_pdos_convolved_all, labels
 
@@ -2439,7 +2580,8 @@ def pdos(params):
         params (dict):
             * path_to_all_pdos (str): The full path to the pdos files produced by CP2K
             * atoms (list): This list contains the atom types number and names in a separate list.
-                            CP2K produces the pdos files in *k{i}*.pdos files where `i` is the atom type number.
+                            CP2K produces the pdos files in *k{i}*.pdos files where `i` is the atom type number
+                            (*k{i}*.pdos_raw for CP2K 2026, taken first when present).
                             e.g.: [ [1,2] , ['Ti', 'O'] ]
             * orbitals (list): A list containing the atomic angular momentum.
             * orbital_cols (list): The columns for specific angular momentum as in `orbitals`
@@ -2483,7 +2625,7 @@ def pdos(params):
 
         for c1, i in enumerate(atoms[0]):
             # Finding all the pdos files
-            pdos_files = glob.glob(path_to_all_pdos + F'/*k{i}*.pdos')
+            pdos_files = find_cp2k_pdos_files(path_to_all_pdos, F'*k{i}*')
 
             ave_energy_grid, homo_energy, ave_pdos_convolved_all, labels = aux_pdos(
                 c1, atoms, pdos_files, shift, homo_occ, orbitals_cols, sigma, npoints, ave_pdos_convolved_all, orbitals, labels)
@@ -2530,8 +2672,8 @@ def pdos(params):
 
         for c1, i in enumerate(atoms[0]):
             # Finding all the pdos files
-            pdos_files_alp = glob.glob(path_to_all_pdos + F'/*ALPHA*k{i}*.pdos')
-            pdos_files_bet = glob.glob(path_to_all_pdos + F'/*BETA*k{i}*.pdos')
+            pdos_files_alp = find_cp2k_pdos_files(path_to_all_pdos, F'*ALPHA*k{i}*')
+            pdos_files_bet = find_cp2k_pdos_files(path_to_all_pdos, F'*BETA*k{i}*')
 
             ave_energy_grid_alp, homo_energy_alp, ave_pdos_convolved_all_alp, labels_alp = aux_pdos(
                 c1, atoms, pdos_files_alp, shift, homo_occ, orbitals_cols, sigma, npoints, ave_pdos_convolved_all_alp, orbitals, labels_alp)

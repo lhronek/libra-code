@@ -812,7 +812,7 @@ def run_step2_many_body(params):
         os.system("mpirun -np %d %s -i %s-%i.inp -o logfiles/step_%d.log " %
                   (nprocs, cp2k_exe, project_name, curr_step, curr_step))
         # After finishing the CP2K calculations move all the pdos and cube files to specified folders
-        os.system("mv *.pdos pdosfiles")
+        CP2K_methods.collect_pdos_files("pdosfiles")
 
     elif es_software == "gaussian":
 
@@ -923,7 +923,7 @@ def run_step2_many_body(params):
             os.system("mpirun -np %d %s -i %s-%i.inp -o logfiles/step_%d.log " %
                       (nprocs, cp2k_exe, project_name, curr_step, curr_step))
             # Move all the pdos and cube files to one folder
-            os.system("mv *.pdos pdosfiles")
+            CP2K_methods.collect_pdos_files("pdosfiles")
 
         elif es_software == "gaussian":
 
