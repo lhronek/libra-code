@@ -180,6 +180,7 @@ def compute_trpes(_params):
                 sh_pop = np.array(F['sh_pop_adi/data'])
 
             E_eff = np.roll(E_ext, -(icond-istep), 0)
+            TRPES_traj = np.zeros((nsteps, n_e_grid_pts))    # this initial condition's map alone - the ensemble average adds it once
             for i in range(nsteps):                
                 for j, e_j in enumerate(e_grid):
                     for state in range(nstates):
