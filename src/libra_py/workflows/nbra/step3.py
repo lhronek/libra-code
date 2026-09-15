@@ -2311,8 +2311,10 @@ def run_step3_ks_nacs_libint(params):
                          F"convention marker (legacy +d data) - writing canonical "
                          F"-d files into it would mix conventions in one directory; "
                          F"use a fresh output path or move the legacy files away")
+    # the record a step-4 runner reads: isUKS decides with koopmans_charge whether the spin-adaptation
+    # factor sqrt 2 belongs on the NACs of the reference SD (closed-shell neutral reference only)
     with open(marker_file, 'w') as f:
-        json.dump({'im_file_contains': 'Im(Hvib) = -d'}, f)
+        json.dump({'im_file_contains': 'Im(Hvib) = -d', 'isUKS': int(params.get('isUKS', 0))}, f)
     t2 = time.time()
     # If we're using multiprocessing, create a pool of processors
     if params['use_multiprocessing']:
@@ -3280,8 +3282,12 @@ def run_step3_sd_nacs_libint(params):
                          F"convention marker (legacy +d data) - writing canonical "
                          F"-d files into it would mix conventions in one directory; "
                          F"use a fresh output path or move the legacy files away")
+    # the record a step-4 runner reads: a closed-shell neutral reference (isUKS 0, koopmans_charge 0) makes
+    # the SD basis stand for the singlet SACs of S0, whose NACs to the reference carry sqrt 2 against the
+    # SD-level ones - a Koopmans hole / electron basis or a UKS basis holds open-shell states only, no factor
     with open(marker_file, 'w') as f:
-        json.dump({'im_file_contains': 'Im(Hvib) = -d'}, f)
+        json.dump({'im_file_contains': 'Im(Hvib) = -d', 'isUKS': int(params.get('isUKS', 0)),
+                   'koopmans_charge': int(params.get('koopmans_charge', 0))}, f)
 
     if params['is_many_body']:
         params['isnap'] = params['start_time']
