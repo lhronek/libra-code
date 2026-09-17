@@ -458,18 +458,27 @@ void dyn_control_params::sanity_check(){
     }
   }
 
-  /// rep_tdse == 0 (diabatic amplitudes): the diabatic branch of
-  /// propagate_electronic implements -1, 0-8 and 10-15 (+100 variants);
-  /// any other value would leave the amplitudes untouched for the whole run
-  if(rep_tdse==0){
+  /// every representation implements a fixed set of electronic integrators
+  /// in propagate_electronic - amplitudes (rep_tdse 0 and 1): -1, 0-8, 10-15;
+  /// the diabatic density matrix (2): 0; the adiabatic density matrix (3):
+  /// 0, 1, 10; each with the +100 variant. Any other value would leave the
+  /// electronic variables untouched for the whole run - refuse it here (the
+  /// dispatch throws as well)
+  if(rep_tdse>=0 && rep_tdse<=3){
     int m = electronic_integrator % 100;
-    int listed = (electronic_integrator==-1) ||
-                 (electronic_integrator>=0 && electronic_integrator<200 &&
-                  ((m>=0 && m<=8) || (m>=10 && m<=15)));
+    int in_range = (electronic_integrator>=0 && electronic_integrator<200);
+    int listed = 0;
+    std::string implemented;
+    if(rep_tdse==0 || rep_tdse==1){
+      listed = (electronic_integrator==-1) || (in_range && ((m>=0 && m<=8) || (m>=10 && m<=15)));
+      implemented = "-1, 0-8, 10-15 or their +100 variants";
+    }
+    else if(rep_tdse==2){ listed = (in_range && m==0); implemented = "0 or 100"; }
+    else { listed = (in_range && (m==0 || m==1 || m==10)); implemented = "0, 1, 10 or their +100 variants"; }
     if(!listed){
       std::cout<<"Error in dyn_control_params::sanity_check: electronic_integrator = "
-          <<electronic_integrator<<" has no diabatic branch (rep_tdse = 0) - the diabatic"
-          <<" representation propagates with -1, 0-8, 10-15 or their +100 variants\n";
+          <<electronic_integrator<<" is not implemented for rep_tdse = "<<rep_tdse
+          <<" - propagate_electronic implements "<<implemented<<" there\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }

@@ -998,6 +998,15 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
         else { C.product(T_new, A, C); }
 
       } // method == 8 && 108
+
+      else {
+        // sanity_check refuses these earlier - a silent fall-through would
+        // leave the amplitudes untouched for the whole run
+        cout << "Error in propagate_electronic(): electronic_integrator = " << method
+             << " has no adiabatic branch (rep_tdse = 1) - use -1, 0-8, 10-15 or their "
+                "+100 variants\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
 }
 
 void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
@@ -1422,6 +1431,13 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
 
       } // method == 15 && 115
 
+      else {
+        cout << "Error in propagate_electronic(): electronic_integrator = " << method
+             << " has no adiabatic branch (rep_tdse = 1) - use -1, 0-8, 10-15 or their "
+                "+100 variants\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
+
     } // rep == 1 - adiabatic
 
     else if (rep == 2) { // diabatic, density matrix formalism
@@ -1455,6 +1471,12 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         *dyn_var.dm_dia[itraj] = unvectorize_density_matrix(vRHO);
 
       } // method == 0
+
+      else {
+        cout << "Error in propagate_electronic(): electronic_integrator = " << method
+             << " has no diabatic density-matrix branch (rep_tdse = 2) - use 0 or 100\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
 
     } // rep == 2 - diabatic, density matrix
 
@@ -1546,6 +1568,13 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         RHO = T_ampl * RHO * T_ampl.H(); // dyn-const to "raw"
         *dyn_var.dm_adi[itraj] = RHO;
       } // method == 10 or 110
+
+      else {
+        cout << "Error in propagate_electronic(): electronic_integrator = " << method
+             << " has no adiabatic density-matrix branch (rep_tdse = 3) - use 0, 1, 10 or "
+                "their +100 variants\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
 
     } // rep == 3 - adiabatic, density matrix
 
