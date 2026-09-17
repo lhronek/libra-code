@@ -547,6 +547,9 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - 3: experimental stochastic algorithm, the original version with elimination (known problems)
                 - 32: experimental stochastic algorithms with all permutations (too expensive)
                 - 33: the improved stochastic algorithm with good scaling and performance, on par with the mincost
+                The stochastic reorderings 3, 32 and 33 are refused by the parameter check: the projector update
+                (update_proj_adi -> compute_projector) receives no random generator, so there they would keep the
+                identity permutation, i.e. run as algorithm 0 under another name.
                 - 4: new, experimental force-based tracking
 
 
@@ -566,7 +569,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - 0: f = exp(-(MK_alpha * dE_ij)^2) [ default ]
                 - 1: f = exp(-MK_alpha * |dE_ij|)
                 - 2: f = exp(-MK_alpha * max(dE_ij, 0))
-                - anything else: f = 1 (no scaling)
+                - -1: f = 1 (no scaling)
 
 
             * **dyn_params["convergence"]** ( int ):  A swtich for stochastic reordering algorithm 3 (and variants)

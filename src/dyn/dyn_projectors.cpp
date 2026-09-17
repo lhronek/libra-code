@@ -356,12 +356,17 @@ MATRIX make_cost_mat(CMATRIX& orb_mat_inp, CMATRIX& en_mat_inp, double alpha, in
 
             
             // the selector numbering is the documented one (0 gaussian [default],
-            // 1 symmetric exponential, 2 one-sided, anything else unscaled) -
+            // 1 symmetric exponential, 2 one-sided, -1 unscaled) -
             // the default must keep the historical gaussian penalty
             double val = 1.0; 
             if(scaling_function==0){ val = exp(-(alpha*dE)*(alpha*dE)); }
             else if(scaling_function==1){  val = exp(-alpha * fabs(dE)); }  // symmetric scaling
             else if(scaling_function==2){  val = exp(-alpha * MAX(0.0, dE) ); }
+            else if(scaling_function==-1){ val = 1.0; }  // no scaling
+            else{
+              std::cout<<"Error in make_cost_mat(): scaling_function = "<<scaling_function<<" has no branch here (implemented: -1, 0, 1, 2)\n";
+              std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+            }
 
             cost_mat.set(a,b,s2 * val);
 
@@ -779,18 +784,23 @@ void update_projectors(dyn_control_params& prms, vector<CMATRIX>& projectors,
     else if(prms.state_tracking_algo==21){
         perm_t = hungarian_algorithm(st, Eadi[traj], prms.MK_alpha, prms.MK_scaling_function);
     }
-    if(prms.state_tracking_algo==3){
+    else if(prms.state_tracking_algo==3){
         perm_t = get_stochastic_reordering(st, rnd);
     }
-    if(prms.state_tracking_algo==32){
+    else if(prms.state_tracking_algo==32){
         perm_t = get_stochastic_reordering2(st, rnd);
     }
 
-    if(prms.state_tracking_algo==33){
+    else if(prms.state_tracking_algo==33){
         perm_t = get_stochastic_reordering3(st, rnd, prms.convergence, prms.max_number_attempts, prms.min_probability_reordering, 0);
     }
-    if(prms.state_tracking_algo==4){ // same as option 2, but the input  for St argument will be different 
+    else if(prms.state_tracking_algo==4){ // same as option 2, but the input  for St argument will be different 
         perm_t = Munkres_Kuhn(st, Eadi[traj], prms.MK_alpha, prms.MK_verbosity, prms.MK_scaling_function);
+    }
+    else if(prms.state_tracking_algo==0){ ; } // no reordering: the identity permutation
+    else{
+      std::cout<<"Error in update_projectors(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: 0, 1, 2, 21, 3, 32, 33, 4)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     
     // P -> P * perm
@@ -846,14 +856,25 @@ vector< vector<int> > compute_permutations(dyn_control_params& prms, vector<CMAT
     else if(prms.state_tracking_algo==2){
         perm_t = Munkres_Kuhn(st, Eadi[traj], prms.MK_alpha, prms.MK_verbosity, prms.MK_scaling_function);
     }
-    if(prms.state_tracking_algo==3){
+    else if(prms.state_tracking_algo==21){
+        perm_t = hungarian_algorithm(st, Eadi[traj], prms.MK_alpha, prms.MK_scaling_function);
+    }
+    else if(prms.state_tracking_algo==3){
         perm_t = get_stochastic_reordering(st, rnd);
     }
-    if(prms.state_tracking_algo==32){
+    else if(prms.state_tracking_algo==32){
         perm_t = get_stochastic_reordering2(st, rnd);
     }
-    if(prms.state_tracking_algo==33){
+    else if(prms.state_tracking_algo==33){
         perm_t = get_stochastic_reordering3(st, rnd, prms.convergence, prms.max_number_attempts, prms.min_probability_reordering, 0);
+    }
+    else if(prms.state_tracking_algo==4){ // same as option 2, but the input for the St argument differs
+        perm_t = Munkres_Kuhn(st, Eadi[traj], prms.MK_alpha, prms.MK_verbosity, prms.MK_scaling_function);
+    }
+    else if(prms.state_tracking_algo==0){ ; } // no reordering: the identity permutation
+    else{
+      std::cout<<"Error in compute_permutations(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: 0, 1, 2, 21, 3, 32, 33, 4)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     res.push_back(perm_t);
@@ -895,15 +916,19 @@ vector<CMATRIX> compute_projectors(dyn_control_params& prms, vector<CMATRIX>& Ea
     else if(prms.state_tracking_algo==2){
         perm_t = Munkres_Kuhn(st, Eadi[traj], prms.MK_alpha, prms.MK_verbosity);
     }
-    if(prms.state_tracking_algo==3){
+    else if(prms.state_tracking_algo==3){
         perm_t = get_stochastic_reordering(st, rnd);
     }
-    if(prms.state_tracking_algo==32){
+    else if(prms.state_tracking_algo==32){
         perm_t = get_stochastic_reordering2(st, rnd);
     }
-
-    if(prms.state_tracking_algo==33){
+    else if(prms.state_tracking_algo==33){
         perm_t = get_stochastic_reordering3(st, rnd, prms.convergence, prms.max_number_attempts, prms.min_probability_reordering, 0);
+    }
+    else if(prms.state_tracking_algo==0){ ; } // no reordering: the identity permutation
+    else{
+      std::cout<<"Error in compute_projectors(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: 0, 1, 2, 3, 32, 33)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     
     // P -> P * perm
@@ -956,6 +981,11 @@ CMATRIX compute_projector(dyn_control_params& prms, CMATRIX& Eadi, CMATRIX& St){
     perm_t = get_stochastic_reordering3(st, rnd, prms.convergence, prms.max_number_attempts, prms.min_probability_reordering, 0);
   }
 */
+  else if(prms.state_tracking_algo==0){ ; } // no reordering: the identity permutation, the phase correction below still applies
+  else{
+    std::cout<<"Error in compute_projector(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: 0, 1, 2, 4, 21 - the stochastic 3, 32, 33 need a random generator this function does not receive)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
   // P -> P * perm
   res = permutation2cmatrix(perm_t);

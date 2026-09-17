@@ -187,6 +187,10 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
     } else if (prms.ham_update_method == 2) {
       ham.compute_adiabatic(py_funct, q, model_params, 1);
     }
+    else {
+      std::cout<<"Error in update_Hamiltonian_variables(): ham_update_method = "<<prms.ham_update_method<<" has no branch here (implemented: 0, 1, 2)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
     //    exit(0);
     // Do the additional transformation between any reps, if needed
     if (prms.ham_transform_method == 0) {
@@ -217,6 +221,10 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
       // the type-0 and the first type-1 call); ham_adi was just
       // harvested - mark the frame rotation stale
       dyn_var.ld_frame_stale = 1;
+    }
+    else {
+      std::cout<<"Error in update_Hamiltonian_variables(): ham_transform_method = "<<prms.ham_transform_method<<" has no branch here (implemented: 0, 1, 2, 3, 4)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     // The adiabatic representation assumes an ASCENDING energy ladder: hop
@@ -301,6 +309,10 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
         ham.children[traj]->set_time_overlap_adi_by_val(st);
       }
     } // 1
+    else {
+      std::cout<<"Error in update_Hamiltonian_variables(): time_overlap_method = "<<prms.time_overlap_method<<" has no branch here (implemented: 0, 1)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
 
     // Copy the transformation matrices to the dynamics variable
     dyn_var.update_basis_transform(ham);
@@ -518,6 +530,10 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
           nac_re = nac_npi(st_re, dt);
           nac = CMATRIX(nac_re, nac_im);
         }
+        else {
+          std::cout<<"Error in update_Hamiltonian_variables(): nac_algo = "<<prms.nac_algo<<" has no branch here (implemented: 0, 1)\n";
+          std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+        }
         // back into the re-signed amplitude gauge on the relabel routes:
         // nac -> F nac F with F = diag(flip)
         if (relabel_gauge) {
@@ -533,6 +549,11 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
       } // for traj
 
     } // for nac_update_method == 2
+    else if (prms.nac_update_method == 2) { ; } // update_type != 0: the time-overlap NACs are built on the type-0 pass only
+    else {
+      std::cout<<"Error in update_Hamiltonian_variables(): nac_update_method = "<<prms.nac_update_method<<" has no branch here (implemented: 0, 1, 2)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
 
     if (prms.do_nac_phase_correction ==
         1) { // Experimental option to fix the phase of NACs:
@@ -604,6 +625,10 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
       }
       ham.compute_hvib_adi(1);
     }
+    else {
+      std::cout<<"Error in update_Hamiltonian_variables(): hvib_update_method = "<<prms.hvib_update_method<<" has no branch here (implemented: 0, 1)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
 
   } // update_type==0 || update_type==1
 
@@ -670,6 +695,10 @@ void update_time_overlaps(dyn_control_params &prms, dyn_variables &dyn_var,
       ham.children[traj]->set_time_overlap_adi_by_val(st);
     }
   } // 1
+  else {
+    std::cout<<"Error in update_time_overlaps(): time_overlap_method = "<<prms.time_overlap_method<<" has no branch here (implemented: 0, 1)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 }
 
 void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
@@ -839,6 +868,10 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
    
 
     }// 6 adaptive SVD-based LD
+    else {
+      std::cout<<"Error in update_proj_adi(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: -1, 0, 1, 2, 3, 4, 5, 6, 21, 32, 33)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
 
     *dyn_var.proj_adi[itraj] = T_new;
     } catch (...) {

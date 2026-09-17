@@ -1032,6 +1032,10 @@ obj.nac_adi with the couplings in the real part (obj.nac_ci is not an ingested a
             Z_star = gap_in[j];
           }
         }
+        else{
+          std::cout<<"Error in hopping_probabilities_lz(): rep = "<<rep<<" has no branch here (implemented: 1, 2, 5)\n";
+          std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+        }
 
         if(nonzero==1){  // This is the condition of intersection of diabatic surfaces, alternatively, we 
                          // could be looking to locate the adiabatic surfaces minimum
@@ -1149,6 +1153,10 @@ must supply obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
       }// j!=i
     }// for j
   }// rep == 3 generalized-linear diabatic
+  else{
+    std::cout<<"Error in hopping_probabilities_lz(): rep = "<<rep<<" has no branch here (implemented: 0, 1, 2, 3, 5; 4 is computed by hopping_probabilities_bllz)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
   // Diagonal elements - common for both reps
   double sum = 0.0;
@@ -1666,6 +1674,10 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
       lowdin_sh = ham.child(traj)->lowdin_dia(X_l, Y_l);
       if(lowdin_sh){ dm = Y_l * dm * Y_l; }
     }
+    else{
+      std::cout<<"Error in hop_proposal_probabilities(): rep_sh = "<<prms.rep_sh<<" has no branch here (implemented: 0, 1)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
 
     nucl_stenc_y[0] = traj;
     el_stenc_y[0] = traj;
@@ -1707,6 +1719,10 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
       }
       else if(prms.rep_sh==0){
         g[traj] = hopping_probabilities_gfsh(prms, dm, Hvib, dyn_var.act_states_dia[traj]);
+      }
+      else{
+        std::cout<<"Error in hop_proposal_probabilities(): rep_sh = "<<prms.rep_sh<<" has no branch here (implemented: 0, 1)\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
     }
     else if(prms.tsh_method == 2){ // MSSH
@@ -1834,6 +1850,10 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
         if(lowdin_sh){ dm_prev = Y_l * dm_prev * Y_l; }
         g[traj] = hopping_probabilities_fssh2(prms, dm, dm_prev, dyn_var.act_states_dia[traj]);
       }
+      else{
+        std::cout<<"Error in hop_proposal_probabilities(): rep_sh = "<<prms.rep_sh<<" has no branch here (implemented: 0, 1)\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
     }
     else if(prms.tsh_method == 8){ // FSSH3
 
@@ -1861,6 +1881,10 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
         CMATRIX dm_prev_trans(dm_prev);
         g[traj] = hopping_probabilities_fssh3(prms, dm, dm_prev_trans, dyn_var.act_states_dia[traj], dyn_var.fssh3_errors[traj]);
       }
+      else{
+        std::cout<<"Error in hop_proposal_probabilities(): rep_sh = "<<prms.rep_sh<<" has no branch here (implemented: 0, 1)\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
     } // FSSH-3
 	
 	else if(prms.tsh_method == 9){ // GFSH - original
@@ -1874,6 +1898,10 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
         CMATRIX dm_prev(*dyn_var.dm_dia_prev[traj]);
         if(lowdin_sh){ dm_prev = Y_l * dm_prev * Y_l; }
         g[traj] = hopping_probabilities_gfsh_orig(prms, dm, dm_prev, dyn_var.act_states_dia[traj]);
+      }
+      else{
+        std::cout<<"Error in hop_proposal_probabilities(): rep_sh = "<<prms.rep_sh<<" has no branch here (implemented: 0, 1)\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
     }// GFSH original
 		

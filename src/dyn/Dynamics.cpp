@@ -606,6 +606,10 @@ void remove_thermal_correction(dyn_variables &dyn_var, nHamiltonian &ham,
   } else if (prms.rep_tdse == 1 || prms.rep_tdse == 3) {
     nst = nadi;
   }
+  else {
+    std::cout<<"Error in remove_thermal_correction(): rep_tdse = "<<prms.rep_tdse<<" has no branch here (implemented: 0, 1, 2, 3)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
   // per-trajectory scale factors cannot live on a shared NBRA child -
   // every trajectory's factor would compound on the same matrices
@@ -730,6 +734,10 @@ void update_wp_width(dyn_variables &dyn_var, dyn_control_params &prms) {
 
     } // traj
   }
+  else {
+    std::cout<<"Error in update_wp_width(): use_td_width = "<<prms.use_td_width<<" has no branch here (implemented: 0, 1, 2, 3)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 }
 
 int need_active_states_diff_rep(dyn_control_params &prms) {
@@ -761,6 +769,10 @@ int need_active_states_diff_rep(dyn_control_params &prms) {
         res = 1;
       }
     }
+  }
+  else {
+    std::cout<<"Error in need_active_states_diff_rep(): rep_sh = "<<prms.rep_sh<<" has no branch here (implemented: 0, 1)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   return res;
@@ -1577,6 +1589,10 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
       }
 
     } // rep == 3 - adiabatic, density matrix
+    else {
+      std::cout<<"Error in propagate_electronic(): rep = "<<rep<<" has no branch here (implemented: 0, 1, 2, 3)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
 
     //  *dyn_var.proj_adi[itraj] = T_new;
 
@@ -2238,6 +2254,10 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   else if (prms.decoherence_times_type == 5) {
     decoherence_rates = Gu_Franco(prms, *dyn_var.ampl_adi);
   }
+  else {
+    std::cout<<"Error in compute_dynamics(): decoherence_times_type = "<<prms.decoherence_times_type<<" has no branch here (implemented: -1, 0, 1, 2, 3, 4, 5)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
   ///== Optionally, apply the dephasing-informed correction ==
   if (prms.dephasing_informed == 1) {
@@ -2403,6 +2423,11 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
 
     } // for traj
   } // simple decoherence
+  else if (prms.decoherence_algo == -1 || prms.decoherence_algo == 8) { ; } // -1: no decoherence; 8 (diabatic IDA) acts after the hops
+  else {
+    std::cout<<"Error in compute_dynamics(): decoherence_algo = "<<prms.decoherence_algo<<" has no branch here (implemented: 0, 1, 2, 3, 4, 5, 6, 7, 9)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
   // Update amplitudes and density matrices in response to decoherence
   // corrections
@@ -2462,6 +2487,10 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
         act_states_dia = accept_hops(dyn_var, ham, prop_states,
                                      dyn_var.act_states_dia, prms, rnd);
       }
+      else {
+        std::cout<<"Error in compute_dynamics(): rep_sh = "<<prms.rep_sh<<" has no branch here (implemented: 0, 1)\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
 
       //=== Post-hop decoherence options ===
 
@@ -2519,6 +2548,11 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       else if (prms.decoherence_algo == 9) { // simple decoherence method 
         reset_coherence_factors(dyn_var, act_states, old_states, prms.gap_correlation_time);
       } // algo == 9
+      else if (prms.decoherence_algo == -1 || prms.decoherence_algo == 0) { ; } // -1: no decoherence; 0 (MSDM / EDC) acts during the propagation
+      else {
+        std::cout<<"Error in compute_dynamics(): decoherence_algo = "<<prms.decoherence_algo<<" has no branch here (implemented: 1, 2, 3, 4, 5, 6, 7, 8, 9)\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
 
     }
     // DISH - the old one

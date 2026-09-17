@@ -192,6 +192,10 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
     vector<int> effective_states(ntraj, 0);
     if(prms.rep_sh==1){ effective_states = dyn_vars.act_states; }
     else if(prms.rep_sh==0){ effective_states = dyn_vars.act_states_dia; }
+    else{
+      std::cout<<"Error in potential_energies(): rep_sh = "<<prms.rep_sh<<" has no branch here (implemented: 0, 1)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
 
     if(prms.enforce_state_following==1){ 
       for(itraj=0; itraj<ntraj; itraj++){ effective_states[itraj] = prms.enforced_state_index; }
@@ -215,6 +219,10 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
         res[itraj] = ham.get_ham_adi(id).get(ist,ist).real();
       }// for itraj
     }// rep_force == 1
+    else{
+      std::cout<<"Error in potential_energies(): rep_force = "<<prms.rep_force<<" has no branch here (implemented: 0, 1)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
 
   }// TSH && adiabatic
 
@@ -248,6 +256,10 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
         }
       }
     }
+    else{
+      std::cout<<"Error in potential_energies(): rep_force = "<<prms.rep_force<<" has no branch here (implemented: 0, 1)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
   
   }// Ehrenfest
 
@@ -256,6 +268,10 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
     vector<int> effective_states(ntraj, 0);
     if(prms.rep_sh==1){ effective_states = dyn_vars.act_states; }
     else if(prms.rep_sh==0){ effective_states = dyn_vars.act_states_dia; }
+    else{
+      std::cout<<"Error in potential_energies(): rep_sh = "<<prms.rep_sh<<" has no branch here (implemented: 0, 1)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
     
     if(prms.enforce_state_following==1){ 
       for(itraj=0; itraj<ntraj; itraj++){ effective_states[itraj] = prms.enforced_state_index; }
@@ -286,6 +302,10 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
         // res[itraj] += ham.QTSH_energy_adi(coeff, id, *(dyn_vars.proj_adi[itraj]) ).real(); // coherence energy
       }// for itraj
     }// rep_force == 1
+    else{
+      std::cout<<"Error in potential_energies(): rep_force = "<<prms.rep_force<<" has no branch here (implemented: 0, 1)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
 
   }
   else if(prms.force_method==4){  // KC-RPMD force
@@ -308,8 +328,16 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
     else if(prms.rep_force==1){
       cout<<"Error in potential_energies(): KC-RPMD works exclusively within diabatic bases\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
+    else{
+      std::cout<<"Error in potential_energies(): rep_force = "<<prms.rep_force<<" has no branch here (implemented: 0, 1)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
   
   }// KC-RPMD
+  else{
+    std::cout<<"Error in potential_energies(): force_method = "<<prms.force_method<<" has no branch here (implemented: 0, 1, 2, 3, 4)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
 
   return res;
@@ -347,13 +375,17 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
 
   }// NBRA
 
-  if(prms.force_method==1){   // State-specific forces
+  else if(prms.force_method==1){   // State-specific forces
 
     // TSH or adiabatic (including excited states)
     // state-specific forces   
     vector<int> effective_states(ntraj, 0);
     if(prms.rep_sh==1){ effective_states = dyn_vars.act_states; }
     else if(prms.rep_sh==0){ effective_states = dyn_vars.act_states_dia; }
+    else{
+      std::cout<<"Error in update_forces(): rep_sh = "<<prms.rep_sh<<" has no branch here (implemented: 0, 1)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
   
     if(prms.enforce_state_following==1){ // NBRA-like enforcement: adiabatic dynamics, in terms of forces 
       for(int itraj=0; itraj<ntraj; itraj++){ effective_states[itraj] = prms.enforced_state_index; }
@@ -368,6 +400,10 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
       MATRIX f1(ndof, 1);
       if(prms.rep_force==0){ f1 = ham.forces_dia(one_state).real(); }
       else if(prms.rep_force==1){ f1 = ham.forces_adi(one_state).real(); }
+      else{
+        std::cout<<"Error in update_forces(): rep_force = "<<prms.rep_force<<" has no branch here (implemented: 0, 1)\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
       for(int itraj=0; itraj<ntraj; itraj++){
         for(int idof=0; idof<ndof; idof++){
           dyn_vars.f->set(idof, itraj, f1.get(idof, 0));
@@ -382,6 +418,10 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
       *dyn_vars.f = ham.forces_adi(effective_states).real(); 
 
     }// rep_force == 1
+    else{
+      std::cout<<"Error in update_forces(): rep_force = "<<prms.isNBRA<<" has no branch here (implemented: 0, 1)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
   }// TSH && adiabatic
 
   else if(prms.force_method==2){  // Ehrenfest forces
@@ -412,12 +452,20 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
       cout<<"nrm in Ehrenfest frcs = "<<nrm<<endl;
 */
     }     
+    else{
+      std::cout<<"Error in update_forces(): rep_force = "<<prms.rep_force<<" has no branch here (implemented: 0, 1)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
   }// Ehrenfest
   else if(prms.force_method==3){  // QTSH forces
     // Effective force determined by the TSH procedure 
     vector<int> effective_states(ntraj, 0);
     if(prms.rep_sh==1){ effective_states = dyn_vars.act_states; }
     else if(prms.rep_sh==0){ effective_states = dyn_vars.act_states_dia; }
+    else{
+      std::cout<<"Error in update_forces(): rep_sh = "<<prms.rep_sh<<" has no branch here (implemented: 0, 1)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
   
     if(prms.enforce_state_following==1){ // NBRA-like enforcement: adiabatic dynamics, in terms of forces 
       for(int itraj=0; itraj<ntraj; itraj++){ effective_states[itraj] = prms.enforced_state_index; }
@@ -430,6 +478,10 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
     else if(prms.rep_force==1){  
       *dyn_vars.f = ham.forces_adi(effective_states).real(); 
     }// rep_force == 1
+    else{
+      std::cout<<"Error in update_forces(): rep_force = "<<prms.rep_force<<" has no branch here (implemented: 0, 1)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
 
     // Off-diagonal Hellmann-Feynman force calculations
     if(prms.rep_force==0){  
@@ -449,6 +501,10 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
 
       *dyn_vars.qtsh_f_nc = ham.QTSH_forces_adi(*dyn_vars.ampl_adi, 1, option).real();
     }
+    else{
+      std::cout<<"Error in update_forces(): rep_force = "<<prms.rep_force<<" has no branch here (implemented: 0, 1)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
 
   }// QTSH
   else if(prms.force_method==4){  // KC-RPMD forces
@@ -464,7 +520,15 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
 
     // Adiabatic 
     else if(prms.rep_force==1){ cout<<"Error in update_forces(): KC-RPMD works exclusively within diabatic bases\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
+    else{
+      std::cout<<"Error in update_forces(): rep_force = "<<prms.rep_force<<" has no branch here (implemented: 0, 1)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
   }// KC-RPMD
+  else{
+    std::cout<<"Error in update_forces(): force_method = "<<prms.force_method<<" has no branch here (implemented: 1, 2, 3, 4)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
 //  return F;
 }

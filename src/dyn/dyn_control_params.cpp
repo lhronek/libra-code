@@ -311,6 +311,135 @@ dyn_control_params::~dyn_control_params() {
 
 void dyn_control_params::sanity_check(){
 
+  /// the MMST representation is a stub: no propagation branch exists for it,
+  /// the amplitudes would stay frozen through the whole run
+  if(rep_tdse==4){
+    std::cout<<"Error in dyn_control_params::sanity_check: rep_tdse = 4 (MMST adiabatic"
+        <<" wfc) is not implemented - no electronic propagation exists for it;"
+        <<" use rep_tdse = 1 (the MMST electronic EOM is the adiabatic TDSE) with"
+        <<" force_method = 2 and sqc_gamma for the Meyer-Miller force\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
+  /// the stochastic reorderings need a random generator, which the
+  /// projector update (update_proj_adi -> compute_projector) does not
+  /// receive - there they would keep the identity permutation, i.e. run as
+  /// state_tracking_algo 0 under another name
+  if(state_tracking_algo==3 || state_tracking_algo==32 || state_tracking_algo==33){
+    std::cout<<"Error in dyn_control_params::sanity_check: state_tracking_algo = "
+        <<state_tracking_algo<<" (stochastic reordering) is not wired into the"
+        <<" projector update - compute_projector receives no random generator and"
+        <<" would keep the identity permutation; use 1, 2, 21 or 4 (deterministic"
+        <<" reorderings), or -1, 5, 6 (rotation projectors)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
+  ///======================== Option domains ============================
+  /// every integer option takes only the values the code implements (the
+  /// sets documented in dynamics/tsh/compute.py) - any other value is
+  /// refused here instead of falling through an if/else-if chain
+  /// (electronic_integrator is checked per representation below)
+  struct option_domain { const char* name; int value; std::vector<int> allowed; };
+  std::vector<option_domain> domains = {
+    {"rep_tdse", rep_tdse, {0, 1, 2, 3}},
+    {"ham_update_method", ham_update_method, {0, 1, 2}},
+    {"ham_transform_method", ham_transform_method, {0, 1, 2, 3, 4}},
+    {"rep_sh", rep_sh, {0, 1}},
+    {"rep_lz", rep_lz, {0, 1, 2, 3, 4, 5}},
+    {"lz_target_space", lz_target_space, {0, 1}},
+    {"rep_force", rep_force, {0, 1}},
+    {"force_method", force_method, {0, 1, 2, 3, 4}},
+    {"ehrenfest_force_option", ehrenfest_force_option, {0, 1}},
+    {"ehrenfest_normalized", ehrenfest_normalized, {0, 1}},
+    {"enforce_state_following", enforce_state_following, {0, 1}},
+    {"time_overlap_method", time_overlap_method, {0, 1}},
+    {"nac_update_method", nac_update_method, {0, 1, 2}},
+    {"nac_algo", nac_algo, {-1, 0, 1}},
+    {"hvib_update_method", hvib_update_method, {0, 1}},
+    {"do_ssy", do_ssy, {0, 1}},
+    {"do_phase_correction", do_phase_correction, {0, 1}},
+    {"do_nac_phase_correction", do_nac_phase_correction, {0, 1}},
+    {"state_tracking_algo", state_tracking_algo, {-1, 0, 1, 2, 4, 5, 6, 21}},
+    {"MK_verbosity", MK_verbosity, {0, 1}},
+    {"MK_scaling_function", MK_scaling_function, {-1, 0, 1, 2}},
+    {"convergence", convergence, {0, 1}},
+    {"tsh_method", tsh_method, {-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9}},
+    {"hop_acceptance_algo", hop_acceptance_algo, {0, 10, 11, 20, 21, 31, 32, 33, 40}},
+    {"momenta_rescaling_algo", momenta_rescaling_algo, {0, 40, 100, 101, 110, 111, 200, 201, 210, 211}},
+    {"use_Jasper_Truhlar_criterion", use_Jasper_Truhlar_criterion, {0, 1}},
+    {"use_boltz_factor", use_boltz_factor, {0, 1}},
+    {"fssh2_revision", fssh2_revision, {0, 1}},
+    {"fssh3_size_option", fssh3_size_option, {0, 1}},
+    {"fssh3_approach_option", fssh3_approach_option, {0, 1}},
+    {"fssh3_decomp_option", fssh3_decomp_option, {0, 1, 2, 3}},
+    {"use_qtsh", use_qtsh, {0, 1}},
+    {"qtsh_force_option", qtsh_force_option, {0, 1, 2}},
+    {"use_kcrpmd", use_kcrpmd, {0, 1}},
+    {"decoherence_algo", (int)decoherence_algo, {-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9}},
+    {"dish_decoherence_event_option", dish_decoherence_event_option, {0, 1}},
+    {"decoherence_times_type", decoherence_times_type, {-1, 0, 1, 2, 3, 4, 5}},
+    {"dephasing_informed", dephasing_informed, {0, 1}},
+    {"instantaneous_decoherence_variant", instantaneous_decoherence_variant, {0, 1, 2, 3, 4}},
+    {"collapse_option", collapse_option, {0, 1}},
+    {"use_xf_force", use_xf_force, {0, 1}},
+    {"project_out_aux", project_out_aux, {0, 1}},
+    {"tp_algo", tp_algo, {0, 1, 2, 3}},
+    {"use_td_width", use_td_width, {0, 1, 2, 3}},
+    {"isNBRA", isNBRA, {0, 1}},
+    {"compute_dm_dia", compute_dm_dia, {-1, 0, 1}},
+    {"entanglement_opt", entanglement_opt, {0, 1, 2, 3, 22}},
+    {"qtag_pot_approx_method", qtag_pot_approx_method, {0, 1, 2, 3}},
+    {"ensemble", ensemble, {0, 1}},
+    {"ampl_transformation_method", ampl_transformation_method, {0, 1}},
+    {"assume_always_consistent", assume_always_consistent, {0, 1}},
+    {"thermally_corrected_nbra", thermally_corrected_nbra, {0, 1}},
+    {"tcnbra_do_nac_scaling", tcnbra_do_nac_scaling, {0, 1}}
+  };
+  /// decoherence_algo is stored as a double - only whole numbers name an algorithm
+  if(decoherence_algo != (double)(int)decoherence_algo){
+    std::cout<<"Error in dyn_control_params::sanity_check: decoherence_algo = "
+        <<decoherence_algo<<" is not a whole number - no algorithm has that label\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  for(size_t i=0; i<domains.size(); i++){
+    int listed = 0;
+    for(size_t j=0; j<domains[i].allowed.size(); j++){ if(domains[i].allowed[j]==domains[i].value){ listed = 1; } }
+    if(!listed){
+      std::cout<<"Error in dyn_control_params::sanity_check: "<<domains[i].name<<" = "
+          <<domains[i].value<<" is not an implemented option - the implemented values are";
+      for(size_t j=0; j<domains[i].allowed.size(); j++){ std::cout<<" "<<domains[i].allowed[j]; }
+      std::cout<<"\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+  }
+  /// counts and indices have a lower bound instead of a value set
+  struct option_bound { const char* name; int value; int minimum; };
+  std::vector<option_bound> bounds = {
+    {"enforced_state_index", enforced_state_index, 0},
+    {"max_number_attempts", max_number_attempts, 1},
+    {"fssh3_max_steps", fssh3_max_steps, 1},
+    {"num_electronic_substeps", num_electronic_substeps, 1},
+    {"omp_num_threads", omp_num_threads, 1},
+    {"tcnbra_nhc_size", tcnbra_nhc_size, 1}
+  };
+  for(size_t i=0; i<bounds.size(); i++){
+    if(bounds[i].value < bounds[i].minimum){
+      std::cout<<"Error in dyn_control_params::sanity_check: "<<bounds[i].name<<" = "
+          <<bounds[i].value<<" must be at least "<<bounds[i].minimum<<"\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+  }
+
+  /// the time-overlap NAC route builds the couplings with nac_algo 0 (HST)
+  /// or 1 (NPI) - with nac_algo -1 it computes nothing and stores zero
+  /// couplings on every trajectory
+  if(nac_update_method==2 && nac_algo==-1){
+    std::cout<<"Error in dyn_control_params::sanity_check: nac_update_method = 2 (NACs from"
+        <<" the time-overlaps) needs nac_algo 0 (HST) or 1 (NPI) - with nac_algo = -1"
+        <<" the couplings would be stored as zero\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
   /// hop acceptance/rescaling FAMILIES are representation-bound: the
   /// dia-energy options (acceptance 11, rescaling 110/111) index ham_dia
   /// with the DIABATIC hop states, every other option indexes adiabatic
@@ -342,24 +471,6 @@ void dyn_control_params::sanity_check(){
     }
   }
 
-  if(!(lz_target_space==0 || lz_target_space==1)){
-    std::cout<<"Error in dyn_control_params::sanity_check: lz_target_space = "
-        <<lz_target_space<<" is not allowed (0 - energy-adjacent only, 1 - all pairs)\n";
-    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-  }
-
-  ///=================== Options for state tracking ======================
-  if(state_tracking_algo==-1 ||
-     state_tracking_algo==0 || state_tracking_algo==1 ||
-     state_tracking_algo==2 || state_tracking_algo==21 || 
-     state_tracking_algo==3 || state_tracking_algo==32 || state_tracking_algo==33 ||
-     state_tracking_algo==4 || state_tracking_algo==5  || state_tracking_algo==6 ){ ; ; }
-  else{
-    std::cout<<"Error in dyn_control_params::sanity_check: state_tracking_algo = "
-        <<state_tracking_algo<<" is not allowed\n";
-    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-  }
-
   /// the local-diabatization transform accumulates the per-step projector
   /// into the trajectory frame and rotates ham_adi - it needs an
   /// adiabatic-native source (the exclusive dispatch never re-diagonalizes
@@ -370,7 +481,7 @@ void dyn_control_params::sanity_check(){
         <<" model (ham_update_method = 2, got "<<ham_update_method<<") - with a"
         <<" diabatic model the loop never re-diagonalizes under this option and"
         <<" the adiabatic side stays frozen at its initial values\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   /// the frame accumulates the per-step projector, which must come from a
@@ -381,7 +492,7 @@ void dyn_control_params::sanity_check(){
         <<" requires supplied time-overlaps (time_overlap_method = 0, got "
         <<time_overlap_method<<") - the frame owns basis_transform, so the"
         <<" method-1 rebuild from basis transforms would read the frame itself\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   /// the stored-U forward transform reads ham_dia, which only a diabatic
@@ -393,7 +504,7 @@ void dyn_control_params::sanity_check(){
         <<" (diabatic->adiabatic by the stored basis transform) requires a diabatic"
         <<" model (ham_update_method = 1, got "<<ham_update_method<<") - nothing"
         <<" else populates ham_dia for it to transform\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   /// the back-transform reads ham_adi, which only an adiabatic-native
@@ -406,7 +517,7 @@ void dyn_control_params::sanity_check(){
         <<" model (ham_update_method = 2, got "<<ham_update_method<<") - with a"
         <<" diabatic model the loop never re-diagonalizes under this option and"
         <<" the adiabatic side stays frozen at its initial values\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   ///============== Integrator vs projector family pairing ==============
@@ -511,37 +622,6 @@ void dyn_control_params::sanity_check(){
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
-  /// the Ehrenfest force unit function computes nothing for any other value
-  if(ehrenfest_force_option!=0 && ehrenfest_force_option!=1){
-    std::cout<<"Error in dyn_control_params::sanity_check: ehrenfest_force_option = "
-        <<ehrenfest_force_option<<" is not allowed (0 - all terms, 1 - no derivative-coupling terms)\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
-  }
-
-  /// the MMST representation is a stub: no propagation branch exists for it,
-  /// the amplitudes would stay frozen through the whole run
-  if(rep_tdse==4){
-    std::cout<<"Error in dyn_control_params::sanity_check: rep_tdse = 4 (MMST adiabatic"
-        <<" wfc) is not implemented - no electronic propagation exists for it;"
-        <<" use rep_tdse = 1 (the MMST electronic EOM is the adiabatic TDSE) with"
-        <<" force_method = 2 and sqc_gamma for the Meyer-Miller force\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
-  }
-
-  /// the QTSH force unit functions compute nothing for any other value
-  if(qtsh_force_option!=0 && qtsh_force_option!=1 && qtsh_force_option!=2){
-    std::cout<<"Error in dyn_control_params::sanity_check: qtsh_force_option = "
-        <<qtsh_force_option<<" is not allowed (0 - first-order off-diagonal force, 1 - with the"
-        <<" second-order term, 2 - no derivative-coupling force, adiabatic only)\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
-  }
-
-  if(ehrenfest_normalized!=0 && ehrenfest_normalized!=1){
-    std::cout<<"Error in dyn_control_params::sanity_check: ehrenfest_normalized = "
-        <<ehrenfest_normalized<<" is not allowed (1 - divide by <c|S|c>, 0 - the un-normalized Meyer-Miller form)\n";
-    throw std::runtime_error("libra C++ error - see the message printed above");
-  }
-
   /// Shall not use DISH with the decoherence correction
   /// (tsh_method 3 is Landau-Zener - DISH is 5)
   if(tsh_method==5 && decoherence_algo!=-1){
@@ -576,13 +656,6 @@ void dyn_control_params::sanity_check(){
     }// for i1
 
   }// sz1!=0
-
-
-  if(num_electronic_substeps<=0){
-      cout<<"Error in dyn_control_params::sanity_check: num_electronic_substeps = "<<num_electronic_substeps
-          <<" should be a positive integer"<<endl;
-      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-  }
 
 }
 

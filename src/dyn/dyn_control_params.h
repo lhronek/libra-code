@@ -360,7 +360,7 @@ class dyn_control_params{
       - 0 : exp(- alpha^2 * |dE_ij|^2 )  [default]
       - 1 : exp(- alpha * |dE_ij| )
       - 2 : exp(-alpha * max(dE_ij, 0) )
-      - anything else:  1  - no scaling 
+      - -1 : 1 - no scaling
 
   */
   int MK_scaling_function;

@@ -101,6 +101,11 @@ void dyn_variables::update_amplitudes(dyn_control_params& dyn_params, nHamiltoni
 
   // The adiabatic rep is the major, so we update the diabatic amplitudes
   else if(dyn_params.rep_tdse==1){   ham.ampl_adi2dia(ampl_dia, ampl_adi, 0, 1);  }
+  else if(dyn_params.rep_tdse==2 || dyn_params.rep_tdse==3){ ; } // density-matrix representations: no amplitudes to convert
+  else{
+    std::cout<<"Error in dyn_variables::update_amplitudes(): rep_tdse = "<<dyn_params.rep_tdse<<" has no branch here (implemented: 0, 1; 2 and 3 carry density matrices, no amplitudes)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
   update_mm_variables();
 }
@@ -146,6 +151,11 @@ void dyn_variables::update_amplitudes(dyn_control_params& dyn_params, bp::object
 
     // The adiabatic rep is the major, so we update the diabatic amplitudes
     else if(dyn_params.rep_tdse==1){   ham.ampl_adi2dia(ampl_dia, ampl_adi, 0, 1);  }
+    else if(dyn_params.rep_tdse==2 || dyn_params.rep_tdse==3){ ; } // density-matrix representations: no amplitudes to convert
+    else{
+      std::cout<<"Error in dyn_variables::update_amplitudes(): rep_tdse = "<<dyn_params.rep_tdse<<" has no branch here (implemented: 0, 1; 2 and 3 carry density matrices, no amplitudes)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
 
     update_mm_variables();
 }
@@ -212,6 +222,11 @@ void dyn_variables::update_amplitudes(dyn_control_params& dyn_params){
       ca = ampl_adi->col(traj);
       cd.product(U, ca);
       for(int i=0;i<ndia;i++){ ampl_dia->set(i, traj, cd.get(i,0) ); }
+    }
+    else if(dyn_params.rep_tdse==2 || dyn_params.rep_tdse==3){ ; } // density-matrix representations: no amplitudes to convert
+    else{
+      std::cout<<"Error in dyn_variables::update_amplitudes(): rep_tdse = "<<dyn_params.rep_tdse<<" has no branch here (implemented: 0, 1; 2 and 3 carry density matrices, no amplitudes)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     } catch (...) {
@@ -311,6 +326,10 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params){
       if(!skip_dia){
         dm_dia[traj]->product(U, *dm_adi[traj], adjoint(U));
       }
+    }
+    else{
+      std::cout<<"Error in dyn_variables::update_density_matrix(): rep = "<<rep<<" has no branch here (implemented: 0, 1, 2, 3)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     } catch (...) {
@@ -431,6 +450,10 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params, nHamil
       if(!skip_dia){
         dm_dia[traj]->product(U, *dm_adi[traj], adjoint(U));
       }
+    }
+    else{
+      std::cout<<"Error in dyn_variables::update_density_matrix(): rep = "<<rep<<" has no branch here (implemented: 0, 1, 2, 3)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
   }// for traj
@@ -1509,6 +1532,10 @@ CMATRIX dyn_variables::compute_average_dm(int rep){
   for(int traj=0; traj<ntraj; traj++){
     if(rep==0 || rep==2){   res += *dm_dia[traj]; }
     else if(rep==1 || rep==3){ res += *dm_adi[traj]; }
+    else{
+      std::cout<<"Error in dyn_variables::compute_average_dm(): rep = "<<rep<<" has no branch here (implemented: 0, 1, 2, 3)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
   }
 
   res = res / (float)ntraj;
@@ -1738,6 +1765,10 @@ MATRIX dyn_variables::compute_coherence_indicator(int rep){
   for(int traj=0; traj<ntraj; traj++){
     if(rep==0 || rep==2){   dm = *dm_dia[traj]; }
     else if(rep==1 || rep==3){ dm = *dm_adi[traj]; }
+    else{
+      std::cout<<"Error in dyn_variables::compute_coherence_indicator(): rep = "<<rep<<" has no branch here (implemented: 0, 1, 2, 3)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
   
     for(int i=0; i<sz; i++){temp.set(i, traj, dm.get(i,i).real() );}
   }

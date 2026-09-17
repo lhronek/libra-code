@@ -309,6 +309,10 @@ void collapse(CMATRIX &Coeff, int traj, int i, int collapse_option) {
   } else if (collapse_option == 1) {
     Coeff.set(i, traj, complex<double>(1.0, 0.0));
   }
+  else {
+    std::cout<<"Error in collapse(): collapse_option = "<<collapse_option<<" has no branch here (implemented: 0, 1)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 }
 
 void collapse_dm(CMATRIX *dm, int i) {
@@ -465,6 +469,10 @@ void instantaneous_decoherence(CMATRIX &Coeff, vector<int> &accepted_states,
       }
     } // traj
   } // IDF
+  else {
+    std::cout<<"Error in instantaneous_decoherence(): instantaneous_decoherence_variant = "<<instantaneous_decoherence_variant<<" has no branch here (implemented: 0, 1, 2, 3, 4)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 }
 
 void instantaneous_decoherence_dia(CMATRIX &Coeff, nHamiltonian &ham,
@@ -571,6 +579,10 @@ void instantaneous_decoherence_dia(CMATRIX &Coeff, nHamiltonian &ham,
     } // traj
 
   } // ID-C
+  else {
+    std::cout<<"Error in instantaneous_decoherence_dia(): instantaneous_decoherence_variant = "<<instantaneous_decoherence_variant<<" has no branch here (implemented: 0, 1, 2 in the diabatic variant)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 }
 
 CMATRIX afssh_dzdt(CMATRIX &dz, CMATRIX &Hvib, CMATRIX &F, CMATRIX &C,
@@ -1387,6 +1399,11 @@ void shxf(dyn_variables &dyn_var, nHamiltonian &ham, nHamiltonian &ham_prev,
         cout << "Keep auxiliary momenta except for the active state " << a
              << " at a classical turning point on traj " << traj << endl;
       }
+      else if (prms.tp_algo == 0) { ; } // 0: no turning-point treatment
+      else {
+        std::cout<<"Error in shxf(): tp_algo = "<<prms.tp_algo<<" has no branch here (implemented: 1, 2, 3)\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
 
       is_tp = 0;
     }
@@ -1632,6 +1649,11 @@ void mqcxf(dyn_variables &dyn_var, nHamiltonian &ham, nHamiltonian &ham_prev,
         }
         cout << "Keep auxiliary momenta except for the active state " << a
              << " at a classical turning point on traj " << traj << endl;
+      }
+      else if (prms.tp_algo == 0) { ; } // 0: no turning-point treatment
+      else {
+        std::cout<<"Error in mqcxf(): tp_algo = "<<prms.tp_algo<<" has no branch here (implemented: 1, 2, 3)\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
       is_tp = 0;
     }

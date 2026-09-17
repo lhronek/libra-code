@@ -855,6 +855,10 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
 
     }// for itraj
   }// algo == 40
+  else{
+    std::cout<<"Error in accept_hops(): hop_acceptance_algo = "<<prms.hop_acceptance_algo<<" has no branch here (implemented: 0, 10, 11, 20, 21, 31, 32, 33, 40)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
 
   return fstates;
@@ -1048,6 +1052,10 @@ vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms){
           else{
             if(prms.momenta_rescaling_algo==100){  scl_fac = 1.0; }
             else if(prms.momenta_rescaling_algo==101){  scl_fac = -1.0; }
+            else{
+              std::cout<<"Error in handle_hops_nuclear(): momenta_rescaling_algo = "<<prms.momenta_rescaling_algo<<" has no branch here (implemented: 100, 101)\n";
+              std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+            }
           } 
         }
         else{ scl_fac = 1.0; }
@@ -1086,6 +1094,10 @@ vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms){
           else{
             if(prms.momenta_rescaling_algo==110){  scl_fac = 1.0; }
             else if(prms.momenta_rescaling_algo==111){  scl_fac = -1.0; }
+            else{
+              std::cout<<"Error in handle_hops_nuclear(): momenta_rescaling_algo = "<<prms.momenta_rescaling_algo<<" has no branch here (implemented: 110, 111)\n";
+              std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+            }
           }      
         }
         else{ scl_fac = 1.0; } 
@@ -1110,6 +1122,10 @@ vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms){
 
     if(prms.momenta_rescaling_algo==200){ do_reverse = 0; }
     else if(prms.momenta_rescaling_algo==201){ do_reverse = 1; }
+    else{
+      std::cout<<"Error in handle_hops_nuclear(): momenta_rescaling_algo = "<<prms.momenta_rescaling_algo<<" has no branch here (implemented: 200, 201)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
 
     for(traj=0; traj<ntraj; traj++){
 
@@ -1204,6 +1220,10 @@ vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms){
 
     if(prms.momenta_rescaling_algo==210){ do_reverse = 0; }
     else if(prms.momenta_rescaling_algo==211){ do_reverse = 1; }
+    else{
+      std::cout<<"Error in handle_hops_nuclear(): momenta_rescaling_algo = "<<prms.momenta_rescaling_algo<<" has no branch here (implemented: 210, 211)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
 
 
     for(traj=0; traj<ntraj; traj++){
@@ -1266,6 +1286,10 @@ vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms){
       }// if different states
     }// for traj
   }// algo == 40
+  else{
+    std::cout<<"Error in handle_hops_nuclear(): momenta_rescaling_algo = "<<prms.momenta_rescaling_algo<<" has no branch here (implemented: 0, 40, 100, 101, 110, 111, 200, 201, 210, 211)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
 
   *dyn_var.q = q;

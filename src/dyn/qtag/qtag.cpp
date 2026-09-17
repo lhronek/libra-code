@@ -663,6 +663,10 @@ CMATRIX qtag_potential(MATRIX& q1, MATRIX& p1, MATRIX& s1, MATRIX& alp1, int n1,
         v = BATe(i, j, qi, pi, si, ai, n1, qj, pj, sj, aj, n2,
                  AA, BB, CC, ham);
       }// BATe
+      else{
+        std::cout<<"Error in qtag_potential(): method = "<<method<<" has no branch here (implemented: 0, 1, 2, 3)\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
 
       res.set(itraj, jtraj, v);
 
