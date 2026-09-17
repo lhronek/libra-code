@@ -458,6 +458,22 @@ void dyn_control_params::sanity_check(){
     }
   }
 
+  /// rep_tdse == 0 (diabatic amplitudes): the diabatic branch of
+  /// propagate_electronic implements -1, 0-8 and 10-15 (+100 variants);
+  /// any other value would leave the amplitudes untouched for the whole run
+  if(rep_tdse==0){
+    int m = electronic_integrator % 100;
+    int listed = (electronic_integrator==-1) ||
+                 (electronic_integrator>=0 && electronic_integrator<200 &&
+                  ((m>=0 && m<=8) || (m>=10 && m<=15)));
+    if(!listed){
+      std::cout<<"Error in dyn_control_params::sanity_check: electronic_integrator = "
+          <<electronic_integrator<<" has no diabatic branch (rep_tdse = 0) - the diabatic"
+          <<" representation propagates with -1, 0-8, 10-15 or their +100 variants\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+  }
+
   /// rep_tdse == 3 (adiabatic density matrix): methods 0/10 dress bare
   /// energies with T and frame-transform RHO, and the Zhu Liouvillian (1)
   /// generates nothing from a pure state without the rotation frame

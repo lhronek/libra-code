@@ -24,6 +24,7 @@
 */
 
 #include "../calculators/NPI.h"
+#include "../math_meigen/mEigen.h"
 #include <exception>
 #include <stdexcept>
 #include <memory>
@@ -423,6 +424,56 @@ static int metric_moved(CMATRIX &S_old, CMATRIX &S_new) {
     }
   }
   return 0;
+}
+
+// one exact step of i S dc/dt = Hvib c over dt with the metric moving from S_old to
+// S_new: the Lowdin-frame step when it moves, exp(-i S^-1 Hvib dt) when it does not -
+// the constant-metric form of the rep-0 method 3, shared by the 2-point steps 4-8
+static void dia_exp_step(double dt, CMATRIX &C, CMATRIX &Hvib, CMATRIX &S_old,
+                         CMATRIX &S_new) {
+  if (metric_moved(S_old, S_new)) {
+    propagate_electronic_lowdin(dt, C, Hvib, S_old, S_new);
+  } else {
+    CMATRIX invS(S_new.n_rows, S_new.n_cols);
+    FullPivLU_inverse(S_new, invS);
+    CMATRIX G(invS * Hvib);
+    propagate_electronic_nonHermitian(dt, C, G);
+  }
+}
+
+// the same step by sequential rotations (the rep-0 methods 10-15): the rotations need
+// a Hermitian generator and an orthonormal basis, so a non-identity metric is taken
+// to its Lowdin frame b = S^1/2 c - with the frame term of a moving metric exactly as
+// propagate_electronic_lowdin builds it
+static void dia_rot_step(double dt, CMATRIX &C, CMATRIX &Hvib, CMATRIX &S_old,
+                         CMATRIX &S_new) {
+  int sz = Hvib.n_cols;
+  if (metric_moved(S_old, S_new)) {
+    CMATRIX Y0(sz, sz);  CMATRIX X0(sz, sz);
+    CMATRIX Y1(sz, sz);  CMATRIX X1(sz, sz);
+    CMATRIX Ym(sz, sz);  CMATRIX Xm(sz, sz);
+    CMATRIX Sm(sz, sz);
+    Sm = 0.5 * (S_old + S_new);
+    libmeigen::sqrt_matrix(S_old, Y0, X0);
+    libmeigen::sqrt_matrix(S_new, Y1, X1);
+    libmeigen::sqrt_matrix(Sm, Ym, Xm);
+    CMATRIX G(sz, sz);
+    G = Xm * Hvib * Xm + complex<double>(0.0, 1.0 / dt) * ((Y1 - Y0) * Xm);
+    G = 0.5 * (G + G.H());
+    CMATRIX b(Y0 * C);
+    propagate_electronic_rot(dt, b, G);
+    C = X1 * b;
+  } else {
+    CMATRIX X(sz, sz);  CMATRIX Y(sz, sz);
+    if (libmeigen::lowdin_frame(S_new, X, Y)) {
+      CMATRIX G(X * Hvib * X);
+      CMATRIX b(Y * C);
+      propagate_electronic_rot(dt, b, G);
+      C = X * b;
+    } else {
+      propagate_electronic_rot(dt, C, Hvib);
+    }
+  }
 }
 
 void propagate_electronic(dyn_variables &dyn_var, nHamiltonian &ham,
@@ -1151,6 +1202,73 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
           Hvib = invS * Hvib;
           propagate_electronic_nonHermitian(dt, C, Hvib);
         }
+      }
+
+      // The diabatic basis needs no reprojection - the coupling sits in
+      // Hvib_dia itself - so the adiabatic variants that differ only by the
+      // T dressing coincide here; every step takes the Lowdin-frame form
+      // when the metric moves within the step
+      else if (method == 4 || method == 104 || method == 5 || method == 105 ||
+               method == 6 || method == 106) {
+        // 2-point Hvib_dia: the exact midpoint step of method 3 (the
+        // adiabatic 4 undressed, 5 with the new point T-dressed, 6 without
+        // the projector)
+        Hvib = 0.5 * (ham->get_hvib_dia() + ham_prev->get_hvib_dia());
+        Sdia = ham->get_ovlp_dia();
+        CMATRIX Sdia_old(ham_prev->get_ovlp_dia());
+        dia_exp_step(dt, C, Hvib, Sdia_old, Sdia);
+      } else if (method == 7 || method == 107 || method == 8 || method == 108) {
+        // split 2-point Hvib_dia: half a step with the old Hamiltonian, half
+        // with the new, the metric moving half-way in each (the adiabatic 7
+        // and 8 differ only in the reprojection, absent here)
+        Sdia = ham->get_ovlp_dia();
+        CMATRIX Sdia_old(ham_prev->get_ovlp_dia());
+        CMATRIX Sdia_mid(0.5 * (Sdia_old + Sdia));
+        Hvib = ham_prev->get_hvib_dia();
+        dia_exp_step(0.5 * dt, C, Hvib, Sdia_old, Sdia_mid);
+        Hvib = ham->get_hvib_dia();
+        dia_exp_step(0.5 * dt, C, Hvib, Sdia_mid, Sdia);
+      } else if (method == 10 || method == 110) {
+        // crude splitting by rotations: old half, new half
+        Sdia = ham->get_ovlp_dia();
+        CMATRIX Sdia_old(ham_prev->get_ovlp_dia());
+        CMATRIX Sdia_mid(0.5 * (Sdia_old + Sdia));
+        Hvib = ham_prev->get_hvib_dia();
+        dia_rot_step(0.5 * dt, C, Hvib, Sdia_old, Sdia_mid);
+        Hvib = ham->get_hvib_dia();
+        dia_rot_step(0.5 * dt, C, Hvib, Sdia_mid, Sdia);
+      } else if (method == 11 || method == 111) {
+        // symmetric splitting by rotations: old quarter, new half, old quarter
+        Sdia = ham->get_ovlp_dia();
+        CMATRIX Sdia_old(ham_prev->get_ovlp_dia());
+        CMATRIX Sdia_q1(0.75 * Sdia_old + 0.25 * Sdia);
+        CMATRIX Sdia_q3(0.25 * Sdia_old + 0.75 * Sdia);
+        CMATRIX Hvib_old(ham_prev->get_hvib_dia());
+        Hvib = ham->get_hvib_dia();
+        dia_rot_step(0.25 * dt, C, Hvib_old, Sdia_old, Sdia_q1);
+        dia_rot_step(0.5 * dt, C, Hvib, Sdia_q1, Sdia_q3);
+        dia_rot_step(0.25 * dt, C, Hvib_old, Sdia_q3, Sdia);
+      } else if (method == 12 || method == 112 || method == 14 || method == 114 ||
+                 method == 15 || method == 115) {
+        // 2-point Hvib_dia by rotations (the adiabatic 12 local
+        // diabatization, 14 undressed and 15 dressed coincide here)
+        Hvib = 0.5 * (ham->get_hvib_dia() + ham_prev->get_hvib_dia());
+        Sdia = ham->get_ovlp_dia();
+        CMATRIX Sdia_old(ham_prev->get_ovlp_dia());
+        dia_rot_step(dt, C, Hvib, Sdia_old, Sdia);
+      } else if (method == 13 || method == 113) {
+        // 1-point Hvib_dia by rotations: the old Hamiltonian over the step
+        Hvib = ham_prev->get_hvib_dia();
+        Sdia = ham->get_ovlp_dia();
+        CMATRIX Sdia_old(ham_prev->get_ovlp_dia());
+        dia_rot_step(dt, C, Hvib, Sdia_old, Sdia);
+      } else {
+        // sanity_check refuses these earlier - a silent fall-through would
+        // leave the amplitudes untouched for the whole run
+        cout << "Error in propagate_electronic(): electronic_integrator = " << method
+             << " has no diabatic branch (rep_tdse = 0) - use -1, 0-8, 10-15 or their "
+                "+100 variants\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
 
     } // rep == 0 // diabatic

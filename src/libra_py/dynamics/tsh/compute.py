@@ -998,14 +998,23 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
 
             * **dyn_params["electronic_integrator"]** ( int ): the method for electronic TD-SE integration:
 
-              rep_tdse = 0 (diabatic): 1** - with NBRA
+              rep_tdse = 0 (diabatic): 1** - with NBRA. The diabatic basis needs no reprojection (the coupling sits
+              in Hvib_dia itself), so the adiabatic variants that differ only by the T dressing coincide here; a
+              metric that moves within the step takes the Lowdin-frame form of every step (propagate_electronic_lowdin)
 
                 -1              - No propagation
 
                  0              - Lowdin exp_ with 2-point Hvib_dia
                  1              - based on QTAG propagator
                  2              - based on modified QTAG propagator (Z at two times)
-                 3              - non-Hermitian integrator with 2-point Hvib_dia
+                 3              - non-Hermitian integrator with 2-point Hvib_dia: exp(-i S^-1 Hvib_dia dt)
+                 4, 5, 6        - the same 2-point step as 3 (the adiabatic 4 / 5 / 6 differ by the T dressing only)
+                 7, 8           - split 2-point: exp(old half), exp(new half), the metric moving half-way in each
+                10              - crude splitting by rotations: old half, new half
+                11              - symmetric splitting by rotations: old quarter, new half, old quarter
+                12, 14, 15      - 2-point Hvib_dia by rotations (the adiabatic 12 / 14 / 15 coincide here)
+                13              - 1-point Hvib_dia (the old Hamiltonian) by rotations
+              Any other value is refused by sanity_check - it would leave the amplitudes untouched
 
               rep_tdse = 1 (adiabatic):  1** - with NBRA
 
