@@ -227,14 +227,19 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
-    // The adiabatic representation assumes an ASCENDING energy ladder: hop
-    // proposals, the Boltzmann factor and the momentum rescaling all read
-    // E_j - E_i with that sign, so an inverted pair makes a downhill hop
-    // look uphill. Internal diagonalization always sorts - only a supplied
-    // or externally transformed ladder can arrive unsorted, and whether it
-    // does is a property of the model's output at this geometry, so this is
-    // detectable only at runtime. Checked before the entanglement options,
-    // which add their own terms to the diagonal
+    // Internal diagonalization always sorts - only a supplied or externally
+    // transformed adiabatic ladder can arrive unsorted, and whether it does
+    // is a property of the model's output at this geometry, so this is
+    // detectable only at runtime. Two origins look the same here. Labels that
+    // follow the states' identity through their crossings (NBRA files of a
+    // tracked or diabatized step 3): E_j - E_i of the labelled states is then
+    // the true gap and every consumer stays right - the hop acceptance and
+    // the momentum rescaling read the energies of the old and the new state,
+    // the Landau-Zener target filter takes adjacency from the energies. Or a
+    // linear-response excited-state method whose reference breaks down: a
+    // negative excitation energy puts the excited state below its reference,
+    // and a relaxation across that pair is bookkept as uphill. Checked before
+    // the entanglement options, which add their own terms to the diagonal
     {
       static int warned_unsorted_adi = 0;
       int nchildren = ham.children.size();
@@ -249,14 +254,19 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
                  << "energies are not in ascending order - state " << i + 1
                  << " lies " << -gap << " Ha (" << -gap * evolt
                  << " eV) BELOW state " << i << " for trajectory " << itraj
-                 << ". Every adiabatic consumer reads the gap with this sign: a "
-                 << "hop across this pair is bookkept as uphill and the "
-                 << "rescaling drains kinetic energy instead of releasing it. A "
-                 << "linear-response excited-state method returns this where its "
-                 << "reference breaks down - a negative excitation energy "
-                 << "inverts the two lowest states near an S1/S0 conical "
-                 << "intersection - so check the excitation energies the driver "
-                 << "reports at this geometry. Warned once per process\n";
+                 << ". Two origins: (1) supplied states labelled by identity "
+                 << "through their crossings (NBRA files of a tracked or "
+                 << "diabatized step 3) - expected then and harmless: the hop "
+                 << "acceptance, the momentum rescaling and the Landau-Zener "
+                 << "target filter read the energies of the labelled states, "
+                 << "so E_j - E_i is the true gap. (2) a linear-response "
+                 << "excited-state method whose reference breaks down - a "
+                 << "negative excitation energy inverts the two lowest states "
+                 << "near an S1/S0 conical intersection, a relaxation across "
+                 << "this pair is then bookkept as uphill and the rescaling "
+                 << "drains kinetic energy instead of releasing it - check the "
+                 << "excitation energies the driver reports at this geometry. "
+                 << "Warned once per process\n";
             warned_unsorted_adi = 1;
             break;
           }
