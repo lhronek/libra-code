@@ -3513,6 +3513,12 @@ def run_step3_sd_nacs_libint(params):
     # Update the params with sd_states_reindexed_sorted
     params.update({'sd_states_reindexed_sorted': sd_states_reindexed_sorted})
     localized_carrier = str(params['localized_carrier']).lower()
+    # a hole basis holds no electron to localize and an electron basis no hole: the localization would find no
+    # manifold and hand the SD states back as they are
+    own_carrier = {1: 'hole', -1: 'electron'}.get(sd_charge)
+    if own_carrier is not None and localized_carrier not in ('none', own_carrier):
+        raise ValueError(F"localized_carrier {localized_carrier!r} does not fit sd_charge {sd_charge:+d} - its SD basis holds "
+                         F"the {own_carrier} only, use localized_carrier '{own_carrier}' or 'none'")
     W_dia = None
     if localized_carrier != 'none':
         W_dia, dia_index, dia_pops, dia_hole = _sd_diabatization_series(params, sd_states_reindexed_sorted,
