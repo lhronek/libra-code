@@ -2311,7 +2311,7 @@ def run_step3_ks_nacs_libint(params):
                          F"convention marker (legacy +d data) - writing canonical "
                          F"-d files into it would mix conventions in one directory; "
                          F"use a fresh output path or move the legacy files away")
-    # the record a step-4 runner reads: isUKS decides with koopmans_charge whether the spin-adaptation
+    # the record a step-4 runner reads: isUKS decides with sd_charge whether the spin-adaptation
     # factor sqrt 2 belongs on the NACs of the reference SD (closed-shell neutral reference only)
     with open(marker_file, 'w') as f:
         json.dump({'im_file_contains': 'Im(Hvib) = -d', 'isUKS': int(params.get('isUKS', 0))}, f)
@@ -2518,7 +2518,7 @@ def koopmans_sd_basis(reference, charge, nact):
         virt = [a for a in range(1, nact + 1) if a not in ref]
         return ([[[a, a], 'alp'] for a in virt],
                 [ref + [a] for a in virt])
-    raise ValueError(F"koopmans_charge {charge} - use 0, +1 (hole basis) or -1 (electron basis)")
+    raise ValueError(F"sd_charge {charge} - use 0, +1 (hole basis) or -1 (electron basis)")
 
 
 def _sd_block_index(orb, nact):
@@ -2551,8 +2551,8 @@ def _spin_partner(orb, active_space, data_dim):
 def sd_diabatization_groups(sd_lists, kind, active_space=None, data_dim=None):
     """
     The localization manifolds of an SD basis: single excitations of the reference
-    determinant that share the hole ("particle": the excited electron varies), the
-    particle ("hole": the hole varies), or the spin channel ("joint": the complete
+    determinant that share the hole ("electron": the excited electron varies), the
+    particle ("hole": the hole varies), or the spin channel ("both": the complete
     hole x particle product of a channel, holes and electrons localized together).
     An open-shell reference joins the manifold whose defining orbital it occupies singly
     (a hole manifold whose particle's spin partner is occupied - the cation's hole - or a
@@ -2562,7 +2562,7 @@ def sd_diabatization_groups(sd_lists, kind, active_space=None, data_dim=None):
     Args:
         sd_lists (list of lists of int): the SDs of one step in the signed reindexed
             spin-orbital notation of ovlp_arb, in their row order
-        kind (str): "particle", "hole" or "joint"
+        kind (str): "electron", "hole" or "both"
         active_space, data_dim: the 2-block window indices and dimension of the step - the
             spin-partner test of an open-shell reference needs them (None: the reference
             is taken as closed-shell and never joins a manifold)
@@ -2570,12 +2570,12 @@ def sd_diabatization_groups(sd_lists, kind, active_space=None, data_dim=None):
     Returns:
         gs (int): row of the reference determinant (the lowest orbital sum)
         groups (list of dict): manifolds with >= 2 members - "key" (the shared spin-orbital,
-            or the channel sign for "joint"), "rows" (member rows), "tau" (parity signs).
-            particle/hole: "orbs" (the varying spin-orbital of every member, ascending) and
+            or the channel sign for "both"), "rows" (member rows), "tau" (parity signs).
+            electron/hole: "orbs" (the varying spin-orbital of every member, ascending) and
             "sigma" - the localized state with the varying orbital psi_A = sum_j w_jA orb_j
             reads sum_j tau_j sigma_j w_jA |SD_row_j> (tau_j: parity between the member's list
             and the fixed-orbitals-first order, sigma_j: the cofactor sign (-1)^j of a hole
-            manifold, 1 for a particle manifold). joint: "pairs" (the (hole, particle) of every
+            manifold, 1 for a particle manifold). both: "pairs" (the (hole, particle) of every
             member), "holes" and "parts" (the ascending hole and particle spin-orbitals) -
             the state a+_Y a_X |ref> with localized psi_X = sum_i wh_iX hole_i and
             phi_Y = sum_a wp_aY part_a reads sum_j tau_j wh_(i_j)X wp_(a_j)Y |SD_row_j>, tau_j
@@ -2584,12 +2584,13 @@ def sd_diabatization_groups(sd_lists, kind, active_space=None, data_dim=None):
         singles (list of int): rows left untransformed (the reference, one-member manifolds,
             non-single excitations)
 
-    Raises ValueError for an unknown kind, for "joint" when a channel's single
+    Raises ValueError for an unknown kind, for "both" when a channel's single
     excitations do not form the complete hole x particle product or when the reference
     is open-shell (the joint states presume a closed-shell reference).
     """
-    if kind not in ("particle", "hole", "joint"):
-        raise ValueError(F"diabatization {kind!r} - use 'none', 'particle', 'hole' or 'joint'")
+    if kind not in ("electron", "hole", "both"):
+        raise ValueError(F"localized_carrier {kind!r} - use 'none', 'hole', 'electron' or 'both' (the former 'particle' "
+                         F"is 'electron', the former 'joint' is 'both')")
     sets = [frozenset(int(o) for o in sd) for sd in sd_lists]
     gs = min(range(len(sets)), key=lambda k: sum(abs(o) for o in sets[k]))
     ref = sets[gs]
@@ -2611,20 +2612,20 @@ def sd_diabatization_groups(sd_lists, kind, active_space=None, data_dim=None):
             singles.append(k)
             continue
         h, pt = next(iter(hole)), next(iter(part))
-        if kind == "joint":
+        if kind == "both":
             if singly_occupied(h) or singly_occupied(pt):
-                raise ValueError("joint localization presumes a closed-shell reference - the "
+                raise ValueError("the localization of both carriers presumes a closed-shell reference - the "
                                  F"reference holds {h if singly_occupied(h) else pt} singly "
-                                 "(use 'hole' for a cation, 'particle' for an anion)")
+                                 "(use 'hole' for a cation, 'electron' for an anion)")
             manifolds.setdefault(1 if pt > 0 else -1, []).append(((h, pt), k))
             continue
-        key, var = (h, pt) if kind == "particle" else (pt, h)
+        key, var = (h, pt) if kind == "electron" else (pt, h)
         manifolds.setdefault(key, []).append((var, k))
     groups = []
     ref_list = [int(o) for o in sd_lists[gs]]
     for key in sorted(manifolds):
         members = sorted(manifolds[key])
-        if kind != "joint" and singly_occupied(key):
+        if kind != "both" and singly_occupied(key):
             # the reference is the member whose varying orbital is the manifold's own
             # defining orbital (the hole sits in the particle p, or the electron in the hole h)
             members = sorted(members + [(key, gs)])
@@ -2633,13 +2634,13 @@ def sd_diabatization_groups(sd_lists, kind, active_space=None, data_dim=None):
         if len(members) < 2:
             singles.append(members[0][1])
             continue
-        if kind == "joint":
+        if kind == "both":
             pairs = [ia for ia, k in members]
             rows = [k for ia, k in members]
             holes = sorted({h for h, pt in pairs})
             parts = sorted({pt for h, pt in pairs})
             if len(set(pairs)) != len(pairs) or len(pairs) != len(holes) * len(parts):
-                raise ValueError(F"joint localization needs the complete hole x particle product of "
+                raise ValueError(F"the localization of both carriers needs the complete hole x particle product of "
                                  F"the {'alpha' if key > 0 else 'beta'} channel: {len(holes)} holes x "
                                  F"{len(parts)} particles but {len(pairs)} single excitations")
             tau = []
@@ -2652,7 +2653,7 @@ def sd_diabatization_groups(sd_lists, kind, active_space=None, data_dim=None):
             continue
         orbs = [v for v, k in members]
         rows = [k for v, k in members]
-        if kind == "particle":
+        if kind == "electron":
             # the fixed orbitals: the reference without the shared hole (an open-shell
             # reference is a member itself, its varying orbital is that hole)
             fixed = sorted(ref - {key} - set(orbs))
@@ -2731,16 +2732,16 @@ def sd_diabatization_step(sd_lists, P_frag, kind, dia_index=None, active_space=N
         sd_lists (list of lists of int): the SDs of the step in their row order
         P_frag (list of arrays): fragment operators in the active-space 2-block layout
             (orthonormal orbitals)
-        kind (str): "particle", "hole" or "joint"
+        kind (str): "electron", "hole" or "both"
         dia_index (list, optional): the diabatic-state index of an earlier step - the
             columns keep its order, None builds it (reference and singles first, then
-            the manifolds by key, fragment-major - hole-major then electron for "joint")
+            the manifolds by key, fragment-major - hole-major then electron for "both")
         active_space, data_dim: passed to sd_diabatization_groups (open-shell references)
 
     Returns:
         W (array (nsd, nsd)), dia_index (list), pops (array (nsd, nfrag)), pops_hole
         (array (nsd, nfrag)): fragment populations of every diabatic state's localized
-        electron (varying) orbital and of its localized hole ("joint" only), nan elsewhere
+        electron (varying) orbital and of its localized hole ("both" only), nan elsewhere
 
     Raises ValueError when the SD content or the per-fragment orbital counts differ from
     the index (the localization must be stable along the trajectory) and when W is not
@@ -2753,7 +2754,7 @@ def sd_diabatization_step(sd_lists, P_frag, kind, dia_index=None, active_space=N
     gs, groups, singles = sd_diabatization_groups(sd_lists, kind, active_space, data_dim)
     loc = {}
     for g in groups:
-        if g["kind"] == "joint":
+        if g["kind"] == "both":
             loc_h = localize_fragment_block(P_frag, [_sd_block_index(o, nact) for o in g["holes"]])
             loc_p = localize_fragment_block(P_frag, [_sd_block_index(o, nact) for o in g["parts"]])
             loc[g["key"]] = (g, loc_h, loc_p)
@@ -2772,7 +2773,7 @@ def sd_diabatization_step(sd_lists, P_frag, kind, dia_index=None, active_space=N
     if dia_index is None:
         dia_index = [("sd", sets[k]) for k in singles]
         for key in sorted(loc):
-            if loc[key][0]["kind"] == "joint":
+            if loc[key][0]["kind"] == "both":
                 frag_h, frag_p = loc[key][1][1], loc[key][2][1]
                 for f_h in range(nfrag):
                     for r_h in range(frag_h.count(f_h)):
@@ -2857,12 +2858,12 @@ def _fragment_operator_prefix(params, res_dir_1, start_time):
     """The step-2 file prefix of the requested fragment operators and their count - at least two fragments."""
     # no prefix may equal another prefix followed by digits - the fragment index follows the prefix directly
     prefixes = {"mulliken": "P_frag", "pod": "P_pod", "pod2l": "P_pod2l", "pod2gs": "P_pod2gs", "pod_cp2k": "P_pod_cp2k"}
-    operator = str(params['fragment_operator']).lower()
+    operator = str(params['diabatization_scheme']).lower()
     if operator == "pod2":
-        raise ValueError("fragment_operator 'pod2' has no projectors - its fragment states are not orthogonal across "
+        raise ValueError("diabatization_scheme 'pod2' has no projectors - its fragment states are not orthogonal across "
                          "fragments (step2 writes its POD2_hab files only), use 'pod2l' or 'pod2gs'")
     if operator not in prefixes:
-        raise ValueError(F"fragment_operator {operator!r} - use 'mulliken', 'pod', 'pod2l', 'pod2gs' or 'pod_cp2k'")
+        raise ValueError(F"diabatization_scheme {operator!r} - use 'mulliken', 'pod', 'pod2l', 'pod2gs' or 'pod_cp2k'")
     prefix = prefixes[operator]
     nfrag = fragment_operator_count(res_dir_1, prefix, start_time)
     if nfrag < 2:
@@ -2953,15 +2954,15 @@ def ci_diabatization_step(T, O_hole, O_elec, kind, dia_index=None):
     The CI -> diabatic coefficients V of one step, |Lambda_A> = sum_I |Psi_I> V_IA: the ground state (column 0 of
     T) maps onto itself, the excited CI states onto fragment-localized states of their own span - the hole and
     electron fragment operators carried into the CI space through T (O_ci = T_exc^T O_sd T_exc) and localized by
-    the sequential projection of localize_fragment_block: "hole" localizes the hole, "particle" the electron,
-    "joint" the hole first and the electron within every hole-fragment block.
+    the sequential projection of localize_fragment_block: "hole" localizes the hole, "electron" the electron,
+    "both" the hole first and the electron within every hole-fragment block.
 
     Args:
         T (array (nsd, nci + 1)): the SD -> CI coefficients of the step, column 0 the ground state
         O_hole, O_elec (lists of arrays (nsd, nsd)): sd_fragment_operators of the step
-        kind (str): "particle", "hole" or "joint"
+        kind (str): "electron", "hole" or "both"
         dia_index (list, optional): the diabatic-state index of an earlier step - the columns keep its order,
-            None builds it (the ground state first, then fragment-major - hole-major then electron for "joint")
+            None builds it (the ground state first, then fragment-major - hole-major then electron for "both")
 
     Returns:
         V (array (nci + 1, nci + 1)), dia_index (list), pops (array (nci + 1, nfrag)), pops_hole (array
@@ -2972,8 +2973,9 @@ def ci_diabatization_step(T, O_hole, O_elec, kind, dia_index=None):
     non-integer number of states - include the complete set of excitations of every hole x particle manifold in
     number_of_states), when the fragment counts change along the trajectory, and when V is not orthogonal.
     """
-    if kind not in ("particle", "hole", "joint"):
-        raise ValueError(F"diabatization {kind!r} - use 'none', 'particle', 'hole' or 'joint'")
+    if kind not in ("electron", "hole", "both"):
+        raise ValueError(F"localized_carrier {kind!r} - use 'none', 'hole', 'electron' or 'both' (the former 'particle' "
+                         F"is 'electron', the former 'joint' is 'both')")
     T = np.asarray(T)
     if np.iscomplexobj(T):
         # the T matrices of the runner are complex-typed with zero imaginary parts
@@ -2985,15 +2987,15 @@ def ci_diabatization_step(T, O_hole, O_elec, kind, dia_index=None):
     hint = (" - the CI space must hold whole hole x particle manifolds, include the complete set of their "
             "excitations in number_of_states")
     try:
-        if kind in ("hole", "joint"):
+        if kind in ("hole", "both"):
             Oh = [Te.T @ O @ Te for O in O_hole]
             wh, frag_h, ph = localize_fragment_block(Oh, list(range(nci)))
-        if kind in ("particle", "joint"):
+        if kind in ("electron", "both"):
             Oe = [Te.T @ O @ Te for O in O_elec]
     except ValueError as err:
         raise ValueError(F"many-body diabatization: {err}{hint}") from err
     cols, labels = [], []
-    if kind == "joint":
+    if kind == "both":
         for f_h in range(nfrag):
             block = [c for c in range(nci) if frag_h[c] == f_h]
             if not block:
@@ -3036,9 +3038,9 @@ def ci_diabatization_step(T, O_hole, O_elec, kind, dia_index=None):
     pops_hole = np.full((nci + 1, nfrag), np.nan)
     for a in range(nci):
         v = V[1:, a + 1]
-        if kind in ("particle", "joint"):
+        if kind in ("electron", "both"):
             pops[a + 1] = [v @ O @ v for O in Oe]
-        if kind in ("hole", "joint"):
+        if kind in ("hole", "both"):
             pops_hole[a + 1] = [v @ O @ v for O in Oh]
     dev = float(np.abs(V.T @ V - np.eye(nci + 1)).max())
     if dev > 1e-8:
@@ -3082,10 +3084,10 @@ def _write_diabatization_records(res_dir, kind, dia_index, pops_list, hole_list,
             states.append({"index": col, "type": "localized", "manifold": int(entry[1]),
                            "fragment": int(entry[2]), "rank": int(entry[3])})
     with open(F'{res_dir}/U_{basis}_labels.json', 'w') as f:
-        json.dump({"kind": kind, "fragment_operator": operator, "basis": basis,
-                   "note": "particle: the excited electron of the manifold (shared hole = "
+        json.dump({"kind": kind, "diabatization_scheme": operator, "basis": basis,
+                   "note": "electron: the excited electron of the manifold (shared hole = "
                            "manifold) sits on 'fragment', hole: the hole (shared particle = "
-                           "manifold) sits on 'fragment', joint: the hole sits on "
+                           "manifold) sits on 'fragment', both: the hole sits on "
                            "'hole_fragment' and the electron on 'electron_fragment' (channel "
                            "1 = alpha, -1 = beta excitations), ranks order the orbitals of one "
                            "fragment by decreasing population",
@@ -3146,14 +3148,14 @@ def run_step3_sd_nacs_libint(params):
                 The default CHANGED from the historical False (raw overlaps) to
                 "lowdin_cached" - the Lowdin route is the validated convention;
                 set "none" explicitly to reproduce pre-change data
-            * **params['koopmans_charge']** (int): 0 [default] keeps the SCF reference and its single
+            * **params['sd_charge']** (int): the charge of the SD basis. 0 [default] keeps the SCF reference and its single
                 excitations. +1 replaces the SD basis by the frozen-orbital (Koopmans) hole basis of
                 the cation: one beta electron removed from each of the num_occ_states active occupied
                 orbitals of the closed-shell reference (num_occ_states determinants, energies from the
                 neutral orbital energies, no self-consistent screening of the site detuning). -1 is
                 the electron basis of the anion (one alpha electron added to each active virtual).
-                Needs isUKS 0. Pairs with diabatization "hole" / "particle".
-            * **params['fragment_operator']** (string): the fragment operators the diabatization
+                Needs isUKS 0. Pairs with localized_carrier "hole" / "electron".
+            * **params['diabatization_scheme']** (string): the fragment operators the diabatization
                 localizes with - "mulliken" [default] reads P_frag{f}_ks_{step}.npz (step2
                 fragment_atom_lists), "pod" reads P_pod{f}_ks_{step}.npz (step2 compute_pod, libra's own
                 projection-operator diabatization), "pod2l" and "pod2gs" read P_pod2l{f} / P_pod2gs{f}_ks_{step}.npz
@@ -3161,10 +3163,10 @@ def run_step3_sd_nacs_libint(params):
                 fragment states orthonormalized by Lowdin or by Gram-Schmidt; the plain "pod2" of step2 has no
                 projectors, its states are not orthogonal across fragments), "pod_cp2k" reads
                 P_pod_cp2k{f}_ks_{step}.npz (step2 read_pod_cp2k_files, the blocks of CP2K's POD).
-            * **params['diabatization']** (string): "none" [default] keeps the SD basis. "particle" or
+            * **params['localized_carrier']** (string): "none" [default] keeps the SD basis. "electron" or
                 "hole" localizes, in every single-excitation manifold sharing the hole (resp. the
                 particle), the varying spin-orbital on the fragments of the step-2 fragment operators
-                (P_frag{f}_ks_{step}.npz from step2's fragment_atom_lists). "joint" localizes the holes
+                (P_frag{f}_ks_{step}.npz from step2's fragment_atom_lists). "both" localizes the holes
                 among the occupied orbitals AND the electrons among the virtuals of every spin
                 channel's complete hole x particle manifold - the diabatic states are the excitations
                 from a localized hole into a localized electron (Frenkel and charge-transfer states of
@@ -3232,11 +3234,18 @@ def run_step3_sd_nacs_libint(params):
                       'num_unocc_states': 1, 'verbosity': 0, 'isUKS': 0, 'es_software': 'cp2k',
                       'use_multiprocessing': False, 'logfile_directory': os.getcwd() + '/all_logfiles', 'nac_algo': 0,
                       'sd_overlap_kernel': 'auto', 'blas_num_threads': None,
-                      'diabatization': 'none', 'koopmans_charge': 0, 'fragment_operator': 'mulliken'
+                      'localized_carrier': 'none', 'sd_charge': 0, 'diabatization_scheme': 'mulliken'
                       }
 
     if params['is_many_body'] and params['isUKS']:
         raise Exception('Unrestricted-spin calculations are not supported for many-body basis yet!')  # TODO
+
+    # an option set by its former name would leave the present one at its default without a word
+    for former, present in (('koopmans_charge', 'sd_charge'), ('diabatization', 'localized_carrier'),
+                            ('fragment_operator', 'diabatization_scheme')):
+        if former in params:
+            raise ValueError(F"params['{former}'] is params['{present}'] now - rename it in the runner"
+                             + (" (its values 'particle' and 'joint' are 'electron' and 'both')" if former == 'diabatization' else ""))
 
     # Check input, set output dirs
     comn.check_input(params, default_params, critical_params)
@@ -3282,12 +3291,12 @@ def run_step3_sd_nacs_libint(params):
                          F"convention marker (legacy +d data) - writing canonical "
                          F"-d files into it would mix conventions in one directory; "
                          F"use a fresh output path or move the legacy files away")
-    # the record a step-4 runner reads: a closed-shell neutral reference (isUKS 0, koopmans_charge 0) makes
+    # the record a step-4 runner reads: a closed-shell neutral reference (isUKS 0, sd_charge 0) makes
     # the SD basis stand for the singlet SACs of S0, whose NACs to the reference carry sqrt 2 against the
     # SD-level ones - a Koopmans hole / electron basis or a UKS basis holds open-shell states only, no factor
     with open(marker_file, 'w') as f:
         json.dump({'im_file_contains': 'Im(Hvib) = -d', 'isUKS': int(params.get('isUKS', 0)),
-                   'koopmans_charge': int(params.get('koopmans_charge', 0))}, f)
+                   'sd_charge': int(params.get('sd_charge', 0))}, f)
 
     if params['is_many_body']:
         params['isnap'] = params['start_time']
@@ -3446,17 +3455,17 @@ def run_step3_sd_nacs_libint(params):
             active_space_num_occ_orbitals=params['active_space_num_occ_orbitals'])
 
     # Some printings
-    koopmans_charge = int(params['koopmans_charge'])
-    if koopmans_charge != 0:
+    sd_charge = int(params['sd_charge'])
+    if sd_charge != 0:
         if params['isUKS']:
-            raise ValueError("koopmans_charge needs a closed-shell reference (isUKS 0) - an "
+            raise ValueError("sd_charge needs a closed-shell reference (isUKS 0) - an "
                              "unrestricted reference is already the ion, use its own SD basis")
         # the reference is the first reindexed determinant of the closed-shell basis
-        sd_unique_basis, sd_states_reindexed = koopmans_sd_basis(sd_states_reindexed[0], koopmans_charge,
+        sd_unique_basis, sd_states_reindexed = koopmans_sd_basis(sd_states_reindexed[0], sd_charge,
                                                                  len(ks_active_space) // 2)
         params['sd_unique_basis'] = sd_unique_basis
-        print(F'koopmans_charge {koopmans_charge}: {len(sd_states_reindexed)} frozen-orbital '
-              F'{"hole" if koopmans_charge > 0 else "electron"} determinants of the neutral reference')
+        print(F'sd_charge {sd_charge}: {len(sd_states_reindexed)} frozen-orbital '
+              F'{"hole" if sd_charge > 0 else "electron"} determinants of the neutral reference')
     print('sd_unique_basis is:', sd_unique_basis)
     print('sd_states_reindexed is:', sd_states_reindexed)
     print('ks_homo_index', ks_homo_index)
@@ -3503,14 +3512,14 @@ def run_step3_sd_nacs_libint(params):
 
     # Update the params with sd_states_reindexed_sorted
     params.update({'sd_states_reindexed_sorted': sd_states_reindexed_sorted})
-    diabatization = str(params['diabatization']).lower()
+    localized_carrier = str(params['localized_carrier']).lower()
     W_dia = None
-    if diabatization != 'none':
+    if localized_carrier != 'none':
         W_dia, dia_index, dia_pops, dia_hole = _sd_diabatization_series(params, sd_states_reindexed_sorted,
                                                                         ks_active_space, start_time,
-                                                                        finish_time, diabatization)
-        _write_diabatization_records(res_dir_2, diabatization, dia_index, dia_pops, dia_hole, start_time,
-                                     str(params['fragment_operator']).lower())
+                                                                        finish_time, localized_carrier)
+        _write_diabatization_records(res_dir_2, localized_carrier, dia_index, dia_pops, dia_hole, start_time,
+                                     str(params['diabatization_scheme']).lower())
     if params['is_many_body']:
         # Add midpoint energies for CI states in here
         ci_midpoint_energies = step3_many_body.compute_ci_energies_midpoint(ci_energies, params)
@@ -3539,9 +3548,9 @@ def run_step3_sd_nacs_libint(params):
         if W_dia is not None:
             V_dia, ci_dia_index, ci_pops, ci_hole = _ci_diabatization_series(params, sd_states_reindexed_sorted,
                                                                              SD2CI, ks_active_space, start_time,
-                                                                             finish_time, diabatization)
-            _write_diabatization_records(res_dir_2, diabatization, ci_dia_index, ci_pops, ci_hole, start_time,
-                                         str(params['fragment_operator']).lower(), basis="ci")
+                                                                             finish_time, localized_carrier)
+            _write_diabatization_records(res_dir_2, localized_carrier, ci_dia_index, ci_pops, ci_hole, start_time,
+                                         str(params['diabatization_scheme']).lower(), basis="ci")
 
         # We create the var_pool whether we use the multiprocessing or not
         var_pool = make_var_pool(params, sd_states_reindexed_sorted, start_time, finish_time)

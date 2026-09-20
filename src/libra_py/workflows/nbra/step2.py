@@ -463,7 +463,7 @@ def run_cp2k_libint_step2(params):
                                                  KOHN_SHAM_MATRIX print, or is rebuilt from a COMPLETE MO set (ADDED_MOS =
                                                  n_ao - n_occ) when the print is absent, the AO overlap from the OVERLAP_DELTAT
                                                  run. Saves P_pod{f}_ks_{step}.npz (the block projectors over the MO window,
-                                                 step3 fragment_operator "pod") and POD_hab_{step}.npz (block energies and
+                                                 step3 diabatization_scheme "pod") and POD_hab_{step}.npz (block energies and
                                                  couplings). Needs mo_source "wfn" [default: False].
 
                              pod_schemes (list of str): the schemes compute_pod evaluates - "pod" (libra's POD, the global
@@ -473,7 +473,7 @@ def run_cp2k_libint_step2(params):
                                                  Gram-Schmidt first). Every scheme saves {SCHEME}_hab_{step}.npz (block energies
                                                  E_b*, couplings V_b*, and for the pod2 family the raw couplings V_raw_* and the
                                                  state overlaps S_*); "pod", "pod2l" and "pod2gs" also save the projectors
-                                                 P_{scheme}{f}_ks_{step}.npz (step3 fragment_operator) - "pod2" cannot, its
+                                                 P_{scheme}{f}_ks_{step}.npz (step3 diabatization_scheme) - "pod2" cannot, its
                                                  states are not orthogonal across fragments [default: ["pod"]].
 
                              pod2gs_kept_block (int): POD2GS - the fragment whose states stay unchanged in the Gram-Schmidt
@@ -484,7 +484,7 @@ def run_cp2k_libint_step2(params):
                                                     WAVEFUNCTION and TRANSF_MATRIX_R prints: read the POD files of
                                                     every diagonalization run and save the POD fragment projectors
                                                     P_pod_cp2k{f}_ks_{step}.npz over the MO window (the analogue of P_frag,
-                                                    step3 fragment_operator "pod_cp2k") and POD_cp2k_hab_{step}.npz (block
+                                                    step3 diabatization_scheme "pod_cp2k") and POD_cp2k_hab_{step}.npz (block
                                                     energies and couplings). Needs mo_source "wfn" [default: False].
 
                              cp2k_ot_input_template (string): The CP2K OT input template file name (just for the xTB).
