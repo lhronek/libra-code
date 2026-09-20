@@ -1239,8 +1239,15 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         }
       } else if (method == 1 || method == 101) {
         Hvib = 0.5 * (ham->get_hvib_dia() + ham_prev->get_hvib_dia());
-        propagate_electronic_qtag(dt, C, Hvib,
-                                  Sdia); // in this case C - diabatic coeffs
+        if (metric_moved(Sdia_old, Sdia)) {
+          // the QTAG step solves Hvib Z = S Z E with one metric and keeps c^H S c for
+          // that metric only - across a metric that moves it loses the norm (0.29 for
+          // S_ab moving by 0.15), the Lowdin-frame step carries the amplitudes over
+          propagate_electronic_lowdin(dt, C, Hvib, Sdia_old, Sdia);
+        } else {
+          propagate_electronic_qtag(dt, C, Hvib,
+                                    Sdia); // in this case C - diabatic coeffs
+        }
       } else if (method == 2 || method == 102) {
         Hvib = ham->get_ham_dia();
         CMATRIX Hvib_old(ham->ndia, ham->ndia);
