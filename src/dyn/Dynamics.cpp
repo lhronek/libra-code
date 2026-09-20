@@ -441,7 +441,9 @@ static void dia_exp_step(double dt, CMATRIX &C, CMATRIX &Hvib, CMATRIX &S_old,
   }
 }
 
-// the same step by sequential rotations (the rep-0 methods 10-15): the rotations need
+// the same step by sequential rotations (the rep-0 methods 10-15 and 19): a splitting
+// of the pairwise couplings, second order in |coupling| dt - it follows the exp_ step
+// only while the couplings of Hvib_dia stay far below hbar / dt. The rotations need
 // a Hermitian generator and an orthonormal basis, so a non-identity metric is taken
 // to its Lowdin frame b = S^1/2 c - with the frame term of a moving metric exactly as
 // propagate_electronic_lowdin builds it

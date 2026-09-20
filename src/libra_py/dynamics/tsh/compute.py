@@ -1022,6 +1022,11 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 12, 14, 15      - 2-point Hvib_dia by rotations (the adiabatic 12 / 14 / 15 coincide here)
                 13              - 1-point Hvib_dia (the old Hamiltonian) by rotations
                 19              - same as 9, but with rotations
+              The variants by rotations (10-15, 19) split the pairwise couplings of Hvib_dia - a symmetric splitting,
+              second order in |coupling| dt / hbar. A diabatic Hamiltonian carries its couplings off the diagonal, so
+              they follow their exp_ partners only while |coupling| dt / hbar << 1: at 0.24 rad a step the populations
+              are off by 0.7 within 2e4 steps where 9 is off by 0.01 (in the adiabatic representation the propagated
+              matrix is nearly diagonal and the twins agree to 1e-4)
               Any other value is refused by sanity_check - it would leave the amplitudes untouched
 
               rep_tdse = 1 (adiabatic):  1** - with NBRA
