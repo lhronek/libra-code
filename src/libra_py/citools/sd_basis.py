@@ -11,8 +11,9 @@ Fixed single-particle determinant (SD) bases and their CI transforms,
 shared by the on-the-fly drivers (CP2K, DFTB+): the window enumeration
 (make_sd_basis), the SD -> CI transformation matrix with per-state
 dropped weights (sd2ci_matrix), the chained state-sign alignment
-(align_ci_state_signs) and the capture contract of a diabatic SD basis
-(check_sd_capture).
+(align_ci_state_signs), the couplings of a step taken after the states are
+followed through it (followed_nac) and the capture contract of a diabatic SD
+basis (check_sd_capture).
 """
 import numpy as np
 
@@ -249,6 +250,47 @@ def align_ci_state_signs(st_ci, ci_curr, T_curr=None):
             flips.append(j)
     return flips
 
+
+
+def followed_nac(st, dt, min_overlap=0.5):
+    """
+    The time-derivative couplings of a driver step taken AFTER the states are followed through it:
+    the new state pi(i) that continues the old state i (the assignment of the largest |st|) with its
+    sign s_i gives the overlap of the followed states S~ = st[:, pi] s, their coupling is
+    d~ = (S~ - S~^T) / (2 dt), and it goes back under the raw labels of the new states -
+    d[pi(i), pi(i')] = s_i s_i' d~[i, i'] - the labels and signs the engine receives the step under.
+
+    A NAC-carrying integrator under a relabel projector needs this coupling. At an unresolved
+    crossing (a pair that swaps within the step) the engine swaps the labels and moves the
+    amplitudes along, while the raw (st - st^T) / (2 dt) of the swapped pair is 1 / dt or 0 by the
+    arbitrary sign of a fresh diagonalization - the amplitudes are turned twice or not at all.
+    Without a swap and with positive diagonals this is the raw formula to the last bit. A step in
+    which a state finds no partner above min_overlap (it left the propagated block) keeps the raw
+    formula - nothing can be followed there.
+
+    Args:
+        st (np.ndarray): real state time-overlap <prev_i|curr_j>, square
+        dt (float): the nuclear time step, a.u.
+        min_overlap (float): the smallest |st| of a followed pair
+
+    Returns:
+        np.ndarray: the antisymmetric coupling matrix in the raw order of the current states
+    """
+    from scipy.optimize import linear_sum_assignment
+    st = np.asarray(st, dtype=np.float64)
+    n = st.shape[0]
+    rows, cols = linear_sum_assignment(-np.abs(st))
+    pi = np.empty(n, dtype=int)
+    pi[rows] = cols
+    matched = st[np.arange(n), pi]
+    if np.abs(matched).min() < min_overlap:
+        return (st - st.T) / (2.0 * dt)
+    sg = np.where(matched < 0.0, -1.0, 1.0)
+    followed = st[:, pi] * sg[None, :]
+    d_followed = (followed - followed.T) / (2.0 * dt)
+    d = np.zeros((n, n))
+    d[np.ix_(pi, pi)] = sg[:, None] * d_followed * sg[None, :]
+    return d
 
 
 def check_sd_capture(ci_drops, nstates, max_drop, knob="dia_basis_max_drop"):

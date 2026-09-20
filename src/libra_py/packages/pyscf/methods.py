@@ -30,6 +30,7 @@ from libra_py.packages.pyscf.interfaces import ElectronicStructureStrategy, Mole
 
 from libra_py.packages.cp2k import methods as cp2k
 from libra_py import data_conv
+from libra_py.citools.sd_basis import followed_nac
 from libra_py import units
 
 class tmp:
@@ -140,9 +141,13 @@ def pyscf_compute_adi(q, params, full_id):
             obj.d1ham_adi[3 * iatom + 2].set(i, i, complex(grad[i][iatom, 2]))
 
     # ================= Compute derivative couplings =================
+    # the couplings of the FOLLOWED states (followed_nac): the engine swaps the labels of a pair that crosses
+    # within the step, and the raw (St - St^T) / (2 dt) of a swapped pair is 1 / dt or 0 by the arbitrary sign of
+    # the new eigenvectors
+    D = followed_nac(data_conv.MATRIX2nparray(obj.time_overlap_adi).real[:nstates, :nstates], dt)
     for i in range(nstates):
         for j in range(i + 1, nstates):
-            dij = ( obj.time_overlap_adi.get(i, j) - obj.time_overlap_adi.get(j, i) ) / (2.0 * dt)
+            dij = complex(D[i, j])
             # the same couplings in nac_adi (read directly by the LZ detectors,
             # the NAC phase correction and the nac_adi saver)
             obj.nac_adi.set(i, j, dij)

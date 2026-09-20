@@ -27,7 +27,7 @@ from libra_py.workflows.nbra import mapping, step2_many_body
 import scipy.io as io
 import libra_py.citools.ci as ci
 from libra_py.citools.sd_basis import (make_sd_basis, sd2ci_matrix,
-                                       align_ci_state_signs, check_sd_capture)
+                                       align_ci_state_signs, check_sd_capture, followed_nac)
 
 if sys.platform == "cygwin":
     from cyglibra_core import *
@@ -5197,7 +5197,8 @@ def _identity_cmatrix(n):
 
 def fill_adiabatic_hamiltonians(obj, E, st_ci, dt, s_ci=None, nac=True):
     """The adiabatic Hamiltonian objects of a driver step, each matrix through one bulk conversion instead of
-    an element loop: ham_adi = diag(E), hvib_adi = diag(E) - i D with the couplings D = (St - St^T) / (2 dt),
+    an element loop: ham_adi = diag(E), hvib_adi = diag(E) - i D with the couplings D of the followed states
+    (followed_nac: (St - St^T) / (2 dt) after the reordering, the raw formula wherever no pair swaps),
     nac_adi = D when nac is set, time_overlap_adi = St and overlap_adi = s_ci when given (the NBRA twin's
     Lowdin-orthonormalized CI overlap) or the identity. The CI overlaps of the drivers are real - a complex
     one is refused, as the former element casts float(...) refused it."""
@@ -5207,7 +5208,7 @@ def fill_adiabatic_hamiltonians(obj, E, st_ci, dt, s_ci=None, nac=True):
     n = E.shape[0]
     # the CI data may carry more states than the propagated ones - the former loops filled the n x n block
     St = np.asarray(st_ci, dtype=np.float64)[:n, :n]
-    D = (St - St.T) / (2.0 * dt)
+    D = followed_nac(St, dt)
     H = np.diag(E).astype(np.complex128)
     H.imag = 0.0 - D                                   # -D with a +0.0 diagonal, as the element casts wrote it
     obj.ham_adi = data_conv.nparray2CMATRIX(np.diag(E).astype(np.complex128))

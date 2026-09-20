@@ -30,7 +30,7 @@ from libra_py import units
 from libra_py import scan
 from libra_py import data_conv
 from libra_py.citools.sd_basis import (make_sd_basis, sd2ci_matrix,
-                                       align_ci_state_signs, check_sd_capture)
+                                       align_ci_state_signs, check_sd_capture, followed_nac)
 from libra_py import regexlib as rgl
 import libra_py.citools.ci as ci
 from libra_py import data_conv
@@ -3486,9 +3486,13 @@ def dftb_compute_adi(q, params, full_id):
     # the HST couplings go into nac_adi as well: the engine reads nac_adi
     # directly (LZ detectors, NAC phase correction, the nac_adi saver), and
     # hvib = H - i nac is then the engine's own rebuild convention
+    # the couplings of the FOLLOWED states (followed_nac): the engine swaps the labels of a pair that crosses
+    # within the step, and the raw (St - St^T) / (2 dt) of a swapped pair is 1 / dt or 0 by the arbitrary sign of
+    # the new eigenvectors
+    D = followed_nac(data_conv.MATRIX2nparray(obj.time_overlap_adi).real[:nstates, :nstates], dt)
     for i in range(nstates):
         for j in range(i + 1, nstates):
-            dij = ( obj.time_overlap_adi.get(i, j) - obj.time_overlap_adi.get(j, i) ) / (2.0 * dt)
+            dij = complex(D[i, j])
             obj.nac_adi.set(i, j, dij)
             obj.nac_adi.set(j, i, -dij)
             obj.hvib_adi.set(i, j, complex(0.0, -dij))

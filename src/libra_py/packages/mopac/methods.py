@@ -36,6 +36,7 @@ import libra_py.workflows.nbra.step3 as step3
 import libra_py.citools.slatdet as sd
 import libra_py.citools.interfaces as interfaces
 import libra_py.citools.ci as ci
+from libra_py.citools.sd_basis import followed_nac
 import libra_py.orthogonalizations as ortho
 
 def make_mopac_input(mopac_input_filename, mopac_run_params, labels, coords):
@@ -894,9 +895,13 @@ def mopac_compute_adi(q, params, full_id):
             obj.overlap_adi.set(istate,  jstate, complex(float(s_ci[istate, jstate])) )
 
     # Update the Hvib:
+    # the couplings of the FOLLOWED states (followed_nac): the engine swaps the labels of a pair that crosses
+    # within the step, and the raw (St - St^T) / (2 dt) of a swapped pair is 1 / dt or 0 by the arbitrary sign of
+    # the new eigenvectors
+    D = followed_nac(data_conv.MATRIX2nparray(obj.time_overlap_adi).real[:nstates, :nstates], dt)
     for istate in range(nstates):
         for jstate in range(istate + 1, nstates):
-            dij = (obj.time_overlap_adi.get(istate, jstate) - obj.time_overlap_adi.get(jstate, istate)) / (2.0 * dt)
+            dij = complex(D[istate, jstate])
             # the same couplings in nac_adi (read directly by the LZ detectors,
             # the NAC phase correction and the nac_adi saver)
             obj.nac_adi.set(istate, jstate, dij)
