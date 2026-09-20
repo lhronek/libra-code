@@ -1032,8 +1032,11 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                  6              -  same as 4, but without projection matrices (T_new = I)
                  7              -  split 2-point Hvib: exp(old half), T-dressed exp(new half), one reprojection
                  8              -  the same propagator as 7 (a historical duplicate once its reprojection was completed)
+                 9              -  ld, original with the second Magnus term: exp(-i (A + B) dt/2 + (dt^2/12) [A, B]), A the
+                                   old and B the new Hamiltonian in the old frame - for H linear in the step 2 has the
+                                   error constant -1/12 and 0 has +1/24, this one neither
               The projector family must match the integrator family (enforced by sanity_check):
-              0-2 and 10-12 need a rotation projector (state_tracking_algo -1/5/6), 3-8 and 13-15 a
+              0-2, 9 and 10-12, 19 need a rotation projector (state_tracking_algo -1/5/6), 3-8 and 13-15 a
               relabel projector (state_tracking_algo 0/1/2/21). The +100 variants (100-115) share the
               classification and pin the child Hamiltonian.
 
@@ -1043,6 +1046,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 13              -  same as 3, but with rotations
                 14              -  same as 4, but with rotations
                 15              -  same as 5, but with rotations
+                19              -  same as 9, but with rotations
 
               rep_tdse = 2 ( diabatic, density matrix formalism): 1** - with NBRA
 
@@ -1054,6 +1058,8 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                  1              -  Zhu Liouvillian
 
                 10              -  same as 0, but with rotations
+                 9              -  same as 0 with the second Magnus term (i dt/12) [A, B] in the mid-point Hamiltonian
+                19              -  same as 9, but with rotations
 
 
             * **dyn_params["ampl_transformation_method"]** (int): Whether transform the amplitudes by the T

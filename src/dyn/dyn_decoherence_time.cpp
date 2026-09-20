@@ -320,8 +320,9 @@ vector<MATRIX> schwartz_1(dyn_control_params &prms, CMATRIX &amplitudes,
 
   int option = 0; // default value for NAC-based integrators
   if (prms.electronic_integrator == 0 || prms.electronic_integrator == 1 ||
-      prms.electronic_integrator == 2 || prms.electronic_integrator == 10 ||
-      prms.electronic_integrator == 11 || prms.electronic_integrator == 12) {
+      prms.electronic_integrator == 2 || prms.electronic_integrator == 9 ||
+      prms.electronic_integrator == 10 || prms.electronic_integrator == 11 ||
+      prms.electronic_integrator == 12 || prms.electronic_integrator == 19) {
     option = 1;
   }
 
@@ -389,8 +390,9 @@ vector<MATRIX> schwartz_1(dyn_control_params &prms, CMATRIX &amplitudes,
 
   int option = 0; // default value for NAC-based integrators
   if (prms.electronic_integrator == 0 || prms.electronic_integrator == 1 ||
-      prms.electronic_integrator == 2 || prms.electronic_integrator == 10 ||
-      prms.electronic_integrator == 11 || prms.electronic_integrator == 12) {
+      prms.electronic_integrator == 2 || prms.electronic_integrator == 9 ||
+      prms.electronic_integrator == 10 || prms.electronic_integrator == 11 ||
+      prms.electronic_integrator == 12 || prms.electronic_integrator == 19) {
     option = 1;
   }
 

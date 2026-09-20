@@ -531,7 +531,7 @@ void dyn_control_params::sanity_check(){
     int m = electronic_integrator % 100; // the 10x variants share the classification
     int rot_proj = (state_tracking_algo==-1 || state_tracking_algo==5 ||
                     state_tracking_algo==6);
-    int ld_int = (m==0 || m==1 || m==2 || m==10 || m==11 || m==12);
+    int ld_int = (m==0 || m==1 || m==2 || m==9 || m==10 || m==11 || m==12 || m==19);
     int hvib_int = (m==3 || m==4 || m==5 || m==7 || m==8 || m==13 ||
                     m==14 || m==15);
     if(ld_int && (!rot_proj || assume_always_consistent==1)){
@@ -570,9 +570,10 @@ void dyn_control_params::sanity_check(){
   }
 
   /// every representation implements a fixed set of electronic integrators
-  /// in propagate_electronic - amplitudes (rep_tdse 0 and 1): -1, 0-8, 10-15;
+  /// in propagate_electronic - amplitudes (rep_tdse 0 and 1): -1, 0-8, 10-15,
+  /// the adiabatic ones (1) also the Magnus-corrected local diabatization 9, 19;
   /// the diabatic density matrix (2): 0; the adiabatic density matrix (3):
-  /// 0, 1, 10; each with the +100 variant. Any other value would leave the
+  /// 0, 1, 10 and the Magnus-corrected 9, 19; each with the +100 variant. Any other value would leave the
   /// electronic variables untouched for the whole run - refuse it here (the
   /// dispatch throws as well)
   if(rep_tdse>=0 && rep_tdse<=3){
@@ -580,12 +581,19 @@ void dyn_control_params::sanity_check(){
     int in_range = (electronic_integrator>=0 && electronic_integrator<200);
     int listed = 0;
     std::string implemented;
-    if(rep_tdse==0 || rep_tdse==1){
+    if(rep_tdse==0){
       listed = (electronic_integrator==-1) || (in_range && ((m>=0 && m<=8) || (m>=10 && m<=15)));
       implemented = "-1, 0-8, 10-15 or their +100 variants";
     }
+    else if(rep_tdse==1){
+      listed = (electronic_integrator==-1) || (in_range && ((m>=0 && m<=9) || (m>=10 && m<=15) || m==19));
+      implemented = "-1, 0-9, 10-15, 19 or their +100 variants";
+    }
     else if(rep_tdse==2){ listed = (in_range && m==0); implemented = "0 or 100"; }
-    else { listed = (in_range && (m==0 || m==1 || m==10)); implemented = "0, 1, 10 or their +100 variants"; }
+    else {
+      listed = (in_range && (m==0 || m==1 || m==9 || m==10 || m==19));
+      implemented = "0, 1, 9, 10, 19 or their +100 variants";
+    }
     if(!listed){
       std::cout<<"Error in dyn_control_params::sanity_check: electronic_integrator = "
           <<electronic_integrator<<" is not implemented for rep_tdse = "<<rep_tdse
@@ -602,7 +610,7 @@ void dyn_control_params::sanity_check(){
     int m = electronic_integrator % 100;
     int rot_proj = (state_tracking_algo==-1 || state_tracking_algo==5 ||
                     state_tracking_algo==6);
-    if((m==0 || m==1 || m==10) && (!rot_proj || assume_always_consistent==1)){
+    if((m==0 || m==1 || m==9 || m==10 || m==19) && (!rot_proj || assume_always_consistent==1)){
       std::cout<<"Error in dyn_control_params::sanity_check: the adiabatic"
           <<" density-matrix integrator (electronic_integrator = "
           <<electronic_integrator<<") carries the electronic coupling"

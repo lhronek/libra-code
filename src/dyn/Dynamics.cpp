@@ -782,10 +782,11 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
                                           CMATRIX &T_new, nHamiltonian *ham,
                                           nHamiltonian *ham_prev, int is_ssy,
                                           dyn_variables &dyn_var, int itraj,
-                                          int t_identity, int t_ampl_skip) {
+                                          int t_identity, int t_ampl_skip,
+                                          double dt_step) {
   /**
     One step of the adiabatic-amplitude propagation for the exp_-based
-    integrators (electronic_integrator = -1..8 and 100..108), extracted
+    integrators (electronic_integrator = -1..9 and 100..109), extracted
     verbatim from propagate_electronic. C holds amplitudes as columns: a
     single trajectory when called from the per-trajectory loop, or the whole
     (nadi x ntraj) batch at once on the NBRA fast path, where the one-step
@@ -800,7 +801,9 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
   // T_new was loaded as the identity (assume_always_consistent), so its
   // factors drop out of the chains exactly; t_ampl_skip suppresses only the
   // amplitude-side T factors (early electronic substeps) while the Hvib
-  // dressings keep aligning data frames with the real T.
+  // dressings keep aligning data frames with the real T. dt_step is the full
+  // nuclear step: the commutator of integrator 9 takes it, so that the
+  // electronic substeps multiply up to the exponent of the one step.
   thread_local std::unique_ptr<CMATRIX> wHvib, wHvib_old, wA, wB;
   if (!wHvib || wHvib->n_rows != ham->nadi) {
     wHvib.reset(new CMATRIX(ham->nadi, ham->nadi));
@@ -1011,11 +1014,39 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
 
       } // method == 8 && 108
 
+      else if (method == 9 || method == 109) {
+        // The local diabatization approach with the second Magnus term. With
+        // A the old Hamiltonian and B the new one in the old frame, linear in
+        // between, the propagator of the step is
+        // exp(-i (A + B) dt/2 + (dt^2/12) [A, B]). The averaged form (2)
+        // leaves the commutator out - error constant -1/12 - and the split
+        // form (0) carries (dt^2/8) [A, B] - error constant +1/24
+        Hvib_old = ham_prev->get_ham_adi_ref(); // T is the identity matrix
+        if (is_ssy) {
+          SSY_correction(Hvib_old, dyn_var, ham_prev, itraj);
+        }
+
+        Hvib = ham->get_ham_adi_ref();
+        if (is_ssy) {
+          SSY_correction(Hvib, dyn_var, ham, itraj);
+        }
+        if (!t_identity) { Hvib.product(adjoint(T_new), Hvib, T_new); }
+        B = Hvib_old * Hvib - Hvib * Hvib_old; // [A, B], anti-Hermitian
+        Hvib += Hvib_old;
+        // -i (dt/2) * i (dt_step/6) [A, B] = (dt dt_step / 12) [A, B]
+        Hvib += complex<double>(0.0, dt_step / 6.0) * B;
+
+        exp_(A, Hvib, complex<double>(0.0, -0.5 * dt));
+        if (t_identity || t_ampl_skip) { C.product(A, C); }
+        else { C.product(T_new, A, C); }
+
+      } // method == 9 && 109
+
       else {
         // sanity_check refuses these earlier - a silent fall-through would
         // leave the amplitudes untouched for the whole run
         cout << "Error in propagate_electronic(): electronic_integrator = " << method
-             << " has no adiabatic branch (rep_tdse = 1) - use -1, 0-8, 10-15 or their "
+             << " has no adiabatic branch (rep_tdse = 1) - use -1, 0-9, 10-15, 19 or their "
                 "+100 variants\n";
         std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
@@ -1090,7 +1121,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
   // trajectory 0's projector does not serve the whole batch there
   if (prms.isNBRA == 1 && is_ssy == 0 && rep == 1 && ntraj > 0 &&
       prms.state_tracking_algo != 4 &&
-      (method <= 8 || (method >= 100 && method <= 108))) {
+      (method <= 9 || (method >= 100 && method <= 109))) {
     CMATRIX T_new(*dyn_var.proj_adi[0]);
     // proj_adi is the per-nuclear-step reprojection: the amplitude-side
     // factors apply on the last electronic substep only - reapplying them
@@ -1100,7 +1131,8 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
     int t_skip = (isub < num_el - 1);
     propagate_amplitudes_adi_exp(method, dt, Coeff, T_new, Ham->children[0],
                                  Ham_prev->children[0], 0, dyn_var, 0,
-                                 prms.assume_always_consistent, t_skip);
+                                 prms.assume_always_consistent, t_skip,
+                                 prms.dt);
   } else {
 
   // Deterministic per-trajectory propagation: every iteration works only on
@@ -1301,6 +1333,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
            0              -  ld, with crude splitting,  with exp_
            1              -  ld, with symmetric splitting, with exp_
            2              -  ld, original, with exp_
+           9              -  ld, original with the second Magnus term, with exp_
            3              -  1-point, Hvib integration, with exp_
            4              -  2-points, Hvib integration, with exp_
            5              -  2-points, Hvib, integration with the second-point
@@ -1313,6 +1346,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
           13              -  same as 3, but with rotations
           14              -  same as 4, but with rotations
           15              -  same as 5, but with rotations
+          19              -  same as 9, but with rotations
 
       */
       // Workspaces for the rotation-based integrators below (thread-local:
@@ -1326,11 +1360,11 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
       CMATRIX &Hvib = *wHvib_rot;
       CMATRIX &Hvib_old = *wHvib_old_rot;
 
-      if (method <= 8 || (method >= 100 && method <= 108)) {
+      if (method <= 9 || (method >= 100 && method <= 109)) {
         propagate_amplitudes_adi_exp(method, dt, C, T_new, ham, ham_prev,
                                      is_ssy, dyn_var, itraj,
                                      prms.assume_always_consistent,
-                                     t_skip);
+                                     t_skip, prms.dt);
       }
 
       //========================== Rotation-based ============================
@@ -1443,9 +1477,30 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
 
       } // method == 15 && 115
 
+      else if (method == 19 || method == 119) {
+        // Same as 9 or 109, but with rotations
+        Hvib_old = ham_prev->get_ham_adi(); // T is the identity matrix
+        if (is_ssy) {
+          SSY_correction(Hvib_old, dyn_var, ham_prev, itraj);
+        }
+
+        Hvib = ham->get_ham_adi();
+        if (is_ssy) {
+          SSY_correction(Hvib, dyn_var, ham, itraj);
+        }
+        Hvib = T_new.H() * Hvib * T_new;
+        CMATRIX comm(Hvib_old * Hvib - Hvib * Hvib_old); // [A, B]
+        Hvib += Hvib_old;
+        Hvib += complex<double>(0.0, prms.dt / 6.0) * comm;
+
+        propagate_electronic_rot(0.5 * dt, C, Hvib);
+        C = T_ampl * C;
+
+      } // method == 19 && 119
+
       else {
         cout << "Error in propagate_electronic(): electronic_integrator = " << method
-             << " has no adiabatic branch (rep_tdse = 1) - use -1, 0-8, 10-15 or their "
+             << " has no adiabatic branch (rep_tdse = 1) - use -1, 0-9, 10-15, 19 or their "
                 "+100 variants\n";
         std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
@@ -1501,6 +1556,8 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
          Hvib 1              -  Zhu Liouvillian
 
           10              -  same as 0, but with rotations
+           9              -  same as 0 with the second Magnus term
+          19              -  same as 9, but with rotations
       */
 
       if (method == 0 || method == 100) {
@@ -1581,9 +1638,41 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         *dyn_var.dm_adi[itraj] = RHO;
       } // method == 10 or 110
 
+      else if (method == 9 || method == 109 || method == 19 || method == 119) {
+        // Same as 0 (9) or 10 (19) with the second Magnus term: the
+        // mid-point Hamiltonian plus (i dt/12) [A, B], A the old Hamiltonian
+        // and B the new one in the old frame - Hermitian, so the step is the
+        // Liouvillian of exp(-i (A + B) dt/2 + (dt^2/12) [A, B]). The
+        // commutator takes the full nuclear step, the electronic substeps
+        // multiply up to the exponent of the one step
+        CMATRIX Hvib(ham->nadi, ham->nadi);
+        CMATRIX Hvib_prev(ham->nadi, ham->nadi);
+        Hvib = T_new.H() * ham->get_ham_adi() * T_new; // "raw" to dyn-const
+        Hvib_prev = ham_prev->get_ham_adi();
+        if (is_ssy) {
+          SSY_correction(Hvib, dyn_var, ham, itraj);
+          SSY_correction(Hvib_prev, dyn_var, ham_prev, itraj);
+        }
+        CMATRIX comm(Hvib_prev * Hvib - Hvib * Hvib_prev); // [A, B]
+        Hvib = 0.5 * (Hvib + Hvib_prev) + complex<double>(0.0, prms.dt / 12.0) * comm;
+
+        L = make_Liouvillian(Hvib);
+        RHO = *dyn_var.dm_adi[itraj];
+        vRHO = vectorize_density_matrix(RHO);
+        if (method == 9 || method == 109) {
+          vRHO = exp_(L, complex<double>(0.0, -dt)) * vRHO;
+        } else {
+          propagate_electronic_rot(dt, vRHO, L);
+        }
+
+        RHO = unvectorize_density_matrix(vRHO);
+        RHO = T_ampl * RHO * T_ampl.H(); // dyn-const to "raw"
+        *dyn_var.dm_adi[itraj] = RHO;
+      } // method == 9, 109, 19 or 119
+
       else {
         cout << "Error in propagate_electronic(): electronic_integrator = " << method
-             << " has no adiabatic density-matrix branch (rep_tdse = 3) - use 0, 1, 10 or "
+             << " has no adiabatic density-matrix branch (rep_tdse = 3) - use 0, 1, 9, 10, 19 or "
                 "their +100 variants\n";
         std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
