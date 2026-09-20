@@ -1205,7 +1205,22 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
 
     if (rep == 0) { // diabatic
       CMATRIX Hvib(ham->ndia, ham->ndia);
-      CMATRIX Sdia(ham->ndia, ham->ndia);
+      // the metric over this electronic substep: S moves linearly over the nuclear
+      // step and a substep carries the amplitudes across its own share of that
+      // move - the whole move in every substep applies the change of frame
+      // num_electronic_substeps times (c^H S c off by 0.5 with two substeps). The
+      // ends of the nuclear step stay the very matrices of the Hamiltonians, so a
+      // single substep and a metric that does not move take the path they took
+      CMATRIX Sdia_old(ham_prev->get_ovlp_dia());
+      CMATRIX Sdia(ham->get_ovlp_dia());
+      double w_old = double(isub) / num_el;
+      double w_new = double(isub + 1) / num_el;
+      if (num_el > 1 && metric_moved(Sdia_old, Sdia)) {
+        CMATRIX S_first(Sdia_old);
+        CMATRIX S_last(Sdia);
+        if (isub > 0) { Sdia_old = (1.0 - w_old) * S_first + w_old * S_last; }
+        if (isub < num_el - 1) { Sdia = (1.0 - w_new) * S_first + w_new * S_last; }
+      }
 
       if (method == -1) {
         ;
@@ -1214,9 +1229,6 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
       else if (method == 0 || method == 100) {
         // Based on Lowdin transformations, using mid-point Hvib
         Hvib = 0.5 * (ham->get_hvib_dia() + ham_prev->get_hvib_dia());
-        Sdia = ham->get_ovlp_dia();
-        CMATRIX Sdia_old(ham->ndia, ham->ndia);
-        Sdia_old = ham_prev->get_ovlp_dia();
         if (metric_moved(Sdia_old, Sdia)) {
           // a moving metric makes Hvib non-Hermitian - the generalized eigen
           // route cannot take it, the Lowdin-frame step is its exact form
@@ -1227,24 +1239,26 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         }
       } else if (method == 1 || method == 101) {
         Hvib = 0.5 * (ham->get_hvib_dia() + ham_prev->get_hvib_dia());
-        Sdia = ham->get_ovlp_dia();
         propagate_electronic_qtag(dt, C, Hvib,
                                   Sdia); // in this case C - diabatic coeffs
       } else if (method == 2 || method == 102) {
         Hvib = ham->get_ham_dia();
-        Sdia = ham->get_ovlp_dia();
         CMATRIX Hvib_old(ham->ndia, ham->ndia);
         Hvib_old = ham_prev->get_ham_dia();
-        CMATRIX Sdia_old(ham->ndia, ham->ndia);
-        Sdia_old = ham_prev->get_ovlp_dia();
+        // the transfer Z(old) -> Z(new) belongs to the nuclear step: a substep
+        // takes its own share of the move of the Hamiltonian as well, the whole
+        // move in every substep repeats the transfer num_electronic_substeps times
+        if (num_el > 1) {
+          CMATRIX H_first(Hvib_old);
+          CMATRIX H_last(Hvib);
+          if (isub > 0) { Hvib_old = (1.0 - w_old) * H_first + w_old * H_last; }
+          if (isub < num_el - 1) { Hvib = (1.0 - w_new) * H_first + w_new * H_last; }
+        }
 
         propagate_electronic_qtag2(dt, C, Hvib, Hvib_old, Sdia, Sdia_old);
       } else if (method == 3 || method == 103) {
         // Using exp(S^-1 * Hvib_dia * dt)
         Hvib = 0.5 * (ham->get_hvib_dia() + ham_prev->get_hvib_dia());
-        Sdia = ham->get_ovlp_dia();
-        CMATRIX Sdia_old(ham->ndia, ham->ndia);
-        Sdia_old = ham_prev->get_ovlp_dia();
         if (metric_moved(Sdia_old, Sdia)) {
           // exp(S^-1 Hvib dt) with S taken at one end conserves c^H S c only to
           // O(dt) once the metric moves - the Lowdin-frame step conserves it exactly
@@ -1267,15 +1281,11 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         // adiabatic 4 undressed, 5 with the new point T-dressed, 6 without
         // the projector)
         Hvib = 0.5 * (ham->get_hvib_dia() + ham_prev->get_hvib_dia());
-        Sdia = ham->get_ovlp_dia();
-        CMATRIX Sdia_old(ham_prev->get_ovlp_dia());
         dia_exp_step(dt, C, Hvib, Sdia_old, Sdia);
       } else if (method == 7 || method == 107 || method == 8 || method == 108) {
         // split 2-point Hvib_dia: half a step with the old Hamiltonian, half
         // with the new, the metric moving half-way in each (the adiabatic 7
         // and 8 differ only in the reprojection, absent here)
-        Sdia = ham->get_ovlp_dia();
-        CMATRIX Sdia_old(ham_prev->get_ovlp_dia());
         CMATRIX Sdia_mid(0.5 * (Sdia_old + Sdia));
         Hvib = ham_prev->get_hvib_dia();
         dia_exp_step(0.5 * dt, C, Hvib, Sdia_old, Sdia_mid);
@@ -1283,8 +1293,6 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         dia_exp_step(0.5 * dt, C, Hvib, Sdia_mid, Sdia);
       } else if (method == 10 || method == 110) {
         // crude splitting by rotations: old half, new half
-        Sdia = ham->get_ovlp_dia();
-        CMATRIX Sdia_old(ham_prev->get_ovlp_dia());
         CMATRIX Sdia_mid(0.5 * (Sdia_old + Sdia));
         Hvib = ham_prev->get_hvib_dia();
         dia_rot_step(0.5 * dt, C, Hvib, Sdia_old, Sdia_mid);
@@ -1292,8 +1300,6 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         dia_rot_step(0.5 * dt, C, Hvib, Sdia_mid, Sdia);
       } else if (method == 11 || method == 111) {
         // symmetric splitting by rotations: old quarter, new half, old quarter
-        Sdia = ham->get_ovlp_dia();
-        CMATRIX Sdia_old(ham_prev->get_ovlp_dia());
         CMATRIX Sdia_q1(0.75 * Sdia_old + 0.25 * Sdia);
         CMATRIX Sdia_q3(0.25 * Sdia_old + 0.75 * Sdia);
         CMATRIX Hvib_old(ham_prev->get_hvib_dia());
@@ -1306,14 +1312,10 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         // 2-point Hvib_dia by rotations (the adiabatic 12 local
         // diabatization, 14 undressed and 15 dressed coincide here)
         Hvib = 0.5 * (ham->get_hvib_dia() + ham_prev->get_hvib_dia());
-        Sdia = ham->get_ovlp_dia();
-        CMATRIX Sdia_old(ham_prev->get_ovlp_dia());
         dia_rot_step(dt, C, Hvib, Sdia_old, Sdia);
       } else if (method == 13 || method == 113) {
         // 1-point Hvib_dia by rotations: the old Hamiltonian over the step
         Hvib = ham_prev->get_hvib_dia();
-        Sdia = ham->get_ovlp_dia();
-        CMATRIX Sdia_old(ham_prev->get_ovlp_dia());
         dia_rot_step(dt, C, Hvib, Sdia_old, Sdia);
       } else {
         // sanity_check refuses these earlier - a silent fall-through would
