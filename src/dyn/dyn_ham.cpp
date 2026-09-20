@@ -523,6 +523,28 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
                              prms.state_tracking_algo == 5 ||
                              prms.state_tracking_algo == 6);
         int relabel_gauge = (prms.assume_always_consistent == 0 && !rotation_proj);
+        // the relabel routes swap the labels of a pair that crosses within the step
+        // (an unresolved crossing) and move the amplitudes along. The raw St of a
+        // swapped pair turns by nearly pi/2: its antisymmetric part is 1/dt or 0 by
+        // the arbitrary sign of a fresh diagonalization, and the amplitudes would be
+        // turned twice or not at all. The coupling is taken between the FOLLOWED
+        // states - the new states ordered by the projector's own permutation - and
+        // goes back under the raw labels of the new states at the end. The
+        // force-based tracking (4) orders by forces, not by St, and keeps the raw order
+        CMATRIX perm(nadi, nadi);
+        perm.identity();
+        if (relabel_gauge && (prms.state_tracking_algo == 1 || prms.state_tracking_algo == 2 ||
+                              prms.state_tracking_algo == 21)) {
+          CMATRIX Eadi(ham.children[traj]->get_ham_adi());
+          CMATRIX T_follow(compute_projector(prms, Eadi, st));
+          for (int i = 0; i < nadi; i++) {
+            for (int j = 0; j < nadi; j++) {
+              perm.set(i, j, (std::abs(T_follow.get(i, j)) > 0.5) ? complex<double>(1.0, 0.0)
+                                                                   : complex<double>(0.0, 0.0));
+            }
+          }
+          st = st * perm;
+        }
         vector<double> flip(nadi, 1.0);
         if (!rotation_proj) {
           for (int i = 0; i < nadi; i++) {
@@ -545,13 +567,15 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
           std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
         // back into the re-signed amplitude gauge on the relabel routes:
-        // nac -> F nac F with F = diag(flip)
+        // nac -> F nac F with F = diag(flip), then under the raw labels of the new
+        // states: nac -> perm nac perm^H
         if (relabel_gauge) {
           for (int i = 0; i < nadi; i++) {
             for (int j = 0; j < nadi; j++) {
               if (flip[i] * flip[j] < 0.0) { nac.scale(i, j, -1.0); }
             }
           }
+          nac = perm * nac * perm.H();
         }
 
         ham.children[traj]->set_nac_adi_by_val(nac);
