@@ -570,9 +570,9 @@ void dyn_control_params::sanity_check(){
   }
 
   /// every representation implements a fixed set of electronic integrators
-  /// in propagate_electronic - amplitudes (rep_tdse 0 and 1): -1, 0-8, 10-15,
-  /// the adiabatic ones (1) also the Magnus-corrected local diabatization 9, 19;
-  /// the diabatic density matrix (2): 0; the adiabatic density matrix (3):
+  /// in propagate_electronic - amplitudes (rep_tdse 0 and 1): -1, 0-15 and 19
+  /// (9 and 19 carry the second Magnus term);
+  /// the diabatic density matrix (2): 0 and 9; the adiabatic density matrix (3):
   /// 0, 1, 10 and the Magnus-corrected 9, 19; each with the +100 variant. Any other value would leave the
   /// electronic variables untouched for the whole run - refuse it here (the
   /// dispatch throws as well)
@@ -582,14 +582,14 @@ void dyn_control_params::sanity_check(){
     int listed = 0;
     std::string implemented;
     if(rep_tdse==0){
-      listed = (electronic_integrator==-1) || (in_range && ((m>=0 && m<=8) || (m>=10 && m<=15)));
-      implemented = "-1, 0-8, 10-15 or their +100 variants";
+      listed = (electronic_integrator==-1) || (in_range && ((m>=0 && m<=15) || m==19));
+      implemented = "-1, 0-15, 19 or their +100 variants";
     }
     else if(rep_tdse==1){
       listed = (electronic_integrator==-1) || (in_range && ((m>=0 && m<=9) || (m>=10 && m<=15) || m==19));
       implemented = "-1, 0-9, 10-15, 19 or their +100 variants";
     }
-    else if(rep_tdse==2){ listed = (in_range && m==0); implemented = "0 or 100"; }
+    else if(rep_tdse==2){ listed = (in_range && (m==0 || m==9)); implemented = "0, 9 or their +100 variants"; }
     else {
       listed = (in_range && (m==0 || m==1 || m==9 || m==10 || m==19));
       implemented = "0, 1, 9, 10, 19 or their +100 variants";

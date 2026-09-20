@@ -1046,7 +1046,9 @@ class dyn_control_params{
   /**
     the method for electronic TD-SE integration:
 
-    rep_tdse = 0 (diabatic): 1** - with NBRA
+    rep_tdse = 0 (diabatic): 1** - with NBRA. The diabatic basis needs no reprojection, so the adiabatic variants
+    that differ only by the T dressing coincide here; a metric that moves within the step takes the Lowdin-frame form
+    of every step, an electronic substep its own share of that move
 
         -1              - No propagation
 
@@ -1054,6 +1056,16 @@ class dyn_control_params{
          1              - based on QTAG propagator
          2              - based on modified QTAG propagator (Z at two times)
          3              - non-Hermitian integrator with 2-point Hvib_dia
+         4, 5, 6        - the same 2-point step as 3
+         7, 8           - split 2-point: exp(old half), exp(new half), the metric moving half-way in each
+         9              - 2-point Hvib_dia with the second Magnus term: exp(-i (A + B) dt/2 + (dt^2/12) [A, B]), A the old
+                          and B the new S^-1 Hvib_dia - for Hvib_dia linear in the step 0 and 3-6 have the error constant
+                          -1/12 and 7, 8 have +1/24, this one neither
+        10              - crude splitting by rotations: old half, new half
+        11              - symmetric splitting by rotations: old quarter, new half, old quarter
+        12, 14, 15      - 2-point Hvib_dia by rotations
+        13              - 1-point Hvib_dia (the old Hamiltonian) by rotations
+        19              - same as 9, but with rotations
     
     rep_tdse = 1 (adiabatic):  1** - with NBRA
 
@@ -1086,6 +1098,7 @@ class dyn_control_params{
     rep_tdse = 2 ( diabatic, density matrix formalism): 1** - with NBRA
 
          0              -  mid-point Hvib with the second-point correction of Hvib
+         9              -  same as 0 with the second Magnus term (i dt/12) (A S^-1 B - B S^-1 A) in the mid-point Hamiltonian
 
     rep_tdse = 3 ( adiabatic, density matrix formalism): 1** - with NBRA
 

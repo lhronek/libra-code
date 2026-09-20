@@ -476,6 +476,50 @@ static void dia_rot_step(double dt, CMATRIX &C, CMATRIX &Hvib, CMATRIX &S_old,
   }
 }
 
+// the rep-0 step with the second Magnus term (methods 9 and 19, by rotations when rot is
+// set): exp(-i (A + B) dt/2 + (dt^2/12) [A, B]) with A, B the generators of the old and
+// the new frame - exact for a generator linear over the nuclear step. dt is the
+// electronic substep and dt_step the nuclear step: the commutator carries the whole
+// step, so the substeps multiply up to the one-step exponent. S_first -> S_last is the
+// metric over the nuclear step, S_old -> S_new over this substep. A constant metric
+// keeps the generators S^-1 Hvib, whose Magnus exponent is S^-1 applied to the Hermitian
+// (A + B)/2 + (i dt/12) (A S^-1 B - B S^-1 A); a moving metric takes the Lowdin frame
+// b = S^1/2 c, where the two generators are X Hvib X + i (dY/dt) X at the ends of the
+// nuclear step, Hermitian parts as propagate_electronic_lowdin takes them
+static void dia_magnus_step(double dt, double dt_step, CMATRIX &C, CMATRIX &Hvib_old,
+                            CMATRIX &Hvib_new, CMATRIX &S_first, CMATRIX &S_last,
+                            CMATRIX &S_old, CMATRIX &S_new, int rot) {
+  int sz = Hvib_old.n_cols;
+  complex<double> fac(0.0, dt_step / 12.0);
+  if (metric_moved(S_first, S_last)) {
+    CMATRIX Y0(sz, sz);  CMATRIX X0(sz, sz);
+    CMATRIX Y1(sz, sz);  CMATRIX X1(sz, sz);
+    libmeigen::sqrt_matrix(S_first, Y0, X0);
+    libmeigen::sqrt_matrix(S_last, Y1, X1);
+    CMATRIX dY(complex<double>(0.0, 1.0 / dt_step) * (Y1 - Y0));
+    CMATRIX GA(X0 * Hvib_old * X0 + dY * X0);
+    CMATRIX GB(X1 * Hvib_new * X1 + dY * X1);
+    GA = 0.5 * (GA + GA.H());
+    GB = 0.5 * (GB + GB.H());
+    CMATRIX G(0.5 * (GA + GB) + fac * (GA * GB - GB * GA));
+    CMATRIX Ya(sz, sz);  CMATRIX Xa(sz, sz);
+    CMATRIX Yb(sz, sz);  CMATRIX Xb(sz, sz);
+    libmeigen::sqrt_matrix(S_old, Ya, Xa);
+    libmeigen::sqrt_matrix(S_new, Yb, Xb);
+    CMATRIX b(Ya * C);
+    if (rot) { propagate_electronic_rot(dt, b, G); }
+    else { propagate_electronic_eig(dt, b, G); }
+    C = Xb * b;
+  } else {
+    CMATRIX invS(sz, sz);
+    FullPivLU_inverse(S_new, invS);
+    CMATRIX Heff(0.5 * (Hvib_old + Hvib_new) +
+                 fac * (Hvib_old * invS * Hvib_new - Hvib_new * invS * Hvib_old));
+    if (rot) { dia_rot_step(dt, C, Heff, S_new, S_new); }
+    else { dia_exp_step(dt, C, Heff, S_new, S_new); }
+  }
+}
+
 void propagate_electronic(dyn_variables &dyn_var, nHamiltonian &ham,
                           nHamiltonian &ham_prev, dyn_control_params &prms) {
 
@@ -1215,9 +1259,9 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
       CMATRIX Sdia(ham->get_ovlp_dia());
       double w_old = double(isub) / num_el;
       double w_new = double(isub + 1) / num_el;
+      CMATRIX S_first(Sdia_old);
+      CMATRIX S_last(Sdia);
       if (num_el > 1 && metric_moved(Sdia_old, Sdia)) {
-        CMATRIX S_first(Sdia_old);
-        CMATRIX S_last(Sdia);
         if (isub > 0) { Sdia_old = (1.0 - w_old) * S_first + w_old * S_last; }
         if (isub < num_el - 1) { Sdia = (1.0 - w_new) * S_first + w_new * S_last; }
       }
@@ -1298,6 +1342,14 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         dia_exp_step(0.5 * dt, C, Hvib, Sdia_old, Sdia_mid);
         Hvib = ham->get_hvib_dia();
         dia_exp_step(0.5 * dt, C, Hvib, Sdia_mid, Sdia);
+      } else if (method == 9 || method == 109 || method == 19 || method == 119) {
+        // 2-point Hvib_dia with the second Magnus term, 19 by rotations - for
+        // Hvib_dia linear in the step the 2-point average (0, 3-6) has the error
+        // constant -1/12 and the split step (7, 8) +1/24, this one neither
+        CMATRIX Hvib_old(ham_prev->get_hvib_dia());
+        Hvib = ham->get_hvib_dia();
+        dia_magnus_step(dt, prms.dt, C, Hvib_old, Hvib, S_first, S_last, Sdia_old, Sdia,
+                        (method == 19 || method == 119));
       } else if (method == 10 || method == 110) {
         // crude splitting by rotations: old half, new half
         CMATRIX Sdia_mid(0.5 * (Sdia_old + Sdia));
@@ -1328,7 +1380,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         // sanity_check refuses these earlier - a silent fall-through would
         // leave the amplitudes untouched for the whole run
         cout << "Error in propagate_electronic(): electronic_integrator = " << method
-             << " has no diabatic branch (rep_tdse = 0) - use -1, 0-8, 10-15 or their "
+             << " has no diabatic branch (rep_tdse = 0) - use -1, 0-15, 19 or their "
                 "+100 variants\n";
         std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
@@ -1548,9 +1600,32 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
 
       } // method == 0
 
+      else if (method == 9 || method == 109) {
+        // mid-point Hvib with the second Magnus term - the diabatic amplitude step 9
+        // for the density matrix: the generator is S^-1 applied to the Hermitian
+        // (A + B)/2 + (i dt/12) (A S^-1 B - B S^-1 A), the commutator carrying the
+        // whole nuclear step so the substeps multiply up to the one-step exponent
+        CMATRIX Hvib_old(ham_prev->get_hvib_dia());
+        CMATRIX Hvib(ham->get_hvib_dia());
+        CMATRIX invS(ham->ndia, ham->ndia);
+        invS.identity();
+        if (ham->ovlp_dia_mem_status) {
+          CMATRIX Sdia(ham->ndia, ham->ndia);
+          Sdia = ham->get_ovlp_dia();
+          FullPivLU_inverse(Sdia, invS);
+        }
+        CMATRIX Heff(0.5 * (Hvib_old + Hvib) + complex<double>(0.0, prms.dt / 12.0) *
+                     (Hvib_old * invS * Hvib - Hvib * invS * Hvib_old));
+        Heff = invS * Heff;
+        L = make_Liouvillian(Heff);
+        vRHO = vectorize_density_matrix(dyn_var.dm_dia[itraj]);
+        vRHO = exp_(L, complex<double>(0.0, -dt)) * vRHO;
+        *dyn_var.dm_dia[itraj] = unvectorize_density_matrix(vRHO);
+      } // method == 9
+
       else {
         cout << "Error in propagate_electronic(): electronic_integrator = " << method
-             << " has no diabatic density-matrix branch (rep_tdse = 2) - use 0 or 100\n";
+             << " has no diabatic density-matrix branch (rep_tdse = 2) - use 0, 9 or their +100 variants\n";
         std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
 
