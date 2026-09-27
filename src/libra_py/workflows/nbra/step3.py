@@ -3110,6 +3110,27 @@ def _ci_diabatization_series(params, sd_sorted, SD2CI, ci_energies, active_space
     return V_list, dia_index, pops_list, hole_list, energy_list
 
 
+def _follow_diabatic_states(W_list, St_list, start_time, basis="sd"):
+    """The localization eigenvectors carry arbitrary signs: every diabatic state follows the trajectory through the
+    time overlaps of its own basis, O = W(i)^T St(i) W(i+1), and the sign of every column of W(i+1) is set by the
+    sign of diag(O) (in place). A column whose |O_cc| falls below 0.5 does not continue itself - two states of one
+    fragment, or the two fragments' states at a symmetric geometry, swap between the frames - and the run is
+    refused: from that frame on the labels would mean other states."""
+    for i in range(len(St_list)):
+        O = W_list[i].T @ np.asarray(St_list[i].todense()).real @ W_list[i + 1]
+        d = np.abs(np.diag(O))
+        if d.min() < 0.5:
+            c = int(np.argmin(d))
+            row = np.abs(O[c]).copy()
+            row[c] = -1.0
+            partner = int(np.argmax(row))
+            raise ValueError(F"the diabatic {basis.upper()} state {c} of frame {start_time + i} continues into state "
+                             F"{partner} of frame {start_time + i + 1} (|<{c}|{c}>| = {d[c]:.3f}, |<{c}|{partner}>| = "
+                             F"{row[partner]:.3f}) - two localized states swap between the frames and the labels would "
+                             F"mean other states from there on: narrow the manifold or the active space")
+        W_list[i + 1] = W_list[i + 1] * np.where(np.diag(O) < 0.0, -1.0, 1.0)
+
+
 def _write_diabatization_records(res_dir, kind, dia_index, pops_list, hole_list, energy_list, start_time,
                                  operator="mulliken", basis="sd"):
     """U_{basis}_labels.json (the meaning of every diabatic state, with the mean energies over the
@@ -3643,11 +3664,7 @@ def run_step3_sd_nacs_libint(params):
 
     print('Done with computing the SD overlaps. Elapsed time:', time.time() - t2)
     if W_dia is not None:
-        # the localization eigenvectors carry arbitrary signs - the diabatic states
-        # follow the trajectory through the raw SD time overlaps of their own basis
-        for i in range(len(St_sds)):
-            O = W_dia[i].T @ np.asarray(St_sds[i].todense()).real @ W_dia[i + 1]
-            W_dia[i + 1] = W_dia[i + 1] * np.where(np.diag(O) < 0.0, -1.0, 1.0)
+        _follow_diabatic_states(W_dia, St_sds, start_time, "sd")
     if params['do_state_reordering'] == 2 or params['do_state_reordering'] == 1:
         t2 = time.time()
         # For state reordering we need a list of CMATRIX for both St and energy
@@ -3755,11 +3772,7 @@ def run_step3_sd_nacs_libint(params):
                 sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/St_ci_{i+start_time}_re.npz', sp.csc_matrix(St_ci))
 
         if V_dia is not None:
-            # the localization eigenvectors carry arbitrary signs - the diabatic CI states follow the
-            # trajectory through the CI time overlaps of their own (relabeled) basis
-            for i in range(len(St_cis)):
-                O = V_dia[i].T @ np.asarray(St_cis[i].todense()).real @ V_dia[i + 1]
-                V_dia[i + 1] = V_dia[i + 1] * np.where(np.diag(O) < 0.0, -1.0, 1.0)
+            _follow_diabatic_states(V_dia, St_cis, start_time, "ci")
 
     # Now, we move to applying phase-corrections
     if params['apply_phase_correction']:
