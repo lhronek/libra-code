@@ -40,6 +40,7 @@ import json
 import numpy as np
 from libra_py.workflows.nbra.mp_context import MP_CTX as _MP_CTX
 import scipy.sparse as sp
+from scipy.optimize import linear_sum_assignment
 if sys.platform == "cygwin":
     from cyglibra_core import *
 elif sys.platform == "linux" or sys.platform == "linux2":
@@ -3132,13 +3133,14 @@ def _follow_diabatic_states(W_list, St_list, start_time, basis="sd"):
 
 
 def _write_diabatization_records(res_dir, kind, dia_index, pops_list, hole_list, energy_list, start_time,
-                                 operator="mulliken", basis="sd"):
+                                 operator="mulliken", basis="sd", extra=None):
     """U_{basis}_labels.json (the meaning of every diabatic state, with the mean energies over the
     steps: the orbital energies of the localized orbitals of an SD-level state, the excitation
     energy of a many-body one, in eV) and U_{basis}_pops.txt (per step, the fragment populations
     of every diabatic state's localized electron orbital, then of its localized hole - nan where
     the state has none) - basis "sd" for the SD-level states, "ci" for the many-body ones (whose
-    untransformed state is the ground state)."""
+    untransformed state is the ground state). A localized state without an SD manifold (the POD
+    route) carries manifold null. extra: further top-level entries of the labels file."""
     E = np.stack([np.asarray(e, dtype=float) for e in energy_list])
     known = ~np.isnan(E)
     e_mean = np.where(known, E, 0.0).sum(axis=0) / np.maximum(known.sum(axis=0), 1)
@@ -3161,7 +3163,8 @@ def _write_diabatization_records(res_dir, kind, dia_index, pops_list, hole_list,
             else:
                 states[-1]["energy_eV"] = round(float(e_mean[col, 0]), 4)
         else:
-            states.append({"index": col, "type": "localized", "manifold": int(entry[1]),
+            states.append({"index": col, "type": "localized",
+                           "manifold": None if entry[1] is None else int(entry[1]),
                            "fragment": int(entry[2]), "rank": int(entry[3]),
                            "orbital_energy_eV" if basis == "sd" else "energy_eV": round(float(e_mean[col, 0]), 4)})
     with open(F'{res_dir}/U_{basis}_labels.json', 'w') as f:
@@ -3175,7 +3178,7 @@ def _write_diabatization_records(res_dir, kind, dia_index, pops_list, hole_list,
                            "electron in the lowest orbital first - the energies are means over "
                            "the steps in eV (the orbital energies of the localized orbitals of an "
                            "SD-level state, the excitation energy of a many-body state)",
-                   "states": states}, f, indent=1)
+                   "states": states, **(extra or {})}, f, indent=1)
     nfrag = pops_list[0].shape[1]
     nst = pops_list[0].shape[0]
     rows = [np.concatenate(([start_time + i], pops_list[i].reshape(-1), hole_list[i].reshape(-1)))
@@ -3196,6 +3199,277 @@ def _save_u(res_dir, W, cum_phase, step, basis="sd"):
 def _save_u_sd(res_dir, W, cum_phase, step):
     """U_sd = (W F)^T: rows = diabatic states, columns = the saved (phase-corrected) SDs."""
     _save_u(res_dir, W, cum_phase, step, "sd")
+
+
+def _pod_route_frame(hab, spin=0):
+    """h_POD of one frame in the block-state basis, block order: the block energies on the diagonal, the printed
+    couplings V_b{i}_b{j} (i < j) and their transposes between the blocks. Returns (h, nmo), nmo the states of every
+    block."""
+    nblk = len([key for key in hab.files if key.startswith("E_b") and key.endswith(F"_s{spin}")])
+    nmo = [len(hab[F"E_b{ib}_s{spin}"]) for ib in range(nblk)]
+    off = np.concatenate(([0], np.cumsum(nmo)))
+    h = np.zeros((off[-1], off[-1]))
+    for ib in range(nblk):
+        h[off[ib]:off[ib + 1], off[ib]:off[ib + 1]] = np.diag(np.asarray(hab[F"E_b{ib}_s{spin}"], dtype=float))
+        for jb in range(ib + 1, nblk):
+            v = np.asarray(hab[F"V_b{ib}_b{jb}_s{spin}"], dtype=float)
+            h[off[ib]:off[ib + 1], off[jb]:off[jb + 1]] = v
+            h[off[jb]:off[jb + 1], off[ib]:off[ib + 1]] = v.T
+    return h, nmo
+
+
+def _pod_route_hole_basis(nmo, occupied, per_block):
+    """The hole basis over the occupied block states: of every block the highest per_block[f] of its occupied[f]
+    occupied states (the block states are printed by increasing energy), block-major, the block HOMO first.
+    Returns the state indices in block order, the block and the rank of every basis state."""
+    off = np.concatenate(([0], np.cumsum(nmo)))
+    idx, frag, rank = [], [], []
+    for f in range(len(nmo)):
+        for r in range(per_block[f]):
+            idx.append(int(off[f] + occupied[f] - 1 - r))
+            frag.append(f)
+            rank.append(r)
+    return idx, frag, rank
+
+
+def _cofactor_matrix(A):
+    """C_ij = (-1)^(i+j) det(A without row i and column j) - for A the time overlaps of the orbitals of an occupied
+    set, the exact time overlaps of the one-hole determinants in the phase convention (-1)^i of run_step3_pod."""
+    n = A.shape[0]
+    C = np.empty_like(A)
+    for i in range(n):
+        rows = [r for r in range(n) if r != i]
+        for j in range(n):
+            cols = [c for c in range(n) if c != j]
+            C[i, j] = (-1.0) ** (i + j) * (np.linalg.det(A[np.ix_(rows, cols)]) if n > 1 else 1.0)
+    return C
+
+
+def run_step3_pod(params):
+    """
+    The POD-Hamiltonian route of step 3: the hole dynamics of a cation in the basis of the occupied POD block
+    states of the fragments themselves, with the Hamiltonian CP2K's POD prints - the block energies and the
+    block-block couplings - and the nonadiabatic couplings from the time overlaps of the block states between
+    the frames (step2 read_pod_cp2k_files: POD_cp2k_hab_{step}.npz and St_pod_cp2k_{step}.npz). No orbital of
+    the dimer is localized: the diabatic states are the block states, complete within every fragment block.
+
+    The diabatic basis: of every block f the highest num_occ_states_per_block[f] of its pod_occupied[f] occupied
+    block states, block-major, the block HOMO first (rank 0). A basis state is the one-hole determinant of the
+    cation with the hole in that block state, all other occupied block states of the basis filled (the block
+    states outside the basis are frozen, as the orbitals outside the active space of the SD route). With the phase
+    (-1)^i on the determinant of the i-th basis state (i in the basis order) the one-body Hamiltonian h between the
+    determinants is H_hole = tr(h_act) 1 - h_act, h_act the POD Hamiltonian over the basis states, and their time
+    overlap is det(St_act) times the cofactor matrix of St_act, St_act the time overlaps of the basis states -
+    equal to St_act itself to first order in the frame spacing. The signs of the printed block states are followed
+    along the trajectory by the sign of <s(k)|s(k+1)> - a basis state whose |<s(k)|s(k+1)>| falls below 0.5 does not
+    continue itself (two block states of one fragment swap between the frames) and the run is refused, as in the SD
+    route.
+
+    Written into path_to_save_sd_Hvibs - the file set of run_step3_sd_nacs_libint, so that the step-4 runner and the
+    plots read it unchanged, the 'sd' states here being the ADIABATIC hole states, the eigenstates of H_hole of every
+    frame by increasing energy (identity-followed under do_state_reordering 2):
+        Hvib_sd_{k}_re.npz  the adiabatic energies at the midpoint of the frames k and k+1 (as the SD route),
+        Hvib_sd_{k}_im.npz  Im(Hvib) = -d of the interval [k, k+1], (St^T - St) / (2 dt) of St_sd_{k},
+        St_sd_{k}_re.npz    the time overlaps of the adiabatic states, V(k)^T St_hole(k) V(k+1),
+        U_sd_{k}.npz        rows the diabatic (block) states, columns the adiabatic ones - V(k), U H_sd U^T = H_hole,
+        U_sd_labels.json    what every diabatic state is (fragment = block, rank, mean block energy in eV,
+                            manifold null), with "route": "pod_hamiltonian" and the basis counts,
+        U_sd_pops.txt       the block populations of the states (1 on their own block),
+        hvib_convention.json, pod_route_report.json (the continuity minimum, the first-order deviation of the
+                            determinant overlaps from the block-state overlaps, the reordered frames, the block gaps).
+
+    Args:
+        params (dictionary):
+
+            * **params['path_to_npz_files']** (string): the step-2 directory with POD_cp2k_hab_{step}.npz of every
+                frame start_time..finish_time-1 and St_pod_cp2k_{step}.npz of start_time..finish_time-2
+            * **params['logfile_directory']** (string): the step-2 CP2K logs - the HOMO index of the neutral system
+                must equal the sum of pod_occupied
+            * **params['path_to_save_sd_Hvibs']** (string): the output directory [default: cwd/res-pod]
+            * **params['start_time']**, **params['finish_time']** (int): the frames read, finish_time one past the
+                last - Hvib and St are written for start_time..finish_time-2, U for start_time..finish_time-1
+            * **params['time_step']** (float): the frame spacing in fs [default: 1.0]
+            * **params['pod_occupied']** (list of int): the occupied block states of every block - the valence
+                electron pairs of every fragment - in the block order of the POD section
+            * **params['num_occ_states_per_block']** (int or list of int): the basis states of every block, from the
+                block HOMO down [default: None = all occupied block states]
+            * **params['sd_charge']** (int): 1, the hole basis of the cation - the only value implemented
+            * **params['isUKS']** (int): 0 - the only value implemented
+            * **params['localized_carrier']** (string): 'hole' - the only value implemented
+            * **params['diabatization_scheme']** (string): 'pod_cp2k' - the only value implemented
+            * **params['apply_phase_correction']** (bool): follow the signs of the adiabatic states through
+                <a(k)|a(k+1)> [default: False - the frame-wise eigenvector signs, the same physics]
+            * **params['do_state_reordering']** (int): 0 [default] the adiabatic states by increasing energy at every
+                frame, 2 the Hungarian assignment of the adiabatic states of frame k+1 to those of frame k by the
+                largest squared time overlap (identity following through the avoided crossings) - 1 (Sato) is not
+                implemented on this route
+            * **params['state_reordering_alpha']** (float): the energy penalty of the assignment,
+                exp(-(alpha dE)^2) [default: 0]
+            * **params['apply_orthonormalization']**: the vocabulary of the SD route is accepted and has no effect -
+                the block states are orthonormal within every frame by construction (S^-1/2 v of the Lowdin frame),
+                their Lowdin factors are the identity
+
+    Returns:
+        dict: the report written to pod_route_report.json
+    """
+    critical_params = ['path_to_npz_files', 'logfile_directory', 'start_time', 'finish_time', 'pod_occupied']
+    default_params = {'path_to_save_sd_Hvibs': os.getcwd() + '/res-pod', 'time_step': 1.0,
+                      'num_occ_states_per_block': None, 'sd_charge': 1, 'isUKS': 0, 'localized_carrier': 'hole',
+                      'diabatization_scheme': 'pod_cp2k', 'apply_phase_correction': False,
+                      'apply_orthonormalization': 'lowdin_cached', 'do_state_reordering': 0,
+                      'state_reordering_alpha': 0.0}
+    comn.check_input(params, default_params, critical_params)
+    # the values the route implements - every other value is refused
+    for key, allowed, hint in (('sd_charge', (1,), "the frozen-orbital hole basis of the cation"),
+                               ('isUKS', (0,), "closed-shell block states"),
+                               ('localized_carrier', ('hole',), "the hole of the cation"),
+                               ('diabatization_scheme', ('pod_cp2k',), "the POD prints of CP2K"),
+                               ('do_state_reordering', (0, 2), "none or the Hungarian assignment")):
+        if params[key] not in allowed:
+            raise ValueError(F"run_step3_pod: params['{key}'] = {params[key]!r} is not implemented on the POD "
+                             F"route - {list(allowed)} ({hint})")
+    _orthonormalization_mode(params['apply_orthonormalization'])
+    res_dir_1, res_dir_2 = params['path_to_npz_files'], params['path_to_save_sd_Hvibs']
+    start_time, finish_time = int(params['start_time']), int(params['finish_time'])
+    if finish_time - start_time < 2:
+        raise ValueError("run_step3_pod needs at least two frames (finish_time - start_time >= 2)")
+    dt = params['time_step'] * units.fs2au
+    os.makedirs(res_dir_2, exist_ok=True)
+    marker_file = os.path.join(res_dir_2, 'hvib_convention.json')
+    if not os.path.exists(marker_file) and glob.glob(os.path.join(res_dir_2, '*_im.npz')):
+        raise ValueError(F"{res_dir_2} already holds *_im.npz files without a convention marker (legacy +d data) - "
+                         F"writing canonical -d files into it would mix conventions in one directory - use a fresh "
+                         F"output path or move the legacy files away")
+
+    frames = list(range(start_time, finish_time))
+    h_full, nmo_list = [], []
+    for k in frames:
+        h, nmo = _pod_route_frame(np.load(F'{res_dir_1}/POD_cp2k_hab_{k}.npz'))
+        h_full.append(h)
+        nmo_list.append(nmo)
+    if any(nmo != nmo_list[0] for nmo in nmo_list):
+        raise ValueError("the numbers of POD block states change along the trajectory")
+    nmo = nmo_list[0]
+    nblk = len(nmo)
+    occupied = [int(o) for o in params['pod_occupied']]
+    if len(occupied) != nblk:
+        raise ValueError(F"pod_occupied lists {len(occupied)} blocks, the POD prints carry {nblk}")
+    per_block = params['num_occ_states_per_block']
+    if per_block is None:
+        per_block = list(occupied)
+    elif np.isscalar(per_block):
+        per_block = [int(per_block)] * nblk
+    else:
+        per_block = [int(o) for o in per_block]
+    if len(per_block) != nblk:
+        raise ValueError(F"num_occ_states_per_block lists {len(per_block)} blocks, the POD prints carry {nblk}")
+    for f in range(nblk):
+        if not 0 <= per_block[f] <= occupied[f] <= nmo[f]:
+            raise ValueError(F"block {f}: 0 <= num_occ_states_per_block {per_block[f]} <= pod_occupied {occupied[f]} "
+                             F"<= {nmo[f]} block states is needed")
+    if sum(per_block) < 2:
+        raise ValueError("the hole basis needs at least two block states")
+    homo = CP2K_methods.read_homo_index(sorted(glob.glob(params['logfile_directory'] + '/*.log'))[0])
+    if sum(occupied) != homo:
+        raise ValueError(F"pod_occupied {occupied} sums to {sum(occupied)} occupied block states, the neutral system "
+                         F"of the step-2 log has {homo} occupied orbitals")
+    off = np.concatenate(([0], np.cumsum(nmo)))
+    block_gap = {}
+    for f in range(nblk):
+        if occupied[f] < nmo[f]:
+            a, b = off[f] + occupied[f] - 1, off[f] + occupied[f]
+            gaps = [h[b, b] - h[a, a] for h in h_full]
+            if min(gaps) <= 0.0:
+                raise ValueError(F"block {f}: the block state {occupied[f]} (first virtual) lies below the state "
+                                 F"{occupied[f] - 1} (last occupied) at frame {frames[int(np.argmin(gaps))]} - "
+                                 F"pod_occupied does not sit at a gap of the block")
+            block_gap[str(f)] = float(min(gaps) * units.au2ev)
+
+    idx, frag, rank = _pod_route_hole_basis(nmo, occupied, per_block)
+    n = len(idx)
+    St_raw = []
+    for k in frames[:-1]:
+        St_full = np.asarray(sp.load_npz(F'{res_dir_1}/St_pod_cp2k_{k}.npz').todense()).real
+        ntot = St_full.shape[0] // 2
+        if ntot != off[-1]:
+            raise ValueError(F"St_pod_cp2k_{k}.npz carries {ntot} block states per spin, the POD prints {off[-1]}")
+        St_raw.append(St_full[:ntot, :ntot][np.ix_(idx, idx)])
+    # the printed sign of every block state, followed along the trajectory
+    signs = [np.ones(n)]
+    for i, St in enumerate(St_raw):
+        d = np.diag(St)
+        if np.abs(d).min() < 0.5:
+            c = int(np.argmin(np.abs(d)))
+            row = np.abs(St[c]).copy()
+            row[c] = -1.0
+            partner = int(np.argmax(row))
+            raise ValueError(F"the POD block state {idx[c]} (block {frag[c]}, rank {rank[c]}) of frame {frames[i]} "
+                             F"continues into the basis state {partner} (block {frag[partner]}, rank {rank[partner]}) "
+                             F"of frame {frames[i + 1]} (|<{c}|{c}>| = {abs(d[c]):.3f}, |<{c}|{partner}>| = "
+                             F"{row[partner]:.3f}) - two block states swap between the frames and the labels would "
+                             F"mean other states from there on: narrow num_occ_states_per_block")
+        signs.append(signs[-1] * np.where(d < 0.0, -1.0, 1.0))
+    h_act = [signs[i][:, None] * h_full[i][np.ix_(idx, idx)] * signs[i][None, :] for i in range(len(frames))]
+    St_act = [signs[i][:, None] * St_raw[i] * signs[i + 1][None, :] for i in range(len(St_raw))]
+    # the one-hole determinants in the phase convention (-1)^i
+    H_hole = [np.trace(h) * np.eye(n) - h for h in h_act]
+    St_hole = [np.linalg.det(St) * _cofactor_matrix(St) for St in St_act]
+
+    E_adi, V = [], []
+    for k in range(len(frames)):
+        e, v = np.linalg.eigh(H_hole[k])
+        E_adi.append(e)
+        V.append(v)
+    reordered = []
+    for k in range(1, len(frames)):
+        O = V[k - 1].T @ St_hole[k - 1] @ V[k]
+        if params['do_state_reordering'] == 2:
+            dE = E_adi[k - 1][:, None] - E_adi[k - 1][None, :]
+            cost = O ** 2 * np.exp(-(params['state_reordering_alpha'] * dE) ** 2)
+            rows, cols = linear_sum_assignment(cost, maximize=True)
+            perm = cols[np.argsort(rows)]
+            if np.any(perm != np.arange(n)):
+                reordered.append(frames[k])
+            V[k], E_adi[k], O = V[k][:, perm], E_adi[k][perm], O[:, perm]
+        if params['apply_phase_correction']:
+            V[k] = V[k] * np.where(np.diag(O) < 0.0, -1.0, 1.0)
+
+    for k in range(len(frames) - 1):
+        St_adi = V[k].T @ St_hole[k] @ V[k + 1]
+        sp.save_npz(F'{res_dir_2}/St_sd_{frames[k]}_re.npz', sp.csc_matrix(St_adi))
+        sp.save_npz(F'{res_dir_2}/Hvib_sd_{frames[k]}_re.npz',
+                    sp.csc_matrix(np.diag(0.5 * (E_adi[k] + E_adi[k + 1]))))
+        sp.save_npz(F'{res_dir_2}/Hvib_sd_{frames[k]}_im.npz', sp.csc_matrix((St_adi.T - St_adi) / (2.0 * dt)))
+    for k in range(len(frames)):
+        sp.save_npz(F'{res_dir_2}/U_sd_{frames[k]}.npz', sp.csc_matrix(V[k]))
+    with open(marker_file, 'w') as f:
+        json.dump({'im_file_contains': 'Im(Hvib) = -d', 'isUKS': 0, 'sd_charge': 1, 'route': 'pod_hamiltonian'}, f)
+    dia_index = [("loc", None, frag[c], rank[c]) for c in range(n)]
+    pops_list = [np.eye(nblk)[frag] for _ in frames]
+    hole_list = [np.full((n, nblk), np.nan) for _ in frames]
+    energy_list = [np.column_stack((np.diag(h), np.full(n, np.nan))) for h in h_act]
+    _write_diabatization_records(res_dir_2, 'hole', dia_index, pops_list, hole_list, energy_list, start_time,
+                                 operator='pod_cp2k', basis='sd',
+                                 extra={"route": "pod_hamiltonian", "pod_occupied": occupied,
+                                        "num_occ_states_per_block": per_block,
+                                        "route_note": "the diabatic states are the occupied POD block states "
+                                                      "themselves (the one-hole determinants of the cation), the "
+                                                      "'sd' states their adiabatic combinations - the eigenstates of "
+                                                      "the POD hole Hamiltonian"})
+    report = {"frames": [start_time, finish_time], "n_states": n, "blocks": nblk, "block_states": nmo,
+              "pod_occupied": occupied, "num_occ_states_per_block": per_block,
+              "min_continuity": float(min(np.abs(np.diag(St)).min() for St in St_act)),
+              "max_hole_minus_block_overlap": float(max(np.abs(St_hole[k] - St_act[k]).max()
+                                                        for k in range(len(St_act)))),
+              "max_nonunitarity": float(max(np.abs(St.T @ St - np.eye(n)).max() for St in St_hole)),
+              "reordered_frames": reordered, "block_gap_eV": block_gap}
+    with open(F'{res_dir_2}/pod_route_report.json', 'w') as f:
+        json.dump(report, f, indent=1)
+    print(F"run_step3_pod: {n} hole states of {nblk} blocks ({per_block} of {occupied} occupied) over "
+          F"{len(frames)} frames - continuity min {report['min_continuity']:.4f}, |St_hole - St_block| max "
+          F"{report['max_hole_minus_block_overlap']:.2e}, |St^T St - 1| max {report['max_nonunitarity']:.2e}, "
+          F"{len(reordered)} reordered frames, block gaps {block_gap} eV")
+    return report
 
 
 @_with_parent_blas_cap
