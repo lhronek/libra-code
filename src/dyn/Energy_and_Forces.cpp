@@ -419,7 +419,7 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
 
     }// rep_force == 1
     else{
-      std::cout<<"Error in update_forces(): rep_force = "<<prms.isNBRA<<" has no branch here (implemented: 0, 1)\n";
+      std::cout<<"Error in update_forces(): rep_force = "<<prms.rep_force<<" has no branch here (implemented: 0, 1)\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }// TSH && adiabatic

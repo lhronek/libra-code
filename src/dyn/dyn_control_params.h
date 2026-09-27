@@ -1147,6 +1147,17 @@ class dyn_control_params{
 
 
   /**
+    After a change of the active state (an accepted hop, a relabel at a crossing), call the model back at
+    the same geometry for the force of the NEW active state
+    (the python step loop hands params["force_refresh"] = {trajectory: new state} to the model and ingests
+    the returned d1ham_adi alone): 0 - no; 1 - yes, for models that hand over the force of their active state
+    alone (the on-the-fly drivers under force_source "active_state"), whose new state's row is zero after a hop
+    and whose next half kick would otherwise run force-free. Needs force_method 1, rep_sh 1 and isNBRA 0.
+  */
+  int hop_force_refresh;
+
+
+  /**
     Total energy of the system - should be set according to the initial condition of the experiment
     Used by the nbra rescaling approach (experimental method) [ units: a.u. ]
     Default = 0.01 a.u.

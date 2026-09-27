@@ -1977,6 +1977,46 @@ void reset_coherence_factors(dyn_variables &dyn_var, vector<int> &act_states, ve
   } // for itraj
 }
 
+static void check_hop_force_rows(dyn_control_params &prms, dyn_variables &dyn_var,
+                                 nHamiltonian &ham, vector<int> &old_states,
+                                 vector<int> &new_states) {
+  /**
+    After a change of the active state - a surface hop or a relabel at a
+    crossing - the force column of the new state must not be exactly zero
+    while the old state's row of the model's hand-over carries a force: that
+    is a model handing over the force of its active state alone (the
+    on-the-fly drivers under force_source active_state), whose next half kick
+    would run force-free. Under hop_force_refresh the python step loop fills
+    the row right after this step and checks it itself.
+  */
+  if (prms.force_method != 1 || prms.rep_sh != 1 || prms.hop_force_refresh == 1) { return; }
+  int ndof = ham.nnucl;
+  for (int traj = 0; traj < dyn_var.ntraj; traj++) {
+    if (old_states[traj] == new_states[traj] || (int)ham.children.size() <= traj) { continue; }
+    bool zero = true;
+    for (int idof = 0; idof < ndof && zero; idof++) {
+      if (dyn_var.f->get(idof, traj) != 0.0) { zero = false; }
+    }
+    if (!zero) { continue; }
+    bool old_carries = false;
+    for (int idof = 0; idof < ndof && !old_carries; idof++) {
+      CMATRIX d1(prms.rep_force == 0 ? ham.children[traj]->get_d1ham_dia(idof)
+                                     : ham.children[traj]->get_d1ham_adi(idof));
+      if (d1.get(old_states[traj], old_states[traj]).real() != 0.0) { old_carries = true; }
+    }
+    if (old_carries) {
+      std::cout << "Error in compute_dynamics(): the active state of trajectory " << traj << " changed "
+                << old_states[traj] << " -> " << new_states[traj] << " (a hop or a relabel at a crossing) and "
+                << "the force of the new state is zero while the old "
+                << "state's row carries one - the model hands over the force of its active state alone (the "
+                << "on-the-fly drivers under force_source active_state), so the next half kick would run "
+                << "force-free: set hop_force_refresh = 1 (the model is called back at the same geometry for "
+                << "the new state's force) or hand over every state's force (force_source all_states)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+  }
+}
+
 void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
                       nHamiltonian &ham, nHamiltonian &ham_aux,
                       bp::object py_funct, bp::dict params, Random &rnd,
@@ -2793,6 +2833,9 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   dyn_var.update_density_matrix(prms);
 
   update_forces(prms, dyn_var, ham);
+  // old_states holds the active states at the start of the step - a relabel at a
+  // crossing and a surface hop both change the row the forces are read from
+  check_hop_force_rows(prms, dyn_var, ham, old_states, act_states);
 
   // Saves the current density matrix into the previous - needed for FSSH2 and
   // GFSH (original)

@@ -148,6 +148,7 @@ dyn_control_params::dyn_control_params(){
   assume_always_consistent = 0;
 
   thermally_corrected_nbra = 0;
+  hop_force_refresh = 0;
   total_energy = 0.01; // some reasonable value
   tcnbra_nu_therm = 0.001; 
   tcnbra_nhc_size = 1;
@@ -286,6 +287,7 @@ dyn_control_params::dyn_control_params(const dyn_control_params& x){
   *schwartz_interaction_width = *x.schwartz_interaction_width;
 
   thermally_corrected_nbra = x.thermally_corrected_nbra;
+  hop_force_refresh = x.hop_force_refresh;
   total_energy = x.total_energy;
   tcnbra_nu_therm = x.tcnbra_nu_therm;
   tcnbra_nhc_size = x.tcnbra_nhc_size;
@@ -393,6 +395,7 @@ void dyn_control_params::sanity_check(){
     {"ampl_transformation_method", ampl_transformation_method, {0, 1}},
     {"assume_always_consistent", assume_always_consistent, {0, 1}},
     {"thermally_corrected_nbra", thermally_corrected_nbra, {0, 1}},
+    {"hop_force_refresh", hop_force_refresh, {0, 1}},
     {"tcnbra_do_nac_scaling", tcnbra_do_nac_scaling, {0, 1}}
   };
   /// decoherence_algo is stored as a double - only whole numbers name an algorithm
@@ -630,6 +633,15 @@ void dyn_control_params::sanity_check(){
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
+  /// the call-back after a hop refreshes the state-specific force of one trajectory's own child for its
+  /// adiabatic active state
+  if(hop_force_refresh==1 && (isNBRA==1 || force_method!=1 || rep_sh!=1)){
+    std::cout<<"Error in dyn_control_params::sanity_check: hop_force_refresh needs the state-specific forces "
+        <<"(force_method = 1) of adiabatic hopping states (rep_sh = 1) on per-trajectory child Hamiltonians "
+        <<"(isNBRA = 0)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
   /// Shall not use DISH with the decoherence correction
   /// (tsh_method 3 is Landau-Zener - DISH is 5)
   if(tsh_method==5 && decoherence_algo!=-1){
@@ -838,6 +850,7 @@ void dyn_control_params::set_parameters(bp::dict params){
     else if(key=="assume_always_consistent"){  assume_always_consistent = bp::extract<int>(params.values()[i]); }
 
     else if(key=="thermally_corrected_nbra"){ thermally_corrected_nbra = bp::extract<int>(params.values()[i]); }
+    else if(key=="hop_force_refresh"){ hop_force_refresh = bp::extract<int>(params.values()[i]); }
     else if(key=="total_energy") { total_energy = bp::extract<double>(params.values()[i]);  }
     else if(key=="tcnbra_nu_therm") { tcnbra_nu_therm =  bp::extract<double>(params.values()[i]); }
     else if(key=="tcnbra_nhc_size") { tcnbra_nhc_size =  bp::extract<int>(params.values()[i]); }

@@ -5615,6 +5615,56 @@ def _nbra_step_filename(params, key, itraj):
     return name
 
 
+def _cp2k_run_params(params, is_first_time, wd, act_state, force_source, nexc):
+    """The parameters of one CP2K run of the driver: the execution-layer keys of params, the OT pre-convergence
+    template only where the SCF starts cold (the trajectory's first call, under ot_first_call_only - later calls
+    restart the diagonalization from their own previous wfn), and force_source "gs" always at the GS (drops any
+    &EXCITED_STATES section, so the parsed FORCES| block is the S0 forces)."""
+    run_params = {k: params[k] for k in
+                  ("atom_labels", "input_template", "ot_template", "time_dependent",
+                   "force_source", "cp2k_exe", "cp2k_data_dir",
+                   "omp_num_threads", "mpi_executable", "nprocs", "project",
+                   "retry_templates", "allow_unconverged_scf")
+                  if k in params}
+    if params.get("ot_first_call_only", False) and not is_first_time:
+        run_params.pop("ot_template", None)
+    run_params.update({"act_state": 0 if force_source == "gs" else act_state,
+                       "working_directory": wd,
+                       "number_of_states": params.get("number_of_states", nexc)})
+    return run_params
+
+
+def _cp2k_force_refresh(params, itraj, coordinates, nat, nstates):
+    """The hand-over of the engine's call-back after a hop (hop_force_refresh: params["force_refresh"] = {trajectory:
+    new active state}): one CP2K force run for the new state at the same geometry, its force put into the rows handed
+    over at the regular call of this step, and nothing else - the caches of the time overlaps stay as the regular
+    call left them. A trajectory absent from the call-back, and a force_source whose rows are all filled already
+    (gs, none, all_states, the GS-SD mode), hand back an empty object."""
+    obj = tmp()
+    refresh = params["force_refresh"]
+    force_source = params.get("force_source", "active_state")
+    if itraj not in refresh or force_source != "active_state" or not params.get("time_dependent", True):
+        return obj
+    if itraj not in params["force_rows"] or itraj not in params["E_adi_last"]:
+        raise RuntimeError(F"force_refresh for trajectory {itraj} before its regular call of the step")
+    new_state = int(refresh[itraj])
+    wd = F"{params.get('working_directory_prefix', 'wd')}_itraj{itraj}"
+    run_params = _cp2k_run_params(params, False, wd, new_state, force_source, nstates - 1)
+    res = compute_state_energy_and_force(coordinates, run_params)
+    e_last = np.asarray(params["E_adi_last"][itraj], dtype=float)
+    e_now = np.asarray(res["E_adi"], dtype=float)
+    m = min(e_last.size, e_now.size, nstates)
+    dev = float(np.abs(e_now[:m] - e_last[:m]).max())
+    if dev > 1e-4:
+        raise RuntimeError(F"force_refresh of trajectory {itraj}: the energies at the call-back differ from the "
+                           F"regular call of the step by {dev:.2e} Ha - the geometry moved between them")
+    rows = np.array(params["force_rows"][itraj], dtype=np.float64)
+    rows[:3 * nat, new_state] = -np.asarray(res["forces"], dtype=np.float64).reshape(3 * nat)
+    params["force_rows"][itraj] = rows
+    fill_diagonal_forces(obj, rows)
+    return obj
+
+
 def _carried(params, key, itraj, current, is_first_time):
     """Per-trajectory carried state; a missing entry after the first step
     means the params dict was rebuilt between calls - substituting the
@@ -5785,6 +5835,9 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     additionally sits on the 5e-2 print floor)
                                                              [default 1e-6]
                 act_state (dict itraj->int): synced by run_dynamics each step
+                force_refresh (dict itraj->int): set by the engine's call-back after a hop
+                    (hop_force_refresh) - the call hands back the new state's force at the
+                    same geometry and nothing else, see _cp2k_force_refresh
                 working_directory_prefix (str)                   [default "wd"]
                 cp2k_data_dir, omp_num_threads, mpi_executable, nprocs,
                 number_of_states: passed to the execution layer
@@ -5796,14 +5849,14 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     ham_transform_method 3
 
 
-            Caches (auto-created): mo_prev, ci_prev, E_adi_prev, S_prev,
+            Caches (auto-created): mo_prev, ci_prev, E_adi_last, force_rows, S_prev,
                 homo, sd_basis, coordinates_prev, is_first_time
 
         full_id: Libra trajectory id; last element = itraj
 
     Returns:
-        obj with CMATRIX fields: ham_adi, hvib_adi (diagonals = mid-point total
-        energies), time_overlap_adi (CI-level), overlap_adi (identity),
+        obj with CMATRIX fields: ham_adi, hvib_adi (diagonals = the total energies
+        at the geometry), time_overlap_adi (CI-level), overlap_adi (identity),
         basis_transform (identity), nac_adi (zeros), d1ham_adi (list over DOFs,
         -force at the active-state diagonal), dc1_adi (zeros - CP2K TDDFPT has
         no NACVs; use energy-based hop acceptance/rescaling).
@@ -5821,13 +5874,16 @@ def cp2k_compute_adi_impl(q, params, full_id):
     nat = ndof // 3
 
     # ---------------- per-trajectory caches ----------------
-    for key in ("mo_prev", "ci_prev", "E_adi_prev", "S_prev", "sd_prev",
+    for key in ("mo_prev", "ci_prev", "E_adi_last", "force_rows", "S_prev", "sd_prev",
                 "coordinates_prev", "is_first_time", "act_state", "homo", "nelec"):
         params.setdefault(key, {})
     is_first_time = params["is_first_time"].get(itraj, True)
     act_state = int(params["act_state"].get(itraj, 0))
 
     nstates = int(params["nstates"])
+    if "force_refresh" in params:
+        # the engine's call-back after a hop (hop_force_refresh): the new state's force, nothing else
+        return _cp2k_force_refresh(params, itraj, coordinates, nat, nstates)
     nexc = nstates - 1
     LO = int(params["lowest_orbital"])
     HI = int(params["highest_orbital"])
@@ -5906,22 +5962,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
                  glob.glob(os.path.join(wd, "*-RESTART.tdwfn*")):
             os.remove(f)
 
-    run_params = {k: params[k] for k in
-                  ("atom_labels", "input_template", "ot_template", "time_dependent",
-                   "force_source", "cp2k_exe", "cp2k_data_dir",
-                   "omp_num_threads", "mpi_executable", "nprocs", "project",
-                   "retry_templates", "allow_unconverged_scf")
-                  if k in params}
-    # the OT pre-convergence run matters where the SCF starts cold - the
-    # trajectory's first call; later calls restart the diagonalization from
-    # their own previous-step wfn
-    if params.get("ot_first_call_only", False) and not is_first_time:
-        run_params.pop("ot_template", None)
-    # force_source="gs": always run at the GS (drops any &EXCITED_STATES
-    # section), so the parsed FORCES| block is guaranteed to be the S0 forces
-    run_params.update({"act_state": 0 if force_source == "gs" else act_state,
-                       "working_directory": wd,
-                       "number_of_states": params.get("number_of_states", nexc)})
+    run_params = _cp2k_run_params(params, is_first_time, wd, act_state, force_source, nexc)
     res = compute_state_energy_and_force(coordinates, run_params)
     E_adi_curr = res["E_adi"][:nstates]
     forces = res["forces"]
@@ -6265,11 +6306,9 @@ def cp2k_compute_adi_impl(q, params, full_id):
                                cache=sd_cache, sd_states_prev=sd_prev_sorted)
         params["sd_prev"][itraj] = sd_sorted
 
-    # ---------------- mid-point energies ----------------
-    E_adi_prev = _carried(params, "E_adi_prev", itraj, E_adi_curr, is_first_time)
-    E_mid = 0.5 * (E_adi_prev + E_adi_curr)
-
     # ---------------- build the returned object ----------------
+    # the energies AT the geometry: the hop acceptance, the momentum rescaling and the saved total energy read
+    # them there, and the two-point integrators average the two ends of a step by themselves
     obj = tmp()
 
     if dia_basis == "sd":
@@ -6298,7 +6337,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
                                  'time-overlap path (overlap_backend="sd" '
                                  'with TDDFPT states)')
             dt_c = float(params.get("dt", 41.0))
-            H_sd = T_dia @ np.diag(np.asarray(E_mid[:nstates], dtype=float)) @ T_dia.T
+            H_sd = T_dia @ np.diag(np.asarray(E_adi_curr[:nstates], dtype=float)) @ T_dia.T
             D_sd = (np.asarray(st_sd) - np.asarray(st_sd).T) / (2.0 * dt_c)
             obj.hvib_dia = data_conv.nparray2CMATRIX(H_sd - 1j * D_sd)
     else:
@@ -6310,20 +6349,22 @@ def cp2k_compute_adi_impl(q, params, full_id):
     # against any engine rebuild and carried no couplings to consume
     # the same couplings in nac_adi: read directly by the LZ detectors, the NAC phase correction and the
     # nac_adi saver - ham_adi, hvib_adi, nac_adi, time_overlap_adi and the identity overlap_adi in one pass
-    fill_adiabatic_hamiltonians(obj, E_mid[:nstates], st_ci, dt, nac=True)
+    fill_adiabatic_hamiltonians(obj, E_adi_curr[:nstates], st_ci, dt, nac=True)
 
     # the diagonal force terms of every degree of freedom as one array, then one diagonal CMATRIX per degree of
     # freedom through the bulk transfer
     forces_all = res.get("forces_all", None)   # mechanism B: per-state forces, the first nstates of them
     # mechanism A: the active state alone - GS mode and force_source "gs" / "none" put the GS forces on every diagonal
     active = act_state if (time_dependent and force_source == "active_state") else None
-    fill_diagonal_forces(obj, force_diagonals(nstates, ndof, nat, forces, forces_all, active))
+    rows = force_diagonals(nstates, ndof, nat, forces, forces_all, active)
+    fill_diagonal_forces(obj, rows)
+    params["force_rows"][itraj] = rows                  # for the engine's call-back after a hop
 
     # ---------------- store per-trajectory state ----------------
     params["mo_prev"][itraj] = mo_curr
     if time_dependent:
         params["ci_prev"][itraj] = ci_curr
-    params["E_adi_prev"][itraj] = E_adi_curr.copy()
+    params["E_adi_last"][itraj] = E_adi_curr.copy()
     params["S_prev"][itraj] = Sc_ch if isUKS else Sc_ch[0]
     params["coordinates_prev"][itraj] = coordinates.copy()
     params["is_first_time"][itraj] = False
@@ -6497,7 +6538,9 @@ def _cp2k_prefetch_dispatch(q, params, full_id):
 def cp2k_compute_adi(q, params, full_id):
     """Traceback-printing wrapper: C++ callers swallow Python exceptions."""
     try:
-        if int(params.get("prefetch_trajectories", 0)):
+        # the engine's call-back after a hop (hop_force_refresh) is one force run for one trajectory, outside the
+        # per-step prefetch batches
+        if int(params.get("prefetch_trajectories", 0)) and "force_refresh" not in params:
             return _cp2k_prefetch_dispatch(q, params, full_id)
         return cp2k_compute_adi_impl(q, params, full_id)
     except Exception:

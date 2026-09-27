@@ -2887,6 +2887,60 @@ def _uks_ci_overlap(S2, data_bra, data_ket, info, lo):
 _warned_partial_forces = False
 
 
+def _dftb_state_forces(coordinates, dftb_params, prms1, wd, s):
+    """The excited-state forces of root s at the geometry of the regular run in wd (Fortran-shaped (3, natoms)):
+    the excited calculation rerun in wd/fstates with StateOfInterest s, the SCC restarted from the converged
+    charges, the couplings and spectroscopy outputs off - root s is the same variational solution whether or not
+    the roots above it are converged, so solving only s roots trims the dominant Casida cost of the rerun."""
+    fs_wd = os.path.join(wd, "fstates")
+    os.makedirs(fs_wd, exist_ok=True)
+    shutil.copy(os.path.join(wd, "charges.bin"), fs_wd)
+    fs_params = dict(dftb_params)
+    fs_params.update({
+        "StateCouplings": None,
+        "WriteSPTransitions": "No",
+        "WriteXplusY": "No",
+        "WriteEigenvectors": "No",
+        "EigenvectorsAsText": "No",
+        "HamiltonianExtras": (lambda x: x + "\n" if x and not x.endswith("\n") else x)(
+            dftb_params.get("HamiltonianExtras", ""))
+        + "    ReadInitialCharges = Yes\n",
+        "StateOfInterest": s,
+        "NrOfExcitations": s,
+    })
+    prms_s = dict(prms1)
+    prms_s.update({"dftb_run_params": fs_params, "working_directory": fs_wd, "what_calculation": "ex"})
+    run_dftb(coordinates, prms_s)
+    return np.asarray(parse_tagged_file(F"{fs_wd}/autotest.tag")["forces"])
+
+
+def _dftb_force_refresh(params, itraj, coordinates, nat, ndof, dftb_params, prms1, wd):
+    """The hand-over of the engine's call-back after a hop (hop_force_refresh: params["force_refresh"] = {trajectory:
+    new active state}): the force of the new state at the same geometry by the rerun of the all_states route
+    (_dftb_state_forces), put into the rows handed over at the regular call of this step, and nothing else. A
+    trajectory absent from the call-back hands back an empty object - a hop to the ground state (row 0 is always
+    filled), force_source all_states and a Niehaus FRC.DAT (every row filled) hand the rows back as they are."""
+    obj = tmp()
+    refresh = params["force_refresh"]
+    if itraj not in refresh:
+        return obj
+    if itraj not in params.get("force_rows", {}):
+        raise RuntimeError(F"force_refresh for trajectory {itraj} before its regular call of the step")
+    rows = np.array(params["force_rows"][itraj], dtype=np.float64)
+    new_state = int(refresh[itraj])
+    if (new_state >= 1 and params.get("force_source", "active_state") == "active_state"
+            and not os.path.exists(F"{wd}/FRC.DAT")):
+        f_s = _dftb_state_forces(coordinates, dftb_params, prms1, wd, new_state)
+        for iatom in range(nat):
+            for k in range(3):
+                rows[3 * iatom + k, new_state] = -f_s[k, iatom]
+        params["force_rows"][itraj] = rows
+    obj.d1ham_adi = CMATRIXList()
+    for idof in range(ndof):
+        obj.d1ham_adi.append(data_conv.nparray2CMATRIX(np.diag(rows[idof]).astype(np.complex128)))
+    return obj
+
+
 def dftb_compute_adi(q, params, full_id):
     """
     Compute adiabatic electronic properties and derivative couplings for one trajectory
@@ -2954,6 +3008,10 @@ def dftb_compute_adi(q, params, full_id):
         act_state : dict
             Dictionary keyed by trajectory index (`itraj`) with integer values
             indicating the active electronic state for this trajectory.
+        force_refresh : dict
+            Set by the engine's call-back after a hop (hop_force_refresh), keyed by
+            trajectory index with the new active state: the call hands back the new
+            state's force at the same geometry and nothing else (_dftb_force_refresh).
         MO_prev : dict
             Previous molecular orbitals per trajectory (updated in-place).
         data_prev : dict
@@ -3135,6 +3193,9 @@ def dftb_compute_adi(q, params, full_id):
         "working_directory": wd,
         "gen_file": dftb_run_params.get("gen_file", "x1.gen"),
     }
+    if "force_refresh" in params:
+        # the engine's call-back after a hop (hop_force_refresh): the new state's force, nothing else
+        return _dftb_force_refresh(params, itraj, coordinates, nat, ndof, dftb_params, prms1, wd)
     try:
         run_dftb(coordinates, prms1)
     except subprocess.CalledProcessError as e:
@@ -3163,35 +3224,10 @@ def dftb_compute_adi(q, params, full_id):
         # a Niehaus-branch DFTB+ (writeAllExcitedForces) already wrote every
         # StateCouplings state's forces to FRC.DAT - the reruns would be
         # redundant, the fill below consumes the file directly
-        fs_wd = os.path.join(wd, "fstates")
-        os.makedirs(fs_wd, exist_ok=True)
-        shutil.copy(os.path.join(wd, "charges.bin"), fs_wd)
-        fs_params = dict(dftb_params)
-        fs_params.update({
-            "StateCouplings": None,
-            "WriteSPTransitions": "No",
-            "WriteXplusY": "No",
-            "WriteEigenvectors": "No",
-            "EigenvectorsAsText": "No",
-            "HamiltonianExtras": (lambda x: x + "\n" if x and not x.endswith("\n") else x)(
-                dftb_params.get("HamiltonianExtras", ""))
-            + "    ReadInitialCharges = Yes\n",
-        })
         for s in range(1, dftb_run_params.get("NrOfExcitations", 1) + 1):
             if s == dftb_params["StateOfInterest"]:
                 continue
-            fs_params["StateOfInterest"] = s
-            # root s is the same variational solution whether or not the
-            # roots above it are converged - solving only s roots trims the
-            # dominant Casida cost of the rerun
-            fs_params["NrOfExcitations"] = s
-            prms_s = dict(prms1)
-            prms_s.update({"dftb_run_params": fs_params,
-                           "working_directory": fs_wd,
-                           "what_calculation": "ex"})
-            run_dftb(coordinates, prms_s)
-            forces_all[s] = np.asarray(
-                parse_tagged_file(F"{fs_wd}/autotest.tag")["forces"])
+            forces_all[s] = _dftb_state_forces(coordinates, dftb_params, prms1, wd, s)
 
     # ================= Previous coordinates =================
     if is_first_time:
@@ -3467,6 +3503,10 @@ def dftb_compute_adi(q, params, full_id):
                     obj.d1ham_adi[3 * iatom + k].set(soi_row, soi_row, complex(-f_ex[k, iatom]))
                 for s, f_s in forces_all.items():
                     obj.d1ham_adi[3 * iatom + k].set(s, s, complex(-f_s[k, iatom]))
+
+    # the rows handed over, for the engine's call-back after a hop
+    params.setdefault("force_rows", {})[itraj] = np.array([[obj.d1ham_adi[idof].get(i, i).real for i in range(nstates)]
+                                                            for idof in range(ndof)])
 
     # ================= Derivative couplings ====================
     obj.dc1_adi = CMATRIXList()
