@@ -4796,7 +4796,7 @@ def mulliken_fragment_operators(C_win, S_ao, frag_cols):
 
 def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
                          lowest_orbital, highest_orbital, params, fragment_atom_lists=None,
-                         return_ao_overlap=False):
+                         return_ao_overlap=False, return_ao_time_overlap=False):
     """
     All three windowed MO overlap matrices from ONE CP2K-native OVERLAP_DELTAT
     run on the doubled geometry (prev atoms + curr atoms) - no libint needed.
@@ -4822,6 +4822,9 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
             wfn loader supplies it).
         return_ao_overlap (bool): also return the AO overlap of the current geometry (the
             S(curr, curr) block of the doubled run, in the MO coefficients' AO order)
+        return_ao_time_overlap (bool): also return the AO time overlap S(prev, curr) of the
+            doubled run, in the same AO order - the block that carries any other orbital set
+            (the POD block states) from the previous to the current geometry
 
     Returns:
         St_mo, S_mo_prev, S_mo_curr  (each (norb_w, norb_w)). When the mo
@@ -4830,7 +4833,8 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
         spin-independent, so the single doubled-geometry run serves both
         channels at no extra CP2K cost. With fragment_atom_lists a fourth item
         follows: the list over fragments of P_f, each shaped like S_mo_curr. With
-        return_ao_overlap the AO overlap S22 (n_ao, n_ao) is the last item.
+        return_ao_overlap the AO overlap S22 (n_ao, n_ao) follows, with
+        return_ao_time_overlap the AO time overlap S12 (n_ao, n_ao) comes last.
 
     Raises ValueError when the window does not fit the stored MOs (python
     slicing would silently truncate or wrap), and for tabulated/ZDO
@@ -4961,6 +4965,8 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
         out = (St[0], S_prev[0], S_curr[0]) if len(St) == 1 else (St, S_prev, S_curr)
     if return_ao_overlap:
         out = out + (np.ascontiguousarray(S22),)
+    if return_ao_time_overlap:
+        out = out + (np.ascontiguousarray(S12),)
     return out
 
 

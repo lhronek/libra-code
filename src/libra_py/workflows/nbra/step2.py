@@ -484,8 +484,11 @@ def run_cp2k_libint_step2(params):
                                                     WAVEFUNCTION and TRANSF_MATRIX_R prints: read the POD files of
                                                     every diagonalization run and save the POD fragment projectors
                                                     P_pod_cp2k{f}_ks_{step}.npz over the MO window (the analogue of P_frag,
-                                                    step3 diabatization_scheme "pod_cp2k") and POD_cp2k_hab_{step}.npz (block
-                                                    energies and couplings). Needs mo_source "wfn" [default: False].
+                                                    step3 diabatization_scheme "pod_cp2k"), POD_cp2k_hab_{step}.npz (block
+                                                    energies and couplings) and St_pod_cp2k_{step-1}.npz (the time overlaps
+                                                    of all block states between the frames step-1 and step, block order,
+                                                    2-spin-block layout - the input of step3.run_step3_pod). Needs
+                                                    mo_source "wfn" [default: False].
 
                              cp2k_ot_input_template (string): The CP2K OT input template file name (just for the xTB).
                                                               None/absent skips the OT stage: the diagonalization runs then
@@ -779,14 +782,21 @@ def run_cp2k_libint_step2(params):
                 odt_params['cp2k_data_dir'] = params['cp2k_data_dir']
             if counter == 0:
                 mo_prev, R_prev = mo_curr, R_curr
+                if read_pod_cp2k_files:
+                    pod_prev = pod_curr
             # the same bracket guard as the libint route
             _check_homo_bracket(step, isxTB, isUKS, lowest_orbital,
                                 highest_orbital)
             odt_out = CP2K_methods.mo_overlaps_via_cp2k(mo_prev, mo_curr, R_prev, R_curr,
                                                         lowest_orbital, highest_orbital,
                                                         odt_params, fragment_atom_lists,
-                                                        return_ao_overlap=compute_pod)
+                                                        return_ao_overlap=compute_pod,
+                                                        return_ao_time_overlap=read_pod_cp2k_files)
             St, S_prev, S = odt_out[:3]
+            # the optional trailing items of the doubled run, in the order the flags add them
+            odt_extra = list(odt_out[4 if fragment_atom_lists is not None else 3:])
+            S_ao = odt_extra.pop(0) if compute_pod else None
+            S12_ao = odt_extra.pop(0) if read_pod_cp2k_files else None
             # 2-block npz convention (alpha | beta on the diagonal): restricted runs
             # duplicate the single channel, UKS carries genuinely distinct blocks
             S_a, S_b = S if isUKS else (S, S)
@@ -804,7 +814,6 @@ def run_cp2k_libint_step2(params):
             scipy.sparse.save_npz(params['res_dir'] + F'/E_ks_{step}.npz', E_step_sparse)
             if compute_pod:
                 # the AO Kohn-Sham matrices: the diag run's print, else rebuilt from a complete MO set
-                S_ao = odt_out[-1]
                 diag_log = F'OUT-diag_{step}.log' if isxTB else F'step_{step}.log'
                 try:
                     H_ao = CP2K_methods.read_cp2k_ao_ks_print(diag_log, 2 if isUKS else 1)
@@ -871,7 +880,18 @@ def run_cp2k_libint_step2(params):
                 St_a, St_b = St if isUKS else (St, St)
                 St_step_sparse = scipy.sparse.csc_matrix(data_conv.form_block_matrix(St_a, zero_mat, zero_mat, St_b))
                 scipy.sparse.save_npz(params['res_dir'] + F'/St_ks_{step-1}.npz', St_step_sparse)
+                if read_pod_cp2k_files:
+                    # the block states of the previous frame against the current one - the input of the POD route
+                    # of step 3 (their signs are the printed ones, step 3 follows them)
+                    St_pod_a = pod_lib.pod_time_overlaps(pod_prev, pod_curr, S12_ao, 0)
+                    St_pod_b = pod_lib.pod_time_overlaps(pod_prev, pod_curr, S12_ao, 1) if isUKS else St_pod_a
+                    zero_pod = np.zeros_like(St_pod_a)
+                    St_pod_block = data_conv.form_block_matrix(St_pod_a, zero_pod, zero_pod, St_pod_b)
+                    scipy.sparse.save_npz(params['res_dir'] + F'/St_pod_cp2k_{step-1}.npz',
+                                          scipy.sparse.csc_matrix(St_pod_block))
             mo_prev, R_prev = mo_curr, R_curr
+            if read_pod_cp2k_files:
+                pod_prev = pod_curr
             print('Done with computing molecular orbital overlaps. Elapsed time:', time.time() - t1)
             if params['remove_molden'] and os.path.exists(molden_filename):
                 os.system(F'rm {molden_filename}')

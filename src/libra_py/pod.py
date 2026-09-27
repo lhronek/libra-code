@@ -297,6 +297,36 @@ def pod_fragment_operators(pod, C_win, spin=0):
     return out
 
 
+def pod_time_overlaps(pod_prev, pod_curr, S12, spin=0):
+    """
+    The time overlaps of the POD block states between two geometries, <s(prev)|s'(curr)> = c_prev^T S12 c_curr
+    with S12 the AO overlap between the previous and the current geometry (the S(prev, curr) block of the
+    OVERLAP_DELTAT run, in the coefficients' AO order), over all blocks in block order - the matrix that carries
+    a block state from one frame to the next: its signs follow the arbitrary sign of every printed state, its
+    antisymmetric part is the derivative coupling of the block states.
+
+    Args:
+        pod_prev, pod_curr (dict): read_pod_cp2k_files or pod_block_states outputs of the two frames
+        S12 (array (n_ao, n_ao)): the AO time overlap
+        spin (int): the spin channel of the block states
+
+    Returns:
+        array (n_states, n_states): rows the previous frame's block states, columns the current frame's, both in
+        block order (block 0's states, then block 1's, ...)
+    """
+    if pod_prev["n_blocks"] != pod_curr["n_blocks"]:
+        raise ValueError(F"{pod_prev['n_blocks']} POD blocks at the previous frame, {pod_curr['n_blocks']} at "
+                         "the current")
+    C_prev = np.concatenate([np.asarray(pod_prev["coeffs"][(ib, spin)], dtype=float)
+                             for ib in range(pod_prev["n_blocks"])], axis=1)
+    C_curr = np.concatenate([np.asarray(pod_curr["coeffs"][(ib, spin)], dtype=float)
+                             for ib in range(pod_curr["n_blocks"])], axis=1)
+    Cp = data_conv.nparray2MATRIX(np.ascontiguousarray(C_prev.T))                 # (n_states, n_ao)
+    Cc = data_conv.nparray2MATRIX(np.ascontiguousarray(C_curr.T))
+    S_m = data_conv.nparray2MATRIX(np.asarray(S12, dtype=float))
+    return data_conv.MATRIX2nparray((Cp * S_m) * Cc.T(), np.float64)
+
+
 def ks_matrix_from_mos(C, E, S, tol=1e-6):
     """
     The AO Kohn-Sham matrix from a COMPLETE MO set: H = S C^T diag(E) C S (the KS equations
