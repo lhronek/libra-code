@@ -3272,6 +3272,54 @@ def _tracking_record(reordering, alpha, min_overlap, perms, swaps, unresolved, m
                 "edge_departures the states that left the active space ([frame, state, kept, carried by the space])"}
 
 
+def _continuity_record(St_list, start_time, reordering, alpha, min_overlap, perms=None, basis="SD"):
+    """How the states of a basis continue between the frames as labeled. A state whose |St_cc| falls below
+    min_overlap is an EDGE DEPARTURE when the whole space carries less than min_overlap of it (sqrt(sum_j |St_cj|^2)
+    - it left the active space through its edge, the remedy is the space) and is recorded, or an INTERNAL MIXING
+    when the space carries it but no single state does - refused after a reordering (1 or 2: the states mixed by
+    more than the threshold's angle within one frame, the frame spacing does not resolve the crossing, min_overlap
+    0 switches the check off), never refused in the energy order (reordering 0: a crossing of adiabatic states is the
+    convention there and is left to the propagation). Returns the record: the frames let through with an internal
+    continuation below 0.5 (unresolved), the edge departures ([frame, state, kept, carried by the space]), the
+    smallest |St_cc|, and the frames at which the reordering changed the labels (perms: the per-frame label
+    permutations of apply_state_reordering_general)."""
+    conts, edges, unresolved = [], [], []
+    for i, St in enumerate(St_list):
+        A = np.abs(np.asarray(St.todense()).real)
+        c = np.diag(A)
+        inside = np.sqrt(np.sum(A ** 2, axis=1))
+        conts.append(c)
+        for j in np.where(c < max(min_overlap, 0.5))[0]:
+            if inside[j] < max(min_overlap, 0.5):
+                edges.append([start_time + i + 1, int(j), round(float(c[j]), 4), round(float(inside[j]), 4)])
+            elif reordering and min_overlap > 0.0 and c[j] < min_overlap:
+                row = A[j].copy()
+                row[j] = -1.0
+                partner = int(np.argmax(row))
+                raise ValueError(F"the {basis} state {j} of frame {start_time + i} continues into state {partner} "
+                                 F"of frame {start_time + i + 1} after the reordering (|<{j}|{j}>| = {c[j]:.3f} below "
+                                 F"the threshold {min_overlap}, |<{j}|{partner}>| = {row[partner]:.3f}, the space "
+                                 F"carries {inside[j]:.3f} of the state) - an internal mixing the frame spacing does "
+                                 F"not resolve: a lower state_reordering_min_overlap lets the frame through and "
+                                 F"records it, 0 switches the check off")
+            elif c[j] < 0.5 and (start_time + i + 1) not in unresolved:
+                unresolved.append(start_time + i + 1)
+    reordered = []
+    if perms is not None:
+        for i in range(1, min(len(perms), len(St_list) + 1)):
+            if list(perms[i]) != list(perms[i - 1]):
+                reordered.append(start_time + i)
+    return {"do_state_reordering": int(reordering), "state_reordering_alpha": float(alpha),
+            "state_reordering_min_overlap": float(min_overlap),
+            "unresolved_frames": unresolved, "edge_departures": edges,
+            "min_continuity": float(min(c.min() for c in conts)) if conts else 1.0, "reordered_frames": reordered,
+            "note": "unresolved_frames: the frames in which a labeled state continued with less than 0.5 inside the "
+                    "space and was let through - in the energy order the trivial crossings left to the propagation, "
+                    "with a reordering the frames a lowered threshold accepted - edge_departures: [frame, state, kept, "
+                    "carried by the space] of the states that left the active space through its edge - "
+                    "reordered_frames: the frames at which the reordering changed the labels"}
+
+
 def _write_diabatization_records(res_dir, kind, dia_index, pops_list, hole_list, energy_list, start_time,
                                  operator="mulliken", basis="sd", extra=None):
     """U_{basis}_labels.json (the meaning of every diabatic state, with the mean energies over the
@@ -3466,6 +3514,10 @@ def run_step3_pod(params):
                 the block (the basis carries less than the threshold of the state - without a reordering) is
                 recorded in edge_departures - a threshold below 0.5 lets internal mixings through and the labels and
                 the report list them (unresolved_frames, min_continuity).
+            * **params['state_reordering_min_overlap']** (float): the same threshold for the adiabatic states as
+                labeled by do_state_reordering 1 or 2 - refused below it after the reordering, 0 switches the check
+                off - recorded under "adiabatic" in the report (the frames let through below 0.5, min_continuity,
+                reordered_frames) [default: 0.5]. In the energy order (0) nothing is refused.
             * **params['apply_orthonormalization']**: the vocabulary of the SD route is accepted and has no effect -
                 the block states are orthonormal within every frame by construction (S^-1/2 v of the Lowdin frame),
                 their Lowdin factors are the identity
@@ -3479,7 +3531,8 @@ def run_step3_pod(params):
                       'diabatization_scheme': 'pod_cp2k', 'apply_phase_correction': False,
                       'apply_orthonormalization': 'lowdin_cached', 'do_state_reordering': 0,
                       'state_reordering_alpha': 0.0, 'do_diabatic_state_reordering': 0,
-                      'diabatic_state_reordering_alpha': 0.0, 'diabatic_state_reordering_min_overlap': 0.5}
+                      'diabatic_state_reordering_alpha': 0.0, 'diabatic_state_reordering_min_overlap': 0.5,
+                      'state_reordering_min_overlap': 0.5}
     comn.check_input(params, default_params, critical_params)
     # the values the route implements - every other value is refused
     for key, allowed, hint in (('sd_charge', (1,), "the frozen-orbital hole basis of the cation"),
@@ -3498,10 +3551,12 @@ def run_step3_pod(params):
                         ('diabatic_state_reordering_alpha', dia_alpha)):
         if not (np.isreal(value) and value >= 0.0):
             raise ValueError(F"{name} = {value!r} - a non-negative width in 1/Hartree is needed")
-    dia_min_overlap = params['diabatic_state_reordering_min_overlap']
-    if not (np.isreal(dia_min_overlap) and 0.0 <= dia_min_overlap <= 1.0):
-        raise ValueError(F"diabatic_state_reordering_min_overlap = {dia_min_overlap!r} - a threshold between 0 (off) "
-                         F"and 1 is needed")
+    dia_min_overlap, sd_min_overlap = (params['diabatic_state_reordering_min_overlap'],
+                                       params['state_reordering_min_overlap'])
+    for name, value in (('diabatic_state_reordering_min_overlap', dia_min_overlap),
+                        ('state_reordering_min_overlap', sd_min_overlap)):
+        if not (np.isreal(value) and 0.0 <= value <= 1.0):
+            raise ValueError(F"{name} = {value!r} - a threshold between 0 (off) and 1 is needed")
     res_dir_1, res_dir_2 = params['path_to_npz_files'], params['path_to_save_sd_Hvibs']
     start_time, finish_time = int(params['start_time']), int(params['finish_time'])
     if finish_time - start_time < 2:
@@ -3631,7 +3686,8 @@ def run_step3_pod(params):
         e, v = np.linalg.eigh(H_hole[k])
         E_adi.append(e)
         V.append(v)
-    reordered = []
+    reordered, adi_unresolved, adi_edges = [], [], []
+    adi_min_continuity = 1.0
     for k in range(1, len(frames)):
         O = V[k - 1].T @ St_hole[k - 1] @ V[k]
         if params['do_state_reordering'] in (1, 2):
@@ -3639,6 +3695,22 @@ def run_step3_pod(params):
             if np.any(perm != np.arange(n)):
                 reordered.append(frames[k])
             V[k], E_adi[k], O = V[k][:, perm], E_adi[k][perm], O[:, perm]
+        d_adi = np.abs(np.diag(O))
+        adi_min_continuity = min(adi_min_continuity, float(d_adi.min()))
+        # an adiabatic state the basis no longer carries inherited an edge departure of the basis (recorded), one the
+        # basis carries but no single state does mixed internally (refused after a reordering)
+        inside_adi = np.sqrt(np.sum(O ** 2, axis=1))
+        for j in np.where(d_adi < max(sd_min_overlap, 0.5))[0]:
+            if inside_adi[j] < max(sd_min_overlap, 0.5):
+                adi_edges.append([int(frames[k]), int(j), round(float(d_adi[j]), 4), round(float(inside_adi[j]), 4)])
+            elif params['do_state_reordering'] in (1, 2) and sd_min_overlap > 0.0 and d_adi[j] < sd_min_overlap:
+                raise ValueError(F"the adiabatic hole state {j} of frame {frames[k - 1]} carries |<{j}|{j}>| = "
+                                 F"{d_adi[j]:.3f} into frame {frames[k]} after the reordering, below the threshold "
+                                 F"{sd_min_overlap} (the basis carries {inside_adi[j]:.3f} of the state) - an internal "
+                                 F"mixing the frame spacing does not resolve: a lower state_reordering_min_overlap "
+                                 F"lets the frame through and records it, 0 switches the check off")
+            elif d_adi[j] < 0.5 and frames[k] not in adi_unresolved:
+                adi_unresolved.append(frames[k])
         if params['apply_phase_correction']:
             V[k] = V[k] * np.where(np.diag(O) < 0.0, -1.0, 1.0)
 
@@ -3695,13 +3767,18 @@ def run_step3_pod(params):
               "diabatic_state_reordering_min_overlap": float(dia_min_overlap),
               "swap_frames": [int(k) for k in swaps], "frames_off_energy_order": off_order,
               "unresolved_frames": [int(k) for k in unresolved], "edge_departures": edges,
+              "adiabatic": {"do_state_reordering": int(params['do_state_reordering']),
+                            "state_reordering_alpha": float(params['state_reordering_alpha']),
+                            "state_reordering_min_overlap": float(sd_min_overlap),
+                            "unresolved_frames": [int(k) for k in adi_unresolved], "edge_departures": adi_edges,
+                            "min_continuity": float(adi_min_continuity), "reordered_frames": reordered},
               "tracked_block_states": tracked}
     with open(F'{res_dir_2}/pod_route_report.json', 'w') as f:
         json.dump(report, f, indent=1)
     print(F"run_step3_pod: {n} hole states of {nblk} blocks ({per_block} of {occupied} occupied) over "
           F"{len(frames)} frames - continuity min {report['min_continuity']:.4f}, |St_hole - St_block| max "
           F"{report['max_hole_minus_block_overlap']:.2e}, |St^T St - 1| max {report['max_nonunitarity']:.2e}, "
-          F"{len(reordered)} reordered frames of the adiabatic states, "
+          F"{len(reordered)} reordered frames of the adiabatic states ({len(adi_unresolved)} let through below 0.5), "
           F"{len(swaps)} swap frames of the block states ({len(unresolved)} let through below 0.5, {len(edges)} edge "
           F"departures), block gaps {block_gap} eV")
     return report
@@ -3802,6 +3879,13 @@ def run_step3_sd_nacs_libint(params):
                 and is recorded (edge_departures in U_sd_labels.json: [frame, state, kept, carried by the space]),
                 the run goes on. A threshold below 0.5 lets internal mixings through: unresolved_frames lists them
                 beside min_continuity.
+            * **params['state_reordering_min_overlap']** (float): the same threshold for the SD (and CI) states as
+                labeled by do_state_reordering 1 or 2: an internal mixing below it after the reordering refuses the
+                run (the frame spacing does not resolve the crossing, 0 switches the check off), an edge departure
+                is recorded [default: 0.5]. In the energy order (do_state_reordering 0) nothing is refused - a
+                crossing of adiabatic states is the convention there and is left to the propagation.
+                sd_route_report.json records unresolved_frames (internal continuations below 0.5 let through),
+                edge_departures, min_continuity and reordered_frames.
             * **params['npz_file_ks_homo_index']** (integer): the KS HOMO index of the raw npz files.
             * **params['is_many_body']** (bool): a True or False flag for computing the overlaps and energies
                                                  for many-body states
@@ -3857,7 +3941,7 @@ def run_step3_sd_nacs_libint(params):
                       'sd_overlap_kernel': 'auto', 'blas_num_threads': None,
                       'localized_carrier': 'none', 'sd_charge': 0, 'diabatization_scheme': 'mulliken',
                       'do_diabatic_state_reordering': 0, 'diabatic_state_reordering_alpha': 0.0,
-                      'diabatic_state_reordering_min_overlap': 0.5
+                      'diabatic_state_reordering_min_overlap': 0.5, 'state_reordering_min_overlap': 0.5
                       }
 
     if params['is_many_body'] and params['isUKS']:
@@ -3880,10 +3964,12 @@ def run_step3_sd_nacs_libint(params):
                          F"(Munkres-Kuhn) are supported")
     if not (np.isreal(dia_alpha) and dia_alpha >= 0.0):
         raise ValueError(F"diabatic_state_reordering_alpha = {dia_alpha!r} - a non-negative width in 1/Hartree is needed")
-    dia_min_overlap = params['diabatic_state_reordering_min_overlap']
-    if not (np.isreal(dia_min_overlap) and 0.0 <= dia_min_overlap <= 1.0):
-        raise ValueError(F"diabatic_state_reordering_min_overlap = {dia_min_overlap!r} - a threshold between 0 (off) "
-                         F"and 1 is needed")
+    dia_min_overlap, sd_min_overlap = (params['diabatic_state_reordering_min_overlap'],
+                                       params['state_reordering_min_overlap'])
+    for name, value in (('diabatic_state_reordering_min_overlap', dia_min_overlap),
+                        ('state_reordering_min_overlap', sd_min_overlap)):
+        if not (np.isreal(value) and 0.0 <= value <= 1.0):
+            raise ValueError(F"{name} = {value!r} - a threshold between 0 (off) and 1 is needed")
     res_dir_1 = params['path_to_npz_files']
     res_dir_2 = params['path_to_save_sd_Hvibs']
 
@@ -4244,6 +4330,14 @@ def run_step3_sd_nacs_libint(params):
         if W_dia is not None:
             W_dia = [_permute_rows(W_dia[i], perms[i]) for i in range(len(W_dia))]
         print('Done with state-reordering of SDs. Elapsed time:', time.time() - t2)
+    # the continuity of the SD states as labeled: refused below the threshold after a reordering, recorded otherwise
+    route_report = {"sd": _continuity_record(St_sds, start_time, params['do_state_reordering'],
+                                             params['state_reordering_alpha'], sd_min_overlap,
+                                             perms if params['do_state_reordering'] in (1, 2) else None)}
+    print(F"SD states: {len(route_report['sd']['reordered_frames'])} reordered frames, "
+          F"{len(route_report['sd']['unresolved_frames'])} frames let through with a continuation below 0.5, "
+          F"{len(route_report['sd']['edge_departures'])} edge departures (a state left the active space), continuity "
+          F"min {route_report['sd']['min_continuity']:.4f}")
 
     if params['is_many_body']:
         St_cis = []
@@ -4336,6 +4430,12 @@ def run_step3_sd_nacs_libint(params):
                                          extra=_tracking_record(dia_reordering, dia_alpha, dia_min_overlap,
                                                                 perms_ci_dia, swaps_ci_dia, unresolved_ci_dia,
                                                                 cont_ci_dia, edges_ci_dia, start_time))
+        route_report["ci"] = _continuity_record(St_cis, start_time, params['do_state_reordering'],
+                                                params['state_reordering_alpha'], sd_min_overlap,
+                                                perms_ci if params['do_state_reordering'] in (1, 2) else None, "CI")
+
+    with open(F'{res_dir_2}/sd_route_report.json', 'w') as f:
+        json.dump(route_report, f, indent=1)
 
     # Now, we move to applying phase-corrections
     if params['apply_phase_correction']:
