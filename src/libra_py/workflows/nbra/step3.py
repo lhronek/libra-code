@@ -40,7 +40,6 @@ import json
 import numpy as np
 from libra_py.workflows.nbra.mp_context import MP_CTX as _MP_CTX
 import scipy.sparse as sp
-from scipy.optimize import linear_sum_assignment
 if sys.platform == "cygwin":
     from cyglibra_core import *
 elif sys.platform == "linux" or sys.platform == "linux2":
@@ -3111,25 +3110,166 @@ def _ci_diabatization_series(params, sd_sorted, SD2CI, ci_energies, active_space
     return V_list, dia_index, pops_list, hole_list, energy_list
 
 
-def _follow_diabatic_states(W_list, St_list, start_time, basis="sd"):
+def _munkres_assignment(weights):
+    """The column assigned to every row of a weight matrix so that the assigned weights sum to the maximum
+    (libra_py.hungarian.maximize, the Munkres-Kuhn step of the SD reordering) - as many columns as rows or more,
+    the matrix padded to a square with zero rows whose padding rows take the columns left over."""
+    W = np.asarray(weights, dtype=float)
+    nrow, ncol = W.shape
+    if ncol < nrow:
+        raise ValueError(F"{nrow} states cannot be assigned to {ncol} candidates - at least as many candidates are "
+                         "needed")
+    padded = np.zeros((ncol, ncol))
+    padded[:nrow] = W
+    col_of = np.full(nrow, -1, dtype=int)
+    for row, col in hungarian.maximize(data_conv.nparray2MATRIX(padded)):
+        if row < nrow:
+            col_of[row] = col
+    if np.any(col_of < 0) or len(set(col_of.tolist())) != nrow:
+        raise RuntimeError("the Munkres assignment left a state without a distinct candidate")
+    return col_of
+
+
+def _tracking_groups(dia_index):
+    """The columns of a diabatic index that differ in their ranks alone - one fragment's localized states of a
+    manifold, one fragment pair's joint states - as lists of columns, the reference and the untransformed SDs as
+    singletons."""
+    groups = {}
+    for col, entry in enumerate(dia_index):
+        if entry[0] == "loc":
+            key = ("loc", entry[1], entry[2])
+        elif entry[0] == "joint":
+            key = ("joint", entry[1], entry[2], entry[4])
+        else:
+            key = ("single", col)
+        groups.setdefault(key, []).append(col)
+    return list(groups.values())
+
+
+def _assign_states(O, reordering, alpha=0.0, energies=None):
+    """The column of every row of a square time-overlap block that carries its state on, by the reordering of the SD
+    states: 1 the Sato search of libra's get_reordering, 2 the Munkres-Kuhn assignment on |O|^2 exp(-(alpha dE)^2)
+    with dE the energy difference of the two positions at the earlier frame (the cost of make_cost_mat) - alpha 0 or
+    no energies put no penalty."""
+    O = np.asarray(O, dtype=float)
+    if reordering == 1:
+        return np.array([int(c) for c in get_reordering(data_conv.nparray2CMATRIX(O))])
+    weights = O ** 2
+    if alpha and energies is not None:
+        e = np.nan_to_num(np.asarray(energies, dtype=float))
+        weights = weights * np.exp(-(alpha * (e[:, None] - e[None, :])) ** 2)
+    return _munkres_assignment(weights)
+
+
+def _state_energies(energy_records):
+    """The energy of every diabatic state per frame from the records of the diabatization (the orbital energy of a
+    localized state - the same sign for all states of a group - the electron minus the hole orbital energy of a
+    joint state, nan for the reference and the untransformed SDs), in the units of the records."""
+    out = []
+    for e in energy_records:
+        e = np.asarray(e, dtype=float)
+        out.append(e[:, 0] - np.where(np.isnan(e[:, 1]), 0.0, e[:, 1]))
+    return out
+
+
+def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=None, reordering=0, alpha=0.0,
+                            energies=None, min_overlap=0.5):
     """The localization eigenvectors carry arbitrary signs: every diabatic state follows the trajectory through the
     time overlaps of its own basis, O = W(i)^T St(i) W(i+1), and the sign of every column of W(i+1) is set by the
-    sign of diag(O) (in place). A column whose |O_cc| falls below 0.5 does not continue itself - two states of one
-    fragment, or the two fragments' states at a symmetric geometry, swap between the frames - and the run is
-    refused: from that frame on the labels would mean other states."""
+    sign of diag(O) (in place). reordering 0: a column whose |O_cc| falls below min_overlap does not continue itself -
+    two states of one fragment, or the two fragments' states at a symmetric geometry, swap between the frames - and
+    the run is refused: from that frame on the labels would mean other states (min_overlap 0 switches the check
+    off). reordering 1 or 2: within every group of states that differ in their ranks alone (one fragment's states of
+    a manifold, one fragment pair's joint states) the columns of W(i+1) are assigned to the states of W(i) as the SD
+    states are reordered (1 Sato, 2 Munkres-Kuhn on |O|^2 with the energy penalty exp(-(alpha dE)^2), energies the
+    per-frame state energies of the columns) and permuted into the order of W(i) (in place), so that a state keeps
+    the identity it had at start_time through a crossing and the frame's energy order no longer names it. A state
+    whose continuation carries less than min_overlap even so is one of two things: an EDGE DEPARTURE when the whole
+    space carries less than min_overlap of it, sqrt(sum_j |O_cj|^2) < min_overlap - the state left the active space
+    through its edge, the reordering has nothing to assign and the remedy is the space, so the frame is recorded
+    (edges) and the run goes on - or an INTERNAL MIXING when the space carries it but no single state does (the
+    states mixed by more than the threshold's angle within one frame, 0.5 = 60 degrees), which is refused: the frame
+    spacing does not resolve that crossing. A threshold below 0.5 lets internal mixings through and records those
+    below 0.5.
+
+    Returns:
+        perms (list of arrays): perms[i][c] is the column, in the energy order of frame i, that carries the state
+            c of start_time (the identity for start_time itself) - the rows of the per-frame records follow it
+        swaps (list of int): the frames at which the assignment differs from the previous frame's
+        unresolved (list of int): the frames let through with an internal continuation below 0.5
+        min_continuity (float): the smallest |O_cc| of the run
+        edges (list of lists): the edge departures as [frame, state, |O_cc|, the weight kept in the space]
+    """
+    n = W_list[0].shape[1]
+    groups = _tracking_groups(dia_index) if (reordering and dia_index is not None) else [[c] for c in range(n)]
+    perms = [np.arange(n)]
+    swaps, unresolved, edges = [], [], []
+    min_continuity = 1.0
     for i in range(len(St_list)):
         O = W_list[i].T @ np.asarray(St_list[i].todense()).real @ W_list[i + 1]
+        perm = np.arange(n)
+        if reordering:
+            e = None if energies is None else np.asarray(energies[i], dtype=float)
+            for g in groups:
+                if len(g) > 1:
+                    perm[g] = np.array(g)[_assign_states(O[np.ix_(g, g)], reordering, alpha,
+                                                         None if e is None else e[g])]
+            if np.any(perm != np.arange(n)):
+                W_list[i + 1] = W_list[i + 1][:, perm]
+                O = O[:, perm]
         d = np.abs(np.diag(O))
-        if d.min() < 0.5:
-            c = int(np.argmin(d))
+        min_continuity = min(min_continuity, float(d.min()))
+        inside = np.sqrt(np.sum(O ** 2, axis=1))
+        for c in np.where(d < min_overlap)[0]:
+            if inside[c] < min_overlap:
+                edges.append([start_time + i + 1, int(c), round(float(d[c]), 4), round(float(inside[c]), 4)])
+                continue
             row = np.abs(O[c]).copy()
             row[c] = -1.0
             partner = int(np.argmax(row))
-            raise ValueError(F"the diabatic {basis.upper()} state {c} of frame {start_time + i} continues into state "
-                             F"{partner} of frame {start_time + i + 1} (|<{c}|{c}>| = {d[c]:.3f}, |<{c}|{partner}>| = "
-                             F"{row[partner]:.3f}) - two localized states swap between the frames and the labels would "
-                             F"mean other states from there on: narrow the manifold or the active space")
+            if reordering:
+                raise ValueError(F"the diabatic {basis.upper()} state {c} of frame {start_time + i} carries "
+                                 F"|<{c}|{c}>| = {d[c]:.3f} into frame {start_time + i + 1} even after the reordering "
+                                 F"within its group (the largest other overlap |<{c}|{partner}>| = {row[partner]:.3f}, "
+                                 F"the space carries {inside[c]:.3f} of the state, the threshold {min_overlap}) - the "
+                                 F"states mix by more than the threshold's angle within one frame: the frame spacing "
+                                 F"does not resolve the crossing (a lower diabatic_state_reordering_min_overlap lets "
+                                 F"the frame through and records it)")
+            raise ValueError(F"the diabatic {basis.upper()} state {c} of frame {start_time + i} continues into "
+                             F"state {partner} of frame {start_time + i + 1} (|<{c}|{c}>| = {d[c]:.3f} below the "
+                             F"threshold {min_overlap}, |<{c}|{partner}>| = {row[partner]:.3f}) - two localized "
+                             F"states swap between the frames and the labels would mean other states from there "
+                             F"on: narrow the manifold or the active space, or follow the states with "
+                             F"do_diabatic_state_reordering 2")
+        if np.any((d < 0.5) & (inside >= 0.5)):
+            unresolved.append(start_time + i + 1)
         W_list[i + 1] = W_list[i + 1] * np.where(np.diag(O) < 0.0, -1.0, 1.0)
+        perms.append(perm)
+        if np.any(perm != perms[i]):
+            swaps.append(start_time + i + 1)
+    return perms, swaps, unresolved, min_continuity, edges
+
+
+def _permute_records(records, perms):
+    """The per-frame record rows (one row per diabatic state in the frame's energy order) in the order of the
+    followed states."""
+    return [np.asarray(r)[p] for r, p in zip(records, perms)]
+
+
+def _tracking_record(reordering, alpha, min_overlap, perms, swaps, unresolved, min_continuity, edges, start_time):
+    """The entries of the labels file that say how the states were followed."""
+    off = int(sum(np.any(p != np.arange(len(p))) for p in perms))
+    return {"do_diabatic_state_reordering": int(reordering), "diabatic_state_reordering_alpha": float(alpha),
+            "diabatic_state_reordering_min_overlap": float(min_overlap),
+            "swap_frames": [int(k) for k in swaps], "frames_off_energy_order": off,
+            "unresolved_frames": [int(k) for k in unresolved], "min_continuity": float(min_continuity),
+            "edge_departures": edges,
+            "reordering_note": F"the ranks are the energy order at the starting frame {start_time}" + (
+                " and the states keep that identity through the crossings of swap_frames (a followed state may "
+                "lie above its lower-ranked partner from a swap frame on)" if reordering else
+                " and every state continues itself between the frames") + " - an internal mixing below the threshold "
+                "is refused, unresolved_frames lists the frames a threshold below 0.5 let through with less than 0.5, "
+                "edge_departures the states that left the active space ([frame, state, kept, carried by the space])"}
 
 
 def _write_diabatization_records(res_dir, kind, dia_index, pops_list, hole_list, energy_list, start_time,
@@ -3300,11 +3440,32 @@ def run_step3_pod(params):
             * **params['apply_phase_correction']** (bool): follow the signs of the adiabatic states through
                 <a(k)|a(k+1)> [default: False - the frame-wise eigenvector signs, the same physics]
             * **params['do_state_reordering']** (int): 0 [default] the adiabatic states by increasing energy at every
-                frame, 2 the Hungarian assignment of the adiabatic states of frame k+1 to those of frame k by the
-                largest squared time overlap (identity following through the avoided crossings) - 1 (Sato) is not
-                implemented on this route
+                frame, 1 the Sato search (get_reordering), 2 the Munkres-Kuhn assignment of the adiabatic states of
+                frame k+1 to those of frame k by the largest squared time overlap with the energy penalty of
+                state_reordering_alpha (identity following through the avoided crossings)
             * **params['state_reordering_alpha']** (float): the energy penalty of the assignment,
                 exp(-(alpha dE)^2) [default: 0]
+            * **params['do_diabatic_state_reordering']** (int): the reordering of the block states between the
+                frames, with the vocabulary of do_state_reordering. 0 [default]: none - every block state of the
+                basis must continue itself (|<s(k)|s(k+1)>| >= 0.5), a swap of two block states is refused, the
+                ranks are the energy order of every frame. 1: Sato (get_reordering), 2: Munkres-Kuhn
+                (libra_py.hungarian) - ALL block states of a block are reordered against the block's states of the
+                next frame and every basis state follows the block state assigned to it, so a state keeps the block
+                state that carries it through a crossing of the block's levels, at the window edge too - the labels
+                record swap_frames and frames_off_energy_order, the report the followed block states of the frames
+                off the starting order, and the ranks name the energy order at start_time only. A continuation
+                below diabatic_state_reordering_min_overlap is refused when it is an internal mixing and recorded
+                when the state left the basis of its block (edge_departures - without a reordering only, the
+                reordering follows a state anywhere in its block).
+            * **params['diabatic_state_reordering_alpha']** (float): the energy-penalty width of the Munkres-Kuhn
+                cost of the block states, exp(-(alpha dE)^2) on the block energies of the earlier frame, in
+                1/Hartree [default: 0 - no penalty].
+            * **params['diabatic_state_reordering_min_overlap']** (float): the continuity threshold of the block
+                states [default: 0.5 - 60 degrees of mixing within one frame, 0 switches the check off]: below it an
+                internal mixing refuses the run, with or without a reordering, and a departure from the basis of
+                the block (the basis carries less than the threshold of the state - without a reordering) is
+                recorded in edge_departures - a threshold below 0.5 lets internal mixings through and the labels and
+                the report list them (unresolved_frames, min_continuity).
             * **params['apply_orthonormalization']**: the vocabulary of the SD route is accepted and has no effect -
                 the block states are orthonormal within every frame by construction (S^-1/2 v of the Lowdin frame),
                 their Lowdin factors are the identity
@@ -3317,18 +3478,30 @@ def run_step3_pod(params):
                       'num_occ_states_per_block': None, 'sd_charge': 1, 'isUKS': 0, 'localized_carrier': 'hole',
                       'diabatization_scheme': 'pod_cp2k', 'apply_phase_correction': False,
                       'apply_orthonormalization': 'lowdin_cached', 'do_state_reordering': 0,
-                      'state_reordering_alpha': 0.0}
+                      'state_reordering_alpha': 0.0, 'do_diabatic_state_reordering': 0,
+                      'diabatic_state_reordering_alpha': 0.0, 'diabatic_state_reordering_min_overlap': 0.5}
     comn.check_input(params, default_params, critical_params)
     # the values the route implements - every other value is refused
     for key, allowed, hint in (('sd_charge', (1,), "the frozen-orbital hole basis of the cation"),
                                ('isUKS', (0,), "closed-shell block states"),
                                ('localized_carrier', ('hole',), "the hole of the cation"),
                                ('diabatization_scheme', ('pod_cp2k',), "the POD prints of CP2K"),
-                               ('do_state_reordering', (0, 2), "none or the Hungarian assignment")):
+                               ('do_state_reordering', (0, 1, 2), "none, Sato or Munkres-Kuhn"),
+                               ('do_diabatic_state_reordering', (0, 1, 2), "none (a swap of the block states is "
+                                                                          "refused), Sato or Munkres-Kuhn")):
         if params[key] not in allowed:
             raise ValueError(F"run_step3_pod: params['{key}'] = {params[key]!r} is not implemented on the POD "
                              F"route - {list(allowed)} ({hint})")
     _orthonormalization_mode(params['apply_orthonormalization'])
+    dia_reordering, dia_alpha = params['do_diabatic_state_reordering'], params['diabatic_state_reordering_alpha']
+    for name, value in (('state_reordering_alpha', params['state_reordering_alpha']),
+                        ('diabatic_state_reordering_alpha', dia_alpha)):
+        if not (np.isreal(value) and value >= 0.0):
+            raise ValueError(F"{name} = {value!r} - a non-negative width in 1/Hartree is needed")
+    dia_min_overlap = params['diabatic_state_reordering_min_overlap']
+    if not (np.isreal(dia_min_overlap) and 0.0 <= dia_min_overlap <= 1.0):
+        raise ValueError(F"diabatic_state_reordering_min_overlap = {dia_min_overlap!r} - a threshold between 0 (off) "
+                         F"and 1 is needed")
     res_dir_1, res_dir_2 = params['path_to_npz_files'], params['path_to_save_sd_Hvibs']
     start_time, finish_time = int(params['start_time']), int(params['finish_time'])
     if finish_time - start_time < 2:
@@ -3387,30 +3560,68 @@ def run_step3_pod(params):
 
     idx, frag, rank = _pod_route_hole_basis(nmo, occupied, per_block)
     n = len(idx)
-    St_raw = []
+    St_full = []
     for k in frames[:-1]:
-        St_full = np.asarray(sp.load_npz(F'{res_dir_1}/St_pod_cp2k_{k}.npz').todense()).real
-        ntot = St_full.shape[0] // 2
+        St_k = np.asarray(sp.load_npz(F'{res_dir_1}/St_pod_cp2k_{k}.npz').todense()).real
+        ntot = St_k.shape[0] // 2
         if ntot != off[-1]:
             raise ValueError(F"St_pod_cp2k_{k}.npz carries {ntot} block states per spin, the POD prints {off[-1]}")
-        St_raw.append(St_full[:ntot, :ntot][np.ix_(idx, idx)])
-    # the printed sign of every block state, followed along the trajectory
+        St_full.append(St_k[:ntot, :ntot])
+    # the block state that carries every diabatic state at every frame (the energy-ordered basis of start_time at
+    # the start), the printed sign of every block state followed along the trajectory
+    track = [list(idx)]
     signs = [np.ones(n)]
-    for i, St in enumerate(St_raw):
-        d = np.diag(St)
-        if np.abs(d).min() < 0.5:
-            c = int(np.argmin(np.abs(d)))
-            row = np.abs(St[c]).copy()
-            row[c] = -1.0
+    swaps, unresolved, edges = [], [], []
+    min_continuity = 1.0
+    for i, St in enumerate(St_full):
+        cur = track[i]
+        nxt = list(cur)
+        if dia_reordering:
+            # all states of a block are reordered against the block's states of the next frame, as the SD states
+            # are (Sato or Munkres-Kuhn, the penalty on the block energies of the earlier frame) - every basis state
+            # follows the block state assigned to the one that carried it
+            for f in range(nblk):
+                cols = list(range(off[f], off[f + 1]))
+                assigned = _assign_states(St[np.ix_(cols, cols)], dia_reordering, dia_alpha, np.diag(h_full[i])[cols])
+                for c in range(n):
+                    if frag[c] == f:
+                        nxt[c] = cols[assigned[cur[c] - off[f]]]
+        d = np.array([abs(St[cur[c], nxt[c]]) for c in range(n)])
+        min_continuity = min(min_continuity, float(d.min()))
+        # the space of a basis state: the basis of its block without a reordering (a partner outside it is an edge
+        # departure, recorded), the whole block with one (complete - a low continuation is an internal mixing)
+        for c in np.where(d < dia_min_overlap)[0]:
+            row = np.abs(St[cur[c]]).copy()
+            row[nxt[c]] = -1.0
             partner = int(np.argmax(row))
-            raise ValueError(F"the POD block state {idx[c]} (block {frag[c]}, rank {rank[c]}) of frame {frames[i]} "
-                             F"continues into the basis state {partner} (block {frag[partner]}, rank {rank[partner]}) "
-                             F"of frame {frames[i + 1]} (|<{c}|{c}>| = {abs(d[c]):.3f}, |<{c}|{partner}>| = "
-                             F"{row[partner]:.3f}) - two block states swap between the frames and the labels would "
-                             F"mean other states from there on: narrow num_occ_states_per_block")
-        signs.append(signs[-1] * np.where(d < 0.0, -1.0, 1.0))
-    h_act = [signs[i][:, None] * h_full[i][np.ix_(idx, idx)] * signs[i][None, :] for i in range(len(frames))]
-    St_act = [signs[i][:, None] * St_raw[i] * signs[i + 1][None, :] for i in range(len(St_raw))]
+            if dia_reordering:
+                raise ValueError(F"the POD block state {cur[c]} (block {frag[c]}, rank {rank[c]} of frame "
+                                 F"{start_time}) carries |<s|s'>| = {d[c]:.3f} into frame {frames[i + 1]} even after "
+                                 F"the reordering of its block (the largest other overlap {row[partner]:.3f} into the "
+                                 F"block state {partner}, the threshold {dia_min_overlap}) - the states mix by more "
+                                 F"than the threshold's angle within one frame: the frame spacing does not resolve the "
+                                 F"crossing (a lower diabatic_state_reordering_min_overlap lets the frame through and "
+                                 F"records it)")
+            basis_cols = [cur[b] for b in range(n) if frag[b] == frag[c]]
+            inside = float(np.sqrt(np.sum(St[cur[c], basis_cols] ** 2)))
+            if inside < dia_min_overlap:
+                edges.append([int(frames[i + 1]), int(c), round(float(d[c]), 4), round(inside, 4), int(partner)])
+                continue
+            where = F"the basis state {track[i].index(partner)} (block {frag[c]}, rank {rank[track[i].index(partner)]})"
+            raise ValueError(F"the POD block state {cur[c]} (block {frag[c]}, rank {rank[c]}) of frame {frames[i]} "
+                             F"continues into {where} of frame {frames[i + 1]} (|<s|s>| = {d[c]:.3f} below the "
+                             F"threshold {dia_min_overlap}, |<s|s'>| = {row[partner]:.3f}) - two block states swap "
+                             F"between the frames and the labels would mean other states from there on: narrow "
+                             F"num_occ_states_per_block, or follow the states with do_diabatic_state_reordering 2")
+        if d.min() < 0.5 and not any(e[0] == frames[i + 1] and e[1] == int(np.argmin(d)) for e in edges):
+            unresolved.append(frames[i + 1])
+        if nxt != cur:
+            swaps.append(frames[i + 1])
+        track.append(nxt)
+        signs.append(signs[-1] * np.array([np.sign(St[cur[c], nxt[c]]) for c in range(n)]))
+    h_act = [signs[k][:, None] * h_full[k][np.ix_(track[k], track[k])] * signs[k][None, :] for k in range(len(frames))]
+    St_act = [signs[i][:, None] * St_full[i][np.ix_(track[i], track[i + 1])] * signs[i + 1][None, :]
+              for i in range(len(St_full))]
     # the one-hole determinants in the phase convention (-1)^i
     H_hole = [np.trace(h) * np.eye(n) - h for h in h_act]
     St_hole = [np.linalg.det(St) * _cofactor_matrix(St) for St in St_act]
@@ -3423,11 +3634,8 @@ def run_step3_pod(params):
     reordered = []
     for k in range(1, len(frames)):
         O = V[k - 1].T @ St_hole[k - 1] @ V[k]
-        if params['do_state_reordering'] == 2:
-            dE = E_adi[k - 1][:, None] - E_adi[k - 1][None, :]
-            cost = O ** 2 * np.exp(-(params['state_reordering_alpha'] * dE) ** 2)
-            rows, cols = linear_sum_assignment(cost, maximize=True)
-            perm = cols[np.argsort(rows)]
+        if params['do_state_reordering'] in (1, 2):
+            perm = _assign_states(O, params['do_state_reordering'], params['state_reordering_alpha'], E_adi[k - 1])
             if np.any(perm != np.arange(n)):
                 reordered.append(frames[k])
             V[k], E_adi[k], O = V[k][:, perm], E_adi[k][perm], O[:, perm]
@@ -3448,6 +3656,10 @@ def run_step3_pod(params):
     pops_list = [np.eye(nblk)[frag] for _ in frames]
     hole_list = [np.full((n, nblk), np.nan) for _ in frames]
     energy_list = [np.column_stack((np.diag(h), np.full(n, np.nan))) for h in h_act]
+    # the followed block state of every diabatic state, relative to the energy-ordered basis of start_time
+    perms = [np.array([t.index(c) if c in t else -1 for c in idx]) for t in track]
+    off_order = int(sum(t != track[0] for t in track))
+    tracked = {str(frames[k]): [int(c) for c in track[k]] for k in range(len(frames)) if track[k] != track[0]}
     _write_diabatization_records(res_dir_2, 'hole', dia_index, pops_list, hole_list, energy_list, start_time,
                                  operator='pod_cp2k', basis='sd',
                                  extra={"route": "pod_hamiltonian", "pod_occupied": occupied,
@@ -3455,20 +3667,43 @@ def run_step3_pod(params):
                                         "route_note": "the diabatic states are the occupied POD block states "
                                                       "themselves (the one-hole determinants of the cation), the "
                                                       "'sd' states their adiabatic combinations - the eigenstates of "
-                                                      "the POD hole Hamiltonian"})
+                                                      "the POD hole Hamiltonian",
+                                        "do_diabatic_state_reordering": int(dia_reordering),
+                                        "diabatic_state_reordering_alpha": float(dia_alpha),
+                                        "diabatic_state_reordering_min_overlap": float(dia_min_overlap),
+                                        "swap_frames": [int(k) for k in swaps], "frames_off_energy_order": off_order,
+                                        "unresolved_frames": [int(k) for k in unresolved],
+                                        "min_continuity": float(min_continuity), "edge_departures": edges,
+                                        "reordering_note": F"the ranks are the energy order of the block states at the "
+                                                           F"starting frame {start_time}" + (
+                                            " and every state keeps the block state that carries it through the "
+                                            "crossings of swap_frames (pod_route_report.json lists the followed block "
+                                            "states of the frames off that order)" if dia_reordering else
+                                            " and every state continues itself between the frames") + " - an "
+                                            "internal mixing below the threshold is refused, unresolved_frames lists "
+                                            "the frames a threshold below 0.5 let through with less than 0.5, "
+                                            "edge_departures the states that left the basis of their block ([frame, "
+                                            "state, kept, carried by the basis, the block state taken])"})
     report = {"frames": [start_time, finish_time], "n_states": n, "blocks": nblk, "block_states": nmo,
               "pod_occupied": occupied, "num_occ_states_per_block": per_block,
               "min_continuity": float(min(np.abs(np.diag(St)).min() for St in St_act)),
               "max_hole_minus_block_overlap": float(max(np.abs(St_hole[k] - St_act[k]).max()
                                                         for k in range(len(St_act)))),
               "max_nonunitarity": float(max(np.abs(St.T @ St - np.eye(n)).max() for St in St_hole)),
-              "reordered_frames": reordered, "block_gap_eV": block_gap}
+              "reordered_frames": reordered, "block_gap_eV": block_gap,
+              "do_diabatic_state_reordering": int(dia_reordering), "diabatic_state_reordering_alpha": float(dia_alpha),
+              "diabatic_state_reordering_min_overlap": float(dia_min_overlap),
+              "swap_frames": [int(k) for k in swaps], "frames_off_energy_order": off_order,
+              "unresolved_frames": [int(k) for k in unresolved], "edge_departures": edges,
+              "tracked_block_states": tracked}
     with open(F'{res_dir_2}/pod_route_report.json', 'w') as f:
         json.dump(report, f, indent=1)
     print(F"run_step3_pod: {n} hole states of {nblk} blocks ({per_block} of {occupied} occupied) over "
           F"{len(frames)} frames - continuity min {report['min_continuity']:.4f}, |St_hole - St_block| max "
           F"{report['max_hole_minus_block_overlap']:.2e}, |St^T St - 1| max {report['max_nonunitarity']:.2e}, "
-          F"{len(reordered)} reordered frames, block gaps {block_gap} eV")
+          F"{len(reordered)} reordered frames of the adiabatic states, "
+          F"{len(swaps)} swap frames of the block states ({len(unresolved)} let through below 0.5, {len(edges)} edge "
+          F"departures), block gaps {block_gap} eV")
     return report
 
 
@@ -3542,6 +3777,31 @@ def run_step3_sd_nacs_libint(params):
                 state and the diabatic many-body states, columns: the saved CI states in the gauge of
                 Hvib_ci/St_ci) is written with U_ci_labels.json and U_ci_pops.txt - the CI space must
                 hold whole hole x particle manifolds (number_of_states closes every manifold).
+            * **params['do_diabatic_state_reordering']** (int): the reordering of the diabatic states of one
+                fragment between the frames through O = W(k)^T St(k) W(k+1), with the vocabulary of
+                do_state_reordering. 0 [default]: none - every state must continue itself (|O_cc| >= 0.5), a frame
+                pair in which two states of a fragment swap is refused, their ranks are the energy order of every
+                frame. 1: Sato (get_reordering), 2: Munkres-Kuhn (libra_py.hungarian) - within every fragment (and
+                manifold, and fragment pair of the joint states) the states of frame k+1 are assigned to those of
+                frame k, so a state keeps the identity it had at start_time through a crossing of its fragment's
+                levels - U_sd_labels.json records swap_frames (the frames at which the assignment changed) and
+                frames_off_energy_order, and the ranks name the energy order at start_time only. A state whose
+                continuation carries less than diabatic_state_reordering_min_overlap even after the reordering is
+                refused as well when the space still carries it (an internal mixing the frame spacing does not
+                resolve) and recorded when it left the active space through its edge (edge_departures). Applies to
+                the CI-level diabatic states (U_ci) as well.
+            * **params['diabatic_state_reordering_alpha']** (float): the energy-penalty width of the Munkres-Kuhn
+                cost of the diabatic states, exp(-(alpha dE)^2) with dE the difference of the state energies of the
+                two positions at the earlier frame, in 1/Hartree [default: 0 - no penalty] - as
+                state_reordering_alpha for the SD states.
+            * **params['diabatic_state_reordering_min_overlap']** (float): the continuity threshold of the diabatic
+                states, |O_cc| below which a state does not continue itself between two frames [default: 0.5 - a
+                mixing of 60 degrees within one frame, 0 switches the check off]. Below it, a state the space still
+                carries (sqrt(sum_j |O_cj|^2) >= the threshold) mixed internally and the run is refused, with or
+                without a reordering - a state the space no longer carries left the active space through its edge
+                and is recorded (edge_departures in U_sd_labels.json: [frame, state, kept, carried by the space]),
+                the run goes on. A threshold below 0.5 lets internal mixings through: unresolved_frames lists them
+                beside min_continuity.
             * **params['npz_file_ks_homo_index']** (integer): the KS HOMO index of the raw npz files.
             * **params['is_many_body']** (bool): a True or False flag for computing the overlaps and energies
                                                  for many-body states
@@ -3595,7 +3855,9 @@ def run_step3_sd_nacs_libint(params):
                       'num_unocc_states': 1, 'verbosity': 0, 'isUKS': 0, 'es_software': 'cp2k',
                       'use_multiprocessing': False, 'logfile_directory': os.getcwd() + '/all_logfiles', 'nac_algo': 0,
                       'sd_overlap_kernel': 'auto', 'blas_num_threads': None,
-                      'localized_carrier': 'none', 'sd_charge': 0, 'diabatization_scheme': 'mulliken'
+                      'localized_carrier': 'none', 'sd_charge': 0, 'diabatization_scheme': 'mulliken',
+                      'do_diabatic_state_reordering': 0, 'diabatic_state_reordering_alpha': 0.0,
+                      'diabatic_state_reordering_min_overlap': 0.5
                       }
 
     if params['is_many_body'] and params['isUKS']:
@@ -3611,6 +3873,17 @@ def run_step3_sd_nacs_libint(params):
     # Check input, set output dirs
     comn.check_input(params, default_params, critical_params)
     params['apply_orthonormalization'] = _orthonormalization_mode(params['apply_orthonormalization'])
+    dia_reordering, dia_alpha = params['do_diabatic_state_reordering'], params['diabatic_state_reordering_alpha']
+    if dia_reordering not in (0, 1, 2):
+        raise ValueError(F"do_diabatic_state_reordering = {dia_reordering!r} is not a listed option - 0 (none: a swap "
+                         F"of two diabatic states of one fragment between frames is refused), 1 (Sato) and 2 "
+                         F"(Munkres-Kuhn) are supported")
+    if not (np.isreal(dia_alpha) and dia_alpha >= 0.0):
+        raise ValueError(F"diabatic_state_reordering_alpha = {dia_alpha!r} - a non-negative width in 1/Hartree is needed")
+    dia_min_overlap = params['diabatic_state_reordering_min_overlap']
+    if not (np.isreal(dia_min_overlap) and 0.0 <= dia_min_overlap <= 1.0):
+        raise ValueError(F"diabatic_state_reordering_min_overlap = {dia_min_overlap!r} - a threshold between 0 (off) "
+                         F"and 1 is needed")
     res_dir_1 = params['path_to_npz_files']
     res_dir_2 = params['path_to_save_sd_Hvibs']
 
@@ -3884,8 +4157,6 @@ def run_step3_sd_nacs_libint(params):
     if localized_carrier != 'none':
         W_dia, dia_index, dia_pops, dia_hole, dia_energies = _sd_diabatization_series(
             params, sd_states_reindexed_sorted, ks_active_space, start_time, finish_time, localized_carrier)
-        _write_diabatization_records(res_dir_2, localized_carrier, dia_index, dia_pops, dia_hole, dia_energies,
-                                     start_time, str(params['diabatization_scheme']).lower())
     if params['is_many_body']:
         # Add midpoint energies for CI states in here
         ci_midpoint_energies = step3_many_body.compute_ci_energies_midpoint(ci_energies, params)
@@ -3915,9 +4186,6 @@ def run_step3_sd_nacs_libint(params):
             V_dia, ci_dia_index, ci_pops, ci_hole, ci_dia_energies = _ci_diabatization_series(
                 params, sd_states_reindexed_sorted, SD2CI, ci_energies, ks_active_space, start_time, finish_time,
                 localized_carrier)
-            _write_diabatization_records(res_dir_2, localized_carrier, ci_dia_index, ci_pops, ci_hole,
-                                         ci_dia_energies, start_time, str(params['diabatization_scheme']).lower(),
-                                         basis="ci")
 
         # We create the var_pool whether we use the multiprocessing or not
         var_pool = make_var_pool(params, sd_states_reindexed_sorted, start_time, finish_time)
@@ -3938,7 +4206,17 @@ def run_step3_sd_nacs_libint(params):
 
     print('Done with computing the SD overlaps. Elapsed time:', time.time() - t2)
     if W_dia is not None:
-        _follow_diabatic_states(W_dia, St_sds, start_time, "sd")
+        # the records follow the states: written once the columns of W stand in the order of start_time
+        perms_dia, swaps_dia, unresolved_dia, cont_dia, edges_dia = _follow_diabatic_states(
+            W_dia, St_sds, start_time, "sd", dia_index, dia_reordering, dia_alpha, _state_energies(dia_energies),
+            dia_min_overlap)
+        _write_diabatization_records(res_dir_2, localized_carrier, dia_index, _permute_records(dia_pops, perms_dia),
+                                     _permute_records(dia_hole, perms_dia), _permute_records(dia_energies, perms_dia),
+                                     start_time, str(params['diabatization_scheme']).lower(),
+                                     extra=_tracking_record(dia_reordering, dia_alpha, dia_min_overlap, perms_dia,
+                                                            swaps_dia, unresolved_dia, cont_dia, edges_dia, start_time))
+        print(F"diabatic SD states: {len(swaps_dia)} swap frames, {len(unresolved_dia)} frames let through with a "
+              F"continuation below 0.5, {len(edges_dia)} edge departures, continuity min {cont_dia:.4f}")
     if params['do_state_reordering'] == 2 or params['do_state_reordering'] == 1:
         t2 = time.time()
         # For state reordering we need a list of CMATRIX for both St and energy
@@ -4046,7 +4324,18 @@ def run_step3_sd_nacs_libint(params):
                 sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/St_ci_{i+start_time}_re.npz', sp.csc_matrix(St_ci))
 
         if V_dia is not None:
-            _follow_diabatic_states(V_dia, St_cis, start_time, "ci")
+            # the CI records hold eV, the penalty width alpha is per Hartree as for the SD states
+            perms_ci_dia, swaps_ci_dia, unresolved_ci_dia, cont_ci_dia, edges_ci_dia = _follow_diabatic_states(
+                V_dia, St_cis, start_time, "ci", ci_dia_index, dia_reordering, dia_alpha,
+                [e / units.au2ev for e in _state_energies(ci_dia_energies)], dia_min_overlap)
+            _write_diabatization_records(res_dir_2, localized_carrier, ci_dia_index,
+                                         _permute_records(ci_pops, perms_ci_dia),
+                                         _permute_records(ci_hole, perms_ci_dia),
+                                         _permute_records(ci_dia_energies, perms_ci_dia), start_time,
+                                         str(params['diabatization_scheme']).lower(), basis="ci",
+                                         extra=_tracking_record(dia_reordering, dia_alpha, dia_min_overlap,
+                                                                perms_ci_dia, swaps_ci_dia, unresolved_ci_dia,
+                                                                cont_ci_dia, edges_ci_dia, start_time))
 
     # Now, we move to applying phase-corrections
     if params['apply_phase_correction']:
