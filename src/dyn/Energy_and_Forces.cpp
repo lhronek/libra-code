@@ -488,18 +488,7 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
       *dyn_vars.qtsh_f_nc = ham.QTSH_forces_dia(*dyn_vars.ampl_dia, 1).real();
     }
     else if(prms.rep_force==1){
-      int option = 0; // default value for NAC-based integrators
-
-      if(prms.electronic_integrator==0 || 
-         prms.electronic_integrator==1 ||
-         prms.electronic_integrator==2 ||
-         prms.electronic_integrator==9 ||
-         prms.electronic_integrator==10 ||
-         prms.electronic_integrator==11 ||
-         prms.electronic_integrator==12 ||
-         prms.electronic_integrator==19 ){ option = 2; } 
-
-      option = prms.qtsh_force_option;
+      int option = prms.qtsh_force_option;
 
       *dyn_vars.qtsh_f_nc = ham.QTSH_forces_adi(*dyn_vars.ampl_adi, 1, option).real();
     }
