@@ -529,14 +529,29 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
         // the arbitrary sign of a fresh diagonalization, and the amplitudes would be
         // turned twice or not at all. The coupling is taken between the FOLLOWED
         // states - the new states ordered by the projector's own permutation - and
-        // goes back under the raw labels of the new states at the end. The
-        // force-based tracking (4) orders by forces, not by St, and keeps the raw order
+        // goes back under the raw labels of the new states at the end. The pairing is
+        // the projector's own: the time overlap under 1/2/21/22, the force-cost matrix
+        // of the two frames under the force-based tracking 4 (as update_proj_adi)
         CMATRIX perm(nadi, nadi);
         perm.identity();
         if (relabel_gauge && (prms.state_tracking_algo == 1 || prms.state_tracking_algo == 2 ||
-                              prms.state_tracking_algo == 21 || prms.state_tracking_algo == 22)) {
+                              prms.state_tracking_algo == 21 || prms.state_tracking_algo == 22 ||
+                              prms.state_tracking_algo == 4)) {
           CMATRIX Eadi(ham.children[traj]->get_ham_adi());
-          CMATRIX T_follow(compute_projector(prms, Eadi, st));
+          CMATRIX pairing(st);
+          if (prms.state_tracking_algo == 4) {
+            vector<int> traj_id(1, traj);
+            MATRIX e_curr(ham.children[traj]->get_ham_adi().real());
+            MATRIX e_prev(ham_prev.children[traj]->get_ham_adi().real());
+            CMATRIX f_curr(ham.children[traj]->all_forces_adi(traj_id));
+            CMATRIX f_prev(ham_prev.children[traj]->all_forces_adi(traj_id));
+            MATRIX iM(dyn_var.get_imass());
+            MATRIX momenta(dyn_var.get_momenta());
+            MATRIX p(momenta.col(traj));
+            pairing = compute_F_cost_matrix(f_curr, f_prev, e_curr, e_prev, p, iM, prms.dt,
+                                            dyn_var.act_states[traj]);
+          }
+          CMATRIX T_follow(compute_projector(prms, Eadi, pairing));
           for (int i = 0; i < nadi; i++) {
             for (int j = 0; j < nadi; j++) {
               perm.set(i, j, (std::abs(T_follow.get(i, j)) > 0.5) ? complex<double>(1.0, 0.0)
@@ -545,10 +560,9 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
           }
           st = st * perm;
         } else if (!relabel_gauge || prms.state_tracking_algo == -1 || prms.state_tracking_algo == 0 ||
-                   prms.state_tracking_algo == 4 || prms.state_tracking_algo == 5 ||
-                   prms.state_tracking_algo == 6) {
-          ; // the raw gauge, the rotation projectors (-1, 5, 6), no reordering (0) and the force-based
-            // tracking (4) take the new states as stored
+                   prms.state_tracking_algo == 5 || prms.state_tracking_algo == 6) {
+          ; // the raw gauge, the rotation projectors (-1, 5, 6) and no reordering (0) take the new states as
+            // stored
         } else {
           std::cout<<"Error in update_Hamiltonian_variables(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: -1, 0, 1, 2, 4, 5, 6, 21, 22)\n";
           std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
