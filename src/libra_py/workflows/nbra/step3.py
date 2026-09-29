@@ -750,7 +750,7 @@ def make_active_space(num_occ,
         return new_active_space, new_ks_homo_alpha_index, new_ks_homo_beta_index
 
 
-def make_cost_mat(orb_mat_inp, en_mat_inp, alpha):
+def make_cost_mat(orb_mat_inp, en_mat_inp, alpha, en_mat_cols=None):
     """
 
     Makes the cost matrix from a given TDM and information on states' energies
@@ -760,12 +760,17 @@ def make_cost_mat(orb_mat_inp, en_mat_inp, alpha):
             TDM in a given basis. Here, ```nstates``` - the number of states (e.g. the number of doubly-occupied
             orbitals )
 
-        en_mat_inp ( MATRIX(nstates, nstates) ): Matrix of energies in a given basis [units: a.u.]
+        en_mat_inp ( MATRIX(nstates, nstates) ): Matrix of energies in a given basis [units: a.u.] - the energies
+            of the rows (the states followed so far, in their labels)
 
         alpha ( float ): Parameter controlling the range of the orbitals that can participate in
             the reordering. Setting is to 0 makes all orbitals be considered for reordering
             Setting it to a large number makes the effective number of orbitals participating
             in the reordering smaller - this can be used to turn off the reordering. [units: a.u.^-1]
+
+        en_mat_cols ( MATRIX(nstates, nstates) ): the energies of the columns (the candidate positions of the next
+            frame, taken at the earlier frame in their stored order) - the row matrix itself when None, which is
+            right only while no state has been relabeled
 
     Returns:
         MATRIX(nstates, nstates): the matrix of the cost values for different pairs of states
@@ -774,13 +779,15 @@ def make_cost_mat(orb_mat_inp, en_mat_inp, alpha):
 
     nstates = orb_mat_inp.num_of_cols
     cost_mat = MATRIX(nstates, nstates)
+    if en_mat_cols is None:
+        en_mat_cols = en_mat_inp
 
     for a in range(0, nstates):
         for b in range(0, nstates):
 
             s = orb_mat_inp.get(a, b)
             s2 = (s * s.conjugate()).real
-            dE = (en_mat_inp.get(a, a) - en_mat_inp.get(b, b)).real
+            dE = (en_mat_inp.get(a, a) - en_mat_cols.get(b, b)).real
             val = s2 * math.exp(-(alpha * dE)**2)
             cost_mat.set(a, b, val)
 
@@ -860,6 +867,8 @@ def apply_state_reordering(St, E, params):
 
     en_mat_aa = CMATRIX(nstates, nstates)
     en_mat_bb = CMATRIX(nstates, nstates)
+    en_pos_aa = CMATRIX(nstates, nstates)
+    en_pos_bb = CMATRIX(nstates, nstates)
 
     for i in range(0, nsteps):
 
@@ -894,7 +903,9 @@ def apply_state_reordering(St, E, params):
             pop_submatrix(St[i], bb, bet, bet)
 
             # the energies carry the row labels - unpermuted, a state relabeled at a
-            # crossing would keep the other state's energy
+            # crossing would keep the other state's energy - the stored order is kept for the columns, the
+            # candidate positions of the next frame at this frame's energies
+            E_pos = CMATRIX(E[i])
             perm_full = _spin_block_permutation(perm_t_aa, perm_t_bb, nstates)
             E[i].permute_rows(perm_full)
             E[i].permute_cols(perm_full)
@@ -903,6 +914,8 @@ def apply_state_reordering(St, E, params):
             # Extract the alpha and beta orbtial energies
             pop_submatrix(E[i], en_mat_aa, alp, alp)
             pop_submatrix(E[i], en_mat_bb, bet, bet)
+            pop_submatrix(E_pos, en_pos_aa, alp, alp)
+            pop_submatrix(E_pos, en_pos_bb, bet, bet)
 
             # Permute rows
             aa.permute_rows(perm_t_aa)
@@ -911,8 +924,8 @@ def apply_state_reordering(St, E, params):
             bb.permute_rows(perm_t_bb)
 
             # compute the cost matrices for diagonal blocks
-            cost_mat_aa = make_cost_mat(aa, en_mat_aa, params["state_reordering_alpha"])
-            cost_mat_bb = make_cost_mat(bb, en_mat_bb, params["state_reordering_alpha"])
+            cost_mat_aa = make_cost_mat(aa, en_mat_aa, params["state_reordering_alpha"], en_pos_aa)
+            cost_mat_bb = make_cost_mat(bb, en_mat_bb, params["state_reordering_alpha"], en_pos_bb)
 
             # Solve the optimal assignment problem for diagonal blocks
             res_aa = hungarian.maximize(cost_mat_aa)
@@ -1793,12 +1806,14 @@ def apply_state_reordering_general(St, E, params):
             # Permute rows
             St[i].permute_rows(perm_t)
             # the energies carry the row labels - unpermuted, a state relabeled at a
-            # crossing would keep the other state's energy
+            # crossing would keep the other state's energy - the stored order is kept for the columns, the
+            # candidate positions of the next frame at this frame's energies
+            E_pos = CMATRIX(E[i])
             E[i].permute_rows(perm_t)
             E[i].permute_cols(perm_t)
             perms.append([perm_t[k] for k in range(nstates)])
             # compute the cost matrices
-            cost_mat = make_cost_mat(St[i], E[i], params["state_reordering_alpha"])
+            cost_mat = make_cost_mat(St[i], E[i], params["state_reordering_alpha"], E_pos)
 
             # Solve the optimal assignment problem for diagonal blocks
             res = hungarian.maximize(cost_mat)
@@ -3148,18 +3163,21 @@ def _tracking_groups(dia_index):
     return list(groups.values())
 
 
-def _assign_states(O, reordering, alpha=0.0, energies=None):
+def _assign_states(O, reordering, alpha=0.0, energies=None, col_energies=None):
     """The column of every row of a square time-overlap block that carries its state on, by the reordering of the SD
     states: 1 the Sato search of libra's get_reordering, 2 the Munkres-Kuhn assignment on |O|^2 exp(-(alpha dE)^2)
-    with dE the energy difference of the two positions at the earlier frame (the cost of make_cost_mat) - alpha 0 or
-    no energies put no penalty."""
+    with dE the energy difference between the row's state and the column's position, both at the earlier frame (the
+    cost of make_cost_mat): energies are the rows' - the states followed so far, in their labels - and col_energies
+    the columns' - the candidate positions in their stored order, the rows' vector again when None, which is right
+    only while no state has been relabeled. alpha 0 or no energies put no penalty."""
     O = np.asarray(O, dtype=float)
     if reordering == 1:
         return np.array([int(c) for c in get_reordering(data_conv.nparray2CMATRIX(O))])
     weights = O ** 2
     if alpha and energies is not None:
         e = np.nan_to_num(np.asarray(energies, dtype=float))
-        weights = weights * np.exp(-(alpha * (e[:, None] - e[None, :])) ** 2)
+        e_cols = e if col_energies is None else np.nan_to_num(np.asarray(col_energies, dtype=float))
+        weights = weights * np.exp(-(alpha * (e[:, None] - e_cols[None, :])) ** 2)
     return _munkres_assignment(weights)
 
 
@@ -3185,7 +3203,8 @@ def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=N
     a manifold, one fragment pair's joint states) the columns of W(i+1) are assigned to the states of W(i) as the SD
     states are reordered (1 Sato, 2 Munkres-Kuhn on |O|^2 with the energy penalty exp(-(alpha dE)^2), energies the
     per-frame state energies of the columns) and permuted into the order of W(i) (in place), so that a state keeps
-    the identity it had at start_time through a crossing and the frame's energy order no longer names it. A state
+    the identity it had at start_time through a crossing and the frame's energy order no longer names it - the
+    penalty compares the followed state's energy with the candidate position's, both at the earlier frame. A state
     whose continuation carries less than min_overlap even so is one of two things: an EDGE DEPARTURE when the whole
     space carries less than min_overlap of it, sqrt(sum_j |O_cj|^2) < min_overlap - the state left the active space
     through its edge, the reordering has nothing to assign and the remedy is the space, so the frame is recorded
@@ -3211,10 +3230,13 @@ def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=N
         O = W_list[i].T @ np.asarray(St_list[i].todense()).real @ W_list[i + 1]
         perm = np.arange(n)
         if reordering:
+            # the frame's energies stand in its energy order (positions) - the rows are the followed states, whose
+            # positions at this frame are perms[i]
             e = None if energies is None else np.asarray(energies[i], dtype=float)
             for g in groups:
                 if len(g) > 1:
                     perm[g] = np.array(g)[_assign_states(O[np.ix_(g, g)], reordering, alpha,
+                                                         None if e is None else e[perms[i]][g],
                                                          None if e is None else e[g])]
             if np.any(perm != np.arange(n)):
                 W_list[i + 1] = W_list[i + 1][:, perm]
@@ -3359,10 +3381,11 @@ def _follow_orbitals(params, start_time, finish_time):
     min_continuity = 1.0
     for k in range(start_time, finish_time - 1):
         St = np.abs(np.asarray(sp.load_npz(F'{res_dir}/St_ks_{k}.npz').todense()).real)
-        e = np.diag(np.asarray(sp.load_npz(F'{res_dir}/E_ks_{k}.npz').todense()).real)[perm]
+        e_pos = np.diag(np.asarray(sp.load_npz(F'{res_dir}/E_ks_{k}.npz').todense()).real)
+        e = e_pos[perm]
         new = np.empty_like(perm)
         for b in blocks:
-            new[b] = b[_assign_states(St[np.ix_(perm[b], b)], reordering, alpha, e[b])]
+            new[b] = b[_assign_states(St[np.ix_(perm[b], b)], reordering, alpha, e[b], e_pos[b])]
         d = St[perm, new]
         inside = np.sqrt(np.sum(St[perm] ** 2, axis=1))
         min_continuity = min(min_continuity, float(d.min()))
@@ -3820,12 +3843,16 @@ def run_step3_pod(params):
         e, v = np.linalg.eigh(H_hole[k])
         E_adi.append(e)
         V.append(v)
+    # the eigenvalues in the frame's own order - the candidate positions' energies of the assignment, while E_adi
+    # follows the labels
+    E_pos = [e.copy() for e in E_adi]
     reordered, adi_unresolved, adi_edges = [], [], []
     adi_min_continuity = 1.0
     for k in range(1, len(frames)):
         O = V[k - 1].T @ St_hole[k - 1] @ V[k]
         if params['do_state_reordering'] in (1, 2):
-            perm = _assign_states(O, params['do_state_reordering'], params['state_reordering_alpha'], E_adi[k - 1])
+            perm = _assign_states(O, params['do_state_reordering'], params['state_reordering_alpha'], E_adi[k - 1],
+                                  E_pos[k - 1])
             if np.any(perm != np.arange(n)):
                 reordered.append(frames[k])
             V[k], E_adi[k], O = V[k][:, perm], E_adi[k][perm], O[:, perm]
@@ -4002,8 +4029,8 @@ def run_step3_sd_nacs_libint(params):
                 resolve) and recorded when it left the active space through its edge (edge_departures). Applies to
                 the CI-level diabatic states (U_ci) as well.
             * **params['diabatic_state_reordering_alpha']** (float): the energy-penalty width of the Munkres-Kuhn
-                cost of the diabatic states, exp(-(alpha dE)^2) with dE the difference of the state energies of the
-                two positions at the earlier frame, in 1/Hartree [default: 0 - no penalty] - as
+                cost of the diabatic states, exp(-(alpha dE)^2) with dE the difference between the followed state's
+                energy and the candidate position's at the earlier frame, in 1/Hartree [default: 0 - no penalty] - as
                 state_reordering_alpha for the SD states.
             * **params['diabatic_state_reordering_min_overlap']** (float): the continuity threshold of the diabatic
                 states, |O_cc| below which a state does not continue itself between two frames [default: 0.5 - a
