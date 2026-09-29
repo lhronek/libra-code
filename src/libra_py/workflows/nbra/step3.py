@@ -4153,9 +4153,8 @@ def run_step3_sd_nacs_libint(params):
         if former in params:
             raise ValueError(F"params['{former}'] is params['{present}'] now - rename it in the runner"
                              + (" (its values 'particle' and 'joint' are 'electron' and 'both')" if former == 'diabatization' else ""))
-    if 'orbital_perms' in params:
-        raise ValueError("params['orbital_perms'] is not an input - run_step3_sd_nacs_libint writes it from "
-                         "active_space_selection")
+    # written below from active_space_selection into this dict, which a runner may hand in again - never an input
+    params.pop('orbital_perms', None)
 
     # Check input, set output dirs
     comn.check_input(params, default_params, critical_params)
