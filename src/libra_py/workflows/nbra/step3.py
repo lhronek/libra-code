@@ -3640,7 +3640,10 @@ def run_step3_pod(params):
             * **params['localized_carrier']** (string): 'hole' - the only value implemented
             * **params['diabatization_scheme']** (string): 'pod_cp2k' - the only value implemented
             * **params['apply_phase_correction']** (bool): follow the signs of the adiabatic states through
-                <a(k)|a(k+1)> [default: False - the frame-wise eigenvector signs, the same physics]
+                <a(k)|a(k+1)> [default: True]. The sign of every eigenvector column is arbitrary frame by frame, so
+                False leaves those signs in St_sd and Hvib_sd_im - an element with one flipped state turns the
+                antisymmetric coupling formula into the symmetric part - and prints a warning. The energies do not
+                depend on the signs.
             * **params['do_state_reordering']** (int): 0 [default] the adiabatic states by increasing energy at every
                 frame, 1 the Sato search (get_reordering), 2 the Munkres-Kuhn assignment of the adiabatic states of
                 frame k+1 to those of frame k by the largest squared time overlap with the energy penalty of
@@ -3682,7 +3685,7 @@ def run_step3_pod(params):
     critical_params = ['path_to_npz_files', 'logfile_directory', 'start_time', 'finish_time', 'pod_occupied']
     default_params = {'path_to_save_sd_Hvibs': os.getcwd() + '/res-pod', 'time_step': 1.0,
                       'num_occ_states_per_block': None, 'sd_charge': 1, 'isUKS': 0, 'localized_carrier': 'hole',
-                      'diabatization_scheme': 'pod_cp2k', 'apply_phase_correction': False,
+                      'diabatization_scheme': 'pod_cp2k', 'apply_phase_correction': True,
                       'apply_orthonormalization': 'lowdin_cached', 'do_state_reordering': 0,
                       'state_reordering_alpha': 0.0, 'do_diabatic_state_reordering': 0,
                       'diabatic_state_reordering_alpha': 0.0, 'diabatic_state_reordering_min_overlap': 0.5,
@@ -3754,6 +3757,9 @@ def run_step3_pod(params):
                              F"<= {nmo[f]} block states is needed")
     if sum(per_block) < 2:
         raise ValueError("the hole basis needs at least two block states")
+    if not params['apply_phase_correction']:
+        print("WARNING: apply_phase_correction False - the eigenvector signs of every frame are arbitrary, St_sd and "
+              "Hvib_sd_im carry them and the couplings are not those of followed states")
     homo = CP2K_methods.read_homo_index(sorted(glob.glob(params['logfile_directory'] + '/*.log'))[0])
     if sum(occupied) != homo:
         raise ValueError(F"pod_occupied {occupied} sums to {sum(occupied)} occupied block states, the neutral system "
