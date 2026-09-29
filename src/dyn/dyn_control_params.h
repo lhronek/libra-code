@@ -939,7 +939,7 @@ class dyn_control_params{
       - 1: ETHD
       - 2: ETHD3 (experimental)
       - 22: another flavor of ETHD3 (experimental)
-      - 3: RPMD
+    (no RPMD coupling exists - the former 3 named no code)
   */
   int entanglement_opt;
 

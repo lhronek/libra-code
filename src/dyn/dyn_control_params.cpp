@@ -389,7 +389,7 @@ void dyn_control_params::sanity_check(){
     {"use_td_width", use_td_width, {0, 1, 2, 3}},
     {"isNBRA", isNBRA, {0, 1}},
     {"compute_dm_dia", compute_dm_dia, {-1, 0, 1}},
-    {"entanglement_opt", entanglement_opt, {0, 1, 2, 3, 22}},
+    {"entanglement_opt", entanglement_opt, {0, 1, 2, 22}},
     {"qtag_pot_approx_method", qtag_pot_approx_method, {0, 1, 2, 3}},
     {"ensemble", ensemble, {0, 1}},
     {"ampl_transformation_method", ampl_transformation_method, {0, 1}},

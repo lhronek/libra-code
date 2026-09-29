@@ -983,7 +983,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - 1: ETHD
                 - 2: ETHD3 (experimental)
                 - 22: another flavor of ETHD3 (experimental)
-                - 3: RPMD
+                (no RPMD coupling exists - the former 3 named no code)
 
 
             * **dyn_params["ETHD3_alpha"]** ( double ): Gaussian exponents that dresses up the trajectories in the ETHD3 method
