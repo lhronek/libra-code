@@ -27,7 +27,7 @@ from libra_py.workflows.nbra import mapping, step2_many_body
 import scipy.io as io
 import libra_py.citools.ci as ci
 from libra_py.citools.sd_basis import (make_sd_basis, sd2ci_matrix,
-                                       align_ci_state_signs, check_sd_capture, followed_nac)
+                                       align_ci_state_signs, check_sd_capture)
 
 if sys.platform == "cygwin":
     from cyglibra_core import *
@@ -5201,26 +5201,21 @@ def _identity_cmatrix(n):
     return M
 
 
-def fill_adiabatic_hamiltonians(obj, E, st_ci, dt, s_ci=None, nac=True):
+def fill_adiabatic_hamiltonians(obj, E, st_ci, s_ci=None):
     """The adiabatic Hamiltonian objects of a driver step, each matrix through one bulk conversion instead of
-    an element loop: ham_adi = diag(E), hvib_adi = diag(E) - i D with the couplings D of the followed states
-    (followed_nac: (St - St^T) / (2 dt) after the reordering, the raw formula wherever no pair swaps),
-    nac_adi = D when nac is set, time_overlap_adi = St and overlap_adi = s_ci when given (the NBRA twin's
-    Lowdin-orthonormalized CI overlap) or the identity. The CI overlaps of the drivers are real - a complex
-    one is refused, as the former element casts float(...) refused it."""
+    an element loop: ham_adi = diag(E), time_overlap_adi = St and overlap_adi = s_ci when given (the NBRA twin's
+    Lowdin-orthonormalized CI overlap) or the identity. No coupling is handed over: the engine derives the
+    couplings of the followed states from time_overlap_adi with its own projector (nac_update_method 2) and
+    builds hvib_adi = H - i D (hvib_update_method 1) - a driver's own follower could disagree with the engine's
+    at an ambiguous crossing. The CI overlaps of the drivers are real - a complex one is refused, as the former
+    element casts float(...) refused it."""
     if np.iscomplexobj(st_ci) or (s_ci is not None and np.iscomplexobj(s_ci)):
         raise TypeError("a complex CI overlap reached the adiabatic Hamiltonian fill - the drivers' overlaps are real")
     E = np.asarray(E, dtype=np.float64)
     n = E.shape[0]
     # the CI data may carry more states than the propagated ones - the former loops filled the n x n block
     St = np.asarray(st_ci, dtype=np.float64)[:n, :n]
-    D = followed_nac(St, dt)
-    H = np.diag(E).astype(np.complex128)
-    H.imag = 0.0 - D                                   # -D with a +0.0 diagonal, as the element casts wrote it
     obj.ham_adi = data_conv.nparray2CMATRIX(np.diag(E).astype(np.complex128))
-    obj.hvib_adi = data_conv.nparray2CMATRIX(H)
-    if nac:
-        obj.nac_adi = data_conv.nparray2CMATRIX(D.astype(np.complex128))
     obj.time_overlap_adi = data_conv.nparray2CMATRIX(St.astype(np.complex128))
     if s_ci is None:
         obj.overlap_adi = _identity_cmatrix(n)
@@ -5352,19 +5347,14 @@ def cp2k_compute_adi_nbra(q, params, full_id):
         ham_adi : CMATRIX (nstates, nstates)
             Adiabatic Hamiltonian (diagonal energies).
 
-        hvib_adi : CMATRIX (nstates, nstates)
-            Vibronic Hamiltonian including derivative coupling terms:
-                H_ij = E_i δ_ij - i d_ij
-
         time_overlap_adi : CMATRIX (nstates, nstates)
             Time-overlap matrix:
                 S_ij = <Ψ_i(t) | Ψ_j(t + dt)>
+            No coupling is handed over - the engine derives the couplings of the followed states from it
+            (nac_update_method 2) and builds the vibronic Hamiltonian (hvib_update_method 1).
 
         basis_transform : CMATRIX (nstates, nstates)
             Basis transformation matrix (identity).
-
-        nac_adi : CMATRIX (nstates, nstates)
-            Placeholder for nonadiabatic couplings (currently unused).
 
         d1ham_adi : CMATRIXList (length = ndof)
             Derivatives of Hamiltonian w.r.t. nuclear coordinates
@@ -5414,7 +5404,6 @@ def cp2k_compute_adi_nbra(q, params, full_id):
     >>> obj = cp2k_compute_adi(q, params, full_id)
     >>> print(obj.ham_adi)
     >>> print(obj.time_overlap_adi)
-    >>> print(obj.hvib_adi)
     """
     # ================= Decode trajectory index =================
     Id = Cpp2Py(full_id)
@@ -5488,9 +5477,8 @@ def cp2k_compute_adi_nbra(q, params, full_id):
 
     # ================= Build object =================
     obj = tmp()
-    # the Hamiltonians, the overlaps and the identity basis_transform are filled below - nac_adi stays this
-    # zero matrix, the couplings of the NBRA twin sit in hvib_adi only
-    obj.nac_adi = CMATRIX(nstates, nstates)
+    # the Hamiltonian, the overlaps and the identity basis_transform are filled below - no coupling, the engine
+    # derives it from the time overlap
 
     # ================= Compute overlaps =================
     st_mo = sp.load_npz(time_overlap_filename)
@@ -5560,11 +5548,11 @@ def cp2k_compute_adi_nbra(q, params, full_id):
 
 
     # ================= Populate Hamiltonian =================
-    # the midpoint excitation energies above the ground state (E_0 = 0), the Lowdin-orthonormalized CI
-    # overlaps and the couplings -i (St_ij - St_ji) / (2 dt) in hvib_adi - one bulk conversion per matrix
+    # the midpoint excitation energies above the ground state (E_0 = 0) and the Lowdin-orthonormalized CI
+    # overlaps - one bulk conversion per matrix, the couplings are the engine's
     E = np.zeros(nstates)
     E[1:] = 0.5 * (np.asarray(data_prev[0][:nstates - 1], dtype=np.float64) + np.asarray(data_curr[0][:nstates - 1], dtype=np.float64))
-    fill_adiabatic_hamiltonians(obj, E, st_ci, dt, s_ci=s_ci, nac=False)
+    fill_adiabatic_hamiltonians(obj, E, st_ci, s_ci=s_ci)
     obj.basis_transform = _identity_cmatrix(nstates)
 
     # ================= Forces =================
@@ -5865,11 +5853,12 @@ def cp2k_compute_adi_impl(q, params, full_id):
         full_id: Libra trajectory id; last element = itraj
 
     Returns:
-        obj with CMATRIX fields: ham_adi, hvib_adi (diagonals = the total energies
-        at the geometry), time_overlap_adi (CI-level), overlap_adi (identity),
-        basis_transform (identity), nac_adi (zeros), d1ham_adi (list over DOFs,
-        -force at the active-state diagonal), dc1_adi (zeros - CP2K TDDFPT has
-        no NACVs; use energy-based hop acceptance/rescaling).
+        obj with CMATRIX fields: ham_adi (diagonal = the total energies at the
+        geometry), time_overlap_adi (CI-level), overlap_adi (identity),
+        basis_transform (identity), d1ham_adi (list over DOFs, -force at the
+        active-state diagonal), dc1_adi (zeros - CP2K TDDFPT has no NACVs, use
+        energy-based hop acceptance/rescaling). No coupling: the engine derives
+        it from the time overlap (nac_update_method 2).
     """
     if "tolerance" in params:
         raise ValueError('tolerance was unified into "ci_threshold" (the same '
@@ -6353,13 +6342,9 @@ def cp2k_compute_adi_impl(q, params, full_id):
     else:
         obj.basis_transform = _identity_cmatrix(nstates)
 
-    dt = float(params.get("dt", 41.0))    # the NBRA twin's default
-    # off-diagonal couplings -i (St_ij - St_ji)/(2 dt), the NBRA-twin
-    # convention: a diagonal-only supplied hvib armed the overwrite guard
-    # against any engine rebuild and carried no couplings to consume
-    # the same couplings in nac_adi: read directly by the LZ detectors, the NAC phase correction and the
-    # nac_adi saver - ham_adi, hvib_adi, nac_adi, time_overlap_adi and the identity overlap_adi in one pass
-    fill_adiabatic_hamiltonians(obj, E_adi_curr[:nstates], st_ci, dt, nac=True)
+    # ham_adi, time_overlap_adi and the identity overlap_adi in one pass - the couplings are the engine's, from
+    # the time overlap with its own projector
+    fill_adiabatic_hamiltonians(obj, E_adi_curr[:nstates], st_ci)
 
     # the diagonal force terms of every degree of freedom as one array, then one diagonal CMATRIX per degree of
     # freedom through the bulk transfer

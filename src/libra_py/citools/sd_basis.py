@@ -260,6 +260,10 @@ def followed_nac(st, dt, min_overlap=0.5):
     d~ = (S~ - S~^T) / (2 dt), and it goes back under the raw labels of the new states -
     d[pi(i), pi(i')] = s_i s_i' d~[i, i'] - the labels and signs the engine receives the step under.
 
+    The drivers hand over no coupling: the engine derives the followed coupling from the time overlap with
+    its own projector (nac_update_method 2), so its permutation and the one that relabels the amplitudes are
+    one object - this function serves a model that must hand couplings over itself.
+
     A NAC-carrying integrator under a relabel projector needs this coupling. At an unresolved
     crossing (a pair that swaps within the step) the engine swaps the labels and moves the
     amplitudes along, while the raw (st - st^T) / (2 dt) of the swapped pair is 1 / dt or 0 by the

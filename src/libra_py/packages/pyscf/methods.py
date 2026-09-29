@@ -30,7 +30,6 @@ from libra_py.packages.pyscf.interfaces import ElectronicStructureStrategy, Mole
 
 from libra_py.packages.cp2k import methods as cp2k
 from libra_py import data_conv
-from libra_py.citools.sd_basis import followed_nac
 from libra_py import units
 
 class tmp:
@@ -115,15 +114,12 @@ def pyscf_compute_adi(q, params, full_id):
     # ================= Build object =================
     obj = tmp()
     obj.ham_adi = CMATRIX(nstates, nstates)
-    obj.nac_adi = CMATRIX(nstates, nstates)
-    obj.hvib_adi = CMATRIX(nstates, nstates)
     obj.basis_transform = CMATRIX(nstates, nstates)
     obj.time_overlap_adi = CMATRIX(nstates, nstates)
 
     # ================= Populate Hamiltonian =================
     for i in range(nstates):
         obj.ham_adi.set(i, i, complex(energies[i]) )
-        obj.hvib_adi.set(i, i, complex(energies[i]) )
         obj.basis_transform.set(i, i, 1.0+0.0j)
 
         for j in range(nstates):
@@ -140,20 +136,9 @@ def pyscf_compute_adi(q, params, full_id):
             obj.d1ham_adi[3 * iatom + 1].set(i, i, complex(grad[i][iatom, 1]))
             obj.d1ham_adi[3 * iatom + 2].set(i, i, complex(grad[i][iatom, 2]))
 
-    # ================= Compute derivative couplings =================
-    # the couplings of the FOLLOWED states (followed_nac): the engine swaps the labels of a pair that crosses
-    # within the step, and the raw (St - St^T) / (2 dt) of a swapped pair is 1 / dt or 0 by the arbitrary sign of
-    # the new eigenvectors
-    D = followed_nac(data_conv.MATRIX2nparray(obj.time_overlap_adi).real[:nstates, :nstates], dt)
-    for i in range(nstates):
-        for j in range(i + 1, nstates):
-            dij = complex(D[i, j])
-            # the same couplings in nac_adi (read directly by the LZ detectors,
-            # the NAC phase correction and the nac_adi saver)
-            obj.nac_adi.set(i, j, dij)
-            obj.nac_adi.set(j, i, -dij)
-            obj.hvib_adi.set(i, j, complex(0.0, -dij))
-            obj.hvib_adi.set(j, i, complex(0.0, dij))            
+    # no coupling is handed over: the engine derives the couplings of the followed states from time_overlap_adi
+    # with its own projector (nac_update_method 2) and builds hvib_adi = H - i D (hvib_update_method 1) - a
+    # driver's own follower could disagree with the engine's at an ambiguous crossing
             
     # ================= Store state =================
     params["pyscf_obj"][itraj] = copy.deepcopy(pyscf_obj)

@@ -30,7 +30,7 @@ from libra_py import units
 from libra_py import scan
 from libra_py import data_conv
 from libra_py.citools.sd_basis import (make_sd_basis, sd2ci_matrix,
-                                       align_ci_state_signs, check_sd_capture, followed_nac)
+                                       align_ci_state_signs, check_sd_capture)
 from libra_py import regexlib as rgl
 import libra_py.citools.ci as ci
 from libra_py import data_conv
@@ -3063,9 +3063,6 @@ def dftb_compute_adi(q, params, full_id):
         ham_adi : CMATRIX (nstates, nstates)
             Adiabatic Hamiltonian matrix.
 
-        hvib_adi : CMATRIX (nstates, nstates)
-            Vibronic Hamiltonian including derivative couplings.
-
         time_overlap_adi : CMATRIX (nstates, nstates)
             Time-overlap matrix S_ij(t, t+dt) = <Ψ_i(t)|Ψ_j(t+dt)>.
 
@@ -3291,8 +3288,6 @@ def dftb_compute_adi(q, params, full_id):
     obj = tmp()
 
     obj.ham_adi = CMATRIX(nstates, nstates)
-    obj.nac_adi = CMATRIX(nstates, nstates)
-    obj.hvib_adi = CMATRIX(nstates, nstates)
     obj.basis_transform = CMATRIX(nstates, nstates)
     obj.time_overlap_adi = CMATRIX(nstates, nstates)
     obj.overlap_adi = CMATRIX(nstates, nstates)
@@ -3420,7 +3415,6 @@ def dftb_compute_adi(q, params, full_id):
         energy = 0.0 if i == 0 else data_curr[0][i-1]
 
         obj.ham_adi.set(i, i, energy)
-        obj.hvib_adi.set(i, i, energy)
         obj.basis_transform.set(i, i, 1.0)
 
         for j in range(nstates):
@@ -3459,11 +3453,7 @@ def dftb_compute_adi(q, params, full_id):
     e0 = results_gs['mermin_energy'] - energy_zero
     print(F"GS energy = {e0}")
     for i in range(nstates):
-        obj.ham_adi.add(i, i, e0)
-        # the same shift on hvib: its diagonal must be ham_adi's (the engine's
-        # rebuild is H - i nac, and a supplied hvib is compared against it); a
-        # uniform shift is a global phase of the electronic propagation
-        obj.hvib_adi.add(i, i, e0)
+        obj.ham_adi.add(i, i, e0)      # a uniform shift is a global phase of the electronic propagation
 
     obj.d1ham_adi = CMATRIXList()
     for idof in range(ndof):
@@ -3522,21 +3512,9 @@ def dftb_compute_adi(q, params, full_id):
                     obj.dc1_adi[3 * iatom + 1].set(i, j, complex(nacv[i,j,1,iatom]))
                     obj.dc1_adi[3 * iatom + 2].set(i, j, complex(nacv[i,j,2,iatom]))
 
-    # ================= Compute derivative couplings =================
-    # the HST couplings go into nac_adi as well: the engine reads nac_adi
-    # directly (LZ detectors, NAC phase correction, the nac_adi saver), and
-    # hvib = H - i nac is then the engine's own rebuild convention
-    # the couplings of the FOLLOWED states (followed_nac): the engine swaps the labels of a pair that crosses
-    # within the step, and the raw (St - St^T) / (2 dt) of a swapped pair is 1 / dt or 0 by the arbitrary sign of
-    # the new eigenvectors
-    D = followed_nac(data_conv.MATRIX2nparray(obj.time_overlap_adi).real[:nstates, :nstates], dt)
-    for i in range(nstates):
-        for j in range(i + 1, nstates):
-            dij = complex(D[i, j])
-            obj.nac_adi.set(i, j, dij)
-            obj.nac_adi.set(j, i, -dij)
-            obj.hvib_adi.set(i, j, complex(0.0, -dij))
-            obj.hvib_adi.set(j, i, complex(0.0, dij))            
+    # no coupling is handed over: the engine derives the couplings of the followed states from time_overlap_adi
+    # with its own projector (nac_update_method 2) and builds hvib_adi = H - i D (hvib_update_method 1) - a
+    # driver's own follower could disagree with the engine's at an ambiguous crossing
             
     # ================= Store state =================
     params["MO_prev"][itraj] = copy.deepcopy(MO_curr)

@@ -36,7 +36,6 @@ import libra_py.workflows.nbra.step3 as step3
 import libra_py.citools.slatdet as sd
 import libra_py.citools.interfaces as interfaces
 import libra_py.citools.ci as ci
-from libra_py.citools.sd_basis import followed_nac
 import libra_py.orthogonalizations as ortho
 
 def make_mopac_input(mopac_input_filename, mopac_run_params, labels, coords):
@@ -660,13 +659,6 @@ def mopac_compute_adi(q, params, full_id):
         ham_adi : CMATRIX(nstates, nstates)
             Adiabatic Hamiltonian matrix.
 
-        hvib_adi : CMATRIX(nstates, nstates)
-            Vibronic Hamiltonian matrix.
-
-        nac_adi : CMATRIX(nstates, nstates)
-            Nonadiabatic coupling matrix. Currently allocated but not
-            explicitly populated.
-
         basis_transform : CMATRIX(nstates, nstates)
             Basis transformation matrix. Currently assumed to be the
             identity matrix.
@@ -725,7 +717,7 @@ def mopac_compute_adi(q, params, full_id):
     >>> obj = mopac_compute_adi(q, params, full_id)
     >>> E0 = obj.ham_adi.get(0, 0).real
     >>> S01 = obj.time_overlap_adi.get(0, 1)
-    >>> Hvib = obj.hvib_adi
+    >>> St = obj.time_overlap_adi
     """
 
     # ================= Decode trajectory index =================
@@ -836,8 +828,6 @@ def mopac_compute_adi(q, params, full_id):
     # Do the calculations - time-overlaps, energies, and Hvib
     obj = tmp()
     obj.ham_adi = CMATRIX(nstates, nstates)
-    obj.nac_adi = CMATRIX(nstates, nstates)
-    obj.hvib_adi = CMATRIX(nstates, nstates)
     obj.basis_transform = CMATRIX(nstates, nstates)
     obj.time_overlap_adi = CMATRIX(nstates, nstates)
     obj.overlap_adi = CMATRIX(nstates, nstates)
@@ -887,27 +877,15 @@ def mopac_compute_adi(q, params, full_id):
             energ = float(data_curr[0][istate-1])
 
         obj.ham_adi.set(istate, istate, complex(energ))
-        obj.hvib_adi.set(istate, istate, complex(energ))
         obj.basis_transform.set(istate, istate, 1.0 + 0.0j)  # assume identity
 
         for jstate in range(nstates):
             obj.time_overlap_adi.set(istate, jstate, complex(float(st_ci[istate, jstate])))
             obj.overlap_adi.set(istate,  jstate, complex(float(s_ci[istate, jstate])) )
 
-    # Update the Hvib:
-    # the couplings of the FOLLOWED states (followed_nac): the engine swaps the labels of a pair that crosses
-    # within the step, and the raw (St - St^T) / (2 dt) of a swapped pair is 1 / dt or 0 by the arbitrary sign of
-    # the new eigenvectors
-    D = followed_nac(data_conv.MATRIX2nparray(obj.time_overlap_adi).real[:nstates, :nstates], dt)
-    for istate in range(nstates):
-        for jstate in range(istate + 1, nstates):
-            dij = complex(D[istate, jstate])
-            # the same couplings in nac_adi (read directly by the LZ detectors,
-            # the NAC phase correction and the nac_adi saver)
-            obj.nac_adi.set(istate, jstate, dij)
-            obj.nac_adi.set(jstate, istate, -dij)
-            obj.hvib_adi.set(istate, jstate, complex(0.0, -dij))
-            obj.hvib_adi.set(jstate, istate, complex(0.0, dij))
+    # no coupling is handed over: the engine derives the couplings of the followed states from time_overlap_adi
+    # with its own projector (nac_update_method 2) and builds hvib_adi = H - i D (hvib_update_method 1) - a
+    # driver's own follower could disagree with the engine's at an ambiguous crossing
 
     # Now, make the current the previous and reset the flag `is_first_time` to False
     # Note - we directly modify the input parameters
