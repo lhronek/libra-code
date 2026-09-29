@@ -859,7 +859,8 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
 
 
             * **dyn_params["instantaneous_decoherence_variant"]** ( int ): Option to control the instantaneous
-                decoherence methodology, only used with decoherence_algo == 1
+                decoherence methodology, used with decoherence_algo == 1 (every variant) and 8 (the diabatic
+                chain, the variants 0, 1 and 2 alone - 3 and 4 are refused with it)
 
                 - 0: ID-S
                 - 1: ID-A [default] - if the proposed hop is not successful, we project back to the initial state
