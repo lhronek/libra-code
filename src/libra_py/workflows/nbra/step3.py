@@ -2299,6 +2299,9 @@ def run_step3_ks_nacs_libint(params):
             * **params['nac_algo']** ( int ): selection of a method to compute NACs
                     - 0 : Hamess-Shiffer-Tully (HST), finite difference [ default ]
                     - 1 : Meek-Levine NPI
+            Every key the route does not read is refused: the former option names with their present names, and any
+            key of the SD or POD route (active_space_selection, do_diabatic_state_reordering, is_many_body and kin)
+            with the list of the route's keys - a runner hands every route its own dict.
     Returns:
 
         None
@@ -2313,6 +2316,20 @@ def run_step3_ks_nacs_libint(params):
                       'do_state_reordering': 0, 'state_reordering_alpha': 0, 'es_software': 'cp2k',
                       'nac_algo': 0, 'blas_num_threads': None
                       }
+    # the keys of the KS route: its defaults, the window and HOMO keys it reads, the keys it writes into the dict for
+    # its helpers (a runner may hand the dict in again) - every other key is refused, as on the POD route: the SD
+    # and POD options (active_space_selection, do_diabatic_state_reordering, the many-body keys) have no reading here
+    known = set(default_params) | {'lowest_orbital', 'highest_orbital', 'num_occ_states', 'num_unocc_states',
+                                   'num_occ_alpha', 'num_unocc_alpha', 'num_occ_beta', 'num_unocc_beta', 'isUKS',
+                                   'logfile_directory', 'use_multiprocessing', 'active_space', 'data_dim',
+                                   'homo_index', 'ks_homo_index', 'homo_alpha_index', 'homo_beta_index',
+                                   'npz_file_ks_homo_index', 'npz_file_ks_homo_alpha_index',
+                                   'npz_file_ks_homo_beta_index'}
+    _refuse_former_names(params)
+    unknown = sorted(set(params) - known)
+    if unknown:
+        raise ValueError(F"run_step3_ks_nacs_libint: params {unknown} are not options of the KS route - its keys are "
+                         F"{sorted(known)}")
     comn.check_input(params, default_params, critical_params)
     params['apply_orthonormalization'] = _orthonormalization_mode(params['apply_orthonormalization'])
     _check_reordering_options(params, 'run_step3_ks_nacs_libint')
