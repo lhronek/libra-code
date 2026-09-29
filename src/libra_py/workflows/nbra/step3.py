@@ -3666,7 +3666,12 @@ def _pod_route_frame(hab, spin=0):
     off = np.concatenate(([0], np.cumsum(nmo)))
     h = np.zeros((off[-1], off[-1]))
     for ib in range(nblk):
-        h[off[ib]:off[ib + 1], off[ib]:off[ib + 1]] = np.diag(np.asarray(hab[F"E_b{ib}_s{spin}"], dtype=float))
+        e = np.asarray(hab[F"E_b{ib}_s{spin}"], dtype=float)
+        # the ranks of the route are the energy order of every block - the print must be ascending
+        if np.any(np.diff(e) < 0.0):
+            raise ValueError(F"the POD block {ib} prints its block energies out of ascending order (E_b{ib}_s{spin}: "
+                             F"{e.tolist()}) - the ranks of the route are the energy order of every block")
+        h[off[ib]:off[ib + 1], off[ib]:off[ib + 1]] = np.diag(e)
         for jb in range(ib + 1, nblk):
             v = np.asarray(hab[F"V_b{ib}_b{jb}_s{spin}"], dtype=float)
             h[off[ib]:off[ib + 1], off[jb]:off[jb + 1]] = v
