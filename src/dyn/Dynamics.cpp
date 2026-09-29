@@ -1253,10 +1253,10 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
       CMATRIX Hvib(ham->ndia, ham->ndia);
       // the metric over this electronic substep: S moves linearly over the nuclear
       // step and a substep carries the amplitudes across its own share of that
-      // move - the whole move in every substep applies the change of frame
-      // num_electronic_substeps times (c^H S c off by 0.5 with two substeps). The
-      // ends of the nuclear step stay the very matrices of the Hamiltonians, so a
-      // single substep and a metric that does not move take the path they took
+      // move alone - the whole move in every substep would apply the change of
+      // frame num_electronic_substeps times. The ends of the nuclear step are the
+      // very matrices of the Hamiltonians - a single substep, or a metric that does
+      // not move, is the plain step
       CMATRIX Sdia_old(ham_prev->get_ovlp_dia());
       CMATRIX Sdia(ham->get_ovlp_dia());
       double w_old = double(isub) / num_el;
@@ -1287,8 +1287,8 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         Hvib = 0.5 * (ham->get_hvib_dia() + ham_prev->get_hvib_dia());
         if (metric_moved(Sdia_old, Sdia)) {
           // the QTAG step solves Hvib Z = S Z E with one metric and keeps c^H S c for
-          // that metric only - across a metric that moves it loses the norm (0.29 for
-          // S_ab moving by 0.15), the Lowdin-frame step carries the amplitudes over
+          // that metric alone - across a metric that moves the norm is not kept, the
+          // Lowdin-frame step carries the amplitudes over
           propagate_electronic_lowdin(dt, C, Hvib, Sdia_old, Sdia);
         } else {
           propagate_electronic_qtag(dt, C, Hvib,
