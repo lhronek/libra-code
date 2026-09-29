@@ -994,6 +994,17 @@ def do_phase_corr(cum_phase1, St, cum_phase2, phase_i):
             St.scale(a, b, fab)
 
 
+def _refuse_former_names(params):
+    """An option set by its former name would leave the present one at its default without a word - refused with the
+    present name, in every step-3 writer."""
+    for former, present in (('koopmans_charge', 'sd_charge'), ('diabatization', 'localized_carrier'),
+                            ('fragment_operator', 'diabatization_scheme')):
+        if former in params:
+            raise ValueError(F"params['{former}'] is params['{present}'] now - rename it in the runner"
+                             + (" (its values 'particle' and 'joint' are 'electron' and 'both')"
+                                if former == 'diabatization' else ""))
+
+
 def _check_reordering_options(params, route):
     """The state-reordering options the step-3 writers share, refused outside their domains: do_state_reordering and
     do_diabatic_state_reordering in 0 (none), 1 (Sato), 2 (Munkres-Kuhn), the two alphas non-negative widths in
@@ -3694,6 +3705,12 @@ def run_step3_pod(params):
                 off - recorded under "adiabatic" in the report (the frames let through below 0.5, min_continuity,
                 reordered_frames - the frames at which the labels changed - and frames_off_energy_order) [default:
                 0.5]. In the energy order (0) nothing is refused.
+            * **params['active_space_selection']** (string): 'energy' alone - the POD basis holds no Kohn-Sham
+                orbitals to follow, its block states are followed by do_diabatic_state_reordering.
+            * **params['nac_algo']** (int): 0 alone - the route writes the HST couplings (St^T - St) / 2 dt.
+            Every key the route does not read is refused: the former option names with their present names, the
+            keys of the SD route's Kohn-Sham basis (num_occ_states and its kin) with a pointer to
+            num_occ_states_per_block, any other unknown key with the list of the route's keys.
             * **params['apply_orthonormalization']**: the vocabulary of the SD route is accepted and has no effect -
                 the block states are orthonormal within every frame by construction (S^-1/2 v of the Lowdin frame),
                 their Lowdin factors are the identity
@@ -3708,7 +3725,21 @@ def run_step3_pod(params):
                       'apply_orthonormalization': 'lowdin_cached', 'do_state_reordering': 0,
                       'state_reordering_alpha': 0.0, 'do_diabatic_state_reordering': 0,
                       'diabatic_state_reordering_alpha': 0.0, 'diabatic_state_reordering_min_overlap': 0.5,
-                      'state_reordering_min_overlap': 0.5, 'active_space_selection': 'energy'}
+                      'state_reordering_min_overlap': 0.5, 'active_space_selection': 'energy', 'nac_algo': 0}
+    _refuse_former_names(params)
+    # the keys of the SD route's Kohn-Sham basis have no reading here - num_occ_states in place of
+    # num_occ_states_per_block ran the whole occupied space without a word
+    for key in ('num_occ_states', 'num_unocc_states', 'lowest_orbital', 'highest_orbital', 'num_occ_alpha',
+                'num_unocc_alpha', 'num_occ_beta', 'num_unocc_beta', 'active_space_num_occ_orbitals', 'is_many_body',
+                'number_of_states', 'ci_threshold', 'sorting_type', 'spin_adapted', 'sd_overlap_kernel'):
+        if key in params:
+            raise ValueError(F"run_step3_pod: params['{key}'] is a key of the SD route - the POD route has no "
+                             F"Kohn-Sham basis, num_occ_states_per_block selects the hole basis of every block from "
+                             F"its pod_occupied states")
+    unknown = sorted(set(params) - set(default_params) - set(critical_params))
+    if unknown:
+        raise ValueError(F"run_step3_pod: params {unknown} are not options of the POD route - its keys are "
+                         F"{sorted(set(default_params) | set(critical_params))}")
     comn.check_input(params, default_params, critical_params)
     # the values the route implements - every other value is refused
     for key, allowed, hint in (('sd_charge', (1,), "the frozen-orbital hole basis of the cation"),
@@ -3717,7 +3748,9 @@ def run_step3_pod(params):
                                ('diabatization_scheme', ('pod_cp2k',), "the POD prints of CP2K"),
                                ('active_space_selection', ('energy',), "no Kohn-Sham orbitals in the POD basis - the "
                                                                        "block states are followed by "
-                                                                       "do_diabatic_state_reordering")):
+                                                                       "do_diabatic_state_reordering"),
+                               ('nac_algo', (0,), "the POD route writes the HST couplings (St^T - St) / 2 dt, the NPI "
+                                                  "of nac_algo 1 is not implemented on it")):
         if params[key] not in allowed:
             raise ValueError(F"run_step3_pod: params['{key}'] = {params[key]!r} is not implemented on the POD "
                              F"route - {list(allowed)} ({hint})")
@@ -4167,12 +4200,7 @@ def run_step3_sd_nacs_libint(params):
     if params['is_many_body'] and params['isUKS']:
         raise Exception('Unrestricted-spin calculations are not supported for many-body basis yet!')  # TODO
 
-    # an option set by its former name would leave the present one at its default without a word
-    for former, present in (('koopmans_charge', 'sd_charge'), ('diabatization', 'localized_carrier'),
-                            ('fragment_operator', 'diabatization_scheme')):
-        if former in params:
-            raise ValueError(F"params['{former}'] is params['{present}'] now - rename it in the runner"
-                             + (" (its values 'particle' and 'joint' are 'electron' and 'both')" if former == 'diabatization' else ""))
+    _refuse_former_names(params)
     # written below from active_space_selection into this dict, which a runner may hand in again - never an input
     params.pop('orbital_perms', None)
 
