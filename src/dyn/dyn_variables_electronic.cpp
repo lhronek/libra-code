@@ -1301,14 +1301,16 @@ void dyn_variables::init_electronic_dyn_var(bp::dict _params, Random& rnd){
 //vector<int> update_active_states(vector<int>& act_states, vector<CMATRIX*>& T){
 void dyn_variables:: update_active_states(int direction, int property){
 /*
-  |psi_adi_tilde> C_adi_tilde = |psi_adi> C_adi
+  The projector T of the step (proj_adi, compute_projector on the time overlap St = <psi(t)|psi(t + dt)>) carries
+  the amplitudes from the labels of the previous step to those of the new one exactly as the propagation does
+  (propagate_electronic: C = T_ampl C, RHO = T_ampl RHO T_ampl^H) - the active state, a unit vector in the old
+  labels, moves by the same T. T^H would move it the other way round: the same thing for a swap (T = T^T), the
+  opposite cycle for three states that rotate their labels.
 
-  |psi_adi_tilde> = |psi_adi> T, so:
 
-  T C_adi_tilde = C_adi and  C_adi_tilde = T^+ C_adi
  
-   direction = 1 - forward:  C_adi_tilde = T^+ C_adi
-              -1 - backward  C_adi = T C_adi_tilde
+   direction = 1 - forward:  C_new = T C_old
+              -1 - backward  C_old = T^H C_new
 
    property  = 0 - active state only
              = 1 - adiabatic amplitudes only 
@@ -1331,8 +1333,8 @@ void dyn_variables:: update_active_states(int direction, int property){
       coeff = 0.0;
       coeff.set(act_states[itraj], 0, complex<double>(1.0, 0.0));
 
-      if(direction==1){    coeff = proj_adi[itraj]->H() * coeff; }
-      else if(direction==-1){  coeff = (*proj_adi[itraj]) * coeff; }
+      if(direction==1){    coeff = (*proj_adi[itraj]) * coeff; }
+      else if(direction==-1){  coeff = proj_adi[itraj]->H() * coeff; }
 
       //coeff.max_col_elt(0, max_val, act_states[itraj]);
       rho_tmp = (coeff * coeff.H()).real();
@@ -1351,8 +1353,8 @@ void dyn_variables:: update_active_states(int direction, int property){
     if(property==1 || property==2){
       coeff = ampl_adi->col(itraj);
 
-      if(direction==1){    coeff = proj_adi[itraj]->H() * coeff; }
-      else if(direction==-1){  coeff = (*proj_adi[itraj]) * coeff; }
+      if(direction==1){    coeff = (*proj_adi[itraj]) * coeff; }
+      else if(direction==-1){  coeff = proj_adi[itraj]->H() * coeff; }
 
       for(i=0; i<nst; i++){ ampl_adi->set(i, itraj,  coeff.get(i, 0) ); }
     }
