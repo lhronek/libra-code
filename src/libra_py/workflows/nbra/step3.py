@@ -3262,6 +3262,34 @@ def _state_energies(energy_records):
     return out
 
 
+def _partner(row, taken):
+    """The state that took most of a departing or mixing state: the largest |overlap| of its row outside the column
+    that carries it on."""
+    r = np.abs(np.asarray(row, dtype=float)).copy()
+    r[taken] = -1.0
+    return int(np.argmax(r))
+
+
+def _classify_continuations(d, inside, threshold):
+    """The states of a frame whose continuation |<c|c>| = d falls below max(threshold, 0.5), classified by what the
+    space carries of them (inside = sqrt(sum_j |<c|j>|^2) over the space's states): EDGES - the space carries less
+    than max(threshold, 0.5) of the state, it left the space through its edge (recorded by every writer, the remedy
+    is the space), MIXED - the space carries the state but no single state does, below the threshold (an internal
+    mixing within one frame - refused after a reordering while the threshold is above 0), UNRESOLVED - carried, below
+    0.5 (let through and recorded). Three index arrays in the states' order - the one rule of the SD, CI, diabatic,
+    orbital and POD continuations, whose edge records share the shape [frame, state, kept, carried by the space,
+    the state that took most of it (_partner)]."""
+    d = np.asarray(d, dtype=float)
+    inside = np.asarray(inside, dtype=float)
+    floor = max(float(threshold), 0.5)
+    below = np.where(d < floor)[0]
+    edges = np.array([c for c in below if inside[c] < floor], dtype=int)
+    carried = [c for c in below if inside[c] >= floor]
+    mixed = np.array([c for c in carried if d[c] < threshold], dtype=int)
+    unresolved = np.array([c for c in carried if d[c] < 0.5], dtype=int)
+    return edges, mixed, unresolved
+
+
 def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=None, reordering=0, alpha=0.0,
                             energies=None, min_overlap=0.5):
     """The localization eigenvectors carry arbitrary signs: every diabatic state follows the trajectory through the
@@ -3314,10 +3342,11 @@ def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=N
         d = np.abs(np.diag(O))
         min_continuity = min(min_continuity, float(d.min()))
         inside = np.sqrt(np.sum(O ** 2, axis=1))
-        for c in np.where(d < min_overlap)[0]:
-            if inside[c] < min_overlap:
-                edges.append([start_time + i + 1, int(c), round(float(d[c]), 4), round(float(inside[c]), 4)])
-                continue
+        edge_idx, mixed_idx, unresolved_idx = _classify_continuations(d, inside, min_overlap)
+        for c in edge_idx:
+            edges.append([start_time + i + 1, int(c), round(float(d[c]), 4), round(float(inside[c]), 4),
+                          _partner(O[c], c)])
+        for c in mixed_idx[:1]:
             row = np.abs(O[c]).copy()
             row[c] = -1.0
             partner = int(np.argmax(row))
@@ -3335,7 +3364,7 @@ def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=N
                              F"states swap between the frames and the labels would mean other states from there "
                              F"on: narrow the manifold or the active space, or follow the states with "
                              F"do_diabatic_state_reordering 2")
-        if np.any((d < 0.5) & (inside >= 0.5)):
+        if len(unresolved_idx):
             unresolved.append(start_time + i + 1)
         W_list[i + 1] = W_list[i + 1] * np.where(np.diag(O) < 0.0, -1.0, 1.0)
         perms.append(perm)
@@ -3363,7 +3392,8 @@ def _tracking_record(reordering, alpha, min_overlap, perms, swaps, unresolved, m
                 "lie above its lower-ranked partner from a swap frame on)" if reordering else
                 " and every state continues itself between the frames") + " - an internal mixing below the threshold "
                 "is refused, unresolved_frames lists the frames a threshold below 0.5 let through with less than 0.5, "
-                "edge_departures the states that left the active space ([frame, state, kept, carried by the space])"}
+                "edge_departures the states that left the active space ([frame, state, kept, carried by the space, "
+                "the state that took most of it])"}
 
 
 def _continuity_record(St_list, start_time, reordering, alpha, min_overlap, perms=None, basis="SD"):
@@ -3374,7 +3404,8 @@ def _continuity_record(St_list, start_time, reordering, alpha, min_overlap, perm
     more than the threshold's angle within one frame, the frame spacing does not resolve the crossing, min_overlap
     0 switches the check off), never refused in the energy order (reordering 0: a crossing of adiabatic states is the
     convention there and is left to the propagation). Returns the record: the frames let through with an internal
-    continuation below 0.5 (unresolved), the edge departures ([frame, state, kept, carried by the space]), the
+    continuation below 0.5 (unresolved), the edge departures ([frame, state, kept, carried by the space, the state
+    that took most of it]), the
     smallest |St_cc|, and the frames at which the reordering changed the labels (perms: the per-frame label
     permutations of apply_state_reordering_general)."""
     conts, edges, unresolved = [], [], []
@@ -3383,10 +3414,12 @@ def _continuity_record(St_list, start_time, reordering, alpha, min_overlap, perm
         c = np.diag(A)
         inside = np.sqrt(np.sum(A ** 2, axis=1))
         conts.append(c)
-        for j in np.where(c < max(min_overlap, 0.5))[0]:
-            if inside[j] < max(min_overlap, 0.5):
-                edges.append([start_time + i + 1, int(j), round(float(c[j]), 4), round(float(inside[j]), 4)])
-            elif reordering and min_overlap > 0.0 and c[j] < min_overlap:
+        edge_idx, mixed_idx, unresolved_idx = _classify_continuations(c, inside, min_overlap)
+        for j in edge_idx:
+            edges.append([start_time + i + 1, int(j), round(float(c[j]), 4), round(float(inside[j]), 4),
+                          _partner(A[j], j)])
+        for j in mixed_idx[:1]:
+            if reordering and min_overlap > 0.0:
                 row = A[j].copy()
                 row[j] = -1.0
                 partner = int(np.argmax(row))
@@ -3396,8 +3429,8 @@ def _continuity_record(St_list, start_time, reordering, alpha, min_overlap, perm
                                  F"carries {inside[j]:.3f} of the state) - an internal mixing the frame spacing does "
                                  F"not resolve: a lower state_reordering_min_overlap lets the frame through and "
                                  F"records it, 0 switches the check off")
-            elif c[j] < 0.5 and (start_time + i + 1) not in unresolved:
-                unresolved.append(start_time + i + 1)
+        if len(unresolved_idx):
+            unresolved.append(start_time + i + 1)
     reordered = []
     if perms is not None:
         for i in range(1, min(len(perms), len(St_list) + 1)):
@@ -3410,7 +3443,8 @@ def _continuity_record(St_list, start_time, reordering, alpha, min_overlap, perm
             "note": "unresolved_frames: the frames in which a labeled state continued with less than 0.5 inside the "
                     "space and was let through - in the energy order the trivial crossings left to the propagation, "
                     "with a reordering the frames a lowered threshold accepted - edge_departures: [frame, state, kept, "
-                    "carried by the space] of the states that left the active space through its edge - "
+                    "carried by the space, the state that took most of it] of the states that left the active space "
+                    "through its edge - "
                     "reordered_frames: the frames at which the reordering changed the labels"}
 
 
@@ -3439,7 +3473,8 @@ def _follow_orbitals(params, start_time, finish_time):
     of the frame's window matrices holds the orbital that stands at position perm[r] of the stored window, the
     identity at start_time - and the record of the window: the frames at which the labels changed, the count of
     frames off the energy order, the smallest continuity, the orbitals that left the window (edge_departures:
-    [frame, label, kept, carried by the window] - the window carries less than 0.5 of the orbital) and the
+    [frame, label, kept, carried by the window, the window position that took most of it] - the window carries less
+    than 0.5 of the orbital) and the
     unresolved crossings ([frame, label]: an orbital continuing with less than 0.5 while the window carries it).
     Nothing is refused here: the SD states built from the followed orbitals are checked as labeled
     (state_reordering_min_overlap), _selection_record reads the record against the active space."""
@@ -3466,11 +3501,12 @@ def _follow_orbitals(params, start_time, finish_time):
         d = St[perm, new]
         inside = np.sqrt(np.sum(St[perm] ** 2, axis=1))
         min_continuity = min(min_continuity, float(d.min()))
-        for r in np.where(d < 0.5)[0]:
-            if inside[r] < 0.5:
-                edges.append([k + 1, int(r), round(float(d[r]), 4), round(float(inside[r]), 4)])
-            else:
-                unresolved.append([k + 1, int(r)])
+        edge_idx, _, unresolved_idx = _classify_continuations(d, inside, 0.5)
+        for r in edge_idx:
+            edges.append([k + 1, int(r), round(float(d[r]), 4), round(float(inside[r]), 4),
+                          _partner(St[perm[r]], new[r])])
+        for r in unresolved_idx:
+            unresolved.append([k + 1, int(r)])
         if np.any(new != perm):
             reordered.append(k + 1)
         perm = new
@@ -3514,7 +3550,8 @@ def _selection_record(params, perms, window, active_space):
                     "positions (0-based in the stored window, alpha then beta) of the active-space orbitals in the "
                     "frames they stand off their energy positions - unresolved_frames: an orbital continuing with "
                     "less than 0.5 while the window carries it (active_space_unresolved_frames: one of the active "
-                    "space) - edge_departures: [frame, orbital, kept, carried by the window] of the orbitals that "
+                    "space) - edge_departures: [frame, orbital, kept, carried by the window, the position that took "
+                    "most of it] of the orbitals that "
                     "left the window through its edge - nothing is refused here, the SD states built from the "
                     "followed orbitals are checked as labeled"}
 
@@ -3899,8 +3936,15 @@ def run_step3_pod(params):
         d = np.array([abs(St[cur[c], nxt[c]]) for c in range(n)])
         min_continuity = min(min_continuity, float(d.min()))
         # the space of a basis state: the basis of its block without a reordering (a partner outside it is an edge
-        # departure, recorded), the whole block with one (complete - a low continuation is an internal mixing)
-        for c in np.where(d < dia_min_overlap)[0]:
+        # departure, recorded), the whole block with one (a low continuation the block carries is an internal mixing)
+        space = [list(range(off[frag[c]], off[frag[c] + 1])) if dia_reordering
+                 else [cur[b] for b in range(n) if frag[b] == frag[c]] for c in range(n)]
+        inside = np.array([float(np.sqrt(np.sum(St[cur[c], space[c]] ** 2))) for c in range(n)])
+        edge_idx, mixed_idx, unresolved_idx = _classify_continuations(d, inside, dia_min_overlap)
+        for c in edge_idx:
+            edges.append([int(frames[i + 1]), int(c), round(float(d[c]), 4), round(float(inside[c]), 4),
+                          _partner(St[cur[c]], nxt[c])])
+        for c in mixed_idx[:1]:
             row = np.abs(St[cur[c]]).copy()
             row[nxt[c]] = -1.0
             partner = int(np.argmax(row))
@@ -3912,11 +3956,6 @@ def run_step3_pod(params):
                                  F"than the threshold's angle within one frame: the frame spacing does not resolve the "
                                  F"crossing (a lower diabatic_state_reordering_min_overlap lets the frame through and "
                                  F"records it)")
-            basis_cols = [cur[b] for b in range(n) if frag[b] == frag[c]]
-            inside = float(np.sqrt(np.sum(St[cur[c], basis_cols] ** 2)))
-            if inside < dia_min_overlap:
-                edges.append([int(frames[i + 1]), int(c), round(float(d[c]), 4), round(inside, 4), int(partner)])
-                continue
             # the largest other overlap may sit on a basis state of the block (a swap inside the basis) or on a block
             # state outside it while the basis still carries the state - named as what it is
             if partner in cur:
@@ -3927,12 +3966,11 @@ def run_step3_pod(params):
             raise ValueError(F"the POD block state {cur[c]} (block {frag[c]}, rank {rank[c]}) of frame {frames[i]} "
                              F"continues into {where} of frame {frames[i + 1]} (|<s|s>| = {d[c]:.3f} below the "
                              F"threshold {dia_min_overlap}, |<s|s'>| = {row[partner]:.3f}, the basis carries "
-                             F"{inside:.3f} of the state) - two block states swap between the frames and the labels "
+                             F"{inside[c]:.3f} of the state) - two block states swap between the frames and the labels "
                              F"would mean other states from there on: narrow num_occ_states_per_block, or follow the "
                              F"states with do_diabatic_state_reordering 2")
         # every state let through below 0.5 that the basis still carries is an unresolved continuation
-        departed = {e[1] for e in edges if e[0] == frames[i + 1]}
-        if any(d[c] < 0.5 and c not in departed for c in range(n)):
+        if len(unresolved_idx):
             unresolved.append(frames[i + 1])
         if nxt != cur:
             swaps.append(frames[i + 1])
@@ -3977,17 +4015,19 @@ def run_step3_pod(params):
         # an adiabatic state the basis no longer carries inherited an edge departure of the basis (recorded), one the
         # basis carries but no single state does mixed internally (refused after a reordering)
         inside_adi = np.sqrt(np.sum(O ** 2, axis=1))
-        for j in np.where(d_adi < max(sd_min_overlap, 0.5))[0]:
-            if inside_adi[j] < max(sd_min_overlap, 0.5):
-                adi_edges.append([int(frames[k]), int(j), round(float(d_adi[j]), 4), round(float(inside_adi[j]), 4)])
-            elif params['do_state_reordering'] in (1, 2, 22) and sd_min_overlap > 0.0 and d_adi[j] < sd_min_overlap:
+        edge_idx, mixed_idx, unresolved_idx = _classify_continuations(d_adi, inside_adi, sd_min_overlap)
+        for j in edge_idx:
+            adi_edges.append([int(frames[k]), int(j), round(float(d_adi[j]), 4), round(float(inside_adi[j]), 4),
+                              _partner(O[j], j)])
+        for j in mixed_idx[:1]:
+            if params['do_state_reordering'] in (1, 2, 22) and sd_min_overlap > 0.0:
                 raise ValueError(F"the adiabatic hole state {j} of frame {frames[k - 1]} carries |<{j}|{j}>| = "
                                  F"{d_adi[j]:.3f} into frame {frames[k]} after the reordering, below the threshold "
                                  F"{sd_min_overlap} (the basis carries {inside_adi[j]:.3f} of the state) - an internal "
                                  F"mixing the frame spacing does not resolve: a lower state_reordering_min_overlap "
                                  F"lets the frame through and records it, 0 switches the check off")
-            elif d_adi[j] < 0.5 and frames[k] not in adi_unresolved:
-                adi_unresolved.append(frames[k])
+        if len(unresolved_idx):
+            adi_unresolved.append(frames[k])
         if params['apply_phase_correction']:
             V[k] = V[k] * np.where(np.diag(O) < 0.0, -1.0, 1.0)
 
@@ -4155,7 +4195,8 @@ def run_step3_sd_nacs_libint(params):
                 mixing of 60 degrees within one frame, 0 switches the check off]. Below it, a state the space still
                 carries (sqrt(sum_j |O_cj|^2) >= the threshold) mixed internally and the run is refused, with or
                 without a reordering - a state the space no longer carries left the active space through its edge
-                and is recorded (edge_departures in U_sd_labels.json: [frame, state, kept, carried by the space]),
+                and is recorded (edge_departures in U_sd_labels.json: [frame, state, kept, carried by the space, the
+                state that took most of it]),
                 the run goes on. A threshold below 0.5 lets internal mixings through: unresolved_frames lists them
                 beside min_continuity.
             * **params['state_reordering_min_overlap']** (float): the same threshold for the SD (and CI) states as
