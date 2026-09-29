@@ -994,6 +994,23 @@ def do_phase_corr(cum_phase1, St, cum_phase2, phase_i):
             St.scale(a, b, fab)
 
 
+def _check_reordering_options(params, route):
+    """The state-reordering options the step-3 writers share, refused outside their domains: do_state_reordering and
+    do_diabatic_state_reordering in 0 (none), 1 (Sato), 2 (Munkres-Kuhn), the two alphas non-negative widths in
+    1/Hartree, the two continuity thresholds between 0 (off) and 1 - the keys a route carries. One contract for
+    run_step3_ks_nacs_libint, run_step3_sd_nacs_libint and run_step3_pod."""
+    for key in ('do_state_reordering', 'do_diabatic_state_reordering'):
+        if key in params and params[key] not in (0, 1, 2):
+            raise ValueError(F"{route}: {key} = {params[key]!r} is not a listed option - 0 (none), 1 (Sato) and 2 "
+                             F"(Munkres-Kuhn) are supported")
+    for key in ('state_reordering_alpha', 'diabatic_state_reordering_alpha'):
+        if key in params and not (np.isreal(params[key]) and params[key] >= 0.0):
+            raise ValueError(F"{route}: {key} = {params[key]!r} - a non-negative width in 1/Hartree is needed")
+    for key in ('state_reordering_min_overlap', 'diabatic_state_reordering_min_overlap'):
+        if key in params and not (np.isreal(params[key]) and 0.0 <= params[key] <= 1.0):
+            raise ValueError(F"{route}: {key} = {params[key]!r} - a threshold between 0 (off) and 1 is needed")
+
+
 def _check_orbital_window(params, data_dim, where):
     """The step-2 npz supermatrices are 2*(highest_orbital - lowest_orbital
     + 1) on a side (alpha+beta blocks, both spins share the window), so the
@@ -2257,6 +2274,7 @@ def run_step3_ks_nacs_libint(params):
                       }
     comn.check_input(params, default_params, critical_params)
     params['apply_orthonormalization'] = _orthonormalization_mode(params['apply_orthonormalization'])
+    _check_reordering_options(params, 'run_step3_ks_nacs_libint')
     isUKS = params.get('isUKS', 0)
     if params['es_software'].lower() == 'cp2k':
         sample_logfile = glob.glob(params['logfile_directory'] + '/*.log')[0]
@@ -3696,9 +3714,6 @@ def run_step3_pod(params):
                                ('isUKS', (0,), "closed-shell block states"),
                                ('localized_carrier', ('hole',), "the hole of the cation"),
                                ('diabatization_scheme', ('pod_cp2k',), "the POD prints of CP2K"),
-                               ('do_state_reordering', (0, 1, 2), "none, Sato or Munkres-Kuhn"),
-                               ('do_diabatic_state_reordering', (0, 1, 2), "none (a swap of the block states is "
-                                                                          "refused), Sato or Munkres-Kuhn"),
                                ('active_space_selection', ('energy',), "no Kohn-Sham orbitals in the POD basis - the "
                                                                        "block states are followed by "
                                                                        "do_diabatic_state_reordering")):
@@ -3706,17 +3721,10 @@ def run_step3_pod(params):
             raise ValueError(F"run_step3_pod: params['{key}'] = {params[key]!r} is not implemented on the POD "
                              F"route - {list(allowed)} ({hint})")
     _orthonormalization_mode(params['apply_orthonormalization'])
+    _check_reordering_options(params, 'run_step3_pod')
     dia_reordering, dia_alpha = params['do_diabatic_state_reordering'], params['diabatic_state_reordering_alpha']
-    for name, value in (('state_reordering_alpha', params['state_reordering_alpha']),
-                        ('diabatic_state_reordering_alpha', dia_alpha)):
-        if not (np.isreal(value) and value >= 0.0):
-            raise ValueError(F"{name} = {value!r} - a non-negative width in 1/Hartree is needed")
     dia_min_overlap, sd_min_overlap = (params['diabatic_state_reordering_min_overlap'],
                                        params['state_reordering_min_overlap'])
-    for name, value in (('diabatic_state_reordering_min_overlap', dia_min_overlap),
-                        ('state_reordering_min_overlap', sd_min_overlap)):
-        if not (np.isreal(value) and 0.0 <= value <= 1.0):
-            raise ValueError(F"{name} = {value!r} - a threshold between 0 (off) and 1 is needed")
     res_dir_1, res_dir_2 = params['path_to_npz_files'], params['path_to_save_sd_Hvibs']
     start_time, finish_time = int(params['start_time']), int(params['finish_time'])
     if finish_time - start_time < 2:
@@ -4152,19 +4160,10 @@ def run_step3_sd_nacs_libint(params):
     # Check input, set output dirs
     comn.check_input(params, default_params, critical_params)
     params['apply_orthonormalization'] = _orthonormalization_mode(params['apply_orthonormalization'])
+    _check_reordering_options(params, 'run_step3_sd_nacs_libint')
     dia_reordering, dia_alpha = params['do_diabatic_state_reordering'], params['diabatic_state_reordering_alpha']
-    if dia_reordering not in (0, 1, 2):
-        raise ValueError(F"do_diabatic_state_reordering = {dia_reordering!r} is not a listed option - 0 (none: a swap "
-                         F"of two diabatic states of one fragment between frames is refused), 1 (Sato) and 2 "
-                         F"(Munkres-Kuhn) are supported")
-    if not (np.isreal(dia_alpha) and dia_alpha >= 0.0):
-        raise ValueError(F"diabatic_state_reordering_alpha = {dia_alpha!r} - a non-negative width in 1/Hartree is needed")
     dia_min_overlap, sd_min_overlap = (params['diabatic_state_reordering_min_overlap'],
                                        params['state_reordering_min_overlap'])
-    for name, value in (('diabatic_state_reordering_min_overlap', dia_min_overlap),
-                        ('state_reordering_min_overlap', sd_min_overlap)):
-        if not (np.isreal(value) and 0.0 <= value <= 1.0):
-            raise ValueError(F"{name} = {value!r} - a threshold between 0 (off) and 1 is needed")
     selection = str(params['active_space_selection']).lower()
     if selection not in ('energy', 'identity'):
         raise ValueError(F"active_space_selection = {params['active_space_selection']!r} is not a listed option - "
