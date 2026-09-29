@@ -914,21 +914,17 @@ vector<CMATRIX> compute_projectors(dyn_control_params& prms, vector<CMATRIX>& Ea
         perm_t = get_reordering(st);
     }
     else if(prms.state_tracking_algo==2){
-        perm_t = Munkres_Kuhn(st, Eadi[traj], prms.MK_alpha, prms.MK_verbosity);
+        perm_t = Munkres_Kuhn(st, Eadi[traj], prms.MK_alpha, prms.MK_verbosity, prms.MK_scaling_function);
     }
-    else if(prms.state_tracking_algo==3){
+    if(prms.state_tracking_algo==3){
         perm_t = get_stochastic_reordering(st, rnd);
     }
-    else if(prms.state_tracking_algo==32){
+    if(prms.state_tracking_algo==32){
         perm_t = get_stochastic_reordering2(st, rnd);
     }
-    else if(prms.state_tracking_algo==33){
+
+    if(prms.state_tracking_algo==33){
         perm_t = get_stochastic_reordering3(st, rnd, prms.convergence, prms.max_number_attempts, prms.min_probability_reordering, 0);
-    }
-    else if(prms.state_tracking_algo==0){ ; } // no reordering: the identity permutation
-    else{
-      std::cout<<"Error in compute_projectors(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: 0, 1, 2, 3, 32, 33)\n";
-      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     
     // P -> P * perm

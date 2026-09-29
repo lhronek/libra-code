@@ -1154,7 +1154,7 @@ must supply obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
     }// for j
   }// rep == 3 generalized-linear diabatic
   else{
-    std::cout<<"Error in hopping_probabilities_lz(): rep = "<<rep<<" has no branch here (implemented: 0, 1, 2, 3, 5; 4 is computed by hopping_probabilities_bllz)\n";
+    std::cout<<"Error in hopping_probabilities_lz(): rep = "<<rep<<" has no branch here (implemented: 0, 1, 2, 3, 5 - 4 is computed by hopping_probabilities_bllz)\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 

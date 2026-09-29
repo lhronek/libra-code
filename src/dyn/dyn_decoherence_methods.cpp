@@ -1401,7 +1401,7 @@ void shxf(dyn_variables &dyn_var, nHamiltonian &ham, nHamiltonian &ham_prev,
       }
       else if (prms.tp_algo == 0) { ; } // 0: no turning-point treatment
       else {
-        std::cout<<"Error in shxf(): tp_algo = "<<prms.tp_algo<<" has no branch here (implemented: 1, 2, 3)\n";
+        std::cout<<"Error in shxf(): tp_algo = "<<prms.tp_algo<<" has no branch here (implemented: 0, 1, 2, 3)\n";
         std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
 
@@ -1652,7 +1652,7 @@ void mqcxf(dyn_variables &dyn_var, nHamiltonian &ham, nHamiltonian &ham_prev,
       }
       else if (prms.tp_algo == 0) { ; } // 0: no turning-point treatment
       else {
-        std::cout<<"Error in mqcxf(): tp_algo = "<<prms.tp_algo<<" has no branch here (implemented: 1, 2, 3)\n";
+        std::cout<<"Error in mqcxf(): tp_algo = "<<prms.tp_algo<<" has no branch here (implemented: 0, 1, 2, 3)\n";
         std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
       is_tp = 0;

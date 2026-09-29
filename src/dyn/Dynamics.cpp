@@ -2707,7 +2707,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   } // simple decoherence
   else if (prms.decoherence_algo == -1 || prms.decoherence_algo == 8) { ; } // -1: no decoherence; 8 (diabatic IDA) acts after the hops
   else {
-    std::cout<<"Error in compute_dynamics(): decoherence_algo = "<<prms.decoherence_algo<<" has no branch here (implemented: 0, 1, 2, 3, 4, 5, 6, 7, 9)\n";
+    std::cout<<"Error in compute_dynamics(): decoherence_algo = "<<prms.decoherence_algo<<" has no branch here (implemented: -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
@@ -2832,7 +2832,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       } // algo == 9
       else if (prms.decoherence_algo == -1 || prms.decoherence_algo == 0) { ; } // -1: no decoherence; 0 (MSDM / EDC) acts during the propagation
       else {
-        std::cout<<"Error in compute_dynamics(): decoherence_algo = "<<prms.decoherence_algo<<" has no branch here (implemented: 1, 2, 3, 4, 5, 6, 7, 8, 9)\n";
+        std::cout<<"Error in compute_dynamics(): decoherence_algo = "<<prms.decoherence_algo<<" has no branch here (implemented: -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)\n";
         std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
 

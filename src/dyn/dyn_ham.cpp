@@ -825,11 +825,7 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
       T_new = orthogonalized_T(T_new);
     } else if (prms.state_tracking_algo == 0 ||
                prms.state_tracking_algo == 1 || prms.state_tracking_algo == 2 ||
-               prms.state_tracking_algo == 21 ||
-               prms.state_tracking_algo == 3 ||
-               prms.state_tracking_algo == 32 ||
-               prms.state_tracking_algo ==
-                   33) { // This is based on reordering + phase correction
+               prms.state_tracking_algo == 21) { // This is based on reordering + phase correction
       // algo 0 = no reordering: compute_projector keeps the identity
       // permutation and still applies the phase corrections
       // (do_phase_correction-gated) - without them the diabatic readout
@@ -903,7 +899,7 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
 
     }// 6 adaptive SVD-based LD
     else {
-      std::cout<<"Error in update_proj_adi(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: -1, 0, 1, 2, 3, 4, 5, 6, 21, 32, 33)\n";
+      std::cout<<"Error in update_proj_adi(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: -1, 0, 1, 2, 4, 5, 6, 21 - the stochastic 3, 32, 33 are refused by sanity_check)\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 

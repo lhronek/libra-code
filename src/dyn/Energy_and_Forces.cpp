@@ -528,7 +528,7 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
     }
   }// KC-RPMD
   else{
-    std::cout<<"Error in update_forces(): force_method = "<<prms.force_method<<" has no branch here (implemented: 1, 2, 3, 4)\n";
+    std::cout<<"Error in update_forces(): force_method = "<<prms.force_method<<" has no branch here (implemented: 0, 1, 2, 3, 4)\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
