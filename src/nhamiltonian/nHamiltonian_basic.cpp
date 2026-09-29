@@ -153,7 +153,7 @@ nHamiltonian::nHamiltonian(const nHamiltonian &src) {
 nHamiltonian::nHamiltonian(const nHamiltonian &src, int aux_mode) {
   /**
     aux_mode 1: build a previous-step cache - same hierarchy, but only the
-    read-set allocated (init_aux); any other value falls back to the exact
+    read-set allocated (init_aux) - any other value falls back to the exact
     mirror of the source
   */
   init_mem_status(src.ndia, src.nadi, src.nnucl);
@@ -1953,7 +1953,7 @@ int nHamiltonian::lowdin_dia_derivative(int n, CMATRIX &X, CMATRIX &Y, CMATRIX &
     The metric gradient is the Hermitian part of the diabatic derivative coupling,
     dS = D_n + D_n^H with D_ij = <i|d j> - a basis without dc1_dia has, by that
     contract, a constant metric. Returns the lowdin_dia status (0 = identity metric,
-    nothing filled); dX and dY are zero when dc1_dia[n] is absent or dS vanishes
+    nothing filled) - dX and dY are zero when dc1_dia[n] is absent or dS vanishes
   */
   int status = lowdin_dia(X, Y);
   if (status == 0) { return 0; }

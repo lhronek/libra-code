@@ -28,7 +28,7 @@ template <> const char* expected_format<std::complex<double> >(){ return "Zd"; }
 template <> const char* expected_format<int>(){ return "i"; }
 
 // the struct-module format of the buffer, with the native byte-order prefixes accepted (the
-// hosts libra runs on are little-endian, so "<" is native too); a buffer without a format
+// hosts libra runs on are little-endian, so "<" is native too) - a buffer without a format
 // (NULL) is judged by its item size alone
 bool format_matches(const char* fmt, const char* expected){
   if(fmt == NULL){ return true; }

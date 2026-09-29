@@ -536,7 +536,7 @@ void nHamiltonian::compute_hvib_adi() {
               "(consume the supplied hvib), or supply a consistent nac_adi\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
-  // one validation per harvest; the NAC phase correction disarms it
+  // one validation per harvest - the NAC phase correction disarms it
   hvib_adi_supplied = 0;
   }
   for (int i = 0; i < nadi; i++) {

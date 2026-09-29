@@ -293,7 +293,7 @@ void nHamiltonian::compute_adiabatic_derivatives() {
     diagonalization (compute_adiabatic) and the stored-transformation
     path (transform_dia2adia): adiabatic gradients and derivative
     couplings from (basis_transform, ham_adi, d1ham_dia, dc1_dia) -
-    exact when basis_transform diagonalizes ham_dia. Extracted verbatim;
+    exact when basis_transform diagonalizes ham_dia. Extracted verbatim -
     int i, j locals replace the member-function scope of the caller.
   */
   int i, j;
@@ -515,7 +515,7 @@ void nHamiltonian::transform_dia2adi(int der_lvl, int lvl) {
     transformation (ham_transform_method == 2): ham_adi = U^H ham_dia U
     in the model's own gauge - no internal diagonalization, so no LAPACK
     eigenvector branch switches. der_lvl >= 1 adds the shared
-    Hellmann-Feynman derivative tier (exact when U diagonalizes ham_dia;
+    Hellmann-Feynman derivative tier (exact when U diagonalizes ham_dia -
     a warning names the residual otherwise).
   */
   if (level == lvl) {
@@ -720,7 +720,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       check_cmatrix(obj, "ham_adi", nadi, nadi);
       // a model may supply any family the hierarchy was not initialized
       // for - allocate on demand (the raw-pointer writes would otherwise
-      // dereference NULL); same policy for every ingested family below
+      // dereference NULL) - same policy for every ingested family below
       if (ham_adi_mem_status == 0) { init_ham_adi(); }
       //*ham_adi = extract<CMATRIX>(obj.attr("ham_adi"));
       try {
@@ -940,7 +940,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
 
     // attributes of the OTHER representation are NOT read by this harvest -
     // silently dropping a supplied channel hides wrong models (ham_dia and
-    // ovlp_dia are exempt, harvested above for the crossing detectors;
+    // ovlp_dia are exempt, harvested above for the crossing detectors -
     // basis_transform is dual-harvested), so fail loud instead
     {
       // hvib_dia is NOT in this list - the supplied-hvib workflows ingest
@@ -965,7 +965,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
     {
       static bool warned_unknown = false;
       if (!warned_unknown && (int)hasattr(obj, "__dict__")) {
-        // the union of both harvests; overlap_adi is the deliberate
+        // the union of both harvests - overlap_adi is the deliberate
         // python-side auxiliary channel (drivers/certifiers read it
         // from the model object directly - never ingested)
         const char* known[] = {"ham_dia", "ovlp_dia", "nac_dia",

@@ -9,7 +9,7 @@
   declares the entry points liblibra uses from either, without cblas.h or
   lapacke.h, whose availability and layout differ across distributions. The
   symbols resolve from whatever library the build probes linked
-  (WITH_BLAS_GEMM, WITH_LAPACK_ZHEEVD, WITH_LAPACK); translation units
+  (WITH_BLAS_GEMM, WITH_LAPACK_ZHEEVD, WITH_LAPACK) - translation units
   reference them only inside the corresponding HAVE_* guards.
 
   The kernels (liblinalg namespace): the divide-and-conquer eigensolvers
@@ -57,7 +57,7 @@ void cblas_dgemm(int layout, int transa, int transb, int m, int n, int k,
                  double alpha, const double* a, int lda, const double* b,
                  int ldb, double beta, double* c, int ldc);
 
-// LAPACK (Fortran ABI; the trailing size_t arguments are the hidden
+// LAPACK (Fortran ABI - the trailing size_t arguments are the hidden
 // character-length slots of the modern Fortran calling convention)
 void zheevd_(const char* jobz, const char* uplo, const int* n,
              std::complex<double>* a, const int* lda, double* w,

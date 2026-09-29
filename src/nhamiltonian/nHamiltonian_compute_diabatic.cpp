@@ -153,7 +153,7 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
       check_cmatrix(obj, "ham_dia", ndia, ndia);
       // a model may supply any family the hierarchy was not initialized
       // for - allocate on demand (the raw-pointer writes would otherwise
-      // dereference NULL); same policy for every ingested family below
+      // dereference NULL) - same policy for every ingested family below
       if(ham_dia_mem_status==0){ init_ham_dia(); }
       *ham_dia = extract<CMATRIX>(obj.attr("ham_dia")); 
     }
@@ -286,7 +286,7 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
     {
       static bool warned_unknown = false;
       if (!warned_unknown && (int)hasattr(obj, "__dict__")) {
-        // the union of both harvests; overlap_adi is the deliberate
+        // the union of both harvests - overlap_adi is the deliberate
         // python-side auxiliary channel (drivers/certifiers read it
         // from the model object directly - never ingested)
         const char* known[] = {"ham_dia", "ovlp_dia", "nac_dia",

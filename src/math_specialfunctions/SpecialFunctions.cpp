@@ -1309,7 +1309,7 @@ void exp_(CMATRIX& res, CMATRIX& x, complex<double> dt){
   }
 #ifdef HAVE_LAPACK_ZHEEVD
   {
-    // LAPACK divide-and-conquer path. x is Hermitian; its row-major buffer
+    // LAPACK divide-and-conquer path. x is Hermitian - its row-major buffer
     // read column-major is x^T = conj(x), so it feeds zheevd_ without any
     // transpose copy, and the eigenvectors come back as U = conj(V) of the
     // true V. The reconstruction res = V f(w) V^H = conj(U) f(w) U^T is one

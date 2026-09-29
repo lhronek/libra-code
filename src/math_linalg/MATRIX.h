@@ -207,7 +207,7 @@ void operator/=(double f)
 
   void product(const MATRIX& B, const MATRIX& C); ///< A = B * C: CBLAS dgemm for large products, base-class loop otherwise (shadows base_matrix::product)
 
-  ///< Chained in-place product: this = op1 * op2 * ... * opN (left-associated);
+  ///< Chained in-place product: this = op1 * op2 * ... * opN (left-associated) -
   ///< see CMATRIX::product - operands are MATRIX or transposed(X) tags
   template <typename... Ops> void product(const Ops&... ops);
   MATRIX operator*(const MATRIX& ob); ///< Multiplication operator

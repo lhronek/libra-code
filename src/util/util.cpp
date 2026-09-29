@@ -572,7 +572,7 @@ void check_input(boost::python::dict params, boost::python::dict default_params,
 
       if(!params.has_key(key)){
           // exit(0) reported SUCCESS to the shell and killed Pool workers and
-          // notebooks; a thrown exception reaches Python as a RuntimeError
+          // notebooks - a thrown exception reaches Python as a RuntimeError
           throw std::runtime_error("The critical parameter " + key + " must be defined!");
       }
   }

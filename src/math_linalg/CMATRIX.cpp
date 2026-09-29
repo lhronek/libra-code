@@ -555,7 +555,7 @@ void CMATRIX::product(const CMATRIX& B, const CMATRIX& C){
 /**
   A = B * C, stored in the caller. Shadows base_matrix::product: large
   products go through CBLAS zgemm when built with WITH_BLAS_GEMM
-  (row-major, no transposes); small products (n*k*m < 128, where the
+  (row-major, no transposes) - small products (n*k*m < 128, where the
   call overhead exceeds the arithmetic) and BLAS-less builds use the
   base-class loop. Aliased calls (the caller being B or C) are computed
   via a temporary - the base implementation zeroes the target before

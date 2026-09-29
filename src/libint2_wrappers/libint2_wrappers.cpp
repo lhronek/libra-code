@@ -131,7 +131,7 @@ static bool shg_ordering_is_standard() {
 }
 
 // gaussian position of the f-th standard-ordered component of a pure
-// shell with angular momentum l: m = f - l; gaussian packs m = 0 first,
+// shell with angular momentum l: m = f - l - gaussian packs m = 0 first,
 // then +1, -1, +2, -2, ...
 static inline std::size_t shg_gaussian_pos(int l, std::size_t f) {
   const int m = static_cast<int>(f) - l;
@@ -150,7 +150,7 @@ static inline std::size_t shg_gaussian_pos(int l, std::size_t f) {
 // overlap row of an s shell displaced to a generic point against the
 // cartesian shell factorizes into 1D integrals I_i(Rx) I_j(Ry) I_k(Rz),
 // all distinct at a generic point, so ranking |values| identifies each
-// slot's (i, j, k); the self-overlap diagonal must then match the CCA
+// slot's (i, j, k) - the self-overlap diagonal must then match the CCA
 // pattern prod(2n-1)!!/(2l-1)!!. Outputs are permuted to the descending-
 // lexicographic order (xx, xy, xz, yy, yz, zz, ...) and rescaled to
 // unit-normalized components - the molden/CP2K coefficient convention.
@@ -276,7 +276,7 @@ static const CartMap &cart_lex_map(int l) {
 }
 
 // Combined per-shell output transform: index map + per-component scale.
-// Pure shells: the solid-harmonic permutation (unit scale); cartesian
+// Pure shells: the solid-harmonic permutation (unit scale) - cartesian
 // l >= 2: the empirical lexicographic map + CCA -> unit rescale.
 static bool shell_out_transform(const libint2::Shell &sh, bool shg_std,
                                 std::vector<std::size_t> &map,
@@ -585,7 +585,7 @@ MATRIX compute_1body_ints_parallel(const std::vector<libint2::Shell> &shells_1,
         engines[thread_id].compute(shells_1[s1], shells_2[s2]);
         // a 1-body engine must always produce a batch (screening-to-null
         // is a 2-body behavior) - a null here means a corrupted engine or
-        // shell setup; record it and throw after the join (throwing from
+        // shell setup - record it and throw after the join (throwing from
         // a worker thread would std::terminate)
         if (buf[0] == nullptr) {
           long long expected = -1;
@@ -774,7 +774,7 @@ std::vector<MATRIX> compute_1body_ints_parallel_emultipole3(
   // shown below)
   engines[0] =
       libint2::Engine(libint2::Operator::emultipole3, max_n, max_lval, 0);
-  // the multipole reference point; set BEFORE the pool is cloned from
+  // the multipole reference point - set BEFORE the pool is cloned from
   // engines[0] so every copy inherits it
   engines[0].set_params(std::array<double, 3>{origin.x, origin.y, origin.z});
   // This part is for other operators, I'll keep it but not necessary.

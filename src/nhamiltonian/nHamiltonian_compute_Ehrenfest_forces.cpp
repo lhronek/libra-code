@@ -120,7 +120,7 @@ CMATRIX nHamiltonian::Ehrenfest_forces_dia_unit(CMATRIX &ampl_dia, int option, d
     // gamma * sum_i dE_i/dR: sum_i E_i = tr(S^-1 H) for the generalized
     // eigenproblem and dS/dR = dc1 + dc1^H (the convention of the
     // dia->adi transform), so the term is
-    // gamma * [ tr(S^-1 dH) - 2 Re tr(S^-1 dc1 S^-1 H) ]; option 1 keeps
+    // gamma * [ tr(S^-1 dH) - 2 Re tr(S^-1 dc1 S^-1 H) ] - option 1 keeps
     // only the dH part, like the rest of the force
     if (gamma != 0.0) {
       complex<double> zpe = ((*invS) * (*d1ham_dia[n])).tr();
