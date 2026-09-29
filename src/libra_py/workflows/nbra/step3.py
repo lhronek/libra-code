@@ -3692,7 +3692,8 @@ def run_step3_pod(params):
             * **params['state_reordering_min_overlap']** (float): the same threshold for the adiabatic states as
                 labeled by do_state_reordering 1 or 2 - refused below it after the reordering, 0 switches the check
                 off - recorded under "adiabatic" in the report (the frames let through below 0.5, min_continuity,
-                reordered_frames) [default: 0.5]. In the energy order (0) nothing is refused.
+                reordered_frames - the frames at which the labels changed - and frames_off_energy_order) [default:
+                0.5]. In the energy order (0) nothing is refused.
             * **params['apply_orthonormalization']**: the vocabulary of the SD route is accepted and has no effect -
                 the block states are orthonormal within every frame by construction (S^-1/2 v of the Lowdin frame),
                 their Lowdin factors are the identity
@@ -3861,14 +3862,21 @@ def run_step3_pod(params):
     # follows the labels
     E_pos = [e.copy() for e in E_adi]
     reordered, adi_unresolved, adi_edges = [], [], []
+    adi_off_order = 0
     adi_min_continuity = 1.0
+    perm_prev = np.arange(n)
     for k in range(1, len(frames)):
         O = V[k - 1].T @ St_hole[k - 1] @ V[k]
         if params['do_state_reordering'] in (1, 2):
+            # the assignment maps the followed labels to the frame's energy order, so it is the frame's label
+            # permutation itself - a frame off the energy order counts, a change of the labels is a reordering
             perm = _assign_states(O, params['do_state_reordering'], params['state_reordering_alpha'], E_adi[k - 1],
                                   E_pos[k - 1])
             if np.any(perm != np.arange(n)):
+                adi_off_order += 1
+            if np.any(perm != perm_prev):
                 reordered.append(frames[k])
+            perm_prev = perm
             V[k], E_adi[k], O = V[k][:, perm], E_adi[k][perm], O[:, perm]
         d_adi = np.abs(np.diag(O))
         adi_min_continuity = min(adi_min_continuity, float(d_adi.min()))
@@ -3946,7 +3954,8 @@ def run_step3_pod(params):
                             "state_reordering_alpha": float(params['state_reordering_alpha']),
                             "state_reordering_min_overlap": float(sd_min_overlap),
                             "unresolved_frames": [int(k) for k in adi_unresolved], "edge_departures": adi_edges,
-                            "min_continuity": float(adi_min_continuity), "reordered_frames": reordered},
+                            "min_continuity": float(adi_min_continuity), "reordered_frames": reordered,
+                            "frames_off_energy_order": adi_off_order},
               "tracked_block_states": tracked}
     with open(F'{res_dir_2}/pod_route_report.json', 'w') as f:
         json.dump(report, f, indent=1)
