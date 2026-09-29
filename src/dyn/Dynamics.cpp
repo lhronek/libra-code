@@ -2357,7 +2357,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   // the gap of the two labels changed the total energy at every relabel
   act_states = dyn_var.act_states;
   // Check if rescaling is needed:
-  //act_states = dyn_var.act_states - // these are proposed states
+  //act_states = dyn_var.act_states; // these are proposed states
   //act_states = accept_hops(dyn_var, ham, act_states, old_states, prms, rnd);
 
   //====================== Momenta adjustment after successful/frustrated hops

@@ -586,7 +586,7 @@ void dyn_control_params::sanity_check(){
 
   /// every representation implements a fixed set of electronic integrators
   /// in propagate_electronic - amplitudes (rep_tdse 0 and 1): -1, 0-15 and 19
-  /// (9 and 19 carry the second Magnus term);
+  /// (9 and 19 carry the second Magnus term) -
   /// the diabatic density matrix (2): 0 and 9 - the adiabatic density matrix (3):
   /// 0, 1, 10 and the Magnus-corrected 9, 19 - each with the +100 variant. Any other value would leave the
   /// electronic variables untouched for the whole run - refuse it here (the
