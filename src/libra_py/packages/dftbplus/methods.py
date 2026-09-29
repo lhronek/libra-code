@@ -3482,17 +3482,21 @@ def dftb_compute_adi(q, params, full_id):
                 and params.get("read_forces", False)):
             _warned_partial_forces = True
             print(F"WARNING in dftb_compute_adi: no FRC.DAT - d1ham_adi "
-                  F"carries gradients on rows 0 and {soi_row} only; "
-                  F"mean-field or diabatic-force consumers must not "
-                  F"rely on the other diagonals")
+                  F"carries gradients on rows 0 and {soi_row} only, the other rows are NaN (not handed over) - "
+                  F"the engine refuses every option that reads them")
+        # the rows not computed are NaN - the sentinel the engine's checks read (a zero force is a force)
+        rows = np.full((ndof, nstates), np.nan)
         for iatom in range(nat):
             for k in range(3):
                 if f_gs is not None:
-                    obj.d1ham_adi[3 * iatom + k].set(0, 0, complex(-f_gs[k, iatom]))
+                    rows[3 * iatom + k, 0] = -f_gs[k, iatom]
                 if f_ex is not None:
-                    obj.d1ham_adi[3 * iatom + k].set(soi_row, soi_row, complex(-f_ex[k, iatom]))
+                    rows[3 * iatom + k, soi_row] = -f_ex[k, iatom]
                 for s, f_s in forces_all.items():
-                    obj.d1ham_adi[3 * iatom + k].set(s, s, complex(-f_s[k, iatom]))
+                    rows[3 * iatom + k, s] = -f_s[k, iatom]
+        for idof in range(ndof):
+            for i in range(nstates):
+                obj.d1ham_adi[idof].set(i, i, complex(rows[idof, i]))
 
     # the rows handed over, for the engine's call-back after a hop
     params.setdefault("force_rows", {})[itraj] = np.array([[obj.d1ham_adi[idof].get(i, i).real for i in range(nstates)]

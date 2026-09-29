@@ -15,6 +15,7 @@
 */
 
 
+#include <cmath>
 #include <stdexcept>
 #if defined(USING_PCH)
 #include "../pch.h"
@@ -60,6 +61,11 @@ DOF "<<dof<<" is not allocated for trajectory "<<traj<<" but is needed for the c
           std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
         res.set(dof, traj, -children[traj]->d1ham_adi[dof]->get(st, st) );
+        if(std::isnan(res.get(dof, traj).real())){
+          std::cout<<"Error in forces_adi(): the force of state "<<st<<" of trajectory "<<traj<<" along DOF "<<dof
+                   <<" is NaN - the model handed over no force for that state - a row it did not compute is NaN: under force_source active_state the row of a new active state needs hop_force_refresh = 1, and the options that read every state's force (the mean-field and QTSH forces, the XF decoherence times, A-FSSH, the force-difference hops, the force-based tracking) need every state's force handed over (force_source all_states)\n";
+          std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+        }
       }// for dof 
     }// for traj
   }
@@ -134,6 +140,11 @@ CMATRIX nHamiltonian::all_forces_adi(vector<int>& id_){
 
         for(int ist=0; ist<nadi; ist++){
           res.set(ist, n,  -d1ham_adi[n]->get(ist, ist) ); 
+          if(std::isnan(res.get(ist, n).real())){
+            std::cout<<"Error in all_forces_adi(): the force of state "<<ist<<" along DOF "<<n<<" is NaN - "
+                     <<"the model handed over no force for that state - a row it did not compute is NaN: under force_source active_state the row of a new active state needs hop_force_refresh = 1, and the options that read every state's force (the mean-field and QTSH forces, the XF decoherence times, A-FSSH, the force-difference hops, the force-based tracking) need every state's force handed over (force_source all_states)\n";
+            std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+          }
         }
 
       }// for n

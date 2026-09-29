@@ -23,6 +23,7 @@
    * enable the NBRA-like calculations as well as non-NBRA
 */
 
+#include <cmath>
 #include "../calculators/NPI.h"
 #include "../math_meigen/mEigen.h"
 #include <exception>
@@ -168,6 +169,12 @@ void apply_afssh(dyn_variables &dyn_var, CMATRIX &C, vector<int> &act_states,
       force_full = -1.0 * chld->get_d1ham_adi(idof);
 
       for (i = 0; i < nst; i++) {
+        if (std::isnan(force_full.get(i, i).real())) {
+          std::cout << "Error in apply_afssh(): the force of state " << i << " along DOF " << idof << " is NaN - "
+                    << "A-FSSH reads every state's force, the model handed over its active state's alone "
+                    << "(force_source all_states hands over every state's)\n";
+          std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+        }
         force_diag.set(i, i, force_full.get(i, i));
       }
 
@@ -1982,11 +1989,11 @@ static void check_hop_force_rows(dyn_control_params &prms, dyn_variables &dyn_va
                                  vector<int> &new_states) {
   /**
     After a change of the active state - a surface hop or a relabel at a
-    crossing - the force column of the new state must not be exactly zero
-    while the old state's row of the model's hand-over carries a force: that
-    is a model handing over the force of its active state alone (the
+    crossing - the force row of the new state must not be NaN (the sentinel
+    of a row the model did not hand over) while the old state's row is not:
+    that is a model handing over the force of its active state alone (the
     on-the-fly drivers under force_source active_state), whose next half kick
-    would run force-free. Under hop_force_refresh the row of a relabel is
+    would run force-free. A zero force is a force. Under hop_force_refresh the row of a relabel is
     filled inside the step (refresh_relabel_forces, before the second half
     kick) and the row of a hop by the python step loop right after this step,
     which checks it itself.
@@ -1995,21 +2002,18 @@ static void check_hop_force_rows(dyn_control_params &prms, dyn_variables &dyn_va
   int ndof = ham.nnucl;
   for (int traj = 0; traj < dyn_var.ntraj; traj++) {
     if (old_states[traj] == new_states[traj] || (int)ham.children.size() <= traj) { continue; }
-    bool zero = true;
-    for (int idof = 0; idof < ndof && zero; idof++) {
-      if (dyn_var.f->get(idof, traj) != 0.0) { zero = false; }
-    }
-    if (!zero) { continue; }
+    bool missing = false;
     bool old_carries = false;
-    for (int idof = 0; idof < ndof && !old_carries; idof++) {
+    for (int idof = 0; idof < ndof; idof++) {
       CMATRIX d1(prms.rep_force == 0 ? ham.children[traj]->get_d1ham_dia(idof)
                                      : ham.children[traj]->get_d1ham_adi(idof));
-      if (d1.get(old_states[traj], old_states[traj]).real() != 0.0) { old_carries = true; }
+      if (std::isnan(d1.get(new_states[traj], new_states[traj]).real())) { missing = true; }
+      if (!std::isnan(d1.get(old_states[traj], old_states[traj]).real())) { old_carries = true; }
     }
-    if (old_carries) {
+    if (missing && old_carries) {
       std::cout << "Error in compute_dynamics(): the active state of trajectory " << traj << " changed "
                 << old_states[traj] << " -> " << new_states[traj] << " (a hop or a relabel at a crossing) and "
-                << "the force of the new state is zero while the old "
+                << "the force of the new state was not handed over (NaN) while the old "
                 << "state's row carries one - the model hands over the force of its active state alone (the "
                 << "on-the-fly drivers under force_source active_state), so the next half kick would run "
                 << "force-free: set hop_force_refresh = 1 (the model is called back at the same geometry for "
@@ -2025,13 +2029,13 @@ static void refresh_relabel_forces(dyn_control_params &prms, dyn_variables &dyn_
   /**
     The force of the new active state at this geometry for every trajectory
     whose active state changed in the relabel of this step while the new row
-    of the force hand-over is empty and the old row carries a force (a model
-    handing over the force of its active state alone). The relabel precedes
-    the second half kick, so the row is filled here: the model is called back
-    once with params["force_refresh"] = {trajectory: new state} and
-    params["act_state"] updated, as the python step loop does after a hop -
-    the drivers return the forces of the listed trajectories and nothing else.
-    A row still empty after the call-back stops the run.
+    of the force hand-over is NaN (not handed over) and the old row is not (a
+    model handing over the force of its active state alone). The relabel
+    precedes the second half kick, so the row is filled here: the model is
+    called back once with params["force_refresh"] = {trajectory: new state}
+    and params["act_state"] updated, as the python step loop does after a hop
+    - the drivers return the forces of the listed trajectories and nothing
+    else. A row still NaN after the call-back stops the run.
   */
   if (prms.force_method != 1 || prms.rep_sh != 1) { return; }
   int ndof = ham.nnucl;
@@ -2041,15 +2045,15 @@ static void refresh_relabel_forces(dyn_control_params &prms, dyn_variables &dyn_
   for (int traj = 0; traj < dyn_var.ntraj; traj++) {
     act[traj] = new_states[traj];
     if (old_states[traj] == new_states[traj] || (int)ham.children.size() <= traj) { continue; }
-    bool zero = true;
+    bool missing = false;
     bool old_carries = false;
     for (int idof = 0; idof < ndof; idof++) {
       CMATRIX d1(prms.rep_force == 0 ? ham.children[traj]->get_d1ham_dia(idof)
                                      : ham.children[traj]->get_d1ham_adi(idof));
-      if (d1.get(new_states[traj], new_states[traj]).real() != 0.0) { zero = false; }
-      if (d1.get(old_states[traj], old_states[traj]).real() != 0.0) { old_carries = true; }
+      if (std::isnan(d1.get(new_states[traj], new_states[traj]).real())) { missing = true; }
+      if (!std::isnan(d1.get(old_states[traj], old_states[traj]).real())) { old_carries = true; }
     }
-    if (zero && old_carries) { refresh[traj] = new_states[traj]; any = 1; }
+    if (missing && old_carries) { refresh[traj] = new_states[traj]; any = 1; }
   }
   if (any == 0) { return; }
   params["act_state"] = act;
@@ -2063,13 +2067,13 @@ static void refresh_relabel_forces(dyn_control_params &prms, dyn_variables &dyn_
   params.attr("pop")("force_refresh");
   for (int traj = 0; traj < dyn_var.ntraj; traj++) {
     if (!refresh.has_key(traj)) { continue; }
-    bool zero = true;
-    for (int idof = 0; idof < ndof && zero; idof++) {
+    bool missing = false;
+    for (int idof = 0; idof < ndof && !missing; idof++) {
       CMATRIX d1(prms.rep_force == 0 ? ham.children[traj]->get_d1ham_dia(idof)
                                      : ham.children[traj]->get_d1ham_adi(idof));
-      if (d1.get(new_states[traj], new_states[traj]).real() != 0.0) { zero = false; }
+      if (std::isnan(d1.get(new_states[traj], new_states[traj]).real())) { missing = true; }
     }
-    if (zero) {
+    if (missing) {
       std::cout << "Error in compute_dynamics(): the active state of trajectory " << traj << " was relabeled "
                 << old_states[traj] << " -> " << new_states[traj] << " at a crossing and the model called back "
                 << "for the new state's force (hop_force_refresh) returned none - the second half kick would run "
@@ -2906,10 +2910,11 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   dyn_var.update_amplitudes(prms);
   dyn_var.update_density_matrix(prms);
 
-  update_forces(prms, dyn_var, ham);
   // old_states holds the active states at the start of the step - a relabel at a
-  // crossing and a surface hop both change the row the forces are read from
+  // crossing and a surface hop both change the row the forces are read from - the
+  // check names the remedy, so it runs before the forces are rebuilt from that row
   check_hop_force_rows(prms, dyn_var, ham, old_states, act_states);
+  update_forces(prms, dyn_var, ham);
 
   // Saves the current density matrix into the previous - needed for FSSH2 and
   // GFSH (original)

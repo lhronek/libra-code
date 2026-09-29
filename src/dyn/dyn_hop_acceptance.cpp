@@ -13,6 +13,7 @@
   \brief The file implements the functions to determine if to accept hops
 */
 
+#include <cmath>
 #include "Surface_Hopping.h"
 #include <stdexcept>
 #include "Energy_and_Forces.h"
@@ -674,6 +675,11 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
           dof = which_dofs[idof];
           df = ham.child(traj)->get_d1ham_adi(dof);
           //df = projectors[traj].H() * df * projectors[traj];
+          if(std::isnan(df.get(old_st, old_st).real()) || std::isnan(df.get(new_st, new_st).real())){
+            std::cout<<"Error in the force-difference hop test: the force of state "<<old_st<<" or "<<new_st
+                     <<" along DOF "<<dof<<" is NaN - the force-difference hop acceptance and momentum rescaling read the forces of both states - the model handed over its active state's alone (force_source all_states hands over every state's)\n";
+            std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+          }
           dF.set(dof, 0, df.get(old_st, old_st).real() - df.get(new_st, new_st).real());
 
         }
@@ -1155,6 +1161,11 @@ vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms){
           dNAC.set(dof, 0, nac.get(old_st, new_st).real() );
 
           df = ham.child(traj)->get_d1ham_adi(dof);
+          if(std::isnan(df.get(old_st, old_st).real()) || std::isnan(df.get(new_st, new_st).real())){
+            std::cout<<"Error in handle_hops_nuclear(): the force of state "<<old_st<<" or "<<new_st<<" along DOF "
+                     <<dof<<" is NaN - the force-difference hop acceptance and momentum rescaling read the forces of both states - the model handed over its active state's alone (force_source all_states hands over every state's)\n";
+            std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+          }
           F_old.set(dof, 0, -df.get(old_st, old_st).real() );
           F_new.set(dof, 0, -df.get(new_st, new_st).real() );
         }
@@ -1252,6 +1263,11 @@ vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms){
           dof = which_dofs[idof];
           df = ham.child(traj)->get_d1ham_adi(dof);
           //df = projectors[traj].H() * df * projectors[traj];
+          if(std::isnan(df.get(old_st, old_st).real()) || std::isnan(df.get(new_st, new_st).real())){
+            std::cout<<"Error in the force-difference hop test: the force of state "<<old_st<<" or "<<new_st
+                     <<" along DOF "<<dof<<" is NaN - the force-difference hop acceptance and momentum rescaling read the forces of both states - the model handed over its active state's alone (force_source all_states hands over every state's)\n";
+            std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+          }
           dF.set(dof, 0, df.get(old_st, old_st).real() - df.get(new_st, new_st).real());
         }
 

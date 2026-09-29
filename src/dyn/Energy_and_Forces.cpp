@@ -17,6 +17,7 @@
     
 */
 
+#include <cmath>
 #include "Energy_and_Forces.h"
 #include <stdexcept>
 #include "dyn_projectors.h"
@@ -521,6 +522,18 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
+  // a NaN force reaching the kicks is a row the model did not hand over (the mean-field, QTSH and KC-RPMD forces
+  // read every state's row)
+  for(int itraj=0; itraj<ntraj; itraj++){
+    for(int idof=0; idof<ndof; idof++){
+      if(std::isnan(dyn_vars.f->get(idof, itraj))){
+        std::cout<<"Error in update_forces(): the force along DOF "<<idof<<" of trajectory "<<itraj<<" is NaN under "
+                 <<"force_method "<<prms.force_method<<" - a state's force the model did not hand over entered it "
+                 <<"(force_source all_states hands over every state's, hop_force_refresh = 1 the new active state's)\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
+    }
+  }
 //  return F;
 }
 
