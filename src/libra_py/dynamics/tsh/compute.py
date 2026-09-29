@@ -174,7 +174,7 @@ def _print_simulation_params(dyn_params, nadi, ntraj, init_params=None, model_pa
     if int(p.get("do_phase_correction", 0)) and "phase_correction_tol" in p:
         lines.append(row("phase_correction_tol:", p["phase_correction_tol"]))
     tracking = int(p["state_tracking_algo"])
-    if tracking in (2, 21, 4):
+    if tracking in (2, 21, 22, 4):
         for key in ("MK_alpha", "MK_verbosity", "MK_scaling_function"):
             if key in p:
                 lines.append(row(F"{key}:", p[key]))
@@ -597,6 +597,8 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - 1: method of Kosuke Sato (may fail by getting trapped into an infinite loop)
                 - 2: Munkres-Kuhn (Hungarian) algorithm 
                 - 21: ChatGPT-generated Munkres-Kuhn (Hungarian) algorithm
+                - 22: Jonker-Volgenant shortest augmenting path - the algorithm of scipy's linear_sum_assignment in
+                  C++, the same assignment as 2 and 21
                 - 3: experimental stochastic algorithm, the original version with elimination (known problems)
                 - 32: experimental stochastic algorithms with all permutations (too expensive)
                 - 33: the improved stochastic algorithm with good scaling and performance, on par with the mincost
@@ -1102,7 +1104,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                                    error constant -1/12 and 0 has +1/24, this one neither
               The projector family must match the integrator family (enforced by sanity_check):
               0-2, 9 and 10-12, 19 need a rotation projector (state_tracking_algo -1/5/6), 3-8 and 13-15 a
-              relabel projector (state_tracking_algo 0/1/2/21). The +100 variants (100-115) share the
+              relabel projector (state_tracking_algo 0/1/2/21/22). The +100 variants (100-115) share the
               classification and pin the child Hamiltonian.
 
                 10              -  same as 0, but with rotations

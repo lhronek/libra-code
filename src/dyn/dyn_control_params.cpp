@@ -331,7 +331,7 @@ void dyn_control_params::sanity_check(){
     std::cout<<"Error in dyn_control_params::sanity_check: state_tracking_algo = "
         <<state_tracking_algo<<" (stochastic reordering) is not wired into the"
         <<" projector update - compute_projector receives no random generator and"
-        <<" would keep the identity permutation; use 1, 2, 21 or 4 (deterministic"
+        <<" would keep the identity permutation - use 1, 2, 21, 22 or 4 (deterministic"
         <<" reorderings), or -1, 5, 6 (rotation projectors)\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
@@ -361,7 +361,7 @@ void dyn_control_params::sanity_check(){
     {"do_ssy", do_ssy, {0, 1}},
     {"do_phase_correction", do_phase_correction, {0, 1}},
     {"do_nac_phase_correction", do_nac_phase_correction, {0, 1}},
-    {"state_tracking_algo", state_tracking_algo, {-1, 0, 1, 2, 4, 5, 6, 21}},
+    {"state_tracking_algo", state_tracking_algo, {-1, 0, 1, 2, 4, 5, 6, 21, 22}},
     {"MK_verbosity", MK_verbosity, {0, 1}},
     {"MK_scaling_function", MK_scaling_function, {-1, 0, 1, 2}},
     {"convergence", convergence, {0, 1}},
@@ -577,7 +577,7 @@ void dyn_control_params::sanity_check(){
           <<" Hvib integrator (electronic_integrator = "<<electronic_integrator
           <<") double-counts the basis rotation under the St-derived rotation"
           <<" projector (state_tracking_algo = "<<state_tracking_algo
-          <<"); use a relabel projector (state_tracking_algo 0/1/2/21 with"
+          <<"); use a relabel projector (state_tracking_algo 0/1/2/21/22 with"
           <<" do_phase_correction = 1), or assume_always_consistent = 1 with"
           <<" do_nac_phase_correction = 1\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");

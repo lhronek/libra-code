@@ -177,6 +177,96 @@ vector<int> hungarian_algorithm(CMATRIX& orb_mat_inp, CMATRIX& en_mat_inp, doubl
 }
 
 
+vector<int> jonker_volgenant_maximize(MATRIX& cost){
+/**
+  The column assigned to every row of a cost matrix (as many columns as rows or more) so that the assigned costs
+  sum to the maximum - the shortest augmenting path algorithm of Jonker and Volgenant in the form of Crouse
+  (IEEE Trans. Aerosp. Electron. Syst. 52, 1679 (2016)), the algorithm behind scipy's linear_sum_assignment: the
+  rows enter one by one, every row gets the shortest augmenting path over the columns (Dijkstra on the reduced
+  costs, the dual variables u and v updated along the path), the path is flipped. O(n^3). The same assignment as
+  Munkres_Kuhn_maximize and hungarian_algorithm - returned as the column of every row.
+*/
+  int nr = cost.n_rows;
+  int nc = cost.n_cols;
+  if(nr > nc){
+    std::cout<<"Error in jonker_volgenant_maximize(): "<<nr<<" rows cannot be assigned to "<<nc<<" columns - at least as many columns as rows are needed\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  const double inf = std::numeric_limits<double>::infinity();
+  vector<double> u(nr, 0.0), v(nc, 0.0), shortest(nc, inf);
+  vector<int> path(nc, -1), col4row(nr, -1), row4col(nc, -1), remaining(nc, 0);
+  vector<int> in_rows(nr, 0), in_cols(nc, 0);
+
+  for(int cur = 0; cur < nr; cur++){
+    // the shortest augmenting path from the row cur - the minimization of -cost
+    double min_val = 0.0;
+    int i = cur;
+    int sink = -1;
+    int num_remaining = nc;
+    for(int it = 0; it < nc; it++){ remaining[it] = nc - 1 - it; }
+    std::fill(in_rows.begin(), in_rows.end(), 0);
+    std::fill(in_cols.begin(), in_cols.end(), 0);
+    std::fill(shortest.begin(), shortest.end(), inf);
+
+    while(sink == -1){
+      int index = -1;
+      double lowest = inf;
+      in_rows[i] = 1;
+      for(int it = 0; it < num_remaining; it++){
+        int j = remaining[it];
+        double r = min_val - cost.get(i, j) - u[i] - v[j];
+        if(r < shortest[j]){ path[j] = i; shortest[j] = r; }
+        // a free column wins a tie - the path ends there
+        if(shortest[j] < lowest || (shortest[j] == lowest && row4col[j] == -1)){ lowest = shortest[j]; index = it; }
+      }
+      min_val = lowest;
+      if(min_val == inf){
+        std::cout<<"Error in jonker_volgenant_maximize(): no augmenting path from row "<<cur<<" - the cost matrix holds infinities\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
+      int j = remaining[index];
+      if(row4col[j] == -1){ sink = j; }
+      else{ i = row4col[j]; }
+      in_cols[j] = 1;
+      num_remaining--;
+      remaining[index] = remaining[num_remaining];
+    }
+
+    // the dual variables along the path
+    u[cur] += min_val;
+    for(int k = 0; k < nr; k++){
+      if(in_rows[k] && k != cur){ u[k] += min_val - shortest[col4row[k]]; }
+    }
+    for(int j = 0; j < nc; j++){
+      if(in_cols[j]){ v[j] -= min_val - shortest[j]; }
+    }
+
+    // the path flipped - every column on it takes the row that reached it
+    int j = sink;
+    while(true){
+      int k = path[j];
+      row4col[j] = k;
+      int next = col4row[k];
+      col4row[k] = j;
+      j = next;
+      if(k == cur){ break; }
+    }
+  }// for cur
+
+  return col4row;
+}
+
+
+vector<int> jonker_volgenant(CMATRIX& orb_mat_inp, CMATRIX& en_mat_inp, double alpha, int scaling_function){
+/**
+  state_tracking_algo 22: the Munkres-Kuhn cost of make_cost_mat maximized by jonker_volgenant_maximize - the
+  assignment of Munkres_Kuhn (2) and hungarian_algorithm (21) by the algorithm of scipy's linear_sum_assignment
+*/
+  MATRIX cost_mat = make_cost_mat(orb_mat_inp, en_mat_inp, alpha, scaling_function);
+  return jonker_volgenant_maximize(cost_mat);
+}
+
+
 
 //############################################################
 
@@ -784,6 +874,9 @@ void update_projectors(dyn_control_params& prms, vector<CMATRIX>& projectors,
     else if(prms.state_tracking_algo==21){
         perm_t = hungarian_algorithm(st, Eadi[traj], prms.MK_alpha, prms.MK_scaling_function);
     }
+    else if(prms.state_tracking_algo==22){
+        perm_t = jonker_volgenant(st, Eadi[traj], prms.MK_alpha, prms.MK_scaling_function);
+    }
     else if(prms.state_tracking_algo==3){
         perm_t = get_stochastic_reordering(st, rnd);
     }
@@ -799,7 +892,7 @@ void update_projectors(dyn_control_params& prms, vector<CMATRIX>& projectors,
     }
     else if(prms.state_tracking_algo==0){ ; } // no reordering: the identity permutation
     else{
-      std::cout<<"Error in update_projectors(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: 0, 1, 2, 21, 3, 32, 33, 4)\n";
+      std::cout<<"Error in update_projectors(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: 0, 1, 2, 21, 22, 3, 32, 33, 4)\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     
@@ -859,6 +952,9 @@ vector< vector<int> > compute_permutations(dyn_control_params& prms, vector<CMAT
     else if(prms.state_tracking_algo==21){
         perm_t = hungarian_algorithm(st, Eadi[traj], prms.MK_alpha, prms.MK_scaling_function);
     }
+    else if(prms.state_tracking_algo==22){
+        perm_t = jonker_volgenant(st, Eadi[traj], prms.MK_alpha, prms.MK_scaling_function);
+    }
     else if(prms.state_tracking_algo==3){
         perm_t = get_stochastic_reordering(st, rnd);
     }
@@ -873,7 +969,7 @@ vector< vector<int> > compute_permutations(dyn_control_params& prms, vector<CMAT
     }
     else if(prms.state_tracking_algo==0){ ; } // no reordering: the identity permutation
     else{
-      std::cout<<"Error in compute_permutations(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: 0, 1, 2, 21, 3, 32, 33, 4)\n";
+      std::cout<<"Error in compute_permutations(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: 0, 1, 2, 21, 22, 3, 32, 33, 4)\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
@@ -969,6 +1065,7 @@ CMATRIX compute_projector(dyn_control_params& prms, CMATRIX& Eadi, CMATRIX& St){
   if(prms.state_tracking_algo==1){ perm_t = get_reordering(st);  }
   else if(prms.state_tracking_algo==2 || prms.state_tracking_algo==4){ perm_t = Munkres_Kuhn(st, Eadi, prms.MK_alpha, prms.MK_verbosity, prms.MK_scaling_function); }
   else if(prms.state_tracking_algo==21){ perm_t = hungarian_algorithm(st, Eadi, prms.MK_alpha, prms.MK_scaling_function);     }
+  else if(prms.state_tracking_algo==22){ perm_t = jonker_volgenant(st, Eadi, prms.MK_alpha, prms.MK_scaling_function); }
 
 /*
   else if(prms.state_tracking_algo==3){ perm_t = get_stochastic_reordering(st, rnd);   }
@@ -979,7 +1076,7 @@ CMATRIX compute_projector(dyn_control_params& prms, CMATRIX& Eadi, CMATRIX& St){
 */
   else if(prms.state_tracking_algo==0){ ; } // no reordering: the identity permutation, the phase correction below still applies
   else{
-    std::cout<<"Error in compute_projector(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: 0, 1, 2, 4, 21 - the stochastic 3, 32, 33 need a random generator this function does not receive)\n";
+    std::cout<<"Error in compute_projector(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: 0, 1, 2, 4, 21, 22 - the stochastic 3, 32, 33 need a random generator this function does not receive)\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 

@@ -841,6 +841,12 @@ void export_dyn_projectors_objects(){
   vector<int> (*expt_Munkres_Kuhn_v1)(CMATRIX& orb_mat_inp, CMATRIX& en_mat_inp, double alpha, int verbosity, int scaling_function) = &Munkres_Kuhn;
   def("Munkres_Kuhn", expt_Munkres_Kuhn_v1);  
 
+  vector<int> (*expt_jonker_volgenant_maximize_v1)(MATRIX& cost) = &jonker_volgenant_maximize;
+  def("jonker_volgenant_maximize", expt_jonker_volgenant_maximize_v1);
+
+  vector<int> (*expt_jonker_volgenant_v1)(CMATRIX& orb_mat_inp, CMATRIX& en_mat_inp, double alpha, int scaling_function) = &jonker_volgenant;
+  def("jonker_volgenant", expt_jonker_volgenant_v1);
+
   CMATRIX (*expt_permutation2cmatrix_v1)(vector<int>& permutation) = &permutation2cmatrix;
   def("permutation2cmatrix", expt_permutation2cmatrix_v1);  
 

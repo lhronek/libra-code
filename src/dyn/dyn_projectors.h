@@ -40,6 +40,8 @@ CMATRIX compute_phase_corrections(CMATRIX& S);
 vector<int> get_reordering(CMATRIX& time_overlap);
 MATRIX make_cost_mat(CMATRIX& orb_mat_inp, CMATRIX& en_mat_inp, double alpha, int scaling_function);
 vector<int> Munkres_Kuhn(CMATRIX& orb_mat_inp, CMATRIX& en_mat_inp, double alpha, int verbosity, int scaling_function);
+vector<int> jonker_volgenant_maximize(MATRIX& cost);
+vector<int> jonker_volgenant(CMATRIX& orb_mat_inp, CMATRIX& en_mat_inp, double alpha, int scaling_function);
 vector<int> get_stochastic_reordering(CMATRIX& time_overlap, Random& rnd);
 vector<int> get_stochastic_reordering2(CMATRIX& time_overlap, Random& rnd);
 vector<int> get_stochastic_reordering3(CMATRIX& time_overlap, Random& rnd, int convergence, int max_number_of_attempts);
