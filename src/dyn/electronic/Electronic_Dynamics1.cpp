@@ -558,7 +558,7 @@ void propagate_electronic_lowdin(double dt, CMATRIX& Coeff, CMATRIX& Hvib, CMATR
       i db/dt = G b,   G = X Hvib X + i (dY/dt) X,   X = S^-1/2, Y = S^1/2
   (Hvib = H - i v.D is itself non-Hermitian for a moving metric, Hvib - Hvib^H = -i dS/dt,
   and the frame term restores Hermiticity). The midpoint metric gives X and the frame
-  velocity is the finite difference (Y_new - Y_old)/dt; the O(dt^2) mismatch between that
+  velocity is the finite difference (Y_new - Y_old)/dt - the O(dt^2) mismatch between that
   difference and the model's dc1_dia is dropped by taking the Hermitian part of G, so
   b^H b = c^H S c is conserved exactly. c(t+dt) = X_new b(t+dt). For a constant metric this
   is exp(-i S^-1 Hvib dt) - the callers keep that path for a metric that does not move

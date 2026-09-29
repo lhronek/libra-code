@@ -562,7 +562,7 @@ void dyn_control_params::sanity_check(){
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     // the NAC-side sign correction re-signs the couplings by continuity
-    // (raw gauge); a relabel projector re-signs the amplitudes instead -
+    // (raw gauge) - a relabel projector re-signs the amplitudes instead -
     // both at once double-correct every eigenvector branch switch
     if(do_nac_phase_correction==1 && !rot_proj && assume_always_consistent==0){
       std::cout<<"Error in dyn_control_params::sanity_check: do_nac_phase_correction = 1"
@@ -587,8 +587,8 @@ void dyn_control_params::sanity_check(){
   /// every representation implements a fixed set of electronic integrators
   /// in propagate_electronic - amplitudes (rep_tdse 0 and 1): -1, 0-15 and 19
   /// (9 and 19 carry the second Magnus term);
-  /// the diabatic density matrix (2): 0 and 9; the adiabatic density matrix (3):
-  /// 0, 1, 10 and the Magnus-corrected 9, 19; each with the +100 variant. Any other value would leave the
+  /// the diabatic density matrix (2): 0 and 9 - the adiabatic density matrix (3):
+  /// 0, 1, 10 and the Magnus-corrected 9, 19 - each with the +100 variant. Any other value would leave the
   /// electronic variables untouched for the whole run - refuse it here (the
   /// dispatch throws as well)
   if(rep_tdse>=0 && rep_tdse<=3){

@@ -115,7 +115,7 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
     }
     // the shared-child peninsula: state-enforced, rescaling-free live
     // forces are trajectory-invariant, so one force column serves all
-    // trajectories (classical-path on-the-fly NBRA; the cp2k driver's
+    // trajectories (classical-path on-the-fly NBRA - the cp2k driver's
     // force_source "gs" pairs with it)
     int nbra_live_forces = (prms.force_method == 1 &&
                             prms.enforce_state_following == 1 &&
@@ -146,7 +146,7 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
     // the shared child evaluates the Hamiltonian at trajectory 0's
     // geometry - live-force runs stay valid only while every trajectory
     // rides the same nuclear path (identical initial conditions, no
-    // per-trajectory momentum edits); any spread across the q columns
+    // per-trajectory momentum edits) - any spread across the q columns
     // means the shared Hamiltonian is wrong for the divergent
     // trajectories
     if (prms.force_method != 0) {
@@ -206,19 +206,19 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
     } else if (prms.ham_transform_method == 2) {
       // diabatic -> adiabatic by the MODEL-SUPPLIED transformation: the
       // model's own gauge replaces the internal diagonalization (no
-      // LAPACK branch switches); values + the shared Hellmann-Feynman
+      // LAPACK branch switches) - values + the shared Hellmann-Feynman
       // derivative tier
       ham.transform_dia2adi(1, 1);
     } else if (prms.ham_transform_method == 3) {
       // adiabatic -> diabatic by the stored basis transformation:
-      // ham_dia = S U ham_adi U^H S (transform_adi2dia); runs before the
+      // ham_dia = S U ham_adi U^H S (transform_adi2dia) - runs before the
       // time-overlap/NAC/Hvib updates so every diabatic consumer of this
       // step sees the rotated Hamiltonian
       ham.transform_adi2dia(1);
     } else if (prms.ham_transform_method == 4) {
       // the adi->dia local-diabatization rotation itself lives in the
       // type-1 hook below (update_proj_adi refreshes the frame between
-      // the type-0 and the first type-1 call); ham_adi was just
+      // the type-0 and the first type-1 call) - ham_adi was just
       // harvested - mark the frame rotation stale
       dyn_var.ld_frame_stale = 1;
     }
@@ -338,11 +338,11 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
     // V^H ham_adi V. Runs on the type-1 passes - update_proj_adi sits
     // between the type-0 and the first type-1 call, so T_n and hence V
     // are fresh here (the type-0 dispatch would see the previous
-    // step's frame); the Hvib update below consumes the rotated ham_dia
+    // step's frame) - the Hvib update below consumes the rotated ham_dia
     if (update_type == 1 && prms.ham_transform_method == 4 &&
         dyn_var.ld_frame_stale) {
       // the frame accumulation lives in update_proj_adi (exactly once
-      // per step); the loop makes several type-1 calls per step
+      // per step) - the loop makes several type-1 calls per step
       // (post-half-step, post-rescaling) - the stale flag limits the
       // rotation to the passes where V or ham_adi actually changed
       int nchildren = ham.children.size();
@@ -515,7 +515,7 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
         // raw amplitudes, and do_nac_phase_correction re-signs the NAC
         // downstream - a fold there double-corrects
         // rotation projectors (St^-1) carry the flip in T itself - the raw
-        // St is what they must see; every other route wants the flip
+        // St is what they must see - every other route wants the flip
         // undone in St (else the pair's coupling is zero for this step),
         // and only the relabel routes need it folded back into the
         // re-signed amplitude gauge afterwards
@@ -654,7 +654,7 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
     }
     // Don't update Hvib - perhaps because they are read from files in step 1
     if (prms.hvib_update_method == 0) {
-      // the supplied/precomputed data covers the ADI side only; under
+      // the supplied/precomputed data covers the ADI side only - under
       // transform 3 the diabatic picture (H_SD readout, rep-0
       // propagation) needs hvib_dia built from the rotated ham_dia -
       // unless the model supplied obj.hvib_dia itself (e.g. the
@@ -730,7 +730,7 @@ void update_time_overlaps(dyn_control_params &prms, dyn_variables &dyn_var,
     for (int traj = 0; traj < ntraj; traj++) {
       // the adiabatic bra-ket runs through the diabatic metric: a static
       // diabatic basis has <dia(t)|dia(t+dt)> = ovlp_dia (identity for
-      // orthonormal diabats); time-dependent diabats supply their own
+      // orthonormal diabats) - time-dependent diabats supply their own
       // overlaps through time_overlap_method 0
       st = ham_prev.children[traj]->get_basis_transform().H() *
            ham.children[traj]->get_ovlp_dia() *
@@ -776,7 +776,7 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
   // an eigenvector branch switch (negative time-overlap diagonal) with the
   // phase correction opted out leaves the sign flip uncorrected in every
   // adiabatic-representation consumer - the run would complete with
-  // silently wrong populations; whether a flip occurs is a property of the
+  // silently wrong populations - whether a flip occurs is a property of the
   // data, so this is detectable only at runtime - say so once. The
   // opt-out stays legitimate for flip-free sources (driver-side sign
   // alignment, a model-supplied smooth transformation, the rotation
@@ -806,7 +806,7 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
     }
   }
   // Deterministic per-trajectory projector updates - parallel-safe (each
-  // iteration writes only proj_adi[itraj]); identical for any thread count
+  // iteration writes only proj_adi[itraj]) - identical for any thread count
   // exceptions cannot leave an OMP-outlined region (even a serialized
   // one) - capture and rethrow outside so the guards stay translatable
   std::exception_ptr omp_eptr = nullptr;

@@ -194,11 +194,11 @@ void dyn_variables::update_amplitudes(dyn_control_params& dyn_params){
 
    C_dia = U C_adi
 
-   C_adi = U.H() S C_dia   (S = the cached diabatic metric; identity for
+   C_adi = U.H() S C_dia   (S = the cached diabatic metric - identity for
                             orthonormal diabats)
 */
   // Deterministic per-trajectory transforms - parallel-safe (each iteration
-  // reads/writes only its own column); results identical for any thread count
+  // reads/writes only its own column) - results identical for any thread count
   // exceptions cannot leave an OMP-outlined region (even serialized) -
   // capture and rethrow outside so the guards stay translatable
   std::exception_ptr omp_eptr = nullptr;
@@ -273,19 +273,19 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params){
   int rep = dyn_params.rep_tdse;
   // In the adiabatic representations (rep_tdse 1 and 3) dm_dia is a derived
   // quantity costing two nadi x nadi matrix products per trajectory - skip it
-  // when nothing consumes it: compute_dm_dia == 0; the "auto" value (-1) is
+  // when nothing consumes it: compute_dm_dia == 0 - the "auto" value (-1) is
   // resolved to 0/1 in dynamics/tsh/compute.py from rep_tdse, rep_sh and the
   // requested outputs ("D_dia")
   int skip_dia = (dyn_params.compute_dm_dia == 0) && (rep == 1 || rep == 3);
 
   // dm_dia is the PLAIN-coefficient density C C^H and its diagonal the
-  // plain |C_i|^2 - exact populations for orthonormal diabats; with
+  // plain |C_i|^2 - exact populations for orthonormal diabats - with
   // ovlp_dia != I the S-metric variants derive in post (Re diag(dm S)),
   // and the dia->adi directions here carry the cached metric (C_adi = U^H S C_dia,
   // rho_adi = (S U)^H rho_dia (S U)). The diabatic hop machinery (rep_sh 0) works
   // in the Lowdin frame S^-1/2 of the diabats (nHamiltonian::lowdin_dia)
   // Deterministic per-trajectory updates - parallel-safe (each iteration
-  // writes only its own dm slots); results identical for any thread count
+  // writes only its own dm slots) - results identical for any thread count
   // exceptions cannot leave an OMP-outlined region (even serialized) -
   // capture and rethrow outside so the guards stay translatable
   std::exception_ptr omp_eptr = nullptr;
@@ -299,7 +299,7 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params){
     CMATRIX& U = (*basis_transform[traj]); // * (*proj_adi[indx]); // U_eff - let's wait with this
 
     /// Diabatic wfc representation
-    // dm_dia is the PLAIN-coefficient density C C^H in every branch; the
+    // dm_dia is the PLAIN-coefficient density C C^H in every branch - the
     // cached diabatic metric makes the dia->adi directions exact for
     // S != I (identity metric = the historical bare-U form)
     if(rep==0){
@@ -398,7 +398,7 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params, nHamil
   int rep = dyn_params.rep_tdse;
   // In the adiabatic representations (rep_tdse 1 and 3) dm_dia is a derived
   // quantity costing two nadi x nadi matrix products per trajectory per step.
-  // Skip it when nothing consumes it: compute_dm_dia == 0; the "auto" value
+  // Skip it when nothing consumes it: compute_dm_dia == 0 - the "auto" value
   // (-1) is resolved to 0/1 in dynamics/tsh/compute.py from rep_tdse, rep_sh
   // and the requested outputs ("D_dia")
   int skip_dia = (dyn_params.compute_dm_dia == 0) && (rep == 1 || rep == 3);
@@ -424,7 +424,7 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params, nHamil
 
     /// Diabatic wfc representation
     // dm_dia is the PLAIN-coefficient density C C^H in every branch (its
-    // diagonal = |C_i|^2, exact populations for orthonormal diabats; the
+    // diagonal = |C_i|^2, exact populations for orthonormal diabats - the
     // S-metric variants derive in post) - S enters only FUNCTIONALLY in
     // the dia<->adi conversions: C_adi = (S U)^H C_dia, C_dia = U C_adi
     if(rep==0){
@@ -541,10 +541,10 @@ void dyn_variables::init_amplitudes(bp::dict _params, Random& rnd){
                     Uses "istates" instead of the "istate", similar to the types 2 and 3
                 - 5 : SQC square-window sampling of the Meyer-Miller actions around "istate"
                     (Cotton-Miller 2013): |c_k|^2 = e_k, occupied e in [1, 1 + 2 gamma], the
-                    others in [0, 2 gamma], random phases; gamma = 0.366 unless "sqc_gamma" is given.
+                    others in [0, 2 gamma], random phases - gamma = 0.366 unless "sqc_gamma" is given.
                     NOT normalized - use with force_method 2, ehrenfest_normalized 0 and the same sqc_gamma
                 - 6 : SQC triangle-window sampling (Cotton-Miller 2016/2019): occupied e in [1, 2],
-                    every other e_k in [0, 2 - e_occ], uniform over the region; gamma = 1/3 unless given
+                    every other e_k in [0, 2 - e_occ], uniform over the region - gamma = 1/3 unless given
 
             * **params["nstates"]** ( int ): the number of electronic states in the basis
                 [ default: 1 ]
@@ -553,7 +553,7 @@ void dyn_variables::init_amplitudes(bp::dict _params, Random& rnd){
                 only when **params["init_type"]** is 0 or 1, in which case it defines on 
                 which state the amplitudes will be initialized [ default: 0]
 
-            * **params["sqc_gamma"]** ( double ): the Meyer-Miller gamma of the SQC windows (init_type 5/6);
+            * **params["sqc_gamma"]** ( double ): the Meyer-Miller gamma of the SQC windows (init_type 5/6) -
                 -1 (default) selects the window's standard value (0.366 square, 1/3 triangle)
 
             * **params["istates"]** ( list of ints ): the list of the populations on all electronic
@@ -1608,7 +1608,7 @@ vector<double> dyn_variables::compute_average_sqc_pop(int rep, int window, doubl
   (P_k = <W_k> / sum_m <W_m>). Trajectories inside no window are dropped.
     window 0 - square: e_k in [1, 1 + 2 gamma], every other e_j in [0, 2 gamma]
     window 1 - triangle bin: e_k >= 1, every other e_j <= 1
-  Refs: Cotton, Miller JPCA 117, 7190 (2013); JCP 145, 144108 (2016);
+  Refs: Cotton, Miller JPCA 117, 7190 (2013), JCP 145, 144108 (2016),
   JCP 150, 104101 (2019)
 */
   int sz;

@@ -646,7 +646,7 @@ vector<double> hopping_probabilities_fssh2(dyn_control_params& prms, CMATRIX& de
   }// for j
 
   // the vector-FSSH cap: the leaving probability tops out at 1 and
-  // hop() renormalizes the channels; version 1 rebuilds the row below
+  // hop() renormalizes the channels - version 1 rebuilds the row below
   if(version==0 && sum > 1.0){ sum = 1.0; }
   g[i] = 1.0 - sum;
 
@@ -802,7 +802,7 @@ vector<double> hopping_probabilities_lz(nHamiltonian* ham, nHamiltonian* ham_pre
   gap, 2 - adiabatic, based on the switch of the NAC sign
   5 - adiabatic, minimum-based: the prefilled squared-gap minimum with the Massey
   exponent at the reconstructed NAC peak (nac Z^2 is conserved along a locally-linear
-  passage; exact for such passages at any sampling)
+  passage - exact for such passages at any sampling)
   3 - diabatic, generalized-linear LZ: Eq. (3) of Belyaev, Lasser, Trigila (JCP 140, 224108 (2014))
   evaluated at the gap minimum of the linearized passage, detected inside the last step
   \param[in] p [ndof x 1] or [ndof x ntraj] matrix of nuclear momenta
@@ -860,7 +860,7 @@ crossings with adiabatic state labels - it requires ndia == nadi (got ndia = "
   */
   
   // in-out channel: incoming entries may carry the dispatch's three-point
-  // gap-parabola minima (rep 2); the vector is rewritten with the
+  // gap-parabola minima (rep 2) - the vector is rewritten with the
   // at-crossing gaps of the channels this call detects (-1 elsewhere)
   vector<double> gap_in(gap_mins);
   if((int)gap_in.size() != nstates){ gap_in.assign(nstates, -1.0); }
@@ -959,7 +959,7 @@ must supply obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
     MATRIX nac_adi(nstates,nstates);
     MATRIX ham_adi_prev(nstates,nstates);
     MATRIX nac_adi_prev(nstates,nstates);
-    // the diabatic matrices are (ndia x ndia); only the rep-1 crossing
+    // the diabatic matrices are (ndia x ndia) - only the rep-1 crossing
     // detector reads them
     MATRIX ham_dia(ham->ndia, ham->ndia);
     MATRIX ham_dia_prev(ham->ndia, ham->ndia);
@@ -1044,7 +1044,7 @@ obj.nac_adi with the couplings in the real part (obj.nac_ci is not an ingested a
             // Massey exponent at the reconstructed NAC peak: nac Z^2 is
             // conserved along a locally-linear passage, so nac_max =
             // nac(t1) Z1^2 / Z_min^2 with the bracket's middle sample at
-            // the previous step; the regular form has no small divisors
+            // the previous step - the regular form has no small divisors
             double Z1 = fabs(ham_adi_prev.get(i,i) - ham_adi_prev.get(j,j));
             double nac1 = fabs(nac_adi_prev.get(i,j));
             if(Z_star <= 0.0){ g_ij = 1.0; }  // trivial crossing
@@ -1099,7 +1099,7 @@ must supply obj.ham_dia, or use rep_lz = 2 (adiabatic-only detection) \n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
-    // the pair-local trace-free vector is v = ( (H_ii - H_jj)/2, H_ij ); its
+    // the pair-local trace-free vector is v = ( (H_ii - H_jj)/2, H_ij ) - its
     // time derivative comes from the diabatic derivatives when the model
     // supplies them, from the two steps otherwise
     vector<double> v1d(nstates, 0.0);
@@ -1225,7 +1225,7 @@ static void filter_lz_target_space(vector<double>& g, vector<double>& gap_mins,
   /**
     Adjacent-only proposals (lz_target_space = 0): zero every channel whose
     pair holds a third state's energy strictly inside its interval - such a
-    pairwise minimum is not a two-state passage; the intervening states
+    pairwise minimum is not a two-state passage - the intervening states
     mediate. Equals lz.py's target_space 0 on energy-sorted states and stays
     correct when the instantaneous order deviates from the index order.
     The stay probability is recomputed with the producers' convention.
@@ -1259,13 +1259,13 @@ vector<double> hopping_probabilities_bllz(MATRIX& E_prev2, MATRIX& E_prev, MATRI
   \param[in] act_state_indx - index of the current adiabatic state
   \param[in] dt the integration timestep (a.u.)
 
-  A pair's gap history Z(t-2dt) > Z(t-dt) < Z(t) marks a local minimum; the Lagrange
+  A pair's gap history Z(t-2dt) > Z(t-dt) < Z(t) marks a local minimum - the Lagrange
   parabola through the three SQUARED gaps gives the extrapolated minimum and the
   curvature - Z^2 of a locally-linear passage is exactly quadratic, so the vertex is
   sampling-exact where a parabola on Z lands at the middle-sample scale and
   overestimates the minimum as dt grows. In the regular form
   Z_min^3/Z_dd = Q_min^2/a (a = half the Q-parabola curvature):
-  P = exp( -(pi/2) Q_min / sqrt(a) ); a negative vertex (the parabola undershooting
+  P = exp( -(pi/2) Q_min / sqrt(a) ) - a negative vertex (the parabola undershooting
   the bracket) falls back to the middle sample Q_1. Detailed balance is
   NOT applied here: the hop acceptance machinery owns it.
 
@@ -1289,7 +1289,7 @@ vector<double> hopping_probabilities_bllz(MATRIX& E_prev2, MATRIX& E_prev, MATRI
       if(z0 > z1 && z1 < z2){
         // fit the SQUARED gap: Z^2 of a locally-linear passage is exactly
         // quadratic in time, so the vertex recovers the true minimum at any
-        // sampling; a parabola on Z itself sits at the middle-sample scale
+        // sampling - a parabola on Z itself sits at the middle-sample scale
         // in the V-shaped wings and overestimates the minimum with dt
         double q0 = z0*z0, q1 = z1*z1, q2 = z2*z2;
         // the strict minimum makes denom > 0 and keeps |t_min| < dt/2
@@ -1300,7 +1300,7 @@ vector<double> hopping_probabilities_bllz(MATRIX& E_prev2, MATRIX& E_prev, MATRI
                       + t_min*(t_min + dt)*q2 )/(dt*dt);
         if(q_min < 0.0){
           // a negative vertex means the parabola undershoots the sampled
-          // bracket (asymmetric sampling); the middle sample bounds the
+          // bracket (asymmetric sampling) - the middle sample bounds the
           // true minimum, and the conical limit keeps P -> 1 as q1 -> 0
           q_min = q1;
         }
@@ -1733,7 +1733,7 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
     else if(prms.tsh_method == 3){ // LZ
 
       if(prms.rep_lz == 4){
-        // true Belyaev-Lebedev: adiabatic energies alone; the two-step history
+        // true Belyaev-Lebedev: adiabatic energies alone - the two-step history
         // lives in dyn_var (allocated on first use) and the first two steps
         // propose nothing while it fills
         if(dyn_var.bllz_vars_status == 0){ dyn_var.allocate_bllz(); }
@@ -1790,7 +1790,7 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
                   prms.rep_lz, p_traj, *dyn_var.iM, prms.dt, gms);
         if(prms.lz_target_space == 0){
           // energies of the proposal's own representation: diabatic for
-          // rep 0/3, adiabatic otherwise; rep 5's bracket middle is the
+          // rep 0/3, adiabatic otherwise - rep 5's bracket middle is the
           // previous step
           int nfil = (int)g[traj].size();
           vector<double> Ecol(nfil, 0.0);

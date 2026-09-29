@@ -52,7 +52,7 @@ using namespace libthermostat;
 void export_dyn_control_params_objects(){
 
   // Arbitrary wavefunction
-  // the validator takes no arguments; binding the dict form to set_parameters
+  // the validator takes no arguments - binding the dict form to set_parameters
   // made prms.sanity_check(params) OVERWRITE the parameters
   void (dyn_control_params::*expt_sanity_check_v1)() = &dyn_control_params::sanity_check;
   void (dyn_control_params::*expt_set_parameters_v1)(boost::python::dict params) = &dyn_control_params::set_parameters;
@@ -660,7 +660,7 @@ boost::python::list expt_hopping_probabilities_lz_gaps
 (nHamiltonian& ham, nHamiltonian& ham_prev, int act_state_indx, int rep,
  MATRIX& p, const MATRIX& invM, double dt, boost::python::list gap_mins_in){
   // the gap_mins-carrying entry: the in-list may carry the three-point
-  // prefill (rep 2/5); returns [probabilities, at-crossing gaps]
+  // prefill (rep 2/5) - returns [probabilities, at-crossing gaps]
   vector<double> gms;
   for(int a=0; a<len(gap_mins_in); a++){ gms.push_back(extract<double>(gap_mins_in[a])); }
   vector<double> g = hopping_probabilities_lz(&ham, &ham_prev, act_state_indx, rep, p, invM, dt, gms);
@@ -750,7 +750,7 @@ void export_dyn_hop_proposal_objects(){
   MATRIX& p, const MATRIX& invM) = &hopping_probabilities_zn;
   def("hopping_probabilities_zn", expt_hopping_probabilities_zn_v1);
 
-  // gap_mins-carrying entries: return [probabilities, at-crossing gaps];
+  // gap_mins-carrying entries: return [probabilities, at-crossing gaps] -
   // the lz form accepts the three-point prefill list (rep 2/5)
   def("hopping_probabilities_lz_gaps", expt_hopping_probabilities_lz_gaps);
   def("hopping_probabilities_zn_gaps", expt_hopping_probabilities_zn_gaps);

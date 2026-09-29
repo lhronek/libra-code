@@ -164,7 +164,7 @@ class dyn_variables{
   /**
     The cumulative local-diabatization frame V(t_n) = T_n V(t_n-1),
     V(0) = I (ham_transform_method == 4): ham_dia = V^H ham_adi V is
-    the t0-anchored transported basis. Identity until transform 4 runs;
+    the t0-anchored transported basis. Identity until transform 4 runs -
     like proj_adi it is NOT persisted across restarts.
     Options: CMATRIX(nadi, nadi) x ntraj
   */

@@ -59,7 +59,7 @@ class dyn_control_params{
      - 2: diabatic representation, density matrix (e.g. Liouville's picture)
      - 3: adiabatic representation, density matrix (e.g. Liouville's picture)
      - 4: MMST adiabatic representation, wfc - reserved, not implemented (no
-          electronic propagation exists for it; rejected by sanity_check)
+          electronic propagation exists for it - rejected by sanity_check)
   */
   int rep_tdse;
 
@@ -129,7 +129,7 @@ class dyn_control_params{
       - 0: energy-adjacent only - a pair is eligible iff no third state's
            energy lies strictly inside its interval at the evaluation step
            (a pairwise minimum with intervening states is not a two-state
-           passage; equals lz.py's target_space 0 on energy-sorted states)
+           passage - equals lz.py's target_space 0 on energy-sorted states)
       - 1: all pairs with detected crossings [ default ]
   */
   int lz_target_space;
@@ -163,7 +163,7 @@ class dyn_control_params{
     admitted when combined with enforce_state_following = 1,
     momenta_rescaling_algo = 0 and ensemble = 0 (classical-path
     on-the-fly NBRA - the forces are trajectory-invariant, one column
-    serves all trajectories); anything else needs per-trajectory
+    serves all trajectories) - anything else needs per-trajectory
     forces, which the single shared child Hamiltonian cannot supply
     (rejected at the head of update_Hamiltonian_variables)
   */
@@ -251,7 +251,7 @@ class dyn_control_params{
       - 2: update according to time-overlaps (only time-derivative NACs)
 
     With isNBRA == 1 and ntraj > 1 option 1 is rejected - it rebuilds
-    couplings from per-trajectory momenta on the single shared child;
+    couplings from per-trajectory momenta on the single shared child -
     use 0 (supplied couplings, the NBRA convention) or 2 (HST/NPI from
     the shared time-overlap)
   */
@@ -695,7 +695,7 @@ class dyn_control_params{
 
     With isNBRA == 1 and ntraj > 1 options 2 and 4 are rejected -
     Schwartz 1 builds per-trajectory mean-field forces on the single
-    shared child; use 1 (EDC, the NBRA convention) or 0
+    shared child - use 1 (EDC, the NBRA convention) or 0
   */  
   int decoherence_times_type;
 
@@ -1051,7 +1051,7 @@ class dyn_control_params{
     the method for electronic TD-SE integration:
 
     rep_tdse = 0 (diabatic): 1** - with NBRA. The diabatic basis needs no reprojection, so the adiabatic variants
-    that differ only by the T dressing coincide here; a metric that moves within the step takes the Lowdin-frame form
+    that differ only by the T dressing coincide here - a metric that moves within the step takes the Lowdin-frame form
     of every step, an electronic substep its own share of that move
 
         -1              - No propagation
@@ -1095,7 +1095,7 @@ class dyn_control_params{
                            -1/12 and 0 has +1/24, this one neither
       The projector family must match the integrator family (enforced by sanity_check):
       0-2, 9 and 10-12, 19 need a rotation projector (state_tracking_algo -1/5/6), 3-8 and 13-15 a
-      relabel projector (state_tracking_algo 0/1/2/21/22); the +100 variants share the classification.
+      relabel projector (state_tracking_algo 0/1/2/21/22) - the +100 variants share the classification.
 
         10              -  same as 0, but with rotations
         11              -  same as 1, but with rotations
@@ -1154,7 +1154,7 @@ class dyn_control_params{
     After a change of the active state (an accepted hop, a relabel at a crossing), call the model back at
     the same geometry for the force of the NEW active state
     (the python step loop hands params["force_refresh"] = {trajectory: new state} to the model and ingests
-    the returned d1ham_adi alone): 0 - no; 1 - yes, for models that hand over the force of their active state
+    the returned d1ham_adi alone): 0 - no, 1 - yes, for models that hand over the force of their active state
     alone (the on-the-fly drivers under force_source "active_state"), whose new state's row is zero after a hop
     and whose next half kick would otherwise run force-free. Needs force_method 1, rep_sh 1 and isNBRA 0.
   */

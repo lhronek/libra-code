@@ -485,7 +485,7 @@ static void dia_rot_step(double dt, CMATRIX &C, CMATRIX &Hvib, CMATRIX &S_old,
 // step, so the substeps multiply up to the one-step exponent. S_first -> S_last is the
 // metric over the nuclear step, S_old -> S_new over this substep. A constant metric
 // keeps the generators S^-1 Hvib, whose Magnus exponent is S^-1 applied to the Hermitian
-// (A + B)/2 + (i dt/12) (A S^-1 B - B S^-1 A); a moving metric takes the Lowdin frame
+// (A + B)/2 + (i dt/12) (A S^-1 B - B S^-1 A) - a moving metric takes the Lowdin frame
 // b = S^1/2 c, where the two generators are X Hvib X + i (dY/dt) X at the ends of the
 // nuclear step, Hermitian parts as propagate_electronic_lowdin takes them
 static void dia_magnus_step(double dt, double dt_step, CMATRIX &C, CMATRIX &Hvib_old,
@@ -841,11 +841,11 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
     works on single columns by construction.
   */
   // Thread-local workspaces (resized on nadi change): the helper runs both
-  // once per step (NBRA fast path) and per trajectory inside OpenMP regions;
+  // once per step (NBRA fast path) and per trajectory inside OpenMP regions -
   // per-thread reuse removes four nadi^2 allocations+zeroings per call.
   // Every branch assigns these before reading them. t_identity signals that
   // T_new was loaded as the identity (assume_always_consistent), so its
-  // factors drop out of the chains exactly; t_ampl_skip suppresses only the
+  // factors drop out of the chains exactly - t_ampl_skip suppresses only the
   // amplitude-side T factors (early electronic substeps) while the Hvib
   // dressings keep aligning data frames with the real T. dt_step is the full
   // nuclear step: the commutator of integrator 9 takes it, so that the
@@ -902,7 +902,7 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
         exp_(A, Hvib, complex<double>(0.0, -0.5 * dt));
 
         if (t_identity) { C.product(B, A, B, C); }
-        // dressed old-frame step; the leading relabel waits for the
+        // dressed old-frame step - the leading relabel waits for the
         // last substep
         else if (t_ampl_skip) { C.product(B, adjoint(T_new), A, T_new, B, C); }
         else { C.product(T_new, B, adjoint(T_new), A, T_new, B, C); }
@@ -1143,7 +1143,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
   // Operate directly on the propagated amplitude matrix in the wavefunction
   // representations - the (nst x ntraj) round-trip copies were pure churn.
   // Nothing inside this function reads the amplitudes besides the propagation
-  // itself (SSY corrections read momenta only); rep >= 2 propagates the
+  // itself (SSY corrections read momenta only) - rep >= 2 propagates the
   // density matrices instead and never touches Coeff (dummy target).
   thread_local std::unique_ptr<CMATRIX> w_coeff_dummy;
   if (!w_coeff_dummy) { w_coeff_dummy.reset(new CMATRIX(1, 1)); }
@@ -1326,7 +1326,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
 
       // The diabatic basis needs no reprojection - the coupling sits in
       // Hvib_dia itself - so the adiabatic variants that differ only by the
-      // T dressing coincide here; every step takes the Lowdin-frame form
+      // T dressing coincide here - every step takes the Lowdin-frame form
       // when the metric moves within the step
       else if (method == 4 || method == 104 || method == 5 || method == 105 ||
                method == 6 || method == 106) {
@@ -1413,7 +1413,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
 
       */
       // Workspaces for the rotation-based integrators below (thread-local:
-      // this loop body runs inside an OpenMP region); the exp-family helper
+      // this loop body runs inside an OpenMP region) - the exp-family helper
       // manages its own workspaces. Every branch assigns before reading.
       thread_local std::unique_ptr<CMATRIX> wHvib_rot, wHvib_old_rot;
       if (!wHvib_rot || wHvib_rot->n_rows != ham->nadi) {
@@ -2357,7 +2357,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   // the gap of the two labels changed the total energy at every relabel
   act_states = dyn_var.act_states;
   // Check if rescaling is needed:
-  //act_states = dyn_var.act_states; // these are proposed states
+  //act_states = dyn_var.act_states - // these are proposed states
   //act_states = accept_hops(dyn_var, ham, act_states, old_states, prms, rnd);
 
   //====================== Momenta adjustment after successful/frustrated hops
@@ -2710,7 +2710,8 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
 
     } // for traj
   } // simple decoherence
-  else if (prms.decoherence_algo == -1 || prms.decoherence_algo == 8) { ; } // -1: no decoherence; 8 (diabatic IDA) acts after the hops
+  // -1: no decoherence - 8 (diabatic IDA) acts after the hops
+  else if (prms.decoherence_algo == -1 || prms.decoherence_algo == 8) { ; }
   else {
     std::cout<<"Error in compute_dynamics(): decoherence_algo = "<<prms.decoherence_algo<<" has no branch here (implemented: -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
@@ -2835,7 +2836,8 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       else if (prms.decoherence_algo == 9) { // simple decoherence method 
         reset_coherence_factors(dyn_var, act_states, old_states, prms.gap_correlation_time);
       } // algo == 9
-      else if (prms.decoherence_algo == -1 || prms.decoherence_algo == 0) { ; } // -1: no decoherence; 0 (MSDM / EDC) acts during the propagation
+      // -1: no decoherence - 0 (MSDM / EDC) acts during the propagation
+      else if (prms.decoherence_algo == -1 || prms.decoherence_algo == 0) { ; }
       else {
         std::cout<<"Error in compute_dynamics(): decoherence_algo = "<<prms.decoherence_algo<<" has no branch here (implemented: -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)\n";
         std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
