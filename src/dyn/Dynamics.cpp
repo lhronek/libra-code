@@ -1986,8 +1986,10 @@ static void check_hop_force_rows(dyn_control_params &prms, dyn_variables &dyn_va
     while the old state's row of the model's hand-over carries a force: that
     is a model handing over the force of its active state alone (the
     on-the-fly drivers under force_source active_state), whose next half kick
-    would run force-free. Under hop_force_refresh the python step loop fills
-    the row right after this step and checks it itself.
+    would run force-free. Under hop_force_refresh the row of a relabel is
+    filled inside the step (refresh_relabel_forces, before the second half
+    kick) and the row of a hop by the python step loop right after this step,
+    which checks it itself.
   */
   if (prms.force_method != 1 || prms.rep_sh != 1 || prms.hop_force_refresh == 1) { return; }
   int ndof = ham.nnucl;
@@ -2012,6 +2014,66 @@ static void check_hop_force_rows(dyn_control_params &prms, dyn_variables &dyn_va
                 << "on-the-fly drivers under force_source active_state), so the next half kick would run "
                 << "force-free: set hop_force_refresh = 1 (the model is called back at the same geometry for "
                 << "the new state's force) or hand over every state's force (force_source all_states)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+  }
+}
+
+static void refresh_relabel_forces(dyn_control_params &prms, dyn_variables &dyn_var,
+                                   nHamiltonian &ham, bp::object py_funct, bp::dict params,
+                                   vector<int> &old_states, vector<int> &new_states) {
+  /**
+    The force of the new active state at this geometry for every trajectory
+    whose active state changed in the relabel of this step while the new row
+    of the force hand-over is empty and the old row carries a force (a model
+    handing over the force of its active state alone). The relabel precedes
+    the second half kick, so the row is filled here: the model is called back
+    once with params["force_refresh"] = {trajectory: new state} and
+    params["act_state"] updated, as the python step loop does after a hop -
+    the drivers return the forces of the listed trajectories and nothing else.
+    A row still empty after the call-back stops the run.
+  */
+  if (prms.force_method != 1 || prms.rep_sh != 1) { return; }
+  int ndof = ham.nnucl;
+  bp::dict refresh;
+  bp::dict act;
+  int any = 0;
+  for (int traj = 0; traj < dyn_var.ntraj; traj++) {
+    act[traj] = new_states[traj];
+    if (old_states[traj] == new_states[traj] || (int)ham.children.size() <= traj) { continue; }
+    bool zero = true;
+    bool old_carries = false;
+    for (int idof = 0; idof < ndof; idof++) {
+      CMATRIX d1(prms.rep_force == 0 ? ham.children[traj]->get_d1ham_dia(idof)
+                                     : ham.children[traj]->get_d1ham_adi(idof));
+      if (d1.get(new_states[traj], new_states[traj]).real() != 0.0) { zero = false; }
+      if (d1.get(old_states[traj], old_states[traj]).real() != 0.0) { old_carries = true; }
+    }
+    if (zero && old_carries) { refresh[traj] = new_states[traj]; any = 1; }
+  }
+  if (any == 0) { return; }
+  params["act_state"] = act;
+  params["force_refresh"] = refresh;
+  try {
+    ham.compute_adiabatic(py_funct, *dyn_var.q, params, 1);
+  } catch (...) {
+    params.attr("pop")("force_refresh");
+    throw;
+  }
+  params.attr("pop")("force_refresh");
+  for (int traj = 0; traj < dyn_var.ntraj; traj++) {
+    if (!refresh.has_key(traj)) { continue; }
+    bool zero = true;
+    for (int idof = 0; idof < ndof && zero; idof++) {
+      CMATRIX d1(prms.rep_force == 0 ? ham.children[traj]->get_d1ham_dia(idof)
+                                     : ham.children[traj]->get_d1ham_adi(idof));
+      if (d1.get(new_states[traj], new_states[traj]).real() != 0.0) { zero = false; }
+    }
+    if (zero) {
+      std::cout << "Error in compute_dynamics(): the active state of trajectory " << traj << " was relabeled "
+                << old_states[traj] << " -> " << new_states[traj] << " at a crossing and the model called back "
+                << "for the new state's force (hop_force_refresh) returned none - the second half kick would run "
+                << "force-free\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
@@ -2326,6 +2388,11 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   //dyn_var.f->show_matrix();
   //
 
+  // a relabel at a crossing changed the active state before the second half kick - the new label's force must be
+  // in its row before the kick reads it
+  if (prms.hop_force_refresh == 1) {
+    refresh_relabel_forces(prms, dyn_var, ham, py_funct, params, old_states, dyn_var.act_states);
+  }
   update_forces(prms, dyn_var, ham);
 
   //cout<<"forces after: \n";

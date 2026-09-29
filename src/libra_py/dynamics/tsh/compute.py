@@ -323,13 +323,17 @@ def _sync_nbra_flag(dyn_params):
 def refresh_hop_forces(dyn_var, ham, prms, compute_model, model_params, states_before):
     """The force of the NEW active state at the geometry where the state changed (hop_force_refresh). A model that
     hands over the force of its active state alone (the on-the-fly drivers under force_source "active_state") leaves
-    the new state's row of d1ham_adi zero after a hop or a relabel at a crossing, and the first half kick of the next
-    step would run force-free. Every trajectory whose active state changed in the step is handed back to the model
-    once, at the same geometry, with
-    params["force_refresh"] = {trajectory: new state} - the model returns the forces (the drivers run one force
-    calculation for that state) - only the returned d1ham_adi is ingested and the engine's forces are rebuilt."""
+    the new state's row of d1ham_adi zero after a hop, and the first half kick of the next step would run force-free.
+    Every trajectory whose active state changed in the step and whose force row is still empty is handed back to the
+    model once, at the same geometry, with params["force_refresh"] = {trajectory: new state} - the model returns the
+    forces (the drivers run one force calculation for that state) - only the returned d1ham_adi is ingested and the
+    engine's forces are rebuilt. A relabel at a crossing changes the state before the second half kick of the step,
+    so compute_dynamics fills its row itself (refresh_relabel_forces) - that row is not empty here and is left
+    alone, as is every row a model fills for all states."""
     states = list(dyn_var.act_states)
-    hopped = {itraj: states[itraj] for itraj in range(len(states)) if states[itraj] != states_before[itraj]}
+    f = dyn_var.get_forces()
+    hopped = {itraj: states[itraj] for itraj in range(len(states))
+              if states[itraj] != states_before[itraj] and all(f.get(idof, itraj) == 0.0 for idof in range(f.num_of_rows))}
     if not hopped:
         return
     model_params["act_state"] = {itraj: states[itraj] for itraj in range(len(states))}
@@ -1140,7 +1144,9 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
               force_source "active_state"), whose new state's row is zero then and whose next half kick would
               otherwise run force-free. The model receives
               params["force_refresh"] = {trajectory: new state} and returns the forces, only its d1ham_adi is
-              ingested. Needs force_method 1, rep_sh 1 and isNBRA 0:
+              ingested. A relabel changes the state before the second half kick of its step, so compute_dynamics
+              calls the model back inside the step for it - a hop is served right after the step. Needs
+              force_method 1, rep_sh 1 and isNBRA 0:
 
               - 0: No [default]
               - 1: Yes
