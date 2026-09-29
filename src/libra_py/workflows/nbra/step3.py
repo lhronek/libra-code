@@ -3330,26 +3330,26 @@ def _window_matrix(params, name, frame, active_space, frame_cols=None):
     return np.array(M[rows, :][:, cols]).real
 
 
-def _follow_orbitals(params, active_space, start_time, finish_time):
+def _follow_orbitals(params, start_time, finish_time):
     """The Kohn-Sham orbitals of the stored window followed by identity through St_ks from start_time to
     finish_time - 1, every spin block by itself (active_space_selection 'identity'): within an interval the orbitals
     of the later frame are assigned to those of the earlier one as the SD states are reordered -
     active_space_selection_algo 1 the Sato search of get_reordering, 2 the Munkres-Kuhn assignment on |St|^2
     exp(-(alpha dE)^2) with the orbital energies of the earlier frame (the cost of make_cost_mat,
-    active_space_selection_alpha the width). Returns {frame: perm}, the label
-    permutation of every frame - position r of the frame's window matrices holds the orbital that stands at position
-    perm[r] of the stored window, the identity at start_time - and the record of the following. Nothing is refused
-    here: the SD states built from the followed orbitals are checked as labeled (state_reordering_min_overlap). The
-    record says how the orbitals themselves went - an orbital continuing with less than 0.5 while the window carries
-    it (sqrt(sum_j |St_rj|^2) >= 0.5) is an unresolved crossing, one the window carries less than 0.5 of left the
-    window through its edge."""
+    active_space_selection_alpha the width). Returns {frame: perm}, the label permutation of every frame - position r
+    of the frame's window matrices holds the orbital that stands at position perm[r] of the stored window, the
+    identity at start_time - and the record of the window: the frames at which the labels changed, the count of
+    frames off the energy order, the smallest continuity, the orbitals that left the window (edge_departures:
+    [frame, label, kept, carried by the window] - the window carries less than 0.5 of the orbital) and the
+    unresolved crossings ([frame, label]: an orbital continuing with less than 0.5 while the window carries it).
+    Nothing is refused here: the SD states built from the followed orbitals are checked as labeled
+    (state_reordering_min_overlap), _selection_record reads the record against the active space."""
     res_dir, n = params['path_to_npz_files'], params['data_dim'] // 2
     reordering, alpha = params['active_space_selection_algo'], params['active_space_selection_alpha']
     blocks = [np.arange(n), np.arange(n, 2 * n)]
-    active = np.asarray(active_space)
     perm = np.arange(2 * n)
     perms = {start_time: perm.tolist()}
-    tracked, reordered, edge_frames, unresolved, unresolved_active, edges = {}, [], [], [], [], []
+    reordered, unresolved, edges = [], [], []
     min_continuity = 1.0
     for k in range(start_time, finish_time - 1):
         St = np.abs(np.asarray(sp.load_npz(F'{res_dir}/St_ks_{k}.npz').todense()).real)
@@ -3363,37 +3363,86 @@ def _follow_orbitals(params, active_space, start_time, finish_time):
         for r in np.where(d < 0.5)[0]:
             if inside[r] < 0.5:
                 edges.append([k + 1, int(r), round(float(d[r]), 4), round(float(inside[r]), 4)])
-                continue
-            if (k + 1) not in unresolved:
-                unresolved.append(k + 1)
-            if r in active and (k + 1) not in unresolved_active:
-                unresolved_active.append(k + 1)
+            else:
+                unresolved.append([k + 1, int(r)])
         if np.any(new != perm):
             reordered.append(k + 1)
-        if sorted(new[active].tolist()) != sorted(perm[active].tolist()):
-            edge_frames.append(k + 1)
-        if np.any(new[active] != active):
-            tracked[k + 1] = new[active].tolist()
         perm = new
         perms[k + 1] = perm.tolist()
     identity = list(range(2 * n))
-    record = {"active_space_selection": "identity", "active_space_selection_algo": int(reordering),
-              "active_space_selection_alpha": float(alpha), "reordered_frames": reordered,
-              "frames_off_energy_order": sum(p != identity for p in perms.values()),
-              "active_space_edge_frames": edge_frames, "tracked_orbitals": tracked,
-              "min_continuity": float(min_continuity), "unresolved_frames": unresolved,
-              "active_space_unresolved_frames": unresolved_active, "edge_departures": edges,
-              "note": "the window orbitals followed by identity, the SD basis of every frame built from the orbitals "
-                      "that stood in the active space at the starting frame - reordered_frames: the frames at which "
-                      "the window labels changed - active_space_edge_frames: the frames at which an orbital of the "
-                      "active space exchanged its position with one outside it - tracked_orbitals: the window "
-                      "positions (0-based in the stored window, alpha then beta) of the active-space orbitals in the "
-                      "frames they stand off their energy positions - unresolved_frames: an orbital continuing with "
-                      "less than 0.5 while the window carries it (active_space_unresolved_frames: one of the active "
-                      "space) - edge_departures: [frame, orbital, kept, carried by the window] of the orbitals that "
-                      "left the window through its edge - nothing is refused here, the SD states built from the "
-                      "followed orbitals are checked as labeled"}
-    return perms, record
+    window = {"reordered_frames": reordered, "frames_off_energy_order": sum(p != identity for p in perms.values()),
+              "min_continuity": float(min_continuity), "edge_departures": edges, "unresolved": unresolved}
+    return perms, window
+
+
+def _selection_record(params, perms, window, active_space):
+    """The "active_space" block of sd_route_report.json under active_space_selection 'identity': the record of the
+    window (_follow_orbitals) read against the active space - the frames at which an orbital of the active space
+    exchanged its position with one outside it (active_space_edge_frames), the window positions of the active
+    orbitals in every frame off their energy positions (tracked_orbitals), the unresolved crossings of the window
+    and those of the active orbitals."""
+    active = np.asarray(active_space)
+    active_set = set(active.tolist())
+    frames = sorted(perms)
+    tracked, edge_frames = {}, []
+    for prev, k in zip(frames, frames[1:]):
+        p, q = np.asarray(perms[prev]), np.asarray(perms[k])
+        if sorted(q[active].tolist()) != sorted(p[active].tolist()):
+            edge_frames.append(k)
+        if np.any(q[active] != active):
+            tracked[k] = q[active].tolist()
+    unresolved = sorted({k for k, _ in window["unresolved"]})
+    unresolved_active = sorted({k for k, r in window["unresolved"] if r in active_set})
+    return {"active_space_selection": "identity",
+            "active_space_selection_algo": int(params['active_space_selection_algo']),
+            "active_space_selection_alpha": float(params['active_space_selection_alpha']),
+            "reordered_frames": window["reordered_frames"],
+            "frames_off_energy_order": window["frames_off_energy_order"],
+            "active_space_edge_frames": edge_frames, "tracked_orbitals": tracked,
+            "min_continuity": window["min_continuity"], "unresolved_frames": unresolved,
+            "active_space_unresolved_frames": unresolved_active, "edge_departures": window["edge_departures"],
+            "note": "the window orbitals followed by identity, the SD basis of every frame built from the orbitals "
+                    "that stood in the active space at the starting frame - reordered_frames: the frames at which "
+                    "the window labels changed - active_space_edge_frames: the frames at which an orbital of the "
+                    "active space exchanged its position with one outside it - tracked_orbitals: the window "
+                    "positions (0-based in the stored window, alpha then beta) of the active-space orbitals in the "
+                    "frames they stand off their energy positions - unresolved_frames: an orbital continuing with "
+                    "less than 0.5 while the window carries it (active_space_unresolved_frames: one of the active "
+                    "space) - edge_departures: [frame, orbital, kept, carried by the window] of the orbitals that "
+                    "left the window through its edge - nothing is refused here, the SD states built from the "
+                    "followed orbitals are checked as labeled"}
+
+
+def _relabel_configurations(ci_basis_states, spin_components, perms, start_time, lowest_orbital):
+    """The TD-DFT configurations of every frame with their orbitals named by the labels of active_space_selection
+    'identity' instead of the positions the electronic structure code prints: an orbital index o of frame k
+    (1-based, the stored window starting at lowest_orbital) stands at window position o - lowest_orbital, which the
+    frame's permutation assigns to the orbital of one label - that label, 1-based again, names the orbital in the
+    configuration. Both spins share the spatial orbitals (a closed-shell reference). Returns the relabeled
+    configurations, [frame][state][k] = [occupied, virtual], and the union basis of the labeled configurations with
+    their spins in the order of first appearance (as get_step2_mb_sp_properties builds it over the positions)."""
+    n = len(perms[start_time]) // 2
+    relabeled, unique, seen = [], [], set()
+    for step, states in enumerate(ci_basis_states):
+        label_of_position = np.argsort(np.asarray(perms[start_time + step][:n]))
+        frame = []
+        for i, configurations in enumerate(states):
+            confs = []
+            for k, conf in enumerate(configurations):
+                positions = [int(o) - lowest_orbital for o in conf]
+                if min(positions) < 0 or max(positions) >= n:
+                    raise ValueError(F"the TD-DFT configuration {list(conf)} of frame {start_time + step} names an "
+                                     F"orbital outside the stored window [{lowest_orbital}, {lowest_orbital + n - 1}] "
+                                     F"- widen lowest_orbital / highest_orbital in step 2")
+                labeled = [int(label_of_position[p]) + lowest_orbital for p in positions]
+                confs.append(labeled)
+                key = step3_many_body._conf_key([labeled, spin_components[step][i][k]])
+                if key not in seen:
+                    seen.add(key)
+                    unique.append([labeled, spin_components[step][i][k]])
+            frame.append(confs)
+        relabeled.append(frame)
+    return relabeled, unique
 
 
 def _write_diabatization_records(res_dir, kind, dia_index, pops_list, hole_list, energy_list, start_time,
@@ -3980,7 +4029,9 @@ def run_step3_sd_nacs_libint(params):
                 frame off their energy positions (tracked_orbitals, 0-based in the stored window, alpha then beta),
                 min_continuity, unresolved_frames (an orbital continuing with less than 0.5 inside the window,
                 active_space_unresolved_frames those of the active space) and edge_departures (an orbital that left
-                the window). Needs the single-particle basis (is_many_body False).
+                the window). With is_many_body the TD-DFT configurations of every frame are renamed from the orbital
+                positions the log files print to the labels before the union basis and the T matrices are built, so
+                the CI states are expanded in the followed determinants.
             * **params['active_space_selection_algo']** (int): the assignment that follows the orbitals under
                 'identity', with the values of do_state_reordering: 2 [default] Munkres-Kuhn (libra_py.hungarian on
                 |St_ks|^2 exp(-(alpha dE)^2), the cost of the KS route's reordering), 1 Sato (get_reordering).
@@ -4086,10 +4137,6 @@ def run_step3_sd_nacs_libint(params):
                          F"(Munkres-Kuhn) are supported")
     if not (np.isreal(orb_alpha) and orb_alpha >= 0.0):
         raise ValueError(F"active_space_selection_alpha = {orb_alpha!r} - a non-negative width in 1/Hartree is needed")
-    if selection == 'identity' and params['is_many_body']:
-        raise ValueError("active_space_selection 'identity' needs the single-particle SD basis (is_many_body False) - "
-                         "the TD-DFT coefficients of the many-body basis name the orbitals by their energy positions "
-                         "at every frame")
     res_dir_1 = params['path_to_npz_files']
     res_dir_2 = params['path_to_save_sd_Hvibs']
 
@@ -4138,6 +4185,12 @@ def run_step3_sd_nacs_libint(params):
         json.dump({'im_file_contains': 'Im(Hvib) = -d', 'isUKS': int(params.get('isUKS', 0)),
                    'sd_charge': int(params.get('sd_charge', 0))}, f)
 
+    # the active space by identity: the window orbitals followed between the frames before any basis is built
+    if selection == 'identity':
+        orbital_perms, orbital_window = _follow_orbitals(params, start_time, finish_time)
+    else:
+        orbital_perms, orbital_window = None, None
+
     if params['is_many_body']:
         params['isnap'] = params['start_time']
         params['fsnap'] = params['finish_time']
@@ -4162,6 +4215,13 @@ def run_step3_sd_nacs_libint(params):
 
         # And their spin-components (alpha and beta)
         spin_components = res[4]
+
+        # the configurations name the orbital positions of their frame - under the identity selection the labels of
+        # the followed orbitals name them, and the union basis is the union over the labels
+        if selection == 'identity':
+            ci_basis_states, sd_unique_basis = _relabel_configurations(ci_basis_states, spin_components,
+                                                                       orbital_perms, start_time,
+                                                                       int(params['lowest_orbital']))
 
         # Now we need to generate the active space and KS HOMO index in that
         # active space for use in reading the npz files
@@ -4327,10 +4387,11 @@ def run_step3_sd_nacs_libint(params):
 
     print('Flag ks_active_space:', ks_active_space)
 
-    # the active space by identity: the window orbitals followed between the frames, their label permutations relabel
-    # every window matrix the SD route cuts the active space out of (E_ks, S_ks, St_ks and the fragment operators)
+    # the label permutations relabel every window matrix the SD route cuts the active space out of (E_ks, S_ks, St_ks
+    # and the fragment operators)
     if selection == 'identity':
-        params['orbital_perms'], selection_record = _follow_orbitals(params, ks_active_space, start_time, finish_time)
+        params['orbital_perms'] = orbital_perms
+        selection_record = _selection_record(params, orbital_perms, orbital_window, ks_active_space)
         print(F"active space by identity: {len(selection_record['reordered_frames'])} reordered frames of the window, "
               F"the active space off its energy positions in {len(selection_record['tracked_orbitals'])} frames and "
               F"across its edge at {len(selection_record['active_space_edge_frames'])}, continuity min "
