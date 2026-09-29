@@ -5644,15 +5644,19 @@ def _cp2k_force_refresh(params, itraj, coordinates, nat, nstates):
     """The hand-over of the engine's call-back after a hop (hop_force_refresh: params["force_refresh"] = {trajectory:
     new active state}): one CP2K force run for the new state at the same geometry, its force put into the rows handed
     over at the regular call of this step, and nothing else - the caches of the time overlaps stay as the regular
-    call left them. A trajectory absent from the call-back, and a force_source whose rows are all filled already
-    (gs, none, all_states, the GS-SD mode), hand back an empty object."""
+    call left them. A trajectory absent from the call-back hands back an empty object - a force_source whose rows
+    were all filled at the regular call (gs, none, all_states, the GS-SD mode) hands the rows back as they are, as
+    the DFTB+ driver does."""
     obj = tmp()
     refresh = params["force_refresh"]
     force_source = params.get("force_source", "active_state")
-    if itraj not in refresh or force_source != "active_state" or not params.get("time_dependent", True):
+    if itraj not in refresh:
         return obj
     if itraj not in params["force_rows"] or itraj not in params["E_adi_last"]:
         raise RuntimeError(F"force_refresh for trajectory {itraj} before its regular call of the step")
+    if force_source != "active_state" or not params.get("time_dependent", True):
+        fill_diagonal_forces(obj, params["force_rows"][itraj])
+        return obj
     new_state = int(refresh[itraj])
     wd = F"{params.get('working_directory_prefix', 'wd')}_itraj{itraj}"
     run_params = _cp2k_run_params(params, False, wd, new_state, force_source, nstates - 1)

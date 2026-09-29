@@ -329,11 +329,21 @@ def refresh_hop_forces(dyn_var, ham, prms, compute_model, model_params, states_b
     forces (the drivers run one force calculation for that state) - only the returned d1ham_adi is ingested and the
     engine's forces are rebuilt. A relabel at a crossing changes the state before the second half kick of the step,
     so compute_dynamics fills its row itself (refresh_relabel_forces) - that row is not empty here and is left
-    alone, as is every row a model fills for all states."""
+    alone, as is every row a model fills for all states (the drivers under force_source all_states, gs and none put
+    a force on every diagonal) and a model that hands over no force at all (nothing to refresh) - the condition of
+    the engine's guard: the new row empty while the old state's row carries a force."""
     states = list(dyn_var.act_states)
     f = dyn_var.get_forces()
+    ndof = f.num_of_rows
+
+    def carries(itraj, state):
+        return any(ham.get_d1ham_adi(idof, Py2Cpp_int([0, itraj])).get(state, state).real != 0.0
+                   for idof in range(ndof))
+
     hopped = {itraj: states[itraj] for itraj in range(len(states))
-              if states[itraj] != states_before[itraj] and all(f.get(idof, itraj) == 0.0 for idof in range(f.num_of_rows))}
+              if states[itraj] != states_before[itraj]
+              and all(f.get(idof, itraj) == 0.0 for idof in range(ndof))
+              and carries(itraj, states_before[itraj])}
     if not hopped:
         return
     model_params["act_state"] = {itraj: states[itraj] for itraj in range(len(states))}
