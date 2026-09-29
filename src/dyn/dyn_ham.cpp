@@ -544,6 +544,14 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
             }
           }
           st = st * perm;
+        } else if (!relabel_gauge || prms.state_tracking_algo == -1 || prms.state_tracking_algo == 0 ||
+                   prms.state_tracking_algo == 4 || prms.state_tracking_algo == 5 ||
+                   prms.state_tracking_algo == 6) {
+          ; // the raw gauge, the rotation projectors (-1, 5, 6), no reordering (0) and the force-based
+            // tracking (4) take the new states as stored
+        } else {
+          std::cout<<"Error in update_Hamiltonian_variables(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: -1, 0, 1, 2, 4, 5, 6, 21)\n";
+          std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
         vector<double> flip(nadi, 1.0);
         if (!rotation_proj) {
