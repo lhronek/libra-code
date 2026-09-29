@@ -55,11 +55,11 @@ def _identity_deviation(S):
 def validate_overlap_matrix(S, label="overlap", require_identity=None,
                             sym_tol=1e-8):
     """A valid overlap (Gram) matrix is finite, Hermitian and has a strictly
-    positive diagonal; anything else is corrupted data, not physics, and
+    positive diagonal - anything else is corrupted data, not physics, and
     no orthonormalization can repair it. With require_identity set, the
     matrix must additionally stay within that deviation from identity -
     the invariant of freshly produced MO self-overlaps (production-time
-    check; loaders keep the softer warning so legacy archives remain
+    check - loaders keep the softer warning so legacy archives remain
     repairable). Returns the deviation from identity."""
     S = np.asarray(S)
     if not np.all(np.isfinite(S)):
@@ -195,7 +195,7 @@ def get_Lowdin_scipy(S):
                          F"eigenvalue ({w.min():.3e}) - not a valid Gram matrix; "
                          "corrupted data")
     # one eigendecomposition serves the guard AND the inverse square root
-    # (exact for Hermitian input; the general Schur route costs ~10x)
+    # (exact for Hermitian input - the general Schur route costs ~10x)
     return (V * (w ** -0.5)) @ V.conj().T
 
 

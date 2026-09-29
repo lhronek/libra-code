@@ -793,7 +793,7 @@ def mopac_compute_adi(q, params, full_id):
                    "orbital_space":params.get("orbital_space", None)}
     info, MO_curr, data_curr = read_mopac_orbital_info(read_params)
 
-    # the reader windows the MOs to actual_orbital_space; the CI-overlap
+    # the reader windows the MOs to actual_orbital_space - the CI-overlap
     # range parameters below must describe the SAME window - full-space
     # counts fail the st_mo shape validation for a non-full window
     ci_space = info["actual_orbital_space"]

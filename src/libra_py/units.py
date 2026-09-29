@@ -23,7 +23,7 @@
 # Length units
 Angst = 1.8897261246257702                         # in Bohr (1.0/0.529177210903, CODATA 2018)
 
-# Energy units (CODATA 2018 primaries; derived values are expressions
+# Energy units (CODATA 2018 primaries - derived values are expressions
 # of the primaries so they cannot drift on the next update)
 inv_cm2ev = 1.0 / 8065.543937                      # 1 eV = 8065.543937 cm^-1 (CODATA 2018)
 ev2Ha = 0.03674932217565499                        # (1.0/27.211386245988, CODATA 2018)

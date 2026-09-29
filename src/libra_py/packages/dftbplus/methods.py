@@ -179,7 +179,7 @@ def get_dftb_matrices(filename, act_sp1=None, act_sp2=None, correction=0, tol=0.
         # when some of the matrix elements printed out are nonsense.
         B = A[5 + ikpt * norbs: 5 + (1 + ikpt) * norbs]
 
-        # lines are built first; the scratch file opens only for the
+        # lines are built first - the scratch file opens only for the
         # final write, so the parse raises leak no open handle
         out_lines = []
         x = MATRIX(norbs, norbs)
@@ -2173,7 +2173,7 @@ def make_dftb_input(params, ground_state=True, working_directory="."):
         If False, generate input for excited-state TD-DFTB (Casida).
 
         Note:
-        ``StateOfInterest`` is written only when supplied in the params;
+        ``StateOfInterest`` is written only when supplied in the params -
         DFTB+ requires it nonzero for excited-state forces (both 24.1
         and 25.1), and the driver threads the active state into it.
 
@@ -2247,7 +2247,7 @@ def make_dftb_input(params, ground_state=True, working_directory="."):
     NrOfExcitations = params.get("NrOfExcitations", 5)
     # StateOfInterest is optional in DFTB+ (default 0) and REQUIRED nonzero
     # for excited-state forces ("Excited forces only available for
-    # StateOfInterest non zero" - both 24.1 and 25.1); the line is written
+    # StateOfInterest non zero" - both 24.1 and 25.1) - the line is written
     # only when the caller carries it in dftb_run_params, so forces-free
     # templates stay free of it
     soi_line = ""
@@ -2273,7 +2273,7 @@ def make_dftb_input(params, ground_state=True, working_directory="."):
     PrintForces = params.get("PrintForces", "Yes")
 
     # verbatim extra lines for the Hamiltonian block (e.g. SpinPolarisation
-    # and SpinConstants for open-shell runs); a missing final newline is
+    # and SpinConstants for open-shell runs) - a missing final newline is
     # appended - without it the closing brace or an appended line lands on
     # the last extras line and DFTB+ rejects the input
     HamiltonianExtras = params.get("HamiltonianExtras", "")
@@ -2589,7 +2589,7 @@ def read_dftb_orbital_info(params_):
             Number of occupied orbitals.
 
         nelec : int
-            Number of electrons (closed-shell: 2 nocc; spin-polarized:
+            Number of electrons (closed-shell: 2 nocc - spin-polarized:
             nocc_alpha + nocc_beta).
 
         nao : int
@@ -2709,7 +2709,7 @@ def read_dftb_orbital_info(params_):
 
     active_space_indx = [i - 1 for i in actual_orbital_space]
 
-    # Extract active-space MOs; np.take avoids axis reordering due to
+    # Extract active-space MOs - np.take avoids axis reordering due to
     # advanced indexing. Spin-polarized: an (up, down) pair over the SAME
     # orbital window
     if spin_polarized:
@@ -2729,7 +2729,7 @@ def read_dftb_orbital_info(params_):
 
     # Configuration list from SPX lookup (convert to 1-based indexing)
     if spin_polarized:
-        # keep the spin channel (0 = up, 1 = down; per-spin orbital indices)
+        # keep the spin channel (0 = up, 1 = down, per-spin orbital indices)
         all_confs = [[v[0] + 1, v[1] + 1, v[2]] for v in rpa_lookup]
     else:
         all_confs = [[v[0] + 1, v[1] + 1] for v in rpa_lookup]
@@ -3023,7 +3023,7 @@ def dftb_compute_adi(q, params, full_id):
             keyword and its meaning).
         dia_basis : str, default="none"
             "none" or "sd". With "sd" the fixed single-particle SD basis of
-            the FULL active orbital window (o-major enumeration; requires a
+            the FULL active orbital window (o-major enumeration - requires a
             contiguous orbital_space) is declared as the DIABATIC basis:
             basis_transform becomes the (1 + n_SD, nstates) transition-vector
             matrix and ovlp_dia the identity, enabling engine-side diabatic
@@ -3068,7 +3068,7 @@ def dftb_compute_adi(q, params, full_id):
 
         basis_transform : CMATRIX
             Basis transformation matrix: identity (nstates, nstates) by
-            default; with dia_basis="sd" the (1 + n_SD, nstates) SD -> CI
+            default - with dia_basis="sd" the (1 + n_SD, nstates) SD -> CI
             transition matrix (plus obj.ovlp_dia = identity).
 
         d1ham_adi : CMATRIXList
@@ -3160,7 +3160,7 @@ def dftb_compute_adi(q, params, full_id):
 
     # ================= Run DFTB+ =================
     dftb_params = copy.deepcopy(dftb_run_params)
-    # excited-state forces must follow the trajectory's active state; the
+    # excited-state forces must follow the trajectory's active state - the
     # excited run needs a nonzero state (DFTB+ aborts on 0 - both 24.1 and
     # 25.1), and the keyword is threaded only when the caller opted in by
     # supplying it
@@ -3311,7 +3311,7 @@ def dftb_compute_adi(q, params, full_id):
 
     # the MO matrices above are windowed to actual_orbital_space, so the
     # CI-overlap range parameters must describe the SAME window - full-space
-    # counts fail the st_mo shape validation for any non-full orbital_space;
+    # counts fail the st_mo shape validation for any non-full orbital_space -
     # a window starting above orbital 1 freezes the core out of ci.overlap
     ci_space = info["actual_orbital_space"]
     if list(ci_space) != list(range(ci_space[0], ci_space[0] + len(ci_space))):
@@ -3355,7 +3355,7 @@ def dftb_compute_adi(q, params, full_id):
 
     # chain a smooth state gauge on the emitted data: raw Davidson signs are
     # step-arbitrary, and the in-place amps flips propagate into the cached
-    # data_prev, carrying the alignment forward; with the diabatic transform
+    # data_prev, carrying the alignment forward - with the diabatic transform
     # requested, its columns follow through the T argument
     ci_adapter = {"configs": [np.asarray(c).tolist() for c in data_curr[1]],
                   "amps": data_curr[2]}
@@ -3373,7 +3373,7 @@ def dftb_compute_adi(q, params, full_id):
                              F"(the SD index arithmetic assumes it) - got {list(space)[:6]}...")
         lowest = int(space[0])
         homo_w = info["nocc"] - lowest + 1
-        # window defaults to the FULL active space; the optional narrowing
+        # window defaults to the FULL active space - the optional narrowing
         # matters for the ENGINE side - it allocates dense diabatic arrays
         # scaling as ndof x ndia^2, so a frontier window keeps rep:0 dynamics
         # affordable on larger molecules
@@ -3383,7 +3383,7 @@ def dftb_compute_adi(q, params, full_id):
             # per-channel windows around each HOMO (the UKS basis of
             # make_sd_basis), taking the same per-channel keywords as the
             # CP2K driver (num_occ_alpha/... default through the shared
-            # counts; unspecified betas span their full window)
+            # counts - unspecified betas span their full window)
             homo_b_w = info["nocc_beta"] - lowest + 1
             noa = int(params.get("num_occ_alpha", num_occ))
             nua = int(params.get("num_unocc_alpha", num_unocc))
@@ -3424,7 +3424,7 @@ def dftb_compute_adi(q, params, full_id):
     if dia_basis == "sd":
         # the SD basis is the DIABATIC basis: U[dia, adi] = <SD_i|state_j>,
         # rows in the fixed window enumeration (0 = the reference determinant,
-        # k = sd_unique[k-1], o-major); identity metric for the orthonormal
+        # k = sd_unique[k-1], o-major) - identity metric for the orthonormal
         # determinants. The engine's elec_params must carry ndia = 1 + n_SD
         # and nadi = nstates. Full-RPA X+Y columns are orthonormal only up to
         # the Y-component (near-TDA for gapped systems) - the engine prints
@@ -3470,7 +3470,7 @@ def dftb_compute_adi(q, params, full_id):
         # no StateCouplings-driven FRC.DAT (e.g. spin-polarized runs - NACVs
         # are closed-shell upstream): the tag files carry the ground-state
         # forces and the SOI-state forces, so only those two diagonals are
-        # known; the tag arrays are Fortran-shaped (3, natoms)
+        # known - the tag arrays are Fortran-shaped (3, natoms)
         f_gs = np.asarray(results_gs["forces"]) if "forces" in results_gs else None
         # the excited run's 'forces' tag already carries the SOI-state TOTAL
         # forces ('exc_forces' holds only the excitation contribution) -

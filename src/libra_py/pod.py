@@ -140,7 +140,7 @@ def _orthonormalize_blocks(c_raw, S_m, cols, orthogonalization, kept_block):
     """
     The whole-set counterpart of the pairwise orthogonalization, for the fragment operators (a
     projector partition needs one orthonormal set): Lowdin - c (c^T S c)^-1/2 over all fragment
-    states at once; Gram-Schmidt - the kept block untouched, every other block (in index order)
+    states at once - Gram-Schmidt - the kept block untouched, every other block (in index order)
     projected orthogonal to the blocks before it and re-orthonormalized within itself by its own
     Lowdin step, so its states stay as close to the fragment eigenstates as the projection allows.
     """
@@ -182,7 +182,7 @@ def pod2_block_states(H_list, S, ao_atom, fragment_atom_lists, orthogonalization
     is, POD2L and POD2GS first orthogonalize every donor-acceptor pair of states, symmetrically (Lowdin) or
     keeping one fragment's state (Gram-Schmidt). The site energies are the fragment eigenvalues. The
     fragment operators of POD2L and POD2GS come from the same orthogonalization applied to the whole set of
-    fragment states (coeffs); POD2 keeps the non-orthogonal states there, which form no projector
+    fragment states (coeffs) - POD2 keeps the non-orthogonal states there, which form no projector
     partition. The raw local states stay available (coeffs_raw).
 
     Args:

@@ -687,7 +687,7 @@ def compute_model_nbra_ann(q, params, full_id):
             cnt = cnt + 1
 
     # ============ Vibronic Hamiltonian ===========
-    # the ANN output is interpreted as the NAC itself (+d); training targets
+    # the ANN output is interpreted as the NAC itself (+d) - training targets
     # taken from step-3 _im files must be NEGATED first - under the canonical
     # convention those files store Im(Hvib) = -d (see hvib_convention.json)
     hvib_adi = CMATRIX(nadi, nadi)

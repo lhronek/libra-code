@@ -45,7 +45,7 @@ _MOLDEN_CART_TO_LEX = {
 
 def molden_convention(lines, l_vals):
     """Derive the per-l purity map of a molden file and cross-check the basis
-    size. Molden defaults to CARTESIAN d/f/g; the [5D]/[5D7F]/[5D10F]/[7F]/
+    size. Molden defaults to CARTESIAN d/f/g - the [5D]/[5D7F]/[5D10F]/[7F]/
     [9G] markers switch per l, and a markerless cartesian file carries no
     marker at all - the [MO] coefficient indices are the ground truth.
 
@@ -157,7 +157,7 @@ def molden_file_to_libint_shell(molden_filename: str, is_spherical: bool, is_per
                            This is used later to resort the eigenvectors in molden file.
 
     """
-    # stat-keyed cache: the per-step parsers share one read; do not
+    # stat-keyed cache: the per-step parsers share one read - do not
     # mutate the returned list
     lines = data_read.read_lines_cached(molden_filename)
 
@@ -455,7 +455,7 @@ def resort_eigenvectors(l_vals, purity=None):
 
         purity (dict): Optional {l: bool} spherical-purity map of the file
                        (molden_convention). None keeps the historical
-                       all-spherical behavior; cartesian shells resort from
+                       all-spherical behavior - cartesian shells resort from
                        the molden cartesian order to the lexicographic
                        canonical order.
 

@@ -1957,7 +1957,7 @@ def read_all(params):
 
 
 def _orthogonalized_checked(coeff, tag):
-    """Orthogonalize the first orbital block and verify C^H C = I; the four
+    """Orthogonalize the first orbital block and verify C^H C = I - the four
     read_wfc_grid sites (curr/next, dia/adi) share this so none is left
     unchecked."""
     coeff[0] = QE_utils.orthogonalize_orbitals(coeff[0])

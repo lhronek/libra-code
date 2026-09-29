@@ -19,7 +19,7 @@
  output through the same permute_cols/permutation2cmatrix path, whose defining
  property is that X.permute_cols(res) restores a dominant diagonal. For an
  input built as X = U.H() * permute(U, q), that operational answer is
- inverse(q) - NOT q; the two coincide only for involutions. The pre-2024 form
+ inverse(q) - NOT q - the two coincide only for involutions. The pre-2024 form
  of this suite asserted q (making the correct Munkres_Kuhn look broken on
  every non-involution) and handed get_reordering the TRANSPOSED input
  (permute(U, q).H() * U), which no consumer produces - masking that
@@ -214,7 +214,7 @@ def test_Munkres_Kunh(mtx, perm):
 
 
 # get_reordering is a GREEDY column chase, exact for permutation-structured
-# inputs (trivial crossings - its design case: a, b, c incl. the 3-cycles);
+# inputs (trivial crossings - its design case: a, b, c incl. the 3-cycles) -
 # on the strongly mixed matrices (e..h1) it may legitimately differ from the
 # optimal-assignment answer that Munkres_Kuhn/hungarian_algorithm return -
 # use those for mixed states.

@@ -455,7 +455,7 @@ class DynControlParams:
     dephasing_informed: int = 0
 
     #: SCOTSH gap correlation time - controls the running-average of the energy-gap
-    #: fluctuations in the decoherence-rate calculation; a multiple of dt
+    #: fluctuations in the decoherence-rate calculation - a multiple of dt
     #: [units: a.u. of time, default: 41.0 a.u. = 1 fs]
     gap_correlation_time: float = 41.0
 
@@ -646,7 +646,7 @@ class DynControlParams:
     compute_dm_dia: int = -1
 
     #: OpenMP threads for the per-trajectory loops of the TSH machinery (deterministic work only -
-    #: results identical for any value; compose with process-level parallelism) [ default: 1 ]
+    #: results identical for any value - compose with process-level parallelism) [ default: 1 ]
     omp_num_threads: int = 1
 
     #: Electronic TDSE integrator selector

@@ -62,7 +62,7 @@ def _with_blas_cap(param_pos, param_name="_dyn_params"):
     density-matrix and basis-transform setup) run before the propagation
     loop's own cap and otherwise engage the pools at full machine width.
     param_pos/param_name locate the dyn_params dict in the wrapped
-    signature (positional or keyword call); blas_num_threads: default 1,
+    signature (positional or keyword call) - blas_num_threads: default 1,
     explicit 0 = leave the pools alone."""
     def deco(fn):
         @functools.wraps(fn)
@@ -397,7 +397,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - 2: diabatic representation, density matrix (e.g. Liouville's picture)
                 - 3: adiabatic representation, density matrix (e.g. Liouville's picture)
                 - 4: MMST adiabatic representation, wfc - reserved, not implemented (rejected by
-                     sanity_check; use rep_tdse 1 with force_method 2 and sqc_gamma)
+                     sanity_check - use rep_tdse 1 with force_method 2 and sqc_gamma)
 
             * **dyn_params["ham_update_method"]** ( int ): How to update Hamiltonian and which type of
                 Hamiltonian to update
@@ -413,15 +413,15 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - 1: diabatic->adiabatic according to internal diagonalization [ default ]
                 - 2: diabatic->adiabatic according to internally stored basis transformation
                   matrix [ requires ham_update_method = 1 and a model-supplied
-                  obj.basis_transform; the model's smooth gauge replaces the internal
+                  obj.basis_transform - the model's smooth gauge replaces the internal
                   diagonalization - no eigenvector branch switches ]
                 - 3: adiabatic->diabatic according to internally stored basis transformation
-                  matrix [ requires ham_update_method = 2; materializes ham_dia =
+                  matrix [ requires ham_update_method = 2 - materializes ham_dia =
                   S U ham_adi U^H S every step - the H_SD readout and the diabatic
                   propagation/hopping unlock ]
                 - 4: adiabatic->diabatic according to local diabatization method
                   [ requires ham_update_method = 2, ndia = nadi and supplied
-                  time-overlaps; ham_dia = V^H ham_adi V in the cumulative
+                  time-overlaps - ham_dia = V^H ham_adi V in the cumulative
                   trajectory frame - smooth by construction, the materialized
                   local-diabatization picture. The frame OWNS the diabatic slot:
                   the saved basis_transform is V^H (the frame, not a model
@@ -448,12 +448,12 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - 2: adiabatic, Eq. 3 of the Belyaev-Lebedev paper, crossing point is determined
                      by the sign change of the NAC
                 - 3: diabatic, generalized-linear LZ - Eq. (3) of Belyaev, Lasser, Trigila
-                     (JCP 140, 224108 (2014)) at the gap minimum of the linearized passage;
+                     (JCP 140, 224108 (2014)) at the gap minimum of the linearized passage -
                      needs a populated ham_dia like option 0, but detects the minimum from
                      the two-step segment (also catches coupling-sweep passages)
                 - 4: adiabatic, true Belyaev-Lebedev - Eq. (4) of the same paper: 3-point
                      local minimum of the adiabatic gap with parabolic extrapolation. Needs
-                     NO diabatic data and NO NACs; the first two steps (and the two after a
+                     NO diabatic data and NO NACs - the first two steps (and the two after a
                      restart) propose nothing while the energy history fills
 
 
@@ -479,7 +479,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 admitted when combined with enforce_state_following = 1,
                 momenta_rescaling_algo = 0 and ensemble = 0 (classical-path
                 on-the-fly NBRA - the forces are trajectory-invariant, one
-                column serves all trajectories); anything else needs
+                column serves all trajectories) - anything else needs
                 per-trajectory forces, which the single shared child
                 Hamiltonian cannot supply (rejected at the head of
                 update_Hamiltonian_variables)
@@ -545,7 +545,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - 2: update according to time-overlaps (only time-derivative NACs)
 
                 With isNBRA == 1 and ntraj > 1 option 1 is rejected - it rebuilds
-                couplings from per-trajectory momenta on the single shared child;
+                couplings from per-trajectory momenta on the single shared child -
                 use 0 (supplied couplings, the NBRA convention) or 2 (HST/NPI
                 from the shared time-overlap)
 
@@ -834,7 +834,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
 
                 With isNBRA == 1 and ntraj > 1 options 2 and 4 are rejected -
                 Schwartz 1 builds per-trajectory mean-field forces on the single
-                shared child; use 1 (EDC, the NBRA convention) or 0
+                shared child - use 1 (EDC, the NBRA convention) or 0
 
 
             * **dyn_params["schwartz_decoherence_inv_alpha"]** ( MATRIX(ndof, 1) ): a matrix of 1/alpha - the parameters
@@ -1059,7 +1059,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
             * **dyn_params["electronic_integrator"]** ( int ): the method for electronic TD-SE integration:
 
               rep_tdse = 0 (diabatic): 1** - with NBRA. The diabatic basis needs no reprojection (the coupling sits
-              in Hvib_dia itself), so the adiabatic variants that differ only by the T dressing coincide here; a
+              in Hvib_dia itself), so the adiabatic variants that differ only by the T dressing coincide here - a
               metric that moves within the step takes the Lowdin-frame form of every step (propagate_electronic_lowdin),
               an electronic substep its own share of that move
 
@@ -1434,8 +1434,8 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
     # observables, so an earlier resolution against a user dict without
     # properties_to_save would skip dm_dia and save them as silent zeros
     if dyn_params.get("compute_dm_dia", -1) == -1:
-        # Saved properties backed by dm_dia: D_dia/D_dia_raw directly;
-        # se_pop_dia, coherence_dia and mash_pop_dia via compute_average_dm(0);
+        # Saved properties backed by dm_dia: D_dia/D_dia_raw directly -
+        # se_pop_dia, coherence_dia and mash_pop_dia via compute_average_dm(0) -
         # sh_pop_adi_TR via compute_average_sh_pop_TR(1) - the transformed
         # populations read the OPPOSITE representation's density matrix
         dia_props = {"D_dia", "se_pop_dia", "coherence_dia",
@@ -1469,7 +1469,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
     time_overlap_method = dyn_params["time_overlap_method"]
     decoherence_algo = dyn_params["decoherence_algo"]
     # accept either NBRA spelling and sync both (the C++ layer reads
-    # isNBRA, the python layers is_nbra; isNBRA wins when both differ)
+    # isNBRA, the python layers is_nbra - isNBRA wins when both differ)
     is_nbra = _sync_nbra_flag(dyn_params)
     icond = dyn_params["icond"]    # Setting the initial geoemtry in the dynamics
     nfiles = dyn_params["nfiles"]  # The number of loaded Ham files
@@ -1509,7 +1509,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
     if _savers["txt2_saver"] is not None:
         _savers["txt2_saver"].save_data_txt(F"{prefix2}", properties_to_save, "w", 0)
 
-    # at the init call no interval has been propagated yet; timestep_st = icond
+    # at the init call no interval has been propagated yet - timestep_st = icond
     # is the upcoming interval's start (consumed only by the nac_update_method 2
     # init path, where it is the correct file)
     model_params.update({"timestep": icond, "timestep_st": icond})
@@ -1582,7 +1582,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
     # Hamiltonian: with ham_update_method==2 the generic_recipe-level init ran
     # against a not-yet-computed ham (U = 0), leaving ampl_dia/dm_dia zero -
     # the first save (which happens before the first step) would record them.
-    # The prev-dm snapshot (FSSH2/FSSH3/GFSH-orig; self-gated otherwise) must
+    # The prev-dm snapshot (FSSH2/FSSH3/GFSH-orig - self-gated otherwise) must
     # be taken from these refreshed matrices.
     dyn_var.update_amplitudes(dyn_params, ham)
     dyn_var.update_density_matrix(dyn_params, ham, 1)
@@ -1595,7 +1595,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
     # the init projector spans the PREVIOUS interval (the supplied
     # time-overlap at icond is <t_-1|t_0>) - under transform 4 the call
     # above accumulated it into the frame, anchoring V one interval
-    # early; re-anchor at t0 (the documented V(0) = I)
+    # early - re-anchor at t0 (the documented V(0) = I)
     if int(dyn_params.get("ham_transform_method", 1)) == 4:
         dyn_var.reset_ld_frame()
     update_forces(prms, dyn_var, ham)
@@ -1603,7 +1603,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
     # Do the propagation
     # Cap the BLAS pool inside the propagation loop (restored on exit): the
     # in-dynamics matrix products are too small for threaded BLAS - the pool
-    # handoff rivals the arithmetic. blas_num_threads: default 1; 0 = leave as is
+    # handoff rivals the arithmetic. blas_num_threads: default 1 - 0 = leave as is
     nbt = dyn_params.get("blas_num_threads", 1)
     with blas_thread_limit(1 if nbt is None else nbt):
         for i in range(nsteps):
@@ -1776,13 +1776,13 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
     if dyn_params.get("ham_update_method", 1) == 2:
         # adiabatic-native models supply forces and couplings in the
         # adiabatic representation only - the diabatic derivative tier
-        # (2 x nnucl x ndia^2 complex per level) would be dead weight;
+        # (2 x nnucl x ndia^2 complex per level) would be dead weight -
         # the value matrices stay fully allocated
         ham.init_all(0, 1)
         ham.init_adi_derivatives(1)
     else:
         # der_lvl 1: the TSH machinery reads values and first derivatives
-        # only; second-derivative arrays are allocated on demand by the
+        # only - second-derivative arrays are allocated on demand by the
         # model ingestion when a model supplies them
         ham.init_all(1, 1)
 
@@ -1810,7 +1810,7 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
         # rotates ham_adi into ham_dia every step (hvib_dia follows), which
         # legitimizes diabatic propagation and hopping for square AND
         # rectangular transformations (the projected dynamics is exact for
-        # amplitudes in range(U); a drifting SD frame adds the
+        # amplitudes in range(U) - a drifting SD frame adds the
         # quasi-diabatic model error - quantified in the dia-init stage-2
         # study). Diabatic forces would need dU/dR, which no driver
         # supplies

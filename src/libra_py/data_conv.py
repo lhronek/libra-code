@@ -503,7 +503,7 @@ def form_block_matrix(mat_a, mat_b, mat_c, mat_d):
 
     """
 
-    # rows [a | b] and [c | d], stacked - the documented layout; the earlier
+    # rows [a | b] and [c | d], stacked - the documented layout - the earlier
     # stacking built its transpose [[a, c], [b, d]], invisible for square
     # equal blocks and a shape error for the rectangular UKS off-diagonals
     return np.block([[np.asarray(mat_a), np.asarray(mat_b)],

@@ -424,19 +424,19 @@ def run_cp2k_libint_step2(params):
                              nprocs (integer): Number of processors (MPI ranks for CP2K, threads for libint).
 
                              omp_num_threads (integer): OMP threads per CP2K rank - exported to every CP2K
-                                                        subprocess; total CP2K load is nprocs x omp_num_threads
+                                                        subprocess - total CP2K load is nprocs x omp_num_threads
                                                         [default: 1].
 
                              ao_overlap_method (string): "cp2k" (default) computes the AO overlaps with a CP2K
                                                          OVERLAP_DELTAT run on the doubled geometry (one call per step
-                                                         yields both S and St; periodic cells are handled natively by
-                                                         the overlap template - no translational_vectors needed;
-                                                         requires overlap_template); "libint" computes them in-process
+                                                         yields both S and St - periodic cells are handled natively by
+                                                         the overlap template - no translational_vectors needed -
+                                                         requires overlap_template) - "libint" computes them in-process
                                                          with libint from the molden shells (no extra CP2K run).
 
                              mo_source (string): "wfn" (default) - read the MO coefficients, eigenvalues
                                                  and HOMO from the binary RESTART.wfn file (molden-free, binary
-                                                 precision; requires ao_overlap_method="cp2k"); or "molden" - the
+                                                 precision - requires ao_overlap_method="cp2k") - or "molden" - the
                                                  ASCII molden print (needs the &MO_MOLDEN print, precision capped
                                                  by the printed digits).
 
@@ -472,7 +472,8 @@ def run_cp2k_libint_step2(params):
                                                  donor-acceptor pairs of fragment states orthogonalized by Lowdin or by
                                                  Gram-Schmidt first). Every scheme saves {SCHEME}_hab_{step}.npz (block energies
                                                  E_b*, couplings V_b*, and for the pod2 family the raw couplings V_raw_* and the
-                                                 state overlaps S_*); "pod", "pod2l" and "pod2gs" also save the projectors
+                                                 state overlaps S_*) - "pod", "pod2l" and "pod2gs" also save the
+                                                 projectors
                                                  P_{scheme}{f}_ks_{step}.npz (step3 diabatization_scheme) - "pod2" cannot, its
                                                  states are not orthogonal across fragments [default: ["pod"]].
 
@@ -509,7 +510,7 @@ def run_cp2k_libint_step2(params):
                              cp2k_exe (string): The full path to CP2K executable.
 
                              mpi_executable (string): The mpi run executable for CP2K. Used only for
-                                                      nprocs > 1 (a single rank skips the launcher); for hybrid
+                                                      nprocs > 1 (a single rank skips the launcher) - for hybrid
                                                       MPI+OpenMP runs add binding flags here (e.g. "mpirun
                                                       --map-by slot:PE=4" or "--bind-to none") - Open MPI's
                                                       default bind-to-core pins each rank's OMP threads onto
@@ -582,7 +583,7 @@ def run_cp2k_libint_step2(params):
         'cp2k_data_dir': '',
         'omp_num_threads': 1,
         'use_emultipole': False,
-        # the multipole reference point (a.u.); moments about any other
+        # the multipole reference point (a.u.) - moments about any other
         # origin are exact binomial combinations of these plus S
         'emultipole_origin': [0.0, 0.0, 0.0],
         'emultipole_components': [
@@ -743,7 +744,7 @@ def run_cp2k_libint_step2(params):
         if ao_overlap_method == 'cp2k':
             # ---- CP2K-native route: one OVERLAP_DELTAT run on the doubled geometry per
             # step yields both the time-overlap (prev|curr block) and the current-step
-            # overlap; the overlap template carries the cell, so periodic systems need
+            # overlap - the overlap template carries the cell, so periodic systems need
             # no translational-vector summation ----
             t1 = time.time()
             print('Computing MO overlaps via a CP2K OVERLAP_DELTAT run...')
@@ -1003,7 +1004,7 @@ def run_cp2k_libint_step2(params):
             # the values for lowest_orbital and highest_orbital start from 1
             if isUKS:
                 if params['use_emultipole']:
-                    # per spin channel over every requested component; the 'S'
+                    # per spin channel over every requested component - the 'S'
                     # component writes the standard S_ks file name, so the
                     # emultipole route stays a superset of the plain one
                     for counter1 in range(len(emultipole_labels)):
@@ -1196,7 +1197,7 @@ def run_cp2k_libint_step2(params):
                 if params['use_emultipole']:
                     # per spin channel over every requested component: same-time
                     # matrices from the CURRENT MOs, time-cross matrices with the
-                    # previous step's channel as the bra; the 'S' component
+                    # previous step's channel as the bra - the 'S' component
                     # writes the standard S_ks/St_ks file names
                     for counter1 in range(len(emultipole_labels)):
                         A_alpha = CP2K_methods.mo_window_matrix(alpha_eigenvectors_2, AO_c_all[emultipole_index[counter1]], alpha_eigenvectors_2, lowest_orbital, highest_orbital)

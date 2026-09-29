@@ -15,15 +15,15 @@
        Meyer-Miller mapping: window sampling of initial amplitudes and window
        binning of saved amplitudes into renormalized populations. The engine
        does both natively (init_type 5/6 and compute_average_sqc_pop / the
-       sqc_pop_adi|dia savers); this module is the numpy reference and the
+       sqc_pop_adi|dia savers) - this module is the numpy reference and the
        post-processor for amplitudes saved by earlier runs.
 
 .. moduleauthor:: Lukas Hronek
 
 References:
-    Cotton, S. J.; Miller, W. H. J. Phys. Chem. A 2013, 117, 7190 (square windows)
-    Cotton, S. J.; Miller, W. H. J. Chem. Phys. 2016, 145, 144108 (triangle, two states)
-    Cotton, S. J.; Miller, W. H. J. Chem. Phys. 2019, 150, 104101 (triangle, many states)
+    Cotton, S. J. and Miller, W. H. J. Phys. Chem. A 2013, 117, 7190 (square windows)
+    Cotton, S. J. and Miller, W. H. J. Chem. Phys. 2016, 145, 144108 (triangle, two states)
+    Cotton, S. J. and Miller, W. H. J. Chem. Phys. 2019, 150, 104101 (triangle, many states)
 """
 
 import numpy as np
@@ -71,7 +71,7 @@ def sample_amplitudes(nstates, istate, window, gamma=None, ntraj=1, rng=None):
     uniform on [0, 2 pi) - the numpy twin of init_amplitudes with init_type 5/6.
 
     Returns:
-        numpy.ndarray(nstates, ntraj) of complex amplitudes; sum_k |c_k|^2 lies in
+        numpy.ndarray(nstates, ntraj) of complex amplitudes - sum_k |c_k|^2 lies in
         [1, 1 + 2 N gamma] (square, mean 1 + N gamma) or [1, N] (triangle) - NOT normalized.
     """
     rng = np.random.default_rng() if rng is None else rng
@@ -120,11 +120,11 @@ def sqc_populations(amplitudes, window, gamma=None):
             or (nsteps, ntraj, nstates) for a whole run (the layout of the saved
             "Cadi"/"Cdia" datasets)
         window ( int ): 0 square, 1 triangle
-        gamma ( float ): the Meyer-Miller gamma; None -> the window's standard value
+        gamma ( float ): the Meyer-Miller gamma - None -> the window's standard value
 
     Returns:
         numpy.ndarray of populations, shape (nstates,) or (nsteps, nstates):
-        P_k = <W_k> / sum_m <W_m>; all-zero when no trajectory falls in any window
+        P_k = <W_k> / sum_m <W_m> - all-zero when no trajectory falls in any window
     """
     if gamma is None:
         gamma = default_gamma(window)

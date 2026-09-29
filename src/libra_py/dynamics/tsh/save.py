@@ -53,7 +53,7 @@ import libra_py.data_savers as data_savers
 
 def _has_slot(saver, name):
     """The mem/txt savers stage rows in np_data (allocated per
-    output level); the hdf5 saver writes datasets directly and
+    output level) - the hdf5 saver writes datasets directly and
     carries no np_data - keyword membership is its only gate."""
     if name not in saver.keywords:
         return False
@@ -1052,7 +1052,7 @@ def save_time_overlaps(_savers, params, i, dyn_var, ham):
     Saves the adiabatic time-overlap rows AFTER step i has been propagated,
     so frame i carries the interval [t_i, t_i+1] that step i crossed - under
     BOTH time_overlap_method conventions (the engine computes exactly this
-    interval under method 1; the model supplies it under method 0 via
+    interval under method 1 - the model supplies it under method 0 via
     timestep_st). The pre-step savers would instead capture the PREVIOUS
     interval left in the slot, with a method-dependent frame 0.
     """
@@ -1066,7 +1066,7 @@ def save_time_overlaps(_savers, params, i, dyn_var, ham):
     # frame j of the strided grid carries <t_{j nprint} | t_{(j+1) nprint}>:
     # the PRODUCT of the raw intervals it spans, accumulated per call and
     # written when the span closes (a raw-dt sub-sample would make the
-    # standard (St - St^H)/(2 dt_saved) post-processing off by nprint);
+    # standard (St - St^H)/(2 dt_saved) post-processing off by nprint) -
     # the final frame closes early when nprint does not divide nsteps
     nsteps = params["nsteps"]
     acc = _savers.setdefault("_St_accum", {})

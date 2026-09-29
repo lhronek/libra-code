@@ -310,7 +310,7 @@ def slater_overlap_matrix(dets_A, dets_B, S_orb, complex_valued=False, phases_A=
                 from libra_py.workflows.nbra import mapping as _mapping
                 res = _mapping.ovlp_mat_arb_auto(list(dets_A), list(dets_B), S)
                 # the kernels order determinant rows as written (spins
-                # interleaved); the loop groups alphas before betas -
+                # interleaved) - the loop groups alphas before betas -
                 # bridge the two row orders with their sort-parity
                 # products, then apply the caller phases
                 gA = (_mapping._sort_parities(_mapping._sd_indices(list(dets_A), n_half)) *

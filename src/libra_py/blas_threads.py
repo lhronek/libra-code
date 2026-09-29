@@ -23,11 +23,11 @@ def blas_thread_limit(n):
     """Best-effort cap on the BLAS/OpenMP thread count inside the with-block.
 
     Uses threadpoolctl when installed, otherwise talks to the loaded
-    OpenBLAS and OpenMP runtimes directly; restores the old values on
+    OpenBLAS and OpenMP runtimes directly - restores the old values on
     exit. A falsy limit (None or 0) leaves the pools untouched.
 
     Args:
-        n ( int ): the thread cap; None or 0 = do nothing
+        n ( int ): the thread cap - None or 0 = do nothing
     """
     if not n:
         yield
@@ -67,7 +67,7 @@ def blas_thread_limit(n):
                         saved.append((set_, old))
                         set_(n)
                 # OpenMP runtime (Eigen products, raw omp regions) -
-                # threadpoolctl caps it, so the fallback must too;
+                # threadpoolctl caps it, so the fallback must too -
                 # omp_set_num_threads acts on the calling thread's ICV,
                 # which is the thread running this compute region
                 oget = getattr(handle, 'omp_get_max_threads', None)

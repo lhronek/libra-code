@@ -399,12 +399,12 @@ def ovlp_mat_arb_batched(SD1, SD2, S2, active_space=None, mem_limit_mb=256):
     Batched equivalent of ovlp_mat_arb (listed-order determinant convention:
     rows enter the determinants as given): one LAPACK-batched det call per chunk
     instead of nSD1*nSD2 Python-level np.linalg.det calls. Bit-exact against
-    the loop and 7-11x faster; chunked over bra SDs so the gathered submatrix
+    the loop and 7-11x faster - chunked over bra SDs so the gathered submatrix
     stack stays under mem_limit_mb.
 
     Args:
         SD1, SD2: lists of signed spin-orbital SDs (Libra convention:
-            +i alpha, -i beta, 1-based); any spin structure is allowed, but
+            +i alpha, -i beta, 1-based) - any spin structure is allowed, but
             after active-space filtering all SDs must retain the same number
             of electrons (pairs with mismatched counts are an error in
             ovlp_arb as well)
@@ -565,7 +565,7 @@ def ovlp_mat_arb_lemma(SD1, SD2, S2, active_space=None, mem_limit_mb=256):
     with A = S2[ref1, ref2], G = A^-1, R = U G, C = G V, T = R V,
     W = S2[a, b], where U/V hold the replacement rows/columns against the
     opposite reference. Singly-excited pairs (the TDDFPT/CIS case) reduce to
-    the scalar identity R_p C_q - G[q,p] (T - w); doubles cost a 4x4
+    the scalar identity R_p C_q - G[q,p] (T - w) - doubles cost a 4x4
     determinant per pair - still O(1) in nelec. Pairs are processed per
     (k, l) degree group with one batched LAPACK det call per group, so the
     only O(nSD^2 * nelec) operation remains a single GEMM.

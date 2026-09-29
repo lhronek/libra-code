@@ -40,7 +40,7 @@ def warn_legacy_hvib_dir(path):
     hvib_convention.json: markerless (legacy) dirs store +d (the NAC) in the
     _im files, so a CMATRIX(re, im) reconstruction yields the complex
     CONJUGATE of the vibronic Hamiltonian - harmless for real-valued data,
-    wrong for signed NAC consumers; regenerate with the current step 3.
+    wrong for signed NAC consumers - regenerate with the current step 3.
     """
     if not os.path.exists(os.path.join(path, 'hvib_convention.json')):
         print(F"WARNING: {path} carries no hvib_convention.json - legacy files "
@@ -125,7 +125,9 @@ def get_data(params):
             * **params["data_im_prefix"]** ( string ): prefixes of the files with imaginary part of the data [Required!]
             * **params["data_re_suffix"]** ( string ): suffixes of the files with real part of the Hvib(t) [default: "_re"]
             * **params["data_im_suffix"]** ( string ): suffixes of the files with imaginary part of the Hvib(t) [default: "_im"]
-              (the _im files/values follow the canonical convention Im(Hvib) = -d = -(St - St^T)/(2 dt); directories written by the current step 3 carry hvib_convention.json, markerless directories are legacy and hold +d (the NAC itself))
+              (the _im files/values follow the canonical convention Im(Hvib) = -d = -(St - St^T)/(2 dt) - directories
+              written by the current step 3 carry hvib_convention.json, markerless directories are legacy and hold +d
+              (the NAC itself))
             * **params["get_real"]** ( int ): whether we want to read the real component [ default: 1 - Yes ]
             * **params["get_imag"]** ( int ): whether we want to read the imaginary component [ default: 1 - Yes ]
 
@@ -450,7 +452,7 @@ def get_all_data(params):
             # St
             filename_re = F'{path_to_res_files}/{st_re_prefix}{step}{st_re_suffix}'
             # St is stored real-only in this layout (the sparse branch reads
-            # CMATRIX(st_re, 0) too); the old line referenced never-assigned
+            # CMATRIX(st_re, 0) too) - the old line referenced never-assigned
             # st_im_prefix/st_im_suffix and raised NameError
             st = get_matrix(nstates, nstates, filename_re, filename_re, list(range(nstates)), 1, 0)
             St.append(st)

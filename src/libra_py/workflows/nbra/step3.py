@@ -98,7 +98,9 @@ def get_step2_data(_params):
 
         * **params["hvib_data_im_suffix"]** ( string ): suffix of files containing imaginary part of vibronic Hamiltonian [ default: "_im" ]
 
-        Note: the _im files/values follow the canonical convention Im(Hvib) = -d = -(St - St^T)/(2 dt); directories written by the current step 3 carry hvib_convention.json, markerless directories are legacy and hold +d (the NAC itself)
+        Note: the _im files/values follow the canonical convention Im(Hvib) = -d = -(St - St^T)/(2 dt) - directories
+        written by the current step 3 carry hvib_convention.json, markerless directories are legacy and hold +d (the NAC
+        itself)
 
         * **params["data_set_paths"]** ( list of strings ): see in :func:`libra_py.data_read.get_data_sets`
 
@@ -632,9 +634,9 @@ def _orthonormalization_mode(value):
 
 def _lowdin_cache_take(step, digest):
     """The previous step's ket factor, when it provably is this step's bra
-    factor (the expected step index AND the content digest both match);
+    factor (the expected step index AND the content digest both match) -
     None otherwise. Hits occur on every step after the first in a serial
-    loop and within each contiguous Pool.starmap chunk; a miss just means
+    loop and within each contiguous Pool.starmap chunk - a miss just means
     the factor is recomputed."""
     if _LOWDIN_CACHE["step"] == step and _LOWDIN_CACHE["digest"] == digest:
         return _LOWDIN_CACHE["U"]
@@ -1045,7 +1047,7 @@ def _check_reordering_options(params, route):
 def _check_orbital_window(params, data_dim, where):
     """The step-2 npz supermatrices are 2*(highest_orbital - lowest_orbital
     + 1) on a side (alpha+beta blocks, both spins share the window), so the
-    claimed window is checked against the stored data; a res-dir
+    claimed window is checked against the stored data - a res-dir
     orbital_window.json written by the producers additionally pins the
     absolute window, which the dimension alone cannot (an equal-width
     shift moves the HOMO row silently).
@@ -1580,7 +1582,9 @@ def run(S_dia_ks, St_dia_ks, E_dia_ks, params):
             * **params["Hvib_im_suffix"]** ( string ): common suffix of the output files with imaginary part of the vibronic
                 Hamiltonian at all times [default: "_im"]
 
-            Note: the _im files/values follow the canonical convention Im(Hvib) = -d = -(St - St^T)/(2 dt); directories written by the current step 3 carry hvib_convention.json, markerless directories are legacy and hold +d (the NAC itself)
+            Note: the _im files/values follow the canonical convention Im(Hvib) = -d = -(St - St^T)/(2 dt) - directories
+            written by the current step 3 carry hvib_convention.json, markerless directories are legacy and hold +d (the
+            NAC itself)
 
     Returns:
         list of lists of CMATRIX(N,N): Hvib, such that:
@@ -2132,7 +2136,7 @@ def sort_unique_SD_basis_scipy(step, sd_states_unique, sd_states_reindexed, _par
     return E_this_sd_sparse, sd_states_unique_sorted, sd_states_reindexed_sorted, reindex_nsteps
 
 
-# shared with the TSH dynamics loop (dyn_params["blas_num_threads"]);
+# shared with the TSH dynamics loop (dyn_params["blas_num_threads"]) -
 # the underscore alias serves the call sites below
 from libra_py.blas_threads import blas_thread_limit as _blas_thread_limit
 
@@ -2175,7 +2179,7 @@ def _check_input_overlap(S, tag, step, threshold=0.05, allow_dirty=False):
     defect - AO mis-mapping, ordering, truncation), and the Lowdin
     repair of the downstream results is only empirical (~1-4% NAC
     agreement measured for the known corruption class, unguaranteed for
-    other causes). Raise by default; allow_dirty (the
+    other causes). Raise by default - allow_dirty (the
     allow_nonorthonormal_overlaps parameter) turns it into a
     once-per-process warning for conscious legacy reprocessing.
     Structural invalidity (non-finite, non-Hermitian, non-positive
@@ -2281,7 +2285,7 @@ def run_step3_ks_nacs_libint(params):
                       matrix powers per step)
                     - "lowdin_cached" [default]: bit-identical result, cheaper - the ket factor
                       S_2^{-1/2} is carried to the next step in a per-process cache (one
-                      fractional matrix power per step serially; also hits inside
+                      fractional matrix power per step serially - also hits inside
                       contiguous Pool chunks). This stage historically always
                       orthonormalized, whatever the flag said - that output is preserved
                       exactly.
@@ -2378,7 +2382,7 @@ def run_step3_ks_nacs_libint(params):
         os.system(F'mkdir {res_dir_2}')
     except BaseException:
         print(F'The directory {res_dir_2} already exists.')
-    # the _im files store Im(Hvib) = -d; files WITHOUT this marker predate
+    # the _im files store Im(Hvib) = -d - files WITHOUT this marker predate
     # the convention restoration and hold +d (the NAC itself)
     marker_file = os.path.join(res_dir_2, 'hvib_convention.json')
     if not os.path.exists(marker_file) and glob.glob(os.path.join(res_dir_2, '*_im.npz')):
@@ -2525,7 +2529,7 @@ def _orthonormalize_ks_overlaps(step, params):
     # The mid-point energies
     E_step = 0.5 * (E_1 + E_2)
     # Applying orthonormalization: "lowdin"/True (the historical behavior of this
-    # stage), "lowdin_cached" (default; identical result - the ket factor is carried
+    # stage), "lowdin_cached" (default - identical result - the ket factor is carried
     # to the next step, one fractional matrix power per step instead of two), or
     # "none"/False (raw pass-through)
     mode = _orthonormalization_mode(params.get('apply_orthonormalization', 'lowdin_cached'))
@@ -4135,11 +4139,11 @@ def run_step3_sd_nacs_libint(params):
             * **params['apply_phase_correction']** (bool): a True or False flag for performing the phase-correction
             * **params['apply_orthonormalization']**: orthonormalization of the SD-level
                 overlaps (same vocabulary as cp2k_compute_adi): "lowdin"/True,
-                "lowdin_cached" [default] (identical to "lowdin"; the ket factor is carried to
+                "lowdin_cached" [default] (identical to "lowdin" - the ket factor is carried to
                 the next step in a per-process cache - one fractional matrix power per
                 step serially, hits inside contiguous Pool chunks too), "none"/False.
                 The default CHANGED from the historical False (raw overlaps) to
-                "lowdin_cached" - the Lowdin route is the validated convention;
+                "lowdin_cached" - the Lowdin route is the validated convention -
                 set "none" explicitly to reproduce pre-change data
             * **params['sd_charge']** (int): the charge of the SD basis. 0 [default] keeps the SCF reference and its single
                 excitations. +1 replaces the SD basis by the frozen-orbital (Koopmans) hole basis of
@@ -4153,7 +4157,7 @@ def run_step3_sd_nacs_libint(params):
                 fragment_atom_lists), "pod" reads P_pod{f}_ks_{step}.npz (step2 compute_pod, libra's own
                 projection-operator diabatization), "pod2l" and "pod2gs" read P_pod2l{f} / P_pod2gs{f}_ks_{step}.npz
                 (step2 pod_schemes - the second-generation schemes, fragment-first orthogonalization with the
-                fragment states orthonormalized by Lowdin or by Gram-Schmidt; the plain "pod2" of step2 has no
+                fragment states orthonormalized by Lowdin or by Gram-Schmidt - the plain "pod2" of step2 has no
                 projectors, its states are not orthogonal across fragments), "pod_cp2k" reads
                 P_pod_cp2k{f}_ks_{step}.npz (step2 read_pod_cp2k_files, the blocks of CP2K's POD).
             * **params['localized_carrier']** (string): "none" [default] keeps the SD basis. "electron" or
@@ -4265,7 +4269,7 @@ def run_step3_sd_nacs_libint(params):
                     hybrid parallelism: nprocs workers x blas_num_threads threads each.
             * **params['sd_overlap_kernel']** (string): kernel for the SD overlap matrices
                     - "auto" : batched LAPACK determinants with the determinant-lemma shortcut
-                               for low-degree excitations (singles, doubles, ...); machine
+                               for low-degree excitations (singles, doubles, ...) - machine
                                precision vs "per_pair" [ default ]
                     - "batched" : batched LAPACK determinants only
                     - "lemma" : determinant-lemma kernel only
@@ -4354,7 +4358,7 @@ def run_step3_sd_nacs_libint(params):
         os.system(F'mkdir {res_dir_2}')
     except BaseException:
         print(F'The directory {res_dir_2} already exists.')
-    # the _im files store Im(Hvib) = -d; files WITHOUT this marker predate
+    # the _im files store Im(Hvib) = -d - files WITHOUT this marker predate
     # the convention restoration and hold +d (the NAC itself)
     marker_file = os.path.join(res_dir_2, 'hvib_convention.json')
     if not os.path.exists(marker_file) and glob.glob(os.path.join(res_dir_2, '*_im.npz')):
@@ -4974,7 +4978,7 @@ def _compute_sd_overlaps(step, params):
 
     # SD overlap kernel: "auto" = batched LAPACK determinants + determinant-lemma shortcut
     # for low-degree excitations (machine precision vs the legacy per-pair loop, orders of
-    # magnitude faster for large SD bases); "batched"/"lemma" force one; "per_pair" = ovlp_mat_arb
+    # magnitude faster for large SD bases) - "batched"/"lemma" force one - "per_pair" = ovlp_mat_arb
     ovlp = mapping.sd_overlap_kernel(params.get('sd_overlap_kernel', 'auto'))
 
     #print("active_space = ", active_space)

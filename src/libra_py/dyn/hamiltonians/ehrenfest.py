@@ -138,7 +138,7 @@ def ehrenfest_forces_adi(
     Compute adiabatic Ehrenfest forces for active TBFs.
 
     The return shape is `(ntbf, ndof)` for a trajectory slice. The optional
-    Meyer-Miller/SQC `gamma` term follows the C++ implementation;
+    Meyer-Miller/SQC `gamma` term follows the C++ implementation -
     `normalized=False` is the un-normalized Meyer-Miller mapping force.
     """
 
@@ -181,7 +181,7 @@ def ehrenfest_forces_dia(
     The optional Meyer-Miller/SQC `gamma` term is the diabatic twin of the
     adiabatic gamma * sum_i dE_i/dR: with sum_i E_i = tr(S^-1 H) and
     dS/dR = dc1 + dc1^H it is gamma * [tr(S^-1 dH) - 2 Re tr(S^-1 dc1 S^-1 H)]
-    over <c|S|c>; `option=1` keeps only the dH part, like the rest of the
+    over <c|S|c> - `option=1` keeps only the dH part, like the rest of the
     force. It follows the C++ implementation.
     """
 

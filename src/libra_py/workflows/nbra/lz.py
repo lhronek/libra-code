@@ -77,7 +77,7 @@ def Belyaev_Lebedev(Hvib, params):
                     - 1 - all states available [ default ]
                     - 2 - only energy-adjacent states: a pair is eligible iff no third
                         state's energy lies strictly inside its interval at the given step
-                        (order-free; a pairwise minimum with intervening states is not a
+                        (order-free - a pairwise minimum with intervening states is not a
                         two-state passage)
 
             * **params["gap_fit"]** ( int ): which variable the 3-point Lagrange parabola fits

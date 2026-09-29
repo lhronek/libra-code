@@ -1221,7 +1221,7 @@ def read_cp2k_mo_occupations(filename):
 
     Returns a list of np.ndarray - one for RKS, [alpha, beta] for UKS - or None
     when the log carries no such table. Under &SMEAR these are the fractional
-    populations (2 = full for RKS, 1 for UKS); the wfn restart and NAMD_PRINT
+    populations (2 = full for RKS, 1 for UKS) - the wfn restart and NAMD_PRINT
     never show them.
     """
     tables, cur, alpha_seen = [], None, False
@@ -2064,7 +2064,7 @@ def cp2k_xtb_diag_inp(diag_inp_temp: str, step: int, wfn_restart_file=None, traj
         wfn_restart_file (string): The wfn file the diagonalization restarts
                                    from. None keeps the OT-chain default,
                                    'OT_{step}-RESTART.wfn' (the same-step OT
-                                   run's output); OT-free workflows pass e.g.
+                                   run's output) - OT-free workflows pass e.g.
                                    'Diag_{step-1}-RESTART.wfn' to chain the
                                    diagonalization runs directly (SCF_GUESS
                                    RESTART falls back to the atomic guess
@@ -2074,7 +2074,7 @@ def cp2k_xtb_diag_inp(diag_inp_temp: str, step: int, wfn_restart_file=None, traj
         traj_xyz_filename (string): When given, extract coord-{step}.xyz from
                                     this trajectory here. The two-stage flow
                                     leaves this None because cp2k_xtb_ot_inp
-                                    already wrote the coord file; without the
+                                    already wrote the coord file - without the
                                     OT stage the diag generator must extract
                                     it itself.
 
@@ -2133,7 +2133,7 @@ def run_cp2k_xtb(params):
           * **ot_first_call_only** (bool): with an OT template given, run the
             OT stage only where the diagonalization chain starts cold (the
             previous step's 'Diag_{step-1}-RESTART.wfn' does not exist - the
-            first frame of a job slice); warm frames skip straight to the
+            first frame of a job slice) - warm frames skip straight to the
             chained diagonalization [default: False]
 
           * **cp2k_diag_input_template** (string): The CP2K diagonalization input template file name.
@@ -2146,7 +2146,7 @@ def run_cp2k_xtb(params):
 
           * **nprocs** (integer): Number of processors (MPI ranks).
           * **omp_num_threads** (integer): OMP threads per rank [default: 1].
-            nprocs=1 skips the MPI launcher; for hybrid runs (nprocs > 1 with
+            nprocs=1 skips the MPI launcher - for hybrid runs (nprocs > 1 with
             omp_num_threads > 1) add binding flags to mpi_executable
             ("--map-by slot:PE=N" or "--bind-to none") - Open MPI's default
             bind-to-core pins each rank's OMP threads onto a single core.
@@ -2172,7 +2172,7 @@ def run_cp2k_xtb(params):
     omp = int(params.get('omp_num_threads', 1))
 
     if ot_input_template is not None:
-        # Run OT; the diag run restarts from the same-step OT wfn (the
+        # Run OT - the diag run restarts from the same-step OT wfn (the
         # generator's default) and cp2k_xtb_ot_inp extracts coord-{step}.xyz
         print('Step', step, 'Computing the OT method wfn file...')
         cp2k_xtb_ot_inp(ot_input_template, trajectory_xyz_filename, step)
@@ -2183,7 +2183,7 @@ def run_cp2k_xtb(params):
         print('Done with OT wfn. Elapsed time:', time.time() - t1)
         diag_wfn_restart, diag_traj = None, None
     else:
-        # OT-free: chain the diagonalization runs directly; SCF_GUESS RESTART
+        # OT-free: chain the diagonalization runs directly - SCF_GUESS RESTART
         # falls back to the atomic guess while the file does not exist yet
         # (the first step) - the same way the OT chain itself boots
         print('Step', step, 'No OT template - chaining diagonalization restarts')
@@ -2963,7 +2963,7 @@ def compute_energies_coeffs_scipy(ks_mat, overlap):
         eigenvalues (numpy array): The energies (eigenvalues)
         eigenvectors (numpy array): The MO coefficients
     """
-    # Cholesky decomposition of the overlap matrix; scipy returns the
+    # Cholesky decomposition of the overlap matrix - scipy returns the
     # UPPER factor (S = U^T U) - numpy returns the lower, hence no .T here
     U = scipy.linalg.cholesky(overlap)
     # One ca also use the following as well but it is computationally more demanding
@@ -3201,7 +3201,7 @@ def read_cp2k_newtonx_output(filename):
 
     Contains, at ~1e-12 precision and WITHOUT amplitude thresholding:
       - per state: the FULL MO-basis excitation matrix X (nvirt x nocc,
-        L2-normalized - the metrically correct CI expansion; the log's
+        L2-normalized - the metrically correct CI expansion - the log's
         excitation-analysis amplitudes are printed in a different metric)
       - per state: PHASES ES EIGENVECTORS (nocc values)
       - OCCUPIED/VIRTUAL MO COEFFICIENTS (nao x nmo, CP2K MOLog AO order)
@@ -3217,7 +3217,7 @@ def read_cp2k_newtonx_output(filename):
     Returns:
         dict: X (list of np.ndarray (nvirt, nocc) per state),
               C_occ, C_virt (np.ndarray or None), E_occ, E_virt (np.ndarray or None),
-              nspin (1 or 2); for UKS additionally the beta channel as
+              nspin (1 or 2) - for UKS additionally the beta channel as
               X_b, C_occ_b, C_virt_b, E_occ_b, E_virt_b, phases_occ_b, phases_virt_b
     """
     lines = open(filename).readlines()
@@ -3309,7 +3309,7 @@ def read_cp2k_newtonx_output(filename):
         E_occ, E_virt = extra.get("E_occ"), extra.get("E_virt")
         p_occ, p_virt = extra.get("phases_occ"), extra.get("phases_virt")
     # the writer UNCONDITIONALLY column-scales X by the occupied-MO phases
-    # (qs_tddfpt2_restart.F); undo it so the amplitudes refer to the raw MOs
+    # (qs_tddfpt2_restart.F) - undo it so the amplitudes refer to the raw MOs
     # (the same convention as the molden coefficients). Requires PRINT_PHASES T.
     if p_occ is not None:
         for M in X:
@@ -3387,7 +3387,7 @@ def _ao_overlap_blocks_fast(it):
     C-engine np.loadtxt call - no line list, no joined string, so the
     transient is the loadtxt array (~n^2(1+1/k) doubles) plus the result.
     MOLog data lines are fixed-width, so after block 1 establishes the
-    length, a single len() comparison classifies the ~99.9% hot path; the
+    length, a single len() comparison classifies the ~99.9% hot path - the
     full string predicates run only on headers, blanks and the rare
     remainder-width block (side-buffered and parsed the same way). A
     region-end line accidentally matching the length reaches loadtxt and
@@ -3510,7 +3510,7 @@ def _ao_overlap_blocks_flex(it, logfile):
         if not t:
             continue
         # data rows ("irow iatom Element shell v ...") are ~99.9% of the
-        # region - test them first with two cheap predicates; the header
+        # region - test them first with two cheap predicates - the header
         # check with its per-token scan runs only on the rare misses
         if len(t) >= 5 and t[0].isdigit() and t[2][0].isalpha():
             try:
@@ -3539,7 +3539,7 @@ def _ao_overlap_blocks_flex(it, logfile):
 
 def _skip_to_overlap_banner(f):
     """Advance a log-file iterator past the AO-overlap banner line.
-    GPW: "OVERLAP MATRIX"; xTB: "XTB OVERLAP MATRIX"."""
+    GPW: "OVERLAP MATRIX" - xTB: "XTB OVERLAP MATRIX"."""
     for l in f:
         if l.strip().endswith("OVERLAP MATRIX"):
             return True
@@ -3669,7 +3669,7 @@ def read_cp2k_s_csr(filename, n=None, chunk_rows=None):
     transient at ~chunk size instead of the ~40 bytes per triplet of the
     whole-file array (never benchmark this under tracemalloc - it taxes the
     chunked reader ~6x and once misattributed the cost). Default: whole
-    file. chunk_rows (~200000 is a good size) enables chunking; n (the
+    file. chunk_rows (~200000 is a good size) enables chunking - n (the
     matrix dimension, e.g. 2 x nao on the doubled ODT geometry) preallocates
     the result - out-of-range triplets then raise - and is otherwise grown
     on demand.
@@ -3774,12 +3774,12 @@ def make_cp2k_input(params, working_directory="."):
     Args:
         params (dict):
             input_template (str): path to the template file  [required]
-            act_state (int): active state; 0 = ground state   [default: 0]
+            act_state (int): active state - 0 = ground state   [default: 0]
             project (str): CP2K project name                  [default: "libra"]
             coord_file (str): xyz file name (relative to wd)  [default: "coord.xyz"]
             number_of_states (int or None): rewrite TDDFPT NSTATES  [default: None = keep template]
             input_name (str): output file name                [default: "input.inp"]
-            wfn_restart_file (str or None): explicit SCF restart source; injected
+            wfn_restart_file (str or None): explicit SCF restart source - injected
                 as a DFT-level WFN_RESTART_FILE_NAME if the template has none
                 (used by the OT+diag mode)                    [default: None]
         working_directory (str): where the input file is written
@@ -3793,7 +3793,7 @@ def make_cp2k_input(params, working_directory="."):
     coord_file = params.get("coord_file", "coord.xyz")
     number_of_states = params.get("number_of_states", None)
     input_name = params.get("input_name", "input.inp")
-    # explicit SCF restart source (OT+diag mode); None -> CP2K's default
+    # explicit SCF restart source (OT+diag mode) - None -> CP2K's default
     # {project}-RESTART.wfn, which our fixed project name chains automatically
     wfn_restart_file = params.get("wfn_restart_file", None)
 
@@ -3905,7 +3905,7 @@ def run_cp2k(coords_bohr, params):
     """
     Execute one CP2K calculation in a trajectory-specific working directory.
 
-    Thread-safe (no os.chdir; subprocess runs with cwd=working_directory), so
+    Thread-safe (no os.chdir - subprocess runs with cwd=working_directory), so
     multiple trajectories can run concurrently in separate directories.
     Restart chaining is automatic: with a fixed project name, CP2K overwrites
     {project}-RESTART.wfn / .tdwfn at every step and the generated input
@@ -3918,9 +3918,9 @@ def run_cp2k(coords_bohr, params):
             input_template (str): path to the CP2K template            [required]
             act_state (int): active state (0 = GS)                     [default 0]
             cp2k_exe (str): CP2K executable                            [default "cp2k.psmp"]
-            mpi_executable (str or None): e.g. "mpirun"; None = serial [default None]
+            mpi_executable (str or None): e.g. "mpirun" - None = serial [default None]
             nprocs (int): MPI ranks (used with mpi_executable)         [default 1]
-                nprocs=1 skips the launcher entirely; for hybrid runs
+                nprocs=1 skips the launcher entirely - for hybrid runs
                 (nprocs > 1 with omp_num_threads > 1) add binding flags to
                 mpi_executable (e.g. "mpirun --map-by slot:PE=4" or
                 "--bind-to none") - Open MPI's default bind-to-core pins
@@ -3942,7 +3942,7 @@ def run_cp2k(coords_bohr, params):
             allow_unconverged_scf (int): 1 accepts a step whose log reports an
                 unconverged SCF (only reachable with CP2K's
                 IGNORE_CONVERGENCE_FAILURE, which downgrades the abort to a
-                warning); 0 raises on it                                [default 0]
+                warning) - 0 raises on it                                [default 0]
             project (str), coord_file (str), number_of_states (int): see make_cp2k_input
 
     Returns:
@@ -4039,7 +4039,7 @@ def read_cp2k_forces(logfile):
 
     Takes the LAST such block in the file. With &DFT &EXCITED_STATES active,
     these are the excited-state (GS + linear-response) forces of the selected
-    state; otherwise ground-state forces.
+    state - otherwise ground-state forces.
 
     Returns:
         np.ndarray (natoms, 3): forces in Hartree/Bohr
@@ -4108,7 +4108,7 @@ def read_cp2k_excited_state_info(logfile):
 
     Returns:
         dict with keys 'omega' (Hartree, precise 10-decimal value for the
-        active state) and, for energy-only runs, 'etot'; or None if the block
+        active state) and, for energy-only runs, 'etot' - or None if the block
         is absent (ground-state run).
     """
     omega, etot = None, None
@@ -4271,7 +4271,7 @@ def load_molden_data(molden_file, is_spherical=True, isUKS=False):
     """
     Read a CP2K molden file into libint shells + AO-resorted MO coefficients.
 
-    UKS molden files carry the alpha and beta MOs stacked (alpha first); with
+    UKS molden files carry the alpha and beta MOs stacked (alpha first) - with
     isUKS=True the stack is split and the beta channel returned alongside as
     C_b / E_b (same AO resorting - the AO order is a basis property).
 
@@ -4316,7 +4316,7 @@ def mo_overlap(data1, data2, lowest_orbital, highest_orbital, nprocs=1):
 
     data1/data2 come from load_molden_data (possibly the same object for
     same-time overlaps). The AO overlap is computed with libint for the pair
-    of geometries; the MO matrix is sliced to the 1-based orbital window
+    of geometries - the MO matrix is sliced to the 1-based orbital window
     [lowest_orbital, highest_orbital].
 
     Returns:
@@ -4345,9 +4345,9 @@ def align_mo_phases(C_prev_aligned, data_curr, St_mo):
         C_prev_aligned: unused except for interface symmetry (phases are
             defined by St_mo, which must be <prev_aligned | curr_raw>)
         data_curr (dict): unused here - the CALLER applies the returned
-            phases to its MO matrix; kept for call-site symmetry
+            phases to its MO matrix - kept for call-site symmetry
         St_mo (np.ndarray): time-overlap computed with the RAW current MOs,
-            windowed, one spin channel; fixed in place (columns flipped)
+            windowed, one spin channel - fixed in place (columns flipped)
 
     Returns:
         phases (np.ndarray, norb_w): the +-1 factors applied (window orbitals)
@@ -4367,7 +4367,7 @@ def read_ci_data(logfile, nstates, ci_threshold=0.01, lowest_orbital=1, highest_
     Parse TDDFPT excitation energies + CI expansions from a CP2K log.
 
     Thin wrapper around read_cp2k_tddfpt_log_file (master format). The cut
-    retains configs by |C|^2 > ci_threshold; the log itself only prints
+    retains configs by |C|^2 > ci_threshold - the log itself only prints
     |C| >= 5e-2, the floor of any log-based read.
 
     Returns:
@@ -4445,9 +4445,9 @@ def sd_overlaps(sd_states, St_mo, S_mo_prev, S_mo_curr, orthonormalize=True,
     SD overlap matrices from windowed one-spin MO overlaps.
 
     Args:
-        sd_states: signed-spin-orbital SD list (GS first), window-relative;
+        sd_states: signed-spin-orbital SD list (GS first), window-relative -
             this is the CURRENT (ket) basis
-        St_mo, S_mo_prev, S_mo_curr: (norb_w x norb_w) MO matrices; a single
+        St_mo, S_mo_prev, S_mo_curr: (norb_w x norb_w) MO matrices - a single
             array is used for both spin blocks (restricted), an
             (alpha, beta) tuple/list gives each channel its own block (UKS -
             both channels over the same orbital window)
@@ -4460,17 +4460,17 @@ def sd_overlaps(sd_states, St_mo, S_mo_prev, S_mo_curr, orthonormalize=True,
               cp2k_compute_adi_nbra convention). The cache is guarded by a
               digest of the source overlaps, SD list and kernel (the step3
               guard) and recomputes on any mismatch, so results are
-              bit-identical to "lowdin"; a hit is one fractional matrix
+              bit-identical to "lowdin" - a hit is one fractional matrix
               power cheaper - a saving that matters in file-based
               post-processing, not next to a CP2K call
             - "none" or False: raw determinant overlaps (the historical
-              dftb_compute_adi behavior; upstream moved that driver to
+              dftb_compute_adi behavior - upstream moved that driver to
               Lowdin in 2026-04)
         sd_states_prev: previous-step (bra) SD list if it differs from the
             current one (e.g. per-step energy-sorted bases) [default: sd_states]
-        kernel: SD determinant kernel; same names as step3's
+        kernel: SD determinant kernel - same names as step3's
             sd_overlap_kernel: "auto" [default] | "batched" | "lemma" | "per_pair"
-        cache: mutable dict for the "lowdin_cached" mode; reads and updates
+        cache: mutable dict for the "lowdin_cached" mode - reads and updates
             cache["s_ihalf"] / cache["digest"] (S^-1/2 of this step's ket
             basis and its content key)
 
@@ -4561,7 +4561,7 @@ def make_overlap_deltat_input(template_file, csr_write=True):
         - the &EXCITED_STATES section is replaced by the OVERLAP_DELTAT switch
           (added when the parent has none)
         - csr_write=True adds the &S_CSR_WRITE print (the sparse fast path of
-          the Libra CP2K patch); csr_write=False adds a dense &AO_MATRICES
+          the Libra CP2K patch) - csr_write=False adds a dense &AO_MATRICES
           OVERLAP print instead - stock-CP2K-compatible, read from the log by
           the same caller
         - CONNECTIVITY OFF is enforced in every &TOPOLOGY section (the doubled
@@ -4802,7 +4802,7 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
     run on the doubled geometry (prev atoms + curr atoms) - no libint needed.
 
     The doubled AO matrix supplies S(prev,prev), S(prev,curr) and S(curr,curr)
-    as blocks; they are mapped from CP2K (MOLog) to libint AO order with the
+    as blocks - they are mapped from CP2K (MOLog) to libint AO order with the
     molden-derived resort index and contracted with the cached (phase-aligned)
     previous MOs and the raw current MOs. ~1 s per call even for DFT.
 
@@ -4898,11 +4898,11 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
     logfile = run_cp2k(q2, run_params)
     # a supplied process pool runs the parse outside the GIL - in a chain
     # thread the parse would block every other prefetched chain for its
-    # full duration; .result() releases the GIL while the worker parses
+    # full duration - .result() releases the GIL while the worker parses
     pool = params.get("_parse_pool", None)
     if os.path.exists(csr):        # patched CP2K + &S_CSR_WRITE template: O(nnz)
         # the doubled-geometry overlap is (2 nao)^2 - declaring it makes
-        # out-of-range triplets raise at parse time; csr_chunk_rows caps
+        # out-of-range triplets raise at parse time - csr_chunk_rows caps
         # the parse transient (whole-file when unset)
         n2 = 2 * mo_curr["C"].shape[1]
         crows = params.get("csr_chunk_rows", None)
@@ -5103,7 +5103,7 @@ def load_wfn_mo_data(filename):
     BOTH ground-state-only and TDDFPT runs, at binary precision.
 
     Coefficients are in CP2K-native AO order (resort_idx = None -> pairs with
-    the OVERLAP_DELTAT matrix; requires ao_overlap_method="cp2k"). Verified:
+    the OVERLAP_DELTAT matrix - requires ao_overlap_method="cp2k"). Verified:
     C S C^T = I to 3.5e-12 against the native overlap. Per-MO global signs may
     differ from molden/NAMD_PRINT MOs - irrelevant, the driver's cumulative
     phase alignment handles them.
@@ -5146,7 +5146,7 @@ def ci_data_from_newtonx(newtonx, omegas_Ha, ci_threshold=1e-6,
         ci_threshold: weight cutoff |C|^2 > ci_threshold, applied to
             the exact vectors
         occ_min, vir_max: clip configs to the MO window [occ_min, vir_max]
-            (absolute 1-based; out-of-window amplitudes are dropped before
+            (absolute 1-based - out-of-window amplitudes are dropped before
             renormalization - they cannot be represented in the windowed
             overlap machinery anyway)
 
@@ -5286,17 +5286,17 @@ def cp2k_compute_adi_nbra(q, params, full_id):
 
         logfile_name : str
             Path to CP2K TDDFPT log file. May carry the format fields {timestep}
-            / {timestep_st}, filled from the engine's per-step model_params;
+            / {timestep_st}, filled from the engine's per-step model_params -
             a fixed path is honored (the caller rewrites it per step) but its
             reuse across two engine steps raises.
 
         time_overlap_filename : str
-            Path to sparse MO overlap matrix file (.npz format); same
+            Path to sparse MO overlap matrix file (.npz format) - same
             {timestep}/{timestep_st} templating and reuse guard as logfile_name
             ({timestep_st} = the interval start the St pairs with).
 
         overlap_filename : str
-            Path to the sparse MO self-overlap file (.npz); same templating and
+            Path to the sparse MO self-overlap file (.npz) - same templating and
             reuse guard.
 
         atom_labels : list of str
@@ -5595,7 +5595,7 @@ def cp2k_compute_adi_nbra(q, params, full_id):
 
 def _nbra_step_filename(params, key, itraj):
     """Per-step input path of the NBRA driver: the {timestep}/{timestep_st}
-    fields are filled from the engine's model_params; a fixed path may not be
+    fields are filled from the engine's model_params - a fixed path may not be
     consumed twice in a row for one trajectory (the file would be stale)."""
     template = params[key]
     fields = {k: params[k] for k in ("timestep", "timestep_st") if k in params}
@@ -5664,7 +5664,7 @@ def _cp2k_force_refresh(params, itraj, coordinates, nat, nstates):
 
 
 def _carried(params, key, itraj, current, is_first_time):
-    """Per-trajectory carried state; a missing entry after the first step
+    """Per-trajectory carried state - a missing entry after the first step
     means the params dict was rebuilt between calls - substituting the
     current step would silently zero the time-overlap channel."""
     if is_first_time:
@@ -5691,7 +5691,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
                 nstates (int): TOTAL number of states incl. ground state
                 lowest_orbital, highest_orbital (int): MO window (1-based, absolute)
                 num_occ_states, num_unocc_states (int): SD basis window around HOMO
-                                                (backend A; must cover the CI configs)
+                                                (backend A - must cover the CI configs)
             Optional:
                 apply_orthonormalization: normalization of the SD-level
                     overlaps (same name/meaning as in step3's
@@ -5700,7 +5700,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     cp2k_compute_adi_nbra convention - numerically identical
                     here, one fractional matrix power cheaper), "none"/False
                     (raw determinants - the historical dftb_compute_adi
-                    behavior; upstream moved that driver to Lowdin in 2026-04)
+                    behavior - upstream moved that driver to Lowdin in 2026-04)
                 sd_overlap_kernel (str): SD determinant kernel, same values
                     as step3: "auto" [default] | "batched" | "lemma" | "per_pair"
                 align_mo_phases (bool): cumulative MO-phase alignment of the
@@ -5710,24 +5710,24 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     NOTE the step3/on-the-fly vocabulary correspondence:
                     step3's apply_phase_correction (state signs of the St
                     sequence) corresponds to the DYNAMICS-level
-                    dyn_params["do_phase_correction"], NOT to this flag;
+                    dyn_params["do_phase_correction"], NOT to this flag -
                     step3's do_state_reordering corresponds to the dynamics
-                    dyn_params["state_tracking_algo"]; step3's ci_threshold
+                    dyn_params["state_tracking_algo"] - step3's ci_threshold
                     is the same keyword here (unified weight cut, shared
                     with dftb_compute_adi and cp2k_compute_adi_nbra)
                 time_dependent (bool): True (default) = TDDFPT CI states with
                     per-state forces. False = ground-state-only mode: states are
                     the fixed KS-SD basis, energies E_gs + orbital gaps, GS
                     forces on every diagonal (needs a template WITHOUT TDDFPT /
-                    EXCITED_STATES; nstates must be 1 + num_occ_states*num_unocc_states;
+                    EXCITED_STATES - nstates must be 1 + num_occ_states*num_unocc_states -
                     sd_state_ordering: "energy" (default) or "identity")
                 ao_overlap_method (str): "cp2k" (default) = OVERLAP_DELTAT
-                    doubled-geometry run per step (uses overlap_template; when
+                    doubled-geometry run per step (uses overlap_template - when
                     absent, one is auto-generated from input_template via
                     make_overlap_deltat_input - set overlap_csr_write=False for
-                    stock CP2K; exact AO overlaps, periodic-capable; the CSR
+                    stock CP2K - exact AO overlaps, periodic-capable - the CSR
                     fast path needs the cp2k patch, stock CP2K falls back to
-                    the dense log print); "libint" = molden+libint in-process
+                    the dense log print) - "libint" = molden+libint in-process
                     (no extra CP2K run, nonperiodic)
                 ot_first_call_only (bool): run the ot_template pre-convergence
                     only on each trajectory's first call - later calls restart
@@ -5737,12 +5737,12 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     chain to a thread pool on the step's first model call and
                     harvest per engine call, overlapping the CP2K runs
                     [default: 0]. Needs per-trajectory engine calls (raises
-                    under isNBRA); the pools live in a module registry keyed
+                    under isNBRA) - the pools live in a module registry keyed
                     by working_directory_prefix
-                max_concurrent_chains (int): concurrent chain cap; 0 [default]
+                max_concurrent_chains (int): concurrent chain cap - 0 [default]
                     = allocated physical cores // (nprocs * omp_num_threads)
                 parse_pool_workers (int): fork-process pool size for the
-                    overlap parses under prefetch; 0 disables
+                    overlap parses under prefetch - 0 disables
                     [default: the chain cap]
                 csr_chunk_rows (int): parse the ODT CSR overlap in chunks of
                     this many triplet rows, capping the parse transient
@@ -5750,30 +5750,30 @@ def cp2k_compute_adi_impl(q, params, full_id):
                 force_source (str): what forces CP2K supplies (the engine-side
                     dyn_params["force_method"] decides how they are used):
                     "active_state" [default] - one Z-vector run at the hopping
-                    state (pairs with force_method=1, TSH);
+                    state (pairs with force_method=1, TSH) -
                     "all_states" - mechanism B: template without
                     &EXCITED_STATES but with &TDDFPT &PRINT &FORCES (LIST is
-                    rewritten from number_of_states); forces for ALL states parsed
+                    rewritten from number_of_states) - forces for ALL states parsed
                     from the .tdfrc file and placed on every d1ham_adi diagonal
                     (pairs with force_method=2 - Ehrenfest - or
-                    force-difference rescaling);
+                    force-difference rescaling) -
                     "none" - RUN_TYPE is rewritten to ENERGY and no forces are
                     computed (pairs with force_method=0)
                     "gs" - CP2K always runs at the GROUND state (any
                     &EXCITED_STATES section is dropped) while TDDFPT
-                    energies/overlaps are computed as usual; the GS forces go
+                    energies/overlaps are computed as usual - the GS forces go
                     on EVERY d1ham_adi diagonal, so nuclei follow S0
-                    regardless of the hopping state (classical-path NBRA;
+                    regardless of the hopping state (classical-path NBRA -
                     pairs with force_method=1 + the S0 forces)
                 mo_source (str): "wfn" (default) = binary RESTART.wfn -
-                    zero cost, binary precision, works in GS-SD mode too;
-                    "namd_print" (TDDFPT print file); "molden" (ASCII molden
+                    zero cost, binary precision, works in GS-SD mode too -
+                    "namd_print" (TDDFPT print file) - "molden" (ASCII molden
                     print - needs &MO_MOLDEN in the template, MO precision
                     capped by the print digits). wfn/namd_print need
                     ao_overlap_method="cp2k"
                 ci_source (str): "namd_print" (default) = full-precision
                     X vectors from the &TDDFPT &PRINT &NAMD_PRINT file (the
-                    template must carry that print with PRINT_VIRTUALS T);
+                    template must carry that print with PRINT_VIRTUALS T) -
                     "log" = excitation-analysis block (~5 digits, works with
                     any TDDFPT template)
                 UKS (open shell): detected from the CP2K output itself (two
@@ -5782,30 +5782,30 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     sized by num_occ_alpha/num_unocc_alpha (default
                     num_occ_states/num_unocc_states) and num_occ_beta/
                     num_unocc_beta (default = alpha) - the step3 SD
-                    vocabulary; in GS-SD mode nstates = 1 + the summed
+                    vocabulary - in GS-SD mode nstates = 1 + the summed
                     per-channel excitation counts. Requires
                     ao_overlap_method="cp2k" and overlap_backend="sd"
                 overlap_backend (str): "sd" (default) or "citools"
                     (spin-adapted singlet CSFs, restricted-only)
                 dia_basis (str): "none" (default) or "sd" - declare the SD
                     basis as the DIABATIC basis of the dynamics: the driver
-                    then returns basis_transform = the sd2ci matrix (TDDFPT;
+                    then returns basis_transform = the sd2ci matrix (TDDFPT -
                     the energy-sort permutation in GS-SD mode) and
                     ovlp_dia = identity instead of the identity transform.
                     Enables engine-side diabatic initialization
                     (elec_params rep:0 with istate = an SD index: 0 = the
-                    reference determinant, k = sd_unique[k-1]; set
+                    reference determinant, k = sd_unique[k-1] - set
                     elec_params ndia = 1 + num_occ*num_unocc SDs, nadi =
                     nstates) and per-step SD populations (Cdia, se_pop_dia).
                     The initial adiabatic surface is sampled from
-                    |T[istate, :]|^2 (auto-renormalized); the neglected
+                    |T[istate, :]|^2 (auto-renormalized) - the neglected
                     weight equals the SD's CI-space leakage. Requires
                     overlap_backend="sd"
                 dia_basis_max_drop (float): with dia_basis="sd", the largest
                     CI weight a PROPAGATED state may carry outside the SD
                     basis (the sd2ci dropped weight, checked at every step) -
                     beyond it the renormalized T column is noise and the
-                    driver raises; widen num_occ_states/num_unocc_states or
+                    driver raises - widen num_occ_states/num_unocc_states or
                     reduce nstates to satisfy the contract    [default 0.5]
                 occupation_threshold (float): a population up to this fraction
                     of the full occupation on an orbital above the electron-
@@ -5816,16 +5816,16 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     A larger population is a fractional reference and the
                     driver raises. Set the template's EPS_FERMI_DIRAC to the
                     same value so CP2K's excitation space keeps HOMO->LUMO for
-                    populations libra treats as zero; the population check
+                    populations libra treats as zero - the population check
                     runs only where the log prints MO occupation numbers (&DFT
                     &PRINT &MO OCCUPATION_NUMBERS T)              [default 0.01]
                 sd_capture_max_drop (float): the largest total CI weight a
                     PROPAGATED state may lose to the truncation chain the CI
                     overlaps are built from (the read-stage threshold/
-                    MO-window clip combined with the sd2ci dropped weight;
-                    read-stage only for overlap_backend="citools"; checked
+                    MO-window clip combined with the sd2ci dropped weight -
+                    read-stage only for overlap_backend="citools" - checked
                     at every step) - beyond it the renormalized state
-                    poisons st_ci and the driver raises; widen
+                    poisons st_ci and the driver raises - widen
                     num_occ_states/num_unocc_states (and the MO window) or
                     reduce nstates to satisfy the contract    [default 0.5]
                 ci_threshold (float): config retention cut,
@@ -5842,7 +5842,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     (number_of_states defaults to nstates-1)
                 dia_basis_hvib (str): "none" [default] or "corrected" -
                     with dia_basis="sd", also supply obj.hvib_dia =
-                    H_SD - i D_SD (the SD-frame HST drift correction);
+                    H_SD - i D_SD (the SD-frame HST drift correction) -
                     consume with hvib_update_method 0 +
                     ham_transform_method 3
 
@@ -5850,7 +5850,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
             Caches (auto-created): mo_prev, ci_prev, E_adi_last, force_rows, S_prev,
                 homo, sd_basis, coordinates_prev, is_first_time
 
-        full_id: Libra trajectory id; last element = itraj
+        full_id: Libra trajectory id - last element = itraj
 
     Returns:
         obj with CMATRIX fields: ham_adi (diagonal = the total energies at the
@@ -5927,7 +5927,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
     # tblite runs (&XTB &TBLITE): CP2K's TDDFPT excited-state force assembly
     # calls the native-xTB Coulomb Hessian (xtb_ehess), whose neighbor lists a
     # tblite run never populates - hard segfault, verified
-    # (qs_tddfpt2_forces.F:1358 -> xtb_ehess.F:146; unfixed upstream). Refuse
+    # (qs_tddfpt2_forces.F:1358 -> xtb_ehess.F:146 - unfixed upstream). Refuse
     # BEFORE any CP2K time is spent. (OE_CORR had the same class of defect in
     # tddfpt_oecorr - fixed by the local CP2K patch dispatching to
     # build_tblite_ks_matrix, so it is not guarded here.)
@@ -5992,7 +5992,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
     if itraj not in params["homo"]:
         # the reference occupation comes from the ELECTRON COUNT of the log,
         # never from a printed partition (under &SMEAR CP2K counts every orbital
-        # populated beyond EPS_FERMI_DIRAC as occupied); the wfn's own aufbau
+        # populated beyond EPS_FERMI_DIRAC as occupied) - the wfn's own aufbau
         # homo must agree with it
         ref = reference_occupation(res["logfile"], isUKS=isUKS)
         if "homo" in mo_curr:
@@ -6009,7 +6009,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
     mo_prev = _carried(params, "mo_prev", itraj, mo_curr, is_first_time)
     if params.get("ao_overlap_method", "cp2k") == "cp2k":
         # CP2K-native AO overlaps (OVERLAP_DELTAT doubled-geometry run)
-        # a user template is shared; the auto-generated one is per working
+        # a user template is shared - the auto-generated one is per working
         # directory and stays call-local - under prefetch_trajectories the
         # impl runs concurrently for several trajectories and a shared-params
         # write would race
@@ -6046,7 +6046,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
         St_mo = mo_overlap(mo_prev, mo_curr, LO, HI)
 
     # per-channel views (the overlap builders return [alpha, beta] lists for
-    # UKS); the restricted path is the one-channel special case
+    # UKS) - the restricted path is the one-channel special case
     St_ch = list(St_mo) if isUKS else [St_mo]
     Sp_ch = list(S_prev) if isUKS else [S_prev]
     Sc_ch = list(S_curr) if isUKS else [S_curr]
@@ -6081,7 +6081,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
     Sp_in = tuple(Sp_ch) if isUKS else Sp_ch[0]
     Sc_in = tuple(Sc_ch) if isUKS else Sc_ch[0]
 
-    # SD-overlap options; apply_orthonormalization and sd_overlap_kernel use
+    # SD-overlap options - apply_orthonormalization and sd_overlap_kernel use
     # the step3 vocabulary (run_step3_sd_nacs_libint) with the same meanings
     sd_orthon = params.get("apply_orthonormalization", "lowdin")
     sd_kernel = params.get("sd_overlap_kernel", "auto")
@@ -6163,7 +6163,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
                                  "spin channels cannot be told apart without them)")
             amps_prealigned = False
             if params.get("mo_source", "wfn") == "wfn":
-                # X follows the NAMD-print MO sign convention; the wfn MOs
+                # X follows the NAMD-print MO sign convention - the wfn MOs
                 # carry arbitrary per-MO signs. Re-signing against the ALIGNED
                 # current C converts X to the aligned-MO convention in one shot
                 # (relative raw signs AND the cumulative alignment phases), so
@@ -6171,7 +6171,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
                 # the wfn may hold fewer MOs than the NAMD print (nmo =
                 # nocc + ADDED_MOS under diagonalization) - re-sign over the
                 # shared MOs and truncate X to the wfn virtual range (the
-                # dropped rows reference MOs the wfn route cannot overlap);
+                # dropped rows reference MOs the wfn route cannot overlap) -
                 # per spin channel for UKS (independent MO sets and counts)
                 nx = dict(nx)
                 trunc2 = 0.0
@@ -6253,7 +6253,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
             st_ci = T_prev.T @ st_sd @ T_curr
             align_ci_state_signs(st_ci, ci_curr, T_curr)
             # the CI data may carry more excitations than the propagated
-            # nstates (the template's NSTATES); the diabatic transform must be
+            # nstates (the template's NSTATES) - the diabatic transform must be
             # exactly (1+nSD, nstates) - columns = the propagated states
             T_dia = T_curr[:, :nstates]
             if dia_basis == "sd":
@@ -6275,8 +6275,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
             raise ValueError(f"unknown overlap_backend '{backend}'")
     else:
         # ------- ground-state-only mode: KS-SD (electron-only) states -------
-        # States = the fixed single-particle SD basis (GS first); energies =
-        # E_gs + orbital-energy gaps; forces = GS forces for every state
+        # States = the fixed single-particle SD basis (GS first) - energies =
+        # E_gs + orbital-energy gaps - forces = GS forces for every state
         # (classical-path picture, like the libra-template KS/SD workflows).
         if nstates != 1 + len(sd_unique):
             raise ValueError(f"time_dependent=False requires nstates = "
@@ -6317,7 +6317,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
         # order: 0 = the reference determinant, k = sd_unique[k-1]. Together
         # with the identity diabatic metric this enables rep = 0 (diabatic)
         # initialization in the engine and per-step SD populations
-        # (Cdia = U Cadi); the engine's elec_params must carry
+        # (Cdia = U Cadi) - the engine's elec_params must carry
         # ndia = 1 + len(sd_unique) and nadi = nstates
         obj.basis_transform = data_conv.nparray2CMATRIX(np.asarray(T_dia, dtype=complex))
         ndia_sd = T_dia.shape[0]
@@ -6327,7 +6327,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
         # time-overlaps - removes the SD-frame-drift part of the
         # quasi-diabatic model error (the span part is irreducible for a
         # CI-projected Hamiltonian). Consumed by the engine under
-        # hvib_update_method 0 + ham_transform_method 3; a
+        # hvib_update_method 0 + ham_transform_method 3 - a
         # hvib_update_method 1 rebuild (ham_dia - i*nac_dia, nac_dia = 0)
         # disagrees by construction and fail-louds
         if dia_hvib == "corrected":
@@ -6379,7 +6379,7 @@ _PREFETCH_STATES = {}
 def _allocation_cores():
     """Physical cores available to this process: the affinity mask with
     SMT siblings collapsed (sysfs topology). Logical count when the
-    topology is unreadable; cpu_count where affinity is absent."""
+    topology is unreadable - cpu_count where affinity is absent."""
     try:
         cpus = os.sched_getaffinity(0)
     except AttributeError:
@@ -6437,7 +6437,7 @@ def _cp2k_prefetch_dispatch(q, params, full_id):
     trajectory's chain (the CP2K runs + the python assembly) to a thread
     pool held in a module registry keyed by working_directory_prefix
     (model_params is deepcopied at generic_recipe entry - live executors
-    must stay out of it) and returns its own result; the
+    must stay out of it) and returns its own result - the
     engine-sequenced calls for the remaining trajectories harvest their
     futures. subprocess waits release the GIL, so the CP2K chains overlap
     while the python parts interleave. Rests on what the engine already
@@ -6480,7 +6480,7 @@ def _cp2k_prefetch_dispatch(q, params, full_id):
         if "pool" not in state:
             # one CP2K run occupies nprocs x omp_num_threads PHYSICAL
             # cores - the default cap packs the allocation with exactly
-            # that footprint (affinity-masked, SMT siblings collapsed;
+            # that footprint (affinity-masked, SMT siblings collapsed -
             # cpu_count would report the whole node's logical CPUs).
             # Riding on top, uncounted: the parse workers (a full core
             # each, ~1-2 s bursts when chains finish together) and the

@@ -26,7 +26,7 @@ def make_sd_basis(homo_w, num_occ_states, num_unocc_states, norb_w,
     Excitations occ -> vir with occ in [homo_w-num_occ_states+1, homo_w] and
     vir in [homo_w+1, homo_w+num_unocc_states], all indices 1-based WITHIN the window.
 
-    Restricted by default; passing homo_beta_w switches to the UKS basis:
+    Restricted by default - passing homo_beta_w switches to the UKS basis:
     electron-only excitations per spin channel (alpha windowed around homo_w,
     beta around homo_beta_w, both over the same norb_w orbital window), with
     the beta excitation counts defaulting to the alpha ones. The determinants
@@ -105,7 +105,7 @@ def sd2ci_matrix(ci_data, sd_unique, lowest_orbital):
     Column 0 = ground state (pure reference determinant). Column i>0 holds the
     normalized amplitudes of excited state i distributed over the SD basis.
     Configs in ci_data are absolute orbital indices (per spin channel, matched
-    through ci_data["spins"] against the 'alp'/'bet' tags of sd_unique);
+    through ci_data["spins"] against the 'alp'/'bet' tags of sd_unique) -
     sd_unique is window-relative.
 
     Components outside the SD WINDOW (hole below or particle above it) cannot be
@@ -114,7 +114,7 @@ def sd2ci_matrix(ci_data, sd_unique, lowest_orbital):
     reference at all (hole above the reference HOMO, particle at or below it)
     raises - it means the vectors came from a different occupation (the same
     truncate-then-renormalize convention the log reader and
-    normalize_ci_coefficients apply upstream; bit-identical when nothing is
+    normalize_ci_coefficients apply upstream - bit-identical when nothing is
     dropped). The lost weight is printed per state when it exceeds 1e-6 -
     widen num_occ_states/num_unocc_states and/or the MO window to capture more.
     A state lying entirely outside the basis raises.
@@ -224,7 +224,7 @@ def align_ci_state_signs(st_ci, ci_curr, T_curr=None):
 
     See also: the engine-side compute_phase_corrections/compute_projector
     (dyn_projectors.cpp) correct the AMPLITUDES via proj_adi during the
-    dynamics; step3's apply_phase_correction family corrects NBRA St file
+    dynamics - step3's apply_phase_correction family corrects NBRA St file
     series. This helper aligns the emitted driver data itself, so every
     consumer - the engine under any setting, archives, restarts - sees
     one smooth gauge.

@@ -84,13 +84,17 @@ def get_Hvib(params):
             * **params["nfiles"]** ( int ): how many files to read, starting from index 0 [Required!]
             * **params["Hvib_re_prefix"]** ( string ): prefixes of the files with real part of the Hvib(t) [Required!]
             * **params["Hvib_im_prefix"]** ( string ): prefixes of the files with imaginary part of the Hvib(t) [Required!]
-              (the _im files/values follow the canonical convention Im(Hvib) = -d = -(St - St^T)/(2 dt); directories written by the current step 3 carry hvib_convention.json, markerless directories are legacy and hold +d (the NAC itself))
+              (the _im files/values follow the canonical convention Im(Hvib) = -d = -(St - St^T)/(2 dt) - directories
+              written by the current step 3 carry hvib_convention.json, markerless directories are legacy and hold +d
+              (the NAC itself))
             * **params["active_space"]** ( list of ints ): the indices of the states we care
                 about. These indices will be used to determine the size of the created CMATRIX objects
                 and only these states will be extracted from the original files [ default: range(nstates) ]
             * **params["Hvib_re_suffix"]** ( string ): suffixes of the files with real part of the Hvib(t) [default: "_re"]
             * **params["Hvib_im_suffix"]** ( string ): suffixes of the files with imaginary part of the Hvib(t) [default: "_im"]
-              (the _im files/values follow the canonical convention Im(Hvib) = -d = -(St - St^T)/(2 dt); directories written by the current step 3 carry hvib_convention.json, markerless directories are legacy and hold +d (the NAC itself))
+              (the _im files/values follow the canonical convention Im(Hvib) = -d = -(St - St^T)/(2 dt) - directories
+              written by the current step 3 carry hvib_convention.json, markerless directories are legacy and hold +d
+              (the NAC itself))
 
     Returns:
         list of CMATRIX objects: Hvib:
@@ -780,22 +784,22 @@ def _set_method(params, ham_rep=0, is_nbra=0, method=0):
         params ( dict ): the parameters dictionary which will be modified
 
         ham_rep ( int ): 0 - the adiabatic Hamiltonian is computed via the
-            diabatic one [ default ]; 1 - the adiabatic properties are
+            diabatic one [ default ] - 1 - the adiabatic properties are
             available directly
 
-        is_nbra ( int ): -1 - custom (leave the keys alone); 0 - non-NBRA;
-            1 - file-based NBRA; 2 - on-the-fly NBRA. Rows 0/1/2 also pin
+        is_nbra ( int ): -1 - custom (leave the keys alone), 0 - non-NBRA,
+            1 - file-based NBRA, 2 - on-the-fly NBRA. Rows 0/1/2 also pin
             the engine isNBRA flag they require (0/1/0 - file-based runs
             on the single shared child Hamiltonian, the other rows need
-            per-trajectory children for their forces/NACs); -1 leaves the
+            per-trajectory children for their forces/NACs) - -1 leaves the
             flag alone
 
-        method ( int ): -1 - custom; 0 - FSSH; 1 - IDA; 2 - mSDM; 5 - DISH
-            (the engine's tsh_method id; 3 = legacy alias); 21 - mSDM,
-            dephasing-informed; 51 - DISH, dephasing-informed (31 = legacy)
+        method ( int ): -1 - custom, 0 - FSSH, 1 - IDA, 2 - mSDM, 5 - DISH
+            (the engine's tsh_method id, 3 = legacy alias), 21 - mSDM,
+            dephasing-informed, 51 - DISH, dephasing-informed (31 = legacy)
     """
 
-    # ham_rep 0: diabatic model diagonalized; 1: adiabatic-native
+    # ham_rep 0: diabatic model diagonalized, 1: adiabatic-native
     params.update({"ham_update_method": 1 if ham_rep == 0 else 2})
 
     if is_nbra == -1:    # custom
@@ -828,8 +832,8 @@ def _set_method(params, ham_rep=0, is_nbra=0, method=0):
         params.update({"tsh_method": 0, "decoherence_algo": 1, "dephasing_informed": 0})
     elif method == 2:    # mSDM
         params.update({"tsh_method": 0, "decoherence_algo": 0, "dephasing_informed": 0})
-    elif method in (3, 5):    # DISH (5 = the engine's tsh_method id; 3 = legacy preset)
-        # tsh_method 3 is Landau-Zener; DISH is 5 (Dynamics.cpp gates dish() on it)
+    elif method in (3, 5):    # DISH (5 = the engine's tsh_method id, 3 = legacy preset)
+        # tsh_method 3 is Landau-Zener - DISH is 5 (Dynamics.cpp gates dish() on it)
         params.update({"tsh_method": 5, "decoherence_algo": -1, "dephasing_informed": 0})
     elif method == 21:   # mSDM, dephasing-informed
         params.update({"tsh_method": 0, "decoherence_algo": 0, "dephasing_informed": 1})
@@ -1194,7 +1198,7 @@ def get_Hvib_scipy(params):
     hvib = []
     for i in range(len(params['data_set_paths'])):
         # CMATRIX(re, im) below assumes the canonical convention (_im files =
-        # Im(Hvib) = -d, marker written by the current step 3); legacy dirs
+        # Im(Hvib) = -d, marker written by the current step 3) - legacy dirs
         # hold +d and reconstruct to the complex CONJUGATE - populations and
         # hop rates are unaffected for real-valued data, signed NAC consumers
         # and complex-St data are not
