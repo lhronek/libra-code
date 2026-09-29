@@ -3834,18 +3834,29 @@ def run_step3_pod(params):
             if inside < dia_min_overlap:
                 edges.append([int(frames[i + 1]), int(c), round(float(d[c]), 4), round(inside, 4), int(partner)])
                 continue
-            where = F"the basis state {track[i].index(partner)} (block {frag[c]}, rank {rank[track[i].index(partner)]})"
+            # the largest other overlap may sit on a basis state of the block (a swap inside the basis) or on a block
+            # state outside it while the basis still carries the state - named as what it is
+            if partner in cur:
+                b = cur.index(partner)
+                where = F"the basis state {b} (block {frag[b]}, rank {rank[b]})"
+            else:
+                where = F"the block state {partner} outside the basis"
             raise ValueError(F"the POD block state {cur[c]} (block {frag[c]}, rank {rank[c]}) of frame {frames[i]} "
                              F"continues into {where} of frame {frames[i + 1]} (|<s|s>| = {d[c]:.3f} below the "
-                             F"threshold {dia_min_overlap}, |<s|s'>| = {row[partner]:.3f}) - two block states swap "
-                             F"between the frames and the labels would mean other states from there on: narrow "
-                             F"num_occ_states_per_block, or follow the states with do_diabatic_state_reordering 2")
-        if d.min() < 0.5 and not any(e[0] == frames[i + 1] and e[1] == int(np.argmin(d)) for e in edges):
+                             F"threshold {dia_min_overlap}, |<s|s'>| = {row[partner]:.3f}, the basis carries "
+                             F"{inside:.3f} of the state) - two block states swap between the frames and the labels "
+                             F"would mean other states from there on: narrow num_occ_states_per_block, or follow the "
+                             F"states with do_diabatic_state_reordering 2")
+        # every state let through below 0.5 that the basis still carries is an unresolved continuation
+        departed = {e[1] for e in edges if e[0] == frames[i + 1]}
+        if any(d[c] < 0.5 and c not in departed for c in range(n)):
             unresolved.append(frames[i + 1])
         if nxt != cur:
             swaps.append(frames[i + 1])
         track.append(nxt)
-        signs.append(signs[-1] * np.array([np.sign(St[cur[c], nxt[c]]) for c in range(n)]))
+        # the printed sign of every followed block state - an exactly zero overlap keeps the sign (np.sign would drop
+        # the state from every later frame)
+        signs.append(signs[-1] * np.where(np.array([St[cur[c], nxt[c]] for c in range(n)]) < 0.0, -1.0, 1.0))
     h_act = [signs[k][:, None] * h_full[k][np.ix_(track[k], track[k])] * signs[k][None, :] for k in range(len(frames))]
     St_act = [signs[i][:, None] * St_full[i][np.ix_(track[i], track[i + 1])] * signs[i + 1][None, :]
               for i in range(len(St_full))]
