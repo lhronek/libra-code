@@ -1996,8 +1996,7 @@ def sort_unique_SD_basis_scipy(step, sd_states_unique, sd_states_reindexed, _par
 
     # At this step, compute the energy of the SD
     active_space = params['active_space']
-    E_ks = np.array(sp.load_npz(params['path_to_npz_files'] +
-                                F'/E_ks_{step}.npz').todense().real)[active_space, :][:, active_space]
+    E_ks = _window_matrix(params, 'E_ks', step, active_space)
     # E_ks_MATRIX = data_conv.nparray2MATRIX( E_ks )
     # E_this_sd = mapping.energy_mat_arb( sd_states_reindexed, E_ks_MATRIX, SD_energy_corr )
     E_this_sd = mapping.energy_mat_arb(sd_states_reindexed, E_ks, SD_energy_corr)
@@ -2905,16 +2904,13 @@ def _fragment_operator_prefix(params, res_dir_1, start_time):
 
 
 def _fragment_operators_of_step(params, prefix, nfrag, step, active_space):
-    """The step-2 fragment operators and the orbital-energy operator of one step sliced to the active space,
-    Lowdin-orthonormalized when the SD overlaps are (the orthonormal-orbital layout sd_diabatization_step and
-    sd_fragment_operators read)."""
-    res_dir_1 = params['path_to_npz_files']
-    P_frag = [np.array(sp.load_npz(F'{res_dir_1}/{prefix}{f}_ks_{step}.npz').todense()
-                       [active_space, :][:, active_space]).real for f in range(nfrag)]
-    E_orb = np.array(sp.load_npz(F'{res_dir_1}/E_ks_{step}.npz').todense()[active_space, :][:, active_space]).real
+    """The step-2 fragment operators and the orbital-energy operator of one step sliced to the active space (through
+    the orbital relabeling of active_space_selection 'identity'), Lowdin-orthonormalized when the SD overlaps are
+    (the orthonormal-orbital layout sd_diabatization_step and sd_fragment_operators read)."""
+    P_frag = [_window_matrix(params, F'{prefix}{f}_ks', step, active_space) for f in range(nfrag)]
+    E_orb = _window_matrix(params, 'E_ks', step, active_space)
     if params['apply_orthonormalization'] != "none":
-        s_ks = np.array(sp.load_npz(F'{res_dir_1}/S_ks_{step}.npz').todense()
-                        [active_space, :][:, active_space]).real
+        s_ks = _window_matrix(params, 'S_ks', step, active_space)
         X = orthogonalizations.get_Lowdin_scipy(s_ks)
         P_frag = [X.T @ P @ X for P in P_frag]
         E_orb = X.T @ E_orb @ X
@@ -3320,6 +3316,86 @@ def _continuity_record(St_list, start_time, reordering, alpha, min_overlap, perm
                     "reordered_frames: the frames at which the reordering changed the labels"}
 
 
+def _window_matrix(params, name, frame, active_space, frame_cols=None):
+    """The step-2 window matrix {name}_{frame}.npz of path_to_npz_files, dense and real, cut to the active space -
+    through the label permutations of active_space_selection 'identity' (params['orbital_perms'], {frame: perm}) when
+    they are set: the rows take the frame's followed orbitals, the columns those of frame_cols (the ket frame of a
+    time overlap) or of the frame itself."""
+    perms = params.get('orbital_perms')
+    rows = cols = list(active_space)
+    if perms is not None:
+        rows = [perms[frame][i] for i in active_space]
+        cols = [perms[frame if frame_cols is None else frame_cols][i] for i in active_space]
+    M = sp.load_npz(F"{params['path_to_npz_files']}/{name}_{frame}.npz").todense()
+    return np.array(M[rows, :][:, cols]).real
+
+
+def _follow_orbitals(params, active_space, start_time, finish_time):
+    """The Kohn-Sham orbitals of the stored window followed by identity through St_ks from start_time to
+    finish_time - 1, every spin block by itself (active_space_selection 'identity'): within an interval the orbitals
+    of the later frame are assigned to those of the earlier one as the SD states are reordered -
+    active_space_selection_algo 1 the Sato search of get_reordering, 2 the Munkres-Kuhn assignment on |St|^2
+    exp(-(alpha dE)^2) with the orbital energies of the earlier frame (the cost of make_cost_mat,
+    active_space_selection_alpha the width). Returns {frame: perm}, the label
+    permutation of every frame - position r of the frame's window matrices holds the orbital that stands at position
+    perm[r] of the stored window, the identity at start_time - and the record of the following. Nothing is refused
+    here: the SD states built from the followed orbitals are checked as labeled (state_reordering_min_overlap). The
+    record says how the orbitals themselves went - an orbital continuing with less than 0.5 while the window carries
+    it (sqrt(sum_j |St_rj|^2) >= 0.5) is an unresolved crossing, one the window carries less than 0.5 of left the
+    window through its edge."""
+    res_dir, n = params['path_to_npz_files'], params['data_dim'] // 2
+    reordering, alpha = params['active_space_selection_algo'], params['active_space_selection_alpha']
+    blocks = [np.arange(n), np.arange(n, 2 * n)]
+    active = np.asarray(active_space)
+    perm = np.arange(2 * n)
+    perms = {start_time: perm.tolist()}
+    tracked, reordered, edge_frames, unresolved, unresolved_active, edges = {}, [], [], [], [], []
+    min_continuity = 1.0
+    for k in range(start_time, finish_time - 1):
+        St = np.abs(np.asarray(sp.load_npz(F'{res_dir}/St_ks_{k}.npz').todense()).real)
+        e = np.diag(np.asarray(sp.load_npz(F'{res_dir}/E_ks_{k}.npz').todense()).real)[perm]
+        new = np.empty_like(perm)
+        for b in blocks:
+            new[b] = b[_assign_states(St[np.ix_(perm[b], b)], reordering, alpha, e[b])]
+        d = St[perm, new]
+        inside = np.sqrt(np.sum(St[perm] ** 2, axis=1))
+        min_continuity = min(min_continuity, float(d.min()))
+        for r in np.where(d < 0.5)[0]:
+            if inside[r] < 0.5:
+                edges.append([k + 1, int(r), round(float(d[r]), 4), round(float(inside[r]), 4)])
+                continue
+            if (k + 1) not in unresolved:
+                unresolved.append(k + 1)
+            if r in active and (k + 1) not in unresolved_active:
+                unresolved_active.append(k + 1)
+        if np.any(new != perm):
+            reordered.append(k + 1)
+        if sorted(new[active].tolist()) != sorted(perm[active].tolist()):
+            edge_frames.append(k + 1)
+        if np.any(new[active] != active):
+            tracked[k + 1] = new[active].tolist()
+        perm = new
+        perms[k + 1] = perm.tolist()
+    identity = list(range(2 * n))
+    record = {"active_space_selection": "identity", "active_space_selection_algo": int(reordering),
+              "active_space_selection_alpha": float(alpha), "reordered_frames": reordered,
+              "frames_off_energy_order": sum(p != identity for p in perms.values()),
+              "active_space_edge_frames": edge_frames, "tracked_orbitals": tracked,
+              "min_continuity": float(min_continuity), "unresolved_frames": unresolved,
+              "active_space_unresolved_frames": unresolved_active, "edge_departures": edges,
+              "note": "the window orbitals followed by identity, the SD basis of every frame built from the orbitals "
+                      "that stood in the active space at the starting frame - reordered_frames: the frames at which "
+                      "the window labels changed - active_space_edge_frames: the frames at which an orbital of the "
+                      "active space exchanged its position with one outside it - tracked_orbitals: the window "
+                      "positions (0-based in the stored window, alpha then beta) of the active-space orbitals in the "
+                      "frames they stand off their energy positions - unresolved_frames: an orbital continuing with "
+                      "less than 0.5 while the window carries it (active_space_unresolved_frames: one of the active "
+                      "space) - edge_departures: [frame, orbital, kept, carried by the window] of the orbitals that "
+                      "left the window through its edge - nothing is refused here, the SD states built from the "
+                      "followed orbitals are checked as labeled"}
+    return perms, record
+
+
 def _write_diabatization_records(res_dir, kind, dia_index, pops_list, hole_list, energy_list, start_time,
                                  operator="mulliken", basis="sd", extra=None):
     """U_{basis}_labels.json (the meaning of every diabatic state, with the mean energies over the
@@ -3532,7 +3608,7 @@ def run_step3_pod(params):
                       'apply_orthonormalization': 'lowdin_cached', 'do_state_reordering': 0,
                       'state_reordering_alpha': 0.0, 'do_diabatic_state_reordering': 0,
                       'diabatic_state_reordering_alpha': 0.0, 'diabatic_state_reordering_min_overlap': 0.5,
-                      'state_reordering_min_overlap': 0.5}
+                      'state_reordering_min_overlap': 0.5, 'active_space_selection': 'energy'}
     comn.check_input(params, default_params, critical_params)
     # the values the route implements - every other value is refused
     for key, allowed, hint in (('sd_charge', (1,), "the frozen-orbital hole basis of the cation"),
@@ -3541,7 +3617,10 @@ def run_step3_pod(params):
                                ('diabatization_scheme', ('pod_cp2k',), "the POD prints of CP2K"),
                                ('do_state_reordering', (0, 1, 2), "none, Sato or Munkres-Kuhn"),
                                ('do_diabatic_state_reordering', (0, 1, 2), "none (a swap of the block states is "
-                                                                          "refused), Sato or Munkres-Kuhn")):
+                                                                          "refused), Sato or Munkres-Kuhn"),
+                               ('active_space_selection', ('energy',), "no Kohn-Sham orbitals in the POD basis - the "
+                                                                       "block states are followed by "
+                                                                       "do_diabatic_state_reordering")):
         if params[key] not in allowed:
             raise ValueError(F"run_step3_pod: params['{key}'] = {params[key]!r} is not implemented on the POD "
                              F"route - {list(allowed)} ({hint})")
@@ -3886,6 +3965,27 @@ def run_step3_sd_nacs_libint(params):
                 crossing of adiabatic states is the convention there and is left to the propagation.
                 sd_route_report.json records unresolved_frames (internal continuations below 0.5 let through),
                 edge_departures, min_continuity and reordered_frames.
+            * **params['active_space_selection']** (string): how the orbitals of the active space are picked at every
+                frame. 'energy' [default]: the energy positions of the frame (an orbital that crosses the edge of the
+                active space leaves the basis, the SD state it carried is recorded as an edge departure). 'identity':
+                the orbitals that stood in the active space at start_time, followed through the whole stored window
+                by their time overlaps - the Kohn-Sham orbitals of the window are followed by identity between the
+                frames, per interval and spin block, and the label permutation of every frame relabels E_ks, S_ks,
+                St_ks and the fragment operators before the active space is cut out of them, so the SD basis of every
+                frame is built from the same orbitals wherever their energies took them, as the POD basis of
+                run_step3_pod is followed within its block. Nothing is refused for the orbitals themselves - the SD
+                states built from them are checked as labeled (state_reordering_min_overlap) - sd_route_report.json
+                records under "active_space" the reordered frames of the window, the frames at which the active space
+                crossed its edge (active_space_edge_frames), the window positions of the active orbitals in every
+                frame off their energy positions (tracked_orbitals, 0-based in the stored window, alpha then beta),
+                min_continuity, unresolved_frames (an orbital continuing with less than 0.5 inside the window,
+                active_space_unresolved_frames those of the active space) and edge_departures (an orbital that left
+                the window). Needs the single-particle basis (is_many_body False).
+            * **params['active_space_selection_algo']** (int): the assignment that follows the orbitals under
+                'identity', with the values of do_state_reordering: 2 [default] Munkres-Kuhn (libra_py.hungarian on
+                |St_ks|^2 exp(-(alpha dE)^2), the cost of the KS route's reordering), 1 Sato (get_reordering).
+            * **params['active_space_selection_alpha']** (float): the energy-penalty width of that Munkres-Kuhn cost,
+                in 1/Hartree [default: 0 - no penalty] - as state_reordering_alpha.
             * **params['npz_file_ks_homo_index']** (integer): the KS HOMO index of the raw npz files.
             * **params['is_many_body']** (bool): a True or False flag for computing the overlaps and energies
                                                  for many-body states
@@ -3941,7 +4041,9 @@ def run_step3_sd_nacs_libint(params):
                       'sd_overlap_kernel': 'auto', 'blas_num_threads': None,
                       'localized_carrier': 'none', 'sd_charge': 0, 'diabatization_scheme': 'mulliken',
                       'do_diabatic_state_reordering': 0, 'diabatic_state_reordering_alpha': 0.0,
-                      'diabatic_state_reordering_min_overlap': 0.5, 'state_reordering_min_overlap': 0.5
+                      'diabatic_state_reordering_min_overlap': 0.5, 'state_reordering_min_overlap': 0.5,
+                      'active_space_selection': 'energy', 'active_space_selection_algo': 2,
+                      'active_space_selection_alpha': 0.0
                       }
 
     if params['is_many_body'] and params['isUKS']:
@@ -3953,6 +4055,9 @@ def run_step3_sd_nacs_libint(params):
         if former in params:
             raise ValueError(F"params['{former}'] is params['{present}'] now - rename it in the runner"
                              + (" (its values 'particle' and 'joint' are 'electron' and 'both')" if former == 'diabatization' else ""))
+    if 'orbital_perms' in params:
+        raise ValueError("params['orbital_perms'] is not an input - run_step3_sd_nacs_libint writes it from "
+                         "active_space_selection")
 
     # Check input, set output dirs
     comn.check_input(params, default_params, critical_params)
@@ -3970,6 +4075,21 @@ def run_step3_sd_nacs_libint(params):
                         ('state_reordering_min_overlap', sd_min_overlap)):
         if not (np.isreal(value) and 0.0 <= value <= 1.0):
             raise ValueError(F"{name} = {value!r} - a threshold between 0 (off) and 1 is needed")
+    selection = str(params['active_space_selection']).lower()
+    if selection not in ('energy', 'identity'):
+        raise ValueError(F"active_space_selection = {params['active_space_selection']!r} is not a listed option - "
+                         F"'energy' (the energy positions of every frame) and 'identity' (the orbitals of start_time "
+                         F"followed through the window) are supported")
+    algo, orb_alpha = params['active_space_selection_algo'], params['active_space_selection_alpha']
+    if algo not in (1, 2):
+        raise ValueError(F"active_space_selection_algo = {algo!r} is not a listed option - 1 (Sato) and 2 "
+                         F"(Munkres-Kuhn) are supported")
+    if not (np.isreal(orb_alpha) and orb_alpha >= 0.0):
+        raise ValueError(F"active_space_selection_alpha = {orb_alpha!r} - a non-negative width in 1/Hartree is needed")
+    if selection == 'identity' and params['is_many_body']:
+        raise ValueError("active_space_selection 'identity' needs the single-particle SD basis (is_many_body False) - "
+                         "the TD-DFT coefficients of the many-body basis name the orbitals by their energy positions "
+                         "at every frame")
     res_dir_1 = params['path_to_npz_files']
     res_dir_2 = params['path_to_save_sd_Hvibs']
 
@@ -4207,6 +4327,20 @@ def run_step3_sd_nacs_libint(params):
 
     print('Flag ks_active_space:', ks_active_space)
 
+    # the active space by identity: the window orbitals followed between the frames, their label permutations relabel
+    # every window matrix the SD route cuts the active space out of (E_ks, S_ks, St_ks and the fragment operators)
+    if selection == 'identity':
+        params['orbital_perms'], selection_record = _follow_orbitals(params, ks_active_space, start_time, finish_time)
+        print(F"active space by identity: {len(selection_record['reordered_frames'])} reordered frames of the window, "
+              F"the active space off its energy positions in {len(selection_record['tracked_orbitals'])} frames and "
+              F"across its edge at {len(selection_record['active_space_edge_frames'])}, continuity min "
+              F"{selection_record['min_continuity']:.4f}, {len(selection_record['unresolved_frames'])} unresolved "
+              F"frames ({len(selection_record['active_space_unresolved_frames'])} of the active space), "
+              F"{len(selection_record['edge_departures'])} departures from the window")
+    else:
+        selection_record = {"active_space_selection": "energy",
+                            "note": "the active space is the energy positions of every frame"}
+
     # The flag for phase-correction algorithm
     apply_phase_correction = params['apply_phase_correction']
 
@@ -4434,6 +4568,7 @@ def run_step3_sd_nacs_libint(params):
                                                 params['state_reordering_alpha'], sd_min_overlap,
                                                 perms_ci if params['do_state_reordering'] in (1, 2) else None, "CI")
 
+    route_report["active_space"] = selection_record
     with open(F'{res_dir_2}/sd_route_report.json', 'w') as f:
         json.dump(route_report, f, indent=1)
 
@@ -4561,14 +4696,17 @@ def run_step3_sd_nacs_libint(params):
 def make_var_pool(params, sd_states_reindexed_sorted, start_time, finish_time):
     """Per-step argument tuples for compute_sd_overlaps_in_parallel.
 
-    Each task ships only the two SD lists it consumes - putting the full
-    per-step list into every task makes the Pool pickling cost O(nsteps^2).
+    Each task ships only the two SD lists (and the two orbital permutations of active_space_selection 'identity') it
+    consumes - putting the full per-step list into every task makes the Pool pickling cost O(nsteps^2).
     """
     var_pool = []
     for step in range(finish_time - start_time - 1):
         p_task = dict(params)
         p_task['sd_states_reindexed_sorted'] = {step: sd_states_reindexed_sorted[step],
                                                 step + 1: sd_states_reindexed_sorted[step + 1]}
+        if 'orbital_perms' in params:
+            frames = (start_time + step, start_time + step + 1)
+            p_task['orbital_perms'] = {k: params['orbital_perms'][k] for k in frames}
         var_pool.append((step, p_task))
     return var_pool
 
@@ -4602,12 +4740,9 @@ def _compute_sd_overlaps(step, params):
     print('Computing the SD overlaps for step', step)
 
     # The same procedure as above
-    st_ks = np.array(sp.load_npz(F'{res_dir_1}/St_ks_{step+start_time}.npz').todense()
-                     [active_space, :][:, active_space]).real
-    s_ks_1 = np.array(sp.load_npz(F'{res_dir_1}/S_ks_{step+start_time}.npz').todense()
-                      [active_space, :][:, active_space]).real
-    s_ks_2 = np.array(sp.load_npz(F'{res_dir_1}/S_ks_{step+start_time+1}.npz').todense()
-                      [active_space, :][:, active_space]).real
+    st_ks = _window_matrix(params, 'St_ks', step + start_time, active_space, step + start_time + 1)
+    s_ks_1 = _window_matrix(params, 'S_ks', step + start_time, active_space)
+    s_ks_2 = _window_matrix(params, 'S_ks', step + start_time + 1, active_space)
     _allow_dirty = params.get('allow_nonorthonormal_overlaps', False)
     _check_input_overlap(s_ks_1, 'S_ks(t)', step + start_time,
                          allow_dirty=_allow_dirty)
