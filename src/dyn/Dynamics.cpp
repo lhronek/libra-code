@@ -2351,28 +2351,33 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   }
 
 
+  // a relabel is a change of label, not of surface: the trajectory stays on the state that carries it, so
+  // there is no hop to accept and no momentum to rescale (the hops proposed below have both) - the acceptance
+  // test here could refuse the relabel and return the trajectory to the OTHER surface, and the rescaling by
+  // the gap of the two labels changed the total energy at every relabel
+  act_states = dyn_var.act_states;
   // Check if rescaling is needed:
-  act_states = dyn_var.act_states; // these are proposed states
-  act_states = accept_hops(dyn_var, ham, act_states, old_states, prms, rnd);
+  //act_states = dyn_var.act_states; // these are proposed states
+  //act_states = accept_hops(dyn_var, ham, act_states, old_states, prms, rnd);
 
   //====================== Momenta adjustment after successful/frustrated hops
   //===================
   // Velocity rescaling: however here we may be changing velocities
   //act_states = dyn_var.act_states;
-  if (prms.rep_sh == 1) {
+  //if (prms.rep_sh == 1) {
       //cout<<"Rescaling (adiabatic): \n";
       //cout<<"initial -> final: "<<old_states[0]<<" -> "<<act_states[0]<<" ";
       //double av_Epot = average_potential_energy(prms, dyn_var, ham);
       //cout<<"Epot (before) = "<<av_Epot<<endl;
 
-      handle_hops_nuclear(dyn_var, ham, act_states, old_states, prms);
+      //handle_hops_nuclear(dyn_var, ham, act_states, old_states, prms);
       //cout<<"final state = "<<act_states[0]<<endl;
-      dyn_var.act_states = act_states;
+      //dyn_var.act_states = act_states;
       //cout<<"energies: \n"; ham.children[0]->ham_adi->show_matrix();
 
       //av_Epot = average_potential_energy(prms, dyn_var, ham);
       //cout<<"Epot (after) = "<<av_Epot<<endl;
-  }
+  //}
 
 
 
