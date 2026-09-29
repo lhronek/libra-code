@@ -320,57 +320,6 @@ def _sync_nbra_flag(dyn_params):
     return v
 
 
-def refresh_hop_forces(dyn_var, ham, prms, compute_model, model_params, states_before):
-    """The force of the NEW active state at the geometry where the state changed (hop_force_refresh). A model that
-    hands over the force of its active state alone (the on-the-fly drivers under force_source "active_state") leaves
-    the new state's row of d1ham_adi NaN (not handed over) after a hop, and the first half kick of the next step
-    would run force-free.
-    Every trajectory whose active state changed in the step and whose force row is still NaN is handed back to the
-    model once, at the same geometry, with params["force_refresh"] = {trajectory: new state} - the model returns the
-    forces (the drivers run one force calculation for that state) - only the returned d1ham_adi is ingested and the
-    engine's forces are rebuilt. A relabel at a crossing changes the state before the second half kick of the step,
-    so compute_dynamics fills its row itself (refresh_relabel_forces) - that row is not NaN here and is left
-    alone, as is every row a model fills for all states (the drivers under force_source all_states, gs and none put
-    a force on every diagonal, zero is a force) and a model that hands over no force at all (nothing to refresh) -
-    the condition of the engine's guard: the new row NaN while the old state's row is not."""
-    states = list(dyn_var.act_states)
-    ndof = dyn_var.get_forces().num_of_rows
-
-    def missing(itraj, state):
-        return any(math.isnan(ham.get_d1ham_adi(idof, Py2Cpp_int([0, itraj])).get(state, state).real)
-                   for idof in range(ndof))
-
-    hopped = {itraj: states[itraj] for itraj in range(len(states))
-              if states[itraj] != states_before[itraj] and missing(itraj, states[itraj])
-              and not missing(itraj, states_before[itraj])}
-    if not hopped:
-        return
-    model_params["act_state"] = {itraj: states[itraj] for itraj in range(len(states))}
-    model_params["force_refresh"] = hopped
-
-    class forces_of:
-        pass
-
-    def forces_only(q, params, full_id):
-        itraj = Cpp2Py(full_id)[-1]
-        out = forces_of()
-        if itraj in hopped:
-            obj = compute_model(q, params, full_id)
-            if not hasattr(obj, "d1ham_adi"):
-                raise ValueError(F"hop_force_refresh: the model returned no d1ham_adi for trajectory {itraj}")
-            out.d1ham_adi = obj.d1ham_adi
-        return out
-    try:
-        ham.compute_adiabatic(forces_only, dyn_var.get_coords(), model_params, 1)
-    finally:
-        model_params.pop("force_refresh")
-    for itraj, state in hopped.items():
-        if missing(itraj, state):
-            raise ValueError(F"hop_force_refresh: the model returned no force for the new state {state} of "
-                             F"trajectory {itraj} (its row is still NaN)")
-    update_forces(prms, dyn_var, ham)
-
-
 @_with_blas_cap(1)
 def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, init_params=None):
     """
@@ -1153,12 +1102,11 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
             * **dyn_params["hop_force_refresh"]** (int): after a change of the active state (an accepted hop, a
               relabel at a crossing), call the model back at the same geometry for the force of the new active state
               - for models that hand over the force of their active state alone (the on-the-fly drivers under
-              force_source "active_state"), whose new state's row is zero then and whose next half kick would
-              otherwise run force-free. The model receives
-              params["force_refresh"] = {trajectory: new state} and returns the forces, only its d1ham_adi is
-              ingested. A relabel changes the state before the second half kick of its step, so compute_dynamics
-              calls the model back inside the step for it - a hop is served right after the step. Needs
-              force_method 1, rep_sh 1 and isNBRA 0:
+              force_source "active_state"), whose new state's row is NaN then (the sentinel of a row not handed
+              over - a zero force is a force) and whose next half kick would otherwise run force-free. The model
+              receives params["force_refresh"] = {trajectory: new state} and returns the forces, only its
+              d1ham_adi is ingested. compute_dynamics owns both call-backs: a relabel's before the second half
+              kick of its step, a hop's after the hops of the step. Needs force_method 1, rep_sh 1 and isNBRA 0:
 
               - 0: No [default]
               - 1: Yes
@@ -1473,7 +1421,6 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
     nfiles = dyn_params["nfiles"]  # The number of loaded Ham files
     tsh_method = dyn_params["tsh_method"]
     thermally_corrected_nbra = dyn_params["thermally_corrected_nbra"]
-    hop_force_refresh = int(dyn_params["hop_force_refresh"])
     total_energy = dyn_params["total_energy"]
     use_qtsh = dyn_params["use_qtsh"]
     qtsh_force_option = dyn_params["qtsh_force_option"]
@@ -1625,10 +1572,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
             model_params["act_state"] = { itraj : dyn_var.act_states[itraj] for itraj in range(ntraj)  } 
 
 
-            states_before = list(dyn_var.act_states)
             compute_dynamics(dyn_var, dyn_params, ham, ham_aux, compute_model, model_params, rnd, therm)
-            if hop_force_refresh == 1:
-                refresh_hop_forces(dyn_var, ham, prms, compute_model, model_params, states_before)
 
             # the time-overlap of the interval just crossed - saved post-step so
             # frame i means [t_i, t_i+1] under both time_overlap_method values

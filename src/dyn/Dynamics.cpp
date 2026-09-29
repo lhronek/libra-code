@@ -1993,12 +1993,12 @@ static void check_hop_force_rows(dyn_control_params &prms, dyn_variables &dyn_va
     of a row the model did not hand over) while the old state's row is not:
     that is a model handing over the force of its active state alone (the
     on-the-fly drivers under force_source active_state), whose next half kick
-    would run force-free. A zero force is a force. Under hop_force_refresh the row of a relabel is
-    filled inside the step (refresh_relabel_forces, before the second half
-    kick) and the row of a hop by the python step loop right after this step,
-    which checks it itself.
+    would run force-free. A zero force is a force. Under hop_force_refresh both
+    rows are filled inside the step (refresh_force_rows: a relabel's before the
+    second half kick, a hop's after the hops), so a row still NaN here is a
+    call-back that returned none.
   */
-  if (prms.force_method != 1 || prms.rep_sh != 1 || prms.hop_force_refresh == 1) { return; }
+  if (prms.force_method != 1 || prms.rep_sh != 1) { return; }
   int ndof = ham.nnucl;
   for (int traj = 0; traj < dyn_var.ntraj; traj++) {
     if (old_states[traj] == new_states[traj] || (int)ham.children.size() <= traj) { continue; }
@@ -2023,19 +2023,19 @@ static void check_hop_force_rows(dyn_control_params &prms, dyn_variables &dyn_va
   }
 }
 
-static void refresh_relabel_forces(dyn_control_params &prms, dyn_variables &dyn_var,
-                                   nHamiltonian &ham, bp::object py_funct, bp::dict params,
-                                   vector<int> &old_states, vector<int> &new_states) {
+static void refresh_force_rows(dyn_control_params &prms, dyn_variables &dyn_var,
+                               nHamiltonian &ham, bp::object py_funct, bp::dict params,
+                               vector<int> &old_states, vector<int> &new_states) {
   /**
     The force of the new active state at this geometry for every trajectory
-    whose active state changed in the relabel of this step while the new row
-    of the force hand-over is NaN (not handed over) and the old row is not (a
-    model handing over the force of its active state alone). The relabel
-    precedes the second half kick, so the row is filled here: the model is
-    called back once with params["force_refresh"] = {trajectory: new state}
-    and params["act_state"] updated, as the python step loop does after a hop
-    - the drivers return the forces of the listed trajectories and nothing
-    else. A row still NaN after the call-back stops the run.
+    whose active state changed - in the relabel of this step (called before
+    the second half kick) or in its hops (called after them) - while the new
+    row of the force hand-over is NaN (not handed over) and the old row is
+    not (a model handing over the force of its active state alone). The model
+    is called back once with params["force_refresh"] = {trajectory: new state}
+    and params["act_state"] updated - the drivers return the forces of the
+    listed trajectories and nothing else. A row still NaN after the call-back
+    stops the run. The one owner of the refresh: the python step loop has none.
   */
   if (prms.force_method != 1 || prms.rep_sh != 1) { return; }
   int ndof = ham.nnucl;
@@ -2074,10 +2074,10 @@ static void refresh_relabel_forces(dyn_control_params &prms, dyn_variables &dyn_
       if (std::isnan(d1.get(new_states[traj], new_states[traj]).real())) { missing = true; }
     }
     if (missing) {
-      std::cout << "Error in compute_dynamics(): the active state of trajectory " << traj << " was relabeled "
-                << old_states[traj] << " -> " << new_states[traj] << " at a crossing and the model called back "
-                << "for the new state's force (hop_force_refresh) returned none - the second half kick would run "
-                << "force-free\n";
+      std::cout << "Error in compute_dynamics(): the active state of trajectory " << traj << " changed "
+                << old_states[traj] << " -> " << new_states[traj] << " (a hop or a relabel) and the model called "
+                << "back for the new state's force (hop_force_refresh) returned none - the next half kick would "
+                << "run force-free\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
@@ -2400,8 +2400,10 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   // a relabel at a crossing changed the active state before the second half kick - the new label's force must be
   // in its row before the kick reads it
   if (prms.hop_force_refresh == 1) {
-    refresh_relabel_forces(prms, dyn_var, ham, py_funct, params, old_states, dyn_var.act_states);
+    refresh_force_rows(prms, dyn_var, ham, py_funct, params, old_states, dyn_var.act_states);
   }
+  // the check names the remedy, so it runs before the forces are rebuilt from the new row
+  check_hop_force_rows(prms, dyn_var, ham, old_states, dyn_var.act_states);
   update_forces(prms, dyn_var, ham);
 
   //cout<<"forces after: \n";
@@ -2910,6 +2912,12 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   dyn_var.update_amplitudes(prms);
   dyn_var.update_density_matrix(prms);
 
+  // a hop changed the row the forces are read from - under hop_force_refresh the
+  // model is called back for the new row here, as it is for a relabel before the
+  // second half kick (one owner: compute_dynamics)
+  if (prms.hop_force_refresh == 1) {
+    refresh_force_rows(prms, dyn_var, ham, py_funct, params, old_states, act_states);
+  }
   // old_states holds the active states at the start of the step - a relabel at a
   // crossing and a surface hop both change the row the forces are read from - the
   // check names the remedy, so it runs before the forces are rebuilt from that row
