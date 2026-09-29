@@ -40,6 +40,7 @@ import json
 import numpy as np
 from libra_py.workflows.nbra.mp_context import MP_CTX as _MP_CTX
 import scipy.sparse as sp
+from scipy.optimize import linear_sum_assignment
 if sys.platform == "cygwin":
     from cyglibra_core import *
 elif sys.platform == "linux" or sys.platform == "linux2":
@@ -804,6 +805,19 @@ def _spin_block_permutation(perm_aa, perm_bb, nstates):
     return p
 
 
+def _maximize_assignment(cost_mat, reordering):
+    """The [row, column] pairs of the assignment that maximizes the total of a square cost matrix (a libra MATRIX,
+    make_cost_mat) - do_state_reordering 2 libra_py.hungarian.maximize, 22 scipy's linear_sum_assignment, the same
+    assignment."""
+    if reordering == 2:
+        return hungarian.maximize(cost_mat)
+    if reordering == 22:
+        rows, cols = linear_sum_assignment(data_conv.MATRIX2nparray(cost_mat, np.float64), maximize=True)
+        return [[int(r), int(c)] for r, c in zip(rows, cols)]
+    raise ValueError(F"do_state_reordering = {reordering!r} is not a Munkres-Kuhn assignment - 2 (libra_py.hungarian) "
+                     F"and 22 (scipy's linear_sum_assignment) are")
+
+
 def apply_state_reordering(St, E, params):
     """
 
@@ -818,6 +832,8 @@ def apply_state_reordering(St, E, params):
                 Available options:
                     - 1: older version developed by Kosuke Sato, may not the working all the times
                     - 2: Munkres-Kuhn (Hungarian) method [default]
+                    - 22: the Munkres-Kuhn assignment by scipy's linear_sum_assignment - the same result as 2, in a
+                      fraction of its time
 
             * **params["state_reordering_alpha"]** ( double ): a parameter that controls how
                 many states will be included in the reordering
@@ -893,7 +909,7 @@ def apply_state_reordering(St, E, params):
             # Because St = <psi(t)|psi(t+dt)> - the columns take the labels of the next frame
             St[i].permute_cols(perm_cum)
 
-        elif params["do_state_reordering"] == 2:
+        elif params["do_state_reordering"] in (2, 22):
             """
             The Hungarian approach
             """
@@ -928,8 +944,8 @@ def apply_state_reordering(St, E, params):
             cost_mat_bb = make_cost_mat(bb, en_mat_bb, params["state_reordering_alpha"], en_pos_bb)
 
             # Solve the optimal assignment problem for diagonal blocks
-            res_aa = hungarian.maximize(cost_mat_aa)
-            res_bb = hungarian.maximize(cost_mat_bb)
+            res_aa = _maximize_assignment(cost_mat_aa, params["do_state_reordering"])
+            res_bb = _maximize_assignment(cost_mat_bb, params["do_state_reordering"])
 
             # Convert the list of lists into the permutation object
             for ra in res_aa:
@@ -948,6 +964,9 @@ def apply_state_reordering(St, E, params):
             push_submatrix(St[i], ab, alp, bet)
             push_submatrix(St[i], ba, bet, alp)
             push_submatrix(St[i], bb, bet, bet)
+        else:
+            raise ValueError(F"do_state_reordering = {params['do_state_reordering']!r} has no branch here - 1 (Sato), "
+                             F"2 (Munkres-Kuhn, libra_py.hungarian) and 22 (the same assignment by scipy) are")
 
     # the trailing step (E has one entry more than St) takes the final labels
     if params["do_state_reordering"] == 1:
@@ -1007,13 +1026,14 @@ def _refuse_former_names(params):
 
 def _check_reordering_options(params, route):
     """The state-reordering options the step-3 writers share, refused outside their domains: do_state_reordering and
-    do_diabatic_state_reordering in 0 (none), 1 (Sato), 2 (Munkres-Kuhn), the two alphas non-negative widths in
-    1/Hartree, the two continuity thresholds between 0 (off) and 1 - the keys a route carries. One contract for
+    do_diabatic_state_reordering in 0 (none), 1 (Sato), 2 (Munkres-Kuhn by libra_py.hungarian), 22 (the same
+    assignment by scipy's linear_sum_assignment), the two alphas non-negative widths in 1/Hartree, the two
+    continuity thresholds between 0 (off) and 1 - the keys a route carries. One contract for
     run_step3_ks_nacs_libint, run_step3_sd_nacs_libint and run_step3_pod."""
     for key in ('do_state_reordering', 'do_diabatic_state_reordering'):
-        if key in params and params[key] not in (0, 1, 2):
-            raise ValueError(F"{route}: {key} = {params[key]!r} is not a listed option - 0 (none), 1 (Sato) and 2 "
-                             F"(Munkres-Kuhn) are supported")
+        if key in params and params[key] not in (0, 1, 2, 22):
+            raise ValueError(F"{route}: {key} = {params[key]!r} is not a listed option - 0 (none), 1 (Sato), 2 "
+                             F"(Munkres-Kuhn, libra_py.hungarian) and 22 (the same assignment by scipy) are supported")
     for key in ('state_reordering_alpha', 'diabatic_state_reordering_alpha'):
         if key in params and not (np.isreal(params[key]) and params[key] >= 0.0):
             raise ValueError(F"{route}: {key} = {params[key]!r} - a non-negative width in 1/Hartree is needed")
@@ -1776,6 +1796,8 @@ def apply_state_reordering_general(St, E, params):
                 Available options:
                     - 1: older version developed by Kosuke Sato, may not the working all the times
                     - 2: Munkres-Kuhn (Hungarian) method [default]
+                    - 22: the Munkres-Kuhn assignment by scipy's linear_sum_assignment - the same result as 2, in a
+                      fraction of its time
             * **params["state_reordering_alpha"]** ( double ): a parameter that controls how
                 many states will be included in the reordering
     Returns:
@@ -1826,7 +1848,7 @@ def apply_state_reordering_general(St, E, params):
             # Because St = <psi(t)|psi(t+dt)> - the columns take the labels of the next frame
             St[i].permute_cols(perm_cum)
 
-        elif params["do_state_reordering"] == 2:
+        elif params["do_state_reordering"] in (2, 22):
             """
             The Hungarian approach
             """
@@ -1844,7 +1866,7 @@ def apply_state_reordering_general(St, E, params):
             cost_mat = make_cost_mat(St[i], E[i], params["state_reordering_alpha"], E_pos)
 
             # Solve the optimal assignment problem for diagonal blocks
-            res = hungarian.maximize(cost_mat)
+            res = _maximize_assignment(cost_mat, params["do_state_reordering"])
 
             # Convert the list of lists into the permutation object
             for row in res:
@@ -1852,6 +1874,9 @@ def apply_state_reordering_general(St, E, params):
 
             # Permute the blocks by col
             St[i].permute_cols(perm_t)
+        else:
+            raise ValueError(F"do_state_reordering = {params['do_state_reordering']!r} has no branch here - 1 (Sato), "
+                             F"2 (Munkres-Kuhn, libra_py.hungarian) and 22 (the same assignment by scipy) are")
 
     # the trailing step (E has one entry more than St) takes the final labels
     final = perm_cum if params["do_state_reordering"] == 1 else perm_t
@@ -2266,6 +2291,7 @@ def run_step3_ks_nacs_libint(params):
                     - 0: no state reordering - same as in Pyxaid
                     - 1: older method (is not robust, may or may not work)
                     - 2: Hungarian algorithm [default]
+                    - 22: the Hungarian assignment by scipy's linear_sum_assignment - the same result as 2, faster
             * **params['nac_algo']** ( int ): selection of a method to compute NACs
                     - 0 : Hamess-Shiffer-Tully (HST), finite difference [ default ]
                     - 1 : Meek-Levine NPI
@@ -2384,7 +2410,7 @@ def run_step3_ks_nacs_libint(params):
     zero = MATRIX(nstates, nstates)
 
     # Whether to perform state reordering or not
-    if params['do_state_reordering'] == 2 or params['do_state_reordering'] == 1:
+    if params['do_state_reordering'] in (1, 2, 22):
         # This step may be very time-consuming for large matrices but since
         # we have the matrices in sparse format we need to first turn them into
         # CMATRIX and then use them for state reordering.
@@ -2953,17 +2979,19 @@ def _fragment_operator_prefix(params, res_dir_1, start_time):
     return prefix, nfrag
 
 
-def _fragment_operators_of_step(params, prefix, nfrag, step, active_space):
+def _fragment_operators_of_step(params, prefix, nfrag, step, active_space, with_energies=True):
     """The step-2 fragment operators and the orbital-energy operator of one step sliced to the active space (through
     the orbital relabeling of active_space_selection 'identity'), Lowdin-orthonormalized when the SD overlaps are
-    (the orthonormal-orbital layout sd_diabatization_step and sd_fragment_operators read)."""
+    (the orthonormal-orbital layout sd_diabatization_step and sd_fragment_operators read) - the energies None when
+    the caller does not read them."""
     P_frag = [_window_matrix(params, F'{prefix}{f}_ks', step, active_space) for f in range(nfrag)]
-    E_orb = _window_matrix(params, 'E_ks', step, active_space)
+    E_orb = _window_matrix(params, 'E_ks', step, active_space) if with_energies else None
     if params['apply_orthonormalization'] != "none":
         s_ks = _window_matrix(params, 'S_ks', step, active_space)
         X = orthogonalizations.get_Lowdin_scipy(s_ks)
         P_frag = [X.T @ P @ X for P in P_frag]
-        E_orb = X.T @ E_orb @ X
+        if with_energies:
+            E_orb = X.T @ E_orb @ X
     return P_frag, E_orb
 
 
@@ -3145,7 +3173,7 @@ def _ci_diabatization_series(params, sd_sorted, SD2CI, ci_energies, active_space
     prefix, nfrag = _fragment_operator_prefix(params, params['path_to_npz_files'], start_time)
     V_list, pops_list, hole_list, energy_list, dia_index = [], [], [], [], None
     for i, step in enumerate(range(start_time, finish_time)):
-        P_frag, _ = _fragment_operators_of_step(params, prefix, nfrag, step, active_space)
+        P_frag, _ = _fragment_operators_of_step(params, prefix, nfrag, step, active_space, with_energies=False)
         O_hole, O_elec = sd_fragment_operators(sd_sorted[i], P_frag)
         V, dia_index, pops, pops_hole, energies = ci_diabatization_step(SD2CI[i], O_hole, O_elec, ci_energies[i],
                                                                         kind, dia_index)
@@ -3156,21 +3184,30 @@ def _ci_diabatization_series(params, sd_sorted, SD2CI, ci_energies, active_space
     return V_list, dia_index, pops_list, hole_list, energy_list
 
 
-def _munkres_assignment(weights):
-    """The column assigned to every row of a weight matrix so that the assigned weights sum to the maximum
-    (libra_py.hungarian.maximize, the Munkres-Kuhn step of the SD reordering) - as many columns as rows or more,
-    the matrix padded to a square with zero rows whose padding rows take the columns left over."""
+def _munkres_assignment(weights, reordering):
+    """The column assigned to every row of a weight matrix so that the assigned weights sum to the maximum, the
+    Munkres-Kuhn step of the followings - reordering 2 libra_py.hungarian.maximize (the step of the legacy SD-state
+    reordering: the matrix padded to a square with zero rows whose padding rows take the columns left over, a
+    pure-Python loop that takes seconds on a window of a hundred orbitals), 22 scipy's linear_sum_assignment (the
+    same assignment) - as many columns as rows or more."""
     W = np.asarray(weights, dtype=float)
     nrow, ncol = W.shape
     if ncol < nrow:
         raise ValueError(F"{nrow} states cannot be assigned to {ncol} candidates - at least as many candidates are "
                          "needed")
-    padded = np.zeros((ncol, ncol))
-    padded[:nrow] = W
     col_of = np.full(nrow, -1, dtype=int)
-    for row, col in hungarian.maximize(data_conv.nparray2MATRIX(padded)):
-        if row < nrow:
-            col_of[row] = col
+    if reordering == 2:
+        padded = np.zeros((ncol, ncol))
+        padded[:nrow] = W
+        for row, col in hungarian.maximize(data_conv.nparray2MATRIX(padded)):
+            if row < nrow:
+                col_of[row] = col
+    elif reordering == 22:
+        rows, cols = linear_sum_assignment(W, maximize=True)
+        col_of[rows] = cols
+    else:
+        raise ValueError(F"reordering = {reordering!r} is not a Munkres-Kuhn assignment - 2 (libra_py.hungarian) and "
+                         F"22 (scipy's linear_sum_assignment) are")
     if np.any(col_of < 0) or len(set(col_of.tolist())) != nrow:
         raise RuntimeError("the Munkres assignment left a state without a distinct candidate")
     return col_of
@@ -3195,19 +3232,23 @@ def _tracking_groups(dia_index):
 def _assign_states(O, reordering, alpha=0.0, energies=None, col_energies=None):
     """The column of every row of a square time-overlap block that carries its state on, by the reordering of the SD
     states: 1 the Sato search of libra's get_reordering, 2 the Munkres-Kuhn assignment on |O|^2 exp(-(alpha dE)^2)
-    with dE the energy difference between the row's state and the column's position, both at the earlier frame (the
-    cost of make_cost_mat): energies are the rows' - the states followed so far, in their labels - and col_energies
-    the columns' - the candidate positions in their stored order, the rows' vector again when None, which is right
-    only while no state has been relabeled. alpha 0 or no energies put no penalty."""
+    by libra_py.hungarian, 22 the same assignment by scipy's linear_sum_assignment - dE the energy difference
+    between the row's state and the column's position, both at the earlier frame (the cost of make_cost_mat):
+    energies are the rows' - the states followed so far, in their labels - and col_energies the columns' - the
+    candidate positions in their stored order, the rows' vector again when None, which is right only while no state
+    has been relabeled. alpha 0 or no energies put no penalty."""
     O = np.asarray(O, dtype=float)
     if reordering == 1:
         return np.array([int(c) for c in get_reordering(data_conv.nparray2CMATRIX(O))])
+    if reordering not in (2, 22):
+        raise ValueError(F"reordering = {reordering!r} is not a listed option - 1 (Sato), 2 (Munkres-Kuhn, "
+                         F"libra_py.hungarian) and 22 (the same assignment by scipy) are")
     weights = O ** 2
     if alpha and energies is not None:
         e = np.nan_to_num(np.asarray(energies, dtype=float))
         e_cols = e if col_energies is None else np.nan_to_num(np.asarray(col_energies, dtype=float))
         weights = weights * np.exp(-(alpha * (e[:, None] - e_cols[None, :])) ** 2)
-    return _munkres_assignment(weights)
+    return _munkres_assignment(weights, reordering)
 
 
 def _state_energies(energy_records):
@@ -3393,7 +3434,8 @@ def _follow_orbitals(params, start_time, finish_time):
     of the later frame are assigned to those of the earlier one as the SD states are reordered -
     active_space_selection_algo 1 the Sato search of get_reordering, 2 the Munkres-Kuhn assignment on |St|^2
     exp(-(alpha dE)^2) with the orbital energies of the earlier frame (the cost of make_cost_mat,
-    active_space_selection_alpha the width). Returns {frame: perm}, the label permutation of every frame - position r
+    active_space_selection_alpha the width) by libra_py.hungarian, 22 the same assignment by scipy. Returns
+    {frame: perm}, the label permutation of every frame - position r
     of the frame's window matrices holds the orbital that stands at position perm[r] of the stored window, the
     identity at start_time - and the record of the window: the frames at which the labels changed, the count of
     frames off the energy order, the smallest continuity, the orbitals that left the window (edge_departures:
@@ -3404,17 +3446,23 @@ def _follow_orbitals(params, start_time, finish_time):
     res_dir, n = params['path_to_npz_files'], params['data_dim'] // 2
     reordering, alpha = params['active_space_selection_algo'], params['active_space_selection_alpha']
     blocks = [np.arange(n), np.arange(n, 2 * n)]
+    # a closed shell stores the alpha block in both spin blocks - one assignment serves both
+    assigned = blocks if int(params.get('isUKS', 0)) else blocks[:1]
     perm = np.arange(2 * n)
     perms = {start_time: perm.tolist()}
     reordered, unresolved, edges = [], [], []
     min_continuity = 1.0
     for k in range(start_time, finish_time - 1):
         St = np.abs(np.asarray(sp.load_npz(F'{res_dir}/St_ks_{k}.npz').todense()).real)
-        e_pos = np.diag(np.asarray(sp.load_npz(F'{res_dir}/E_ks_{k}.npz').todense()).real)
-        e = e_pos[perm]
+        # the orbital energies enter the penalty alone
+        e_pos = np.diag(np.asarray(sp.load_npz(F'{res_dir}/E_ks_{k}.npz').todense()).real) if alpha else None
+        e = None if e_pos is None else e_pos[perm]
         new = np.empty_like(perm)
-        for b in blocks:
-            new[b] = b[_assign_states(St[np.ix_(perm[b], b)], reordering, alpha, e[b], e_pos[b])]
+        for b in assigned:
+            new[b] = b[_assign_states(St[np.ix_(perm[b], b)], reordering, alpha, None if e is None else e[b],
+                                      None if e_pos is None else e_pos[b])]
+        if len(assigned) == 1:
+            new[blocks[1]] = new[blocks[0]] + n
         d = St[perm, new]
         inside = np.sqrt(np.sum(St[perm] ** 2, axis=1))
         min_continuity = min(min_continuity, float(d.min()))
@@ -3676,18 +3724,20 @@ def run_step3_pod(params):
             * **params['do_state_reordering']** (int): 0 [default] the adiabatic states by increasing energy at every
                 frame, 1 the Sato search (get_reordering), 2 the Munkres-Kuhn assignment of the adiabatic states of
                 frame k+1 to those of frame k by the largest squared time overlap with the energy penalty of
-                state_reordering_alpha (identity following through the avoided crossings)
+                state_reordering_alpha (identity following through the avoided crossings, libra_py.hungarian), 22
+                the same assignment by scipy's linear_sum_assignment
             * **params['state_reordering_alpha']** (float): the energy penalty of the assignment,
                 exp(-(alpha dE)^2) [default: 0]
             * **params['do_diabatic_state_reordering']** (int): the reordering of the block states between the
                 frames, with the vocabulary of do_state_reordering. 0 [default]: none - every block state of the
                 basis must continue itself (|<s(k)|s(k+1)>| >= 0.5), a swap of two block states is refused, the
                 ranks are the energy order of every frame. 1: Sato (get_reordering), 2: Munkres-Kuhn
-                (libra_py.hungarian) - ALL block states of a block are reordered against the block's states of the
-                next frame and every basis state follows the block state assigned to it, so a state keeps the block
-                state that carries it through a crossing of the block's levels, at the window edge too - the labels
-                record swap_frames and frames_off_energy_order, the report the followed block states of the frames
-                off the starting order, and the ranks name the energy order at start_time only. A continuation
+                (libra_py.hungarian), 22: the same assignment by scipy's linear_sum_assignment - ALL block states of
+                a block are reordered against the block's states of the next frame and every basis state follows
+                the block state assigned to it, so a state keeps the block state that carries it through a crossing
+                of the block's levels, at the window edge too - the labels record swap_frames and
+                frames_off_energy_order, the report the followed block states of the frames off the starting order,
+                and the ranks name the energy order at start_time only. A continuation
                 below diabatic_state_reordering_min_overlap is refused when it is an internal mixing and recorded
                 when the state left the basis of its block (edge_departures - without a reordering only, the
                 reordering follows a state anywhere in its block).
@@ -3911,7 +3961,7 @@ def run_step3_pod(params):
     perm_prev = np.arange(n)
     for k in range(1, len(frames)):
         O = V[k - 1].T @ St_hole[k - 1] @ V[k]
-        if params['do_state_reordering'] in (1, 2):
+        if params['do_state_reordering'] in (1, 2, 22):
             # the assignment maps the followed labels to the frame's energy order, so it is the frame's label
             # permutation itself - a frame off the energy order counts, a change of the labels is a reordering
             perm = _assign_states(O, params['do_state_reordering'], params['state_reordering_alpha'], E_adi[k - 1],
@@ -3930,7 +3980,7 @@ def run_step3_pod(params):
         for j in np.where(d_adi < max(sd_min_overlap, 0.5))[0]:
             if inside_adi[j] < max(sd_min_overlap, 0.5):
                 adi_edges.append([int(frames[k]), int(j), round(float(d_adi[j]), 4), round(float(inside_adi[j]), 4)])
-            elif params['do_state_reordering'] in (1, 2) and sd_min_overlap > 0.0 and d_adi[j] < sd_min_overlap:
+            elif params['do_state_reordering'] in (1, 2, 22) and sd_min_overlap > 0.0 and d_adi[j] < sd_min_overlap:
                 raise ValueError(F"the adiabatic hole state {j} of frame {frames[k - 1]} carries |<{j}|{j}>| = "
                                  F"{d_adi[j]:.3f} into frame {frames[k]} after the reordering, below the threshold "
                                  F"{sd_min_overlap} (the basis carries {inside_adi[j]:.3f} of the state) - an internal "
@@ -4086,11 +4136,12 @@ def run_step3_sd_nacs_libint(params):
                 fragment between the frames through O = W(k)^T St(k) W(k+1), with the vocabulary of
                 do_state_reordering. 0 [default]: none - every state must continue itself (|O_cc| >= 0.5), a frame
                 pair in which two states of a fragment swap is refused, their ranks are the energy order of every
-                frame. 1: Sato (get_reordering), 2: Munkres-Kuhn (libra_py.hungarian) - within every fragment (and
-                manifold, and fragment pair of the joint states) the states of frame k+1 are assigned to those of
-                frame k, so a state keeps the identity it had at start_time through a crossing of its fragment's
-                levels - U_sd_labels.json records swap_frames (the frames at which the assignment changed) and
-                frames_off_energy_order, and the ranks name the energy order at start_time only. A state whose
+                frame. 1: Sato (get_reordering), 2: Munkres-Kuhn (libra_py.hungarian), 22: the same assignment by
+                scipy's linear_sum_assignment - within every fragment (and manifold, and fragment pair of the joint
+                states) the states of frame k+1 are assigned to those of frame k, so a state keeps the identity it
+                had at start_time through a crossing of its fragment's levels - U_sd_labels.json records swap_frames
+                (the frames at which the assignment changed) and frames_off_energy_order, and the ranks name the
+                energy order at start_time only. A state whose
                 continuation carries less than diabatic_state_reordering_min_overlap even after the reordering is
                 refused as well when the space still carries it (an internal mixing the frame spacing does not
                 resolve) and recorded when it left the active space through its edge (edge_departures). Applies to
@@ -4134,7 +4185,8 @@ def run_step3_sd_nacs_libint(params):
                 the CI states are expanded in the followed determinants.
             * **params['active_space_selection_algo']** (int): the assignment that follows the orbitals under
                 'identity', with the values of do_state_reordering: 2 [default] Munkres-Kuhn (libra_py.hungarian on
-                |St_ks|^2 exp(-(alpha dE)^2), the cost of the KS route's reordering), 1 Sato (get_reordering).
+                |St_ks|^2 exp(-(alpha dE)^2), the cost of the KS route's reordering), 22 the same assignment by
+                scipy's linear_sum_assignment, 1 Sato (get_reordering).
             * **params['active_space_selection_alpha']** (float): the energy-penalty width of that Munkres-Kuhn cost,
                 in 1/Hartree [default: 0 - no penalty] - as state_reordering_alpha.
             * **params['npz_file_ks_homo_index']** (integer): the KS HOMO index of the raw npz files.
@@ -4157,6 +4209,7 @@ def run_step3_sd_nacs_libint(params):
                     - 0: no state reordering - same as in Pyxaid
                     - 1: older method (is not robust, may or may not work)
                     - 2: Hungarian algorithm [default]
+                    - 22: the Hungarian assignment by scipy's linear_sum_assignment - the same result as 2, faster
             * **params['state_reordering_alpha']** (float): a value for state-reordering
             * **params['nac_algo']** ( int ): selection of a method to compute NACs
                     - 0 : Hamess-Shiffer-Tully (HST), finite difference [ default ]
@@ -4217,9 +4270,9 @@ def run_step3_sd_nacs_libint(params):
                          F"'energy' (the energy positions of every frame) and 'identity' (the orbitals of start_time "
                          F"followed through the window) are supported")
     algo, orb_alpha = params['active_space_selection_algo'], params['active_space_selection_alpha']
-    if algo not in (1, 2):
-        raise ValueError(F"active_space_selection_algo = {algo!r} is not a listed option - 1 (Sato) and 2 "
-                         F"(Munkres-Kuhn) are supported")
+    if algo not in (1, 2, 22):
+        raise ValueError(F"active_space_selection_algo = {algo!r} is not a listed option - 1 (Sato), 2 (Munkres-Kuhn, "
+                         F"libra_py.hungarian) and 22 (the same assignment by scipy) are supported")
     if not (np.isreal(orb_alpha) and orb_alpha >= 0.0):
         raise ValueError(F"active_space_selection_alpha = {orb_alpha!r} - a non-negative width in 1/Hartree is needed")
     res_dir_1 = params['path_to_npz_files']
@@ -4583,7 +4636,7 @@ def run_step3_sd_nacs_libint(params):
                                                             swaps_dia, unresolved_dia, cont_dia, edges_dia, start_time))
         print(F"diabatic SD states: {len(swaps_dia)} swap frames, {len(unresolved_dia)} frames let through with a "
               F"continuation below 0.5, {len(edges_dia)} edge departures, continuity min {cont_dia:.4f}")
-    if params['do_state_reordering'] == 2 or params['do_state_reordering'] == 1:
+    if params['do_state_reordering'] in (1, 2, 22):
         t2 = time.time()
         # For state reordering we need a list of CMATRIX for both St and energy
         St_sds_cmatrix = []
@@ -4613,7 +4666,7 @@ def run_step3_sd_nacs_libint(params):
     # the continuity of the SD states as labeled: refused below the threshold after a reordering, recorded otherwise
     route_report = {"sd": _continuity_record(St_sds, start_time, params['do_state_reordering'],
                                              params['state_reordering_alpha'], sd_min_overlap,
-                                             perms if params['do_state_reordering'] in (1, 2) else None)}
+                                             perms if params['do_state_reordering'] in (1, 2, 22) else None)}
     print(F"SD states: {len(route_report['sd']['reordered_frames'])} reordered frames, "
           F"{len(route_report['sd']['unresolved_frames'])} frames let through with a continuation below 0.5, "
           F"{len(route_report['sd']['edge_departures'])} edge departures (a state left the active space), continuity "
@@ -4632,7 +4685,7 @@ def run_step3_sd_nacs_libint(params):
                 sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/Hvib_ci_{step-1}_re.npz', sp.csc_matrix(E_midpoint))
             E_ci_step_plus = E_ci_step
 
-        if params['do_state_reordering'] == 2 or params['do_state_reordering'] == 1:
+        if params['do_state_reordering'] in (1, 2, 22):
             # Since we have performed state-reordering we need to
             # convert to scipy npz format now
             t2 = time.time()
@@ -4712,7 +4765,7 @@ def run_step3_sd_nacs_libint(params):
                                                                 cont_ci_dia, edges_ci_dia, start_time))
         route_report["ci"] = _continuity_record(St_cis, start_time, params['do_state_reordering'],
                                                 params['state_reordering_alpha'], sd_min_overlap,
-                                                perms_ci if params['do_state_reordering'] in (1, 2) else None, "CI")
+                                                perms_ci if params['do_state_reordering'] in (1, 2, 22) else None, "CI")
 
     route_report["active_space"] = selection_record
     with open(F'{res_dir_2}/sd_route_report.json', 'w') as f:
