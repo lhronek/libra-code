@@ -521,6 +521,8 @@ class dyn_control_params{
 
       - 0: based on master equation, rho(t+dt) = J * rho(t);  J matrix contains hopping probabilities directly  [ defualt ]
       - 1: based on kinetic approach, drho/dt = J * rho; J matrix contains fluxes
+      - 2: the kinetic approach with the banded initial guess of the rate matrix in run_opt
+    (the GFSH branches of -1 exist in the uncalled hopping_probabilities_fssh3_dev alone - not an option)
   */
   int fssh3_approach_option;
 

@@ -372,7 +372,7 @@ void dyn_control_params::sanity_check(){
     {"use_boltz_factor", use_boltz_factor, {0, 1}},
     {"fssh2_revision", fssh2_revision, {0, 1}},
     {"fssh3_size_option", fssh3_size_option, {0, 1}},
-    {"fssh3_approach_option", fssh3_approach_option, {0, 1}},
+    {"fssh3_approach_option", fssh3_approach_option, {0, 1, 2}},
     {"fssh3_decomp_option", fssh3_decomp_option, {0, 1, 2, 3}},
     {"use_qtsh", use_qtsh, {0, 1}},
     {"qtsh_force_option", qtsh_force_option, {0, 1, 2}},

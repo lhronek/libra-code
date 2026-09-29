@@ -741,6 +741,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
 
                 - 0: based on master equation, rho(t+dt) = J * rho(t);  J matrix contains hopping probabilities directly  [ defualt ]
                 - 1: based on kinetic approach, drho/dt = J * rho; J matrix contains fluxes
+                - 2: the kinetic approach with the banded initial guess of the rate matrix in run_opt
 
 
             * **dyn_params["fssh3_decomp_option"]** ( int ): The matrix decomposition method for solving the least-squares problem.
