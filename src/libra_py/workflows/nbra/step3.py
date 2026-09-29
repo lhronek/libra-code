@@ -868,18 +868,21 @@ def apply_state_reordering(St, E, params):
             A simple approach based on permuations - but this is not robust
             may have loops
             """
-            perm_t = get_reordering(St[i])
-
-            # apply the cumulative permutation
-            update_permutation(perm_t, perm_cum)
-
-            # apply the permutation
-            # Because St = <psi(t)|psi(t+dt)> - we permute only columns
-            St[i].permute_cols(perm_cum)
-
-            E[i].permute_cols(perm_cum)
+            # the frame's own labels first - its energies and the rows of its time overlap, recorded as this step's
+            # permutation, as the Hungarian branch does
+            St[i].permute_rows(perm_cum)
             E[i].permute_rows(perm_cum)
+            E[i].permute_cols(perm_cum)
             perms.append([perm_cum[k] for k in range(2 * nstates)])
+
+            # the search on the relabeled rows: perm_t[r] is the column of the next frame that carries the state of
+            # label r, so it is the next frame's label permutation itself
+            perm_t = get_reordering(St[i])
+            for k in range(2 * nstates):
+                perm_cum[k] = perm_t[k]
+
+            # Because St = <psi(t)|psi(t+dt)> - the columns take the labels of the next frame
+            St[i].permute_cols(perm_cum)
 
         elif params["do_state_reordering"] == 2:
             """
@@ -1766,18 +1769,21 @@ def apply_state_reordering_general(St, E, params):
             A simple approach based on permuations - but this is not robust
             may have loops
             """
-            perm_t = get_reordering(St[i])
-
-            # apply the cumulative permutation
-            update_permutation(perm_t, perm_cum)
-
-            # apply the permutation
-            # Because St = <psi(t)|psi(t+dt)> - we permute only columns
-            St[i].permute_cols(perm_cum)
-
-            E[i].permute_cols(perm_cum)
+            # the frame's own labels first - its energies and the rows of its time overlap, recorded as this step's
+            # permutation, as the Hungarian branch does
+            St[i].permute_rows(perm_cum)
             E[i].permute_rows(perm_cum)
+            E[i].permute_cols(perm_cum)
             perms.append([perm_cum[k] for k in range(nstates)])
+
+            # the search on the relabeled rows: perm_t[r] is the column of the next frame that carries the state of
+            # label r, so it is the next frame's label permutation itself
+            perm_t = get_reordering(St[i])
+            for k in range(nstates):
+                perm_cum[k] = perm_t[k]
+
+            # Because St = <psi(t)|psi(t+dt)> - the columns take the labels of the next frame
+            St[i].permute_cols(perm_cum)
 
         elif params["do_state_reordering"] == 2:
             """
