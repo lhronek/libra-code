@@ -35,6 +35,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
 from libra_py import data_conv
+from libra_py.packages.driver_forces import fill_diagonal_forces, force_diagonals, refreshed_rows
 
 from libra_py import data_outs, data_read, data_stat, data_conv
 from libra_py import units, molden_methods, orthogonalizations
@@ -5223,39 +5224,6 @@ def fill_adiabatic_hamiltonians(obj, E, st_ci, s_ci=None):
         obj.overlap_adi = data_conv.nparray2CMATRIX(np.asarray(s_ci, dtype=np.float64)[:n, :n].astype(np.complex128))
 
 
-def fill_diagonal_forces(obj, diagonals):
-    """d1ham_adi of a driver step from an (ndof, nstates) array of the diagonal force terms -dE_i/dx: one
-    diagonal CMATRIX per degree of freedom through one bulk conversion each, in place of nstates element sets
-    per degree of freedom, and dc1_adi as the zero matrices of the same size."""
-    diagonals = np.asarray(diagonals, dtype=np.float64)
-    ndof, nstates = diagonals.shape
-    obj.d1ham_adi = CMATRIXList()
-    obj.dc1_adi = CMATRIXList()
-    for idof in range(ndof):
-        obj.d1ham_adi.append(data_conv.nparray2CMATRIX(np.diag(diagonals[idof]).astype(np.complex128)))
-        obj.dc1_adi.append(CMATRIX(nstates, nstates))
-
-
-def force_diagonals(nstates, ndof, nat, forces, forces_all=None, active_state=None):
-    """The (ndof, nstates) array of the diagonal force terms -dE_i/dx of a driver step, row 3 iat + k: every
-    state's own forces from forces_all (nstates_all, nat, 3) when given - its first nstates states, a CP2K run
-    may carry more excited states than are propagated - the forces (nat, 3) on the active state alone when
-    active_state is given, the other states NaN (the sentinel of a row not handed over, which the engine's checks
-    read - a zero force is a force), the same forces on every state otherwise. Rows beyond 3 nat stay zero."""
-    diagonals = np.zeros((ndof, nstates))
-    if forces_all is not None:
-        forces_all = np.asarray(forces_all, dtype=np.float64)
-        if forces_all.shape[0] < nstates:
-            raise ValueError(F"per-state forces for {forces_all.shape[0]} states cannot fill {nstates} propagated states")
-        diagonals[:3 * nat] = -forces_all[:nstates].transpose(1, 2, 0).reshape(3 * nat, nstates)
-    elif active_state is not None:
-        diagonals[:3 * nat] = np.nan
-        diagonals[:3 * nat, active_state] = -np.asarray(forces, dtype=np.float64).reshape(3 * nat)
-    else:
-        diagonals[:3 * nat] = -np.asarray(forces, dtype=np.float64).reshape(3 * nat, 1)
-    return diagonals
-
-
 def cp2k_compute_adi_nbra(q, params, full_id):
     """
     Compute adiabatic electronic properties and derivative couplings
@@ -5631,38 +5599,28 @@ def _cp2k_run_params(params, is_first_time, wd, act_state, force_source, nexc):
 
 
 def _cp2k_force_refresh(params, itraj, coordinates, nat, nstates):
-    """The hand-over of the engine's call-back after a hop (hop_force_refresh: params["force_refresh"] = {trajectory:
-    new active state}): one CP2K force run for the new state at the same geometry, its force put into the rows handed
-    over at the regular call of this step, and nothing else - the caches of the time overlaps stay as the regular
-    call left them. A trajectory absent from the call-back hands back an empty object - a force_source whose rows
-    were all filled at the regular call (gs, none, all_states, the GS-SD mode) hands the rows back as they are, as
-    the DFTB+ driver does."""
-    obj = tmp()
-    refresh = params["force_refresh"]
-    force_source = params.get("force_source", "active_state")
-    if itraj not in refresh:
-        return obj
-    if itraj not in params["force_rows"] or itraj not in params["E_adi_last"]:
+    """The hand-over of the engine's call-back after a change of the active state (hop_force_refresh): the rows of
+    the regular call of this step with the new state's row - one CP2K force run for that state at the same
+    geometry - where it is NaN (driver_forces.refreshed_rows), nothing else: the caches of the time overlaps stay as
+    the regular call left them."""
+    if itraj in params["force_refresh"] and itraj not in params.get("E_adi_last", {}):
         raise RuntimeError(F"force_refresh for trajectory {itraj} before its regular call of the step")
-    if force_source != "active_state" or not params.get("time_dependent", True):
-        fill_diagonal_forces(obj, params["force_rows"][itraj])
-        return obj
-    new_state = int(refresh[itraj])
-    wd = F"{params.get('working_directory_prefix', 'wd')}_itraj{itraj}"
-    run_params = _cp2k_run_params(params, False, wd, new_state, force_source, nstates - 1)
-    res = compute_state_energy_and_force(coordinates, run_params)
-    e_last = np.asarray(params["E_adi_last"][itraj], dtype=float)
-    e_now = np.asarray(res["E_adi"], dtype=float)
-    m = min(e_last.size, e_now.size, nstates)
-    dev = float(np.abs(e_now[:m] - e_last[:m]).max())
-    if dev > 1e-4:
-        raise RuntimeError(F"force_refresh of trajectory {itraj}: the energies at the call-back differ from the "
-                           F"regular call of the step by {dev:.2e} Ha - the geometry moved between them")
-    rows = np.array(params["force_rows"][itraj], dtype=np.float64)
-    rows[:3 * nat, new_state] = -np.asarray(res["forces"], dtype=np.float64).reshape(3 * nat)
-    params["force_rows"][itraj] = rows
-    fill_diagonal_forces(obj, rows)
-    return obj
+
+    def force_of(new_state):
+        wd = F"{params.get('working_directory_prefix', 'wd')}_itraj{itraj}"
+        run_params = _cp2k_run_params(params, False, wd, new_state, params.get("force_source", "active_state"),
+                                      nstates - 1)
+        res = compute_state_energy_and_force(coordinates, run_params)
+        e_last = np.asarray(params["E_adi_last"][itraj], dtype=float)
+        e_now = np.asarray(res["E_adi"], dtype=float)
+        m = min(e_last.size, e_now.size, nstates)
+        dev = float(np.abs(e_now[:m] - e_last[:m]).max())
+        if dev > 1e-4:
+            raise RuntimeError(F"force_refresh of trajectory {itraj}: the energies at the call-back differ from the "
+                               F"regular call of the step by {dev:.2e} Ha - the geometry moved between them")
+        return res["forces"]
+
+    return refreshed_rows(params, itraj, nat, force_of)
 
 
 def _carried(params, key, itraj, current, is_first_time):

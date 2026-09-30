@@ -35,6 +35,7 @@ from libra_py import regexlib as rgl
 import libra_py.citools.ci as ci
 from libra_py import data_conv
 import libra_py.packages.cp2k.methods as CP2K_methods
+from libra_py.packages.driver_forces import refreshed_rows
 import libra_py.orthogonalizations as ortho
 
 # import numpy as np
@@ -2915,30 +2916,15 @@ def _dftb_state_forces(coordinates, dftb_params, prms1, wd, s):
 
 
 def _dftb_force_refresh(params, itraj, coordinates, nat, ndof, dftb_params, prms1, wd):
-    """The hand-over of the engine's call-back after a hop (hop_force_refresh: params["force_refresh"] = {trajectory:
-    new active state}): the force of the new state at the same geometry by the rerun of the all_states route
-    (_dftb_state_forces), put into the rows handed over at the regular call of this step, and nothing else. A
-    trajectory absent from the call-back hands back an empty object - a hop to the ground state (row 0 is always
-    filled), force_source all_states and a Niehaus FRC.DAT (every row filled) hand the rows back as they are."""
-    obj = tmp()
-    refresh = params["force_refresh"]
-    if itraj not in refresh:
-        return obj
-    if itraj not in params.get("force_rows", {}):
-        raise RuntimeError(F"force_refresh for trajectory {itraj} before its regular call of the step")
-    rows = np.array(params["force_rows"][itraj], dtype=np.float64)
-    new_state = int(refresh[itraj])
-    if (new_state >= 1 and params.get("force_source", "active_state") == "active_state"
-            and not os.path.exists(F"{wd}/FRC.DAT")):
-        f_s = _dftb_state_forces(coordinates, dftb_params, prms1, wd, new_state)
-        for iatom in range(nat):
-            for k in range(3):
-                rows[3 * iatom + k, new_state] = -f_s[k, iatom]
-        params["force_rows"][itraj] = rows
-    obj.d1ham_adi = CMATRIXList()
-    for idof in range(ndof):
-        obj.d1ham_adi.append(data_conv.nparray2CMATRIX(np.diag(rows[idof]).astype(np.complex128)))
-    return obj
+    """The hand-over of the engine's call-back after a change of the active state (hop_force_refresh): the rows of
+    the regular call of this step with the new state's row - the rerun of the all_states route for that state
+    (_dftb_state_forces) - where it is NaN (driver_forces.refreshed_rows), nothing else: a hop to the ground state
+    (row 0 is always filled), force_source all_states and a Niehaus FRC.DAT (every row filled) hand the rows back
+    as they are."""
+    def force_of(new_state):
+        return np.asarray(_dftb_state_forces(coordinates, dftb_params, prms1, wd, new_state)).T    # (nat, 3)
+
+    return refreshed_rows(params, itraj, nat, force_of)
 
 
 def dftb_compute_adi(q, params, full_id):
