@@ -551,6 +551,28 @@ void propagate_electronic_qtag(double dt, CMATRIX& Coeff, CMATRIX& Hvib, CMATRIX
 
 }// propagate_electronic_qtag
 
+void lowdin_frame_generator(double dt, CMATRIX& Hvib, CMATRIX& S_old, CMATRIX& S_new,
+                            CMATRIX& G, CMATRIX& Y0, CMATRIX& X1){
+/**
+  The Hermitian generator of the Lowdin-frame step over a metric that moves S_old -> S_new within dt (the frame
+  b = S^1/2 c): G = Xm Hvib Xm + i (Y1 - Y0)/dt Xm with X = S^-1/2 and Y = S^1/2, Xm of the midpoint metric, the
+  Hermitian part taken - and the frame factors Y0 (into the frame at the start) and X1 (out of it at the end). The
+  amplitudes step as b = Y0 c, exp(-i G dt), c = X1 b - the plain density C C^H as Y0 rho Y0^H, the Liouvillian
+  of G, X1 rho X1^H.
+*/
+  int sz = Hvib.n_cols;
+  CMATRIX X0(sz, sz);
+  CMATRIX Y1(sz, sz);
+  CMATRIX Ym(sz, sz);  CMATRIX Xm(sz, sz);
+  CMATRIX Sm(sz, sz);
+  Sm = 0.5 * (S_old + S_new);
+  sqrt_matrix(S_old, Y0, X0);
+  sqrt_matrix(S_new, Y1, X1);
+  sqrt_matrix(Sm, Ym, Xm);
+  G = Xm * Hvib * Xm + complex<double>(0.0, 1.0 / dt) * ((Y1 - Y0) * Xm);
+  G = 0.5 * (G + G.H());
+}
+
 void propagate_electronic_lowdin(double dt, CMATRIX& Coeff, CMATRIX& Hvib, CMATRIX& S_old, CMATRIX& S_new){
   propagate_electronic_lowdin(dt, Coeff, Hvib, S_old, S_new, 0);
 }
@@ -574,17 +596,8 @@ void propagate_electronic_lowdin(double dt, CMATRIX& Coeff, CMATRIX& Hvib, CMATR
                  rotations of propagate_electronic_rot (the rep-0 methods 10-15 and 19)
 */
   int sz = Hvib.n_cols;
-  CMATRIX Y0(sz, sz);  CMATRIX X0(sz, sz);
-  CMATRIX Y1(sz, sz);  CMATRIX X1(sz, sz);
-  CMATRIX Ym(sz, sz);  CMATRIX Xm(sz, sz);
-  CMATRIX Sm(sz, sz);
-  Sm = 0.5 * (S_old + S_new);
-  sqrt_matrix(S_old, Y0, X0);
-  sqrt_matrix(S_new, Y1, X1);
-  sqrt_matrix(Sm, Ym, Xm);
-  CMATRIX G(sz, sz);
-  G = Xm * Hvib * Xm + complex<double>(0.0, 1.0 / dt) * ((Y1 - Y0) * Xm);
-  G = 0.5 * (G + G.H());
+  CMATRIX G(sz, sz);  CMATRIX Y0(sz, sz);  CMATRIX X1(sz, sz);
+  lowdin_frame_generator(dt, Hvib, S_old, S_new, G, Y0, X1);
   CMATRIX b(Y0 * Coeff);
   if(rot){ propagate_electronic_rot(dt, b, G); }
   else{ propagate_electronic_eig(dt, b, G); }

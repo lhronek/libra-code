@@ -137,6 +137,8 @@ void propagate_electronic_qtag(double dt, CMATRIX& Coeff, CMATRIX& Hvib, CMATRIX
 void propagate_electronic_qtag2(double dt, CMATRIX& Coeff, CMATRIX& Hvib, CMATRIX& Hvib_old, CMATRIX& S, CMATRIX& S_old);
 void propagate_electronic_lowdin(double dt, CMATRIX& Coeff, CMATRIX& Hvib, CMATRIX& S_old, CMATRIX& S_new);
 void propagate_electronic_lowdin(double dt, CMATRIX& Coeff, CMATRIX& Hvib, CMATRIX& S_old, CMATRIX& S_new, int rot);
+void lowdin_frame_generator(double dt, CMATRIX& Hvib, CMATRIX& S_old, CMATRIX& S_new,
+                            CMATRIX& G, CMATRIX& Y0, CMATRIX& X1);
 
 
 // For grid integration

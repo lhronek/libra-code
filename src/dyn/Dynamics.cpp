@@ -484,6 +484,19 @@ static CMATRIX magnus2_generator(CMATRIX &A, CMATRIX &B, CMATRIX &invS,
                                  double dt_step) {
   return 0.5 * (A + B) + complex<double>(0.0, dt_step / 12.0) * (A * invS * B - B * invS * A);
 }
+// the plain density C C^H over a metric that moves within the step, in the Lowdin frame of the
+// generator G (lowdin_frame_generator or the Magnus generator of two frames): Y0 rho Y0^H
+// into the frame, the Liouvillian of G over dt, X1 rho X1^H out of it - the density-matrix
+// image of the amplitude step b = Y0 c, exp(-i G dt), c = X1 b
+static void dia_dm_lowdin_step(double dt, CMATRIX &RHO, CMATRIX &G, CMATRIX &Y0, CMATRIX &X1) {
+  int sz = G.n_cols;
+  CMATRIX rho_b(Y0 * RHO * Y0.H());
+  CMATRIX L(make_Liouvillian(G));
+  CMATRIX v(vectorize_density_matrix(&rho_b));
+  v = exp_(L, complex<double>(0.0, -dt)) * v;
+  rho_b = unvectorize_density_matrix(v);
+  RHO = X1 * rho_b * X1.H();
+}
 // the rep-0 step with the second Magnus term (methods 9 and 19, by rotations when rot is
 // set): exp(-i (A + B) dt/2 + (dt^2/12) [A, B]) with A, B the generators of the old and
 // the new frame - exact for a generator linear over the nuclear step. dt is the
@@ -1573,34 +1586,49 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
       CMATRIX vRHO(nst * nst, 1);      // vectorized DM
       CMATRIX RHO(nst, nst);           // DM
       CMATRIX L(nst * nst, nst * nst); // Liouvillian
+      // the metric over the nuclear step and over this electronic substep, as the
+      // amplitude route takes them (S moves linearly, a substep carries its own share) -
+      // a metric that moves takes the density into the Lowdin frame, one that does not
+      // keeps the S^-1 Hvib Liouvillian bit-identical
+      int with_metric = ham->ovlp_dia_mem_status;
+      CMATRIX S_first(nst, nst);  CMATRIX S_last(nst, nst);
+      CMATRIX S_old(nst, nst);  CMATRIX S_new(nst, nst);
+      S_first.identity();  S_last.identity();
+      if (with_metric) {
+        S_last = ham->get_ovlp_dia();
+        S_first = ham_prev->ovlp_dia_mem_status ? ham_prev->get_ovlp_dia() : S_last;
+      }
+      int moving = with_metric && metric_moved(S_first, S_last);
+      double w_old = double(isub) / num_el;
+      double w_new = double(isub + 1) / num_el;
+      S_old = (1.0 - w_old) * S_first + w_old * S_last;
+      S_new = (1.0 - w_new) * S_first + w_new * S_last;
 
       if (method == 0 || method == 100) {
         // Based on Lowdin transformations, using mid-point Hvib
-
         CMATRIX Hvib(ham->ndia, ham->ndia);
         Hvib = 0.5 * (ham->get_hvib_dia() + ham_prev->get_hvib_dia());
-
-        // non-orthogonal diabats: the generator of i S dC/dt = Hvib C is S^-1 Hvib,
-        // and its Liouvillian (non-Hermitian, real spectrum E_i - E_j) is the image
-        // d rho/dt = -i (A rho - rho A^H) of that equation for the plain C C^H density
-        // the rep-sync layer stores. An identity metric leaves Hvib bit-identical
-        if (ham->ovlp_dia_mem_status) {
-          CMATRIX Sdia(ham->ndia, ham->ndia);
-          Sdia = ham->get_ovlp_dia();
-          CMATRIX invS(ham->ndia, ham->ndia);
-          FullPivLU_inverse(Sdia, invS);
-          Hvib = invS * Hvib;
+        if (moving) {
+          CMATRIX G(nst, nst);  CMATRIX Y0(nst, nst);  CMATRIX X1(nst, nst);
+          lowdin_frame_generator(dt, Hvib, S_old, S_new, G, Y0, X1);
+          dia_dm_lowdin_step(dt, *dyn_var.dm_dia[itraj], G, Y0, X1);
+        } else {
+          // non-orthogonal diabats: the generator of i S dC/dt = Hvib C is S^-1 Hvib,
+          // and its Liouvillian (non-Hermitian, real spectrum E_i - E_j) is the image
+          // d rho/dt = -i (A rho - rho A^H) of that equation for the plain C C^H density
+          // the rep-sync layer stores. An identity metric leaves Hvib bit-identical
+          if (with_metric) {
+            CMATRIX invS(ham->ndia, ham->ndia);
+            FullPivLU_inverse(S_last, invS);
+            Hvib = invS * Hvib;
+          }
+          L = make_Liouvillian(Hvib);
+          vRHO = vectorize_density_matrix(dyn_var.dm_dia[itraj]);
+          vRHO = exp_(L, complex<double>(0.0, -dt)) * vRHO;
+          //      propagate_electronic_rot(dt, vRHO, L);
+          *dyn_var.dm_dia[itraj] = unvectorize_density_matrix(vRHO);
         }
-        L = make_Liouvillian(Hvib);
-        vRHO = vectorize_density_matrix(dyn_var.dm_dia[itraj]);
-
-        vRHO = exp_(L, complex<double>(0.0, -dt)) * vRHO;
-        //      propagate_electronic_rot(dt, vRHO, L);
-
-        *dyn_var.dm_dia[itraj] = unvectorize_density_matrix(vRHO);
-
       } // method == 0
-
       else if (method == 9 || method == 109) {
         // mid-point Hvib with the second Magnus term - the diabatic amplitude step 9
         // for the density matrix: the generator is S^-1 applied to the Hermitian
@@ -1608,18 +1636,34 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         // whole nuclear step so the substeps multiply up to the one-step exponent
         CMATRIX Hvib_old(ham_prev->get_hvib_dia());
         CMATRIX Hvib(ham->get_hvib_dia());
-        CMATRIX invS(ham->ndia, ham->ndia);
-        invS.identity();
-        if (ham->ovlp_dia_mem_status) {
-          CMATRIX Sdia(ham->ndia, ham->ndia);
-          Sdia = ham->get_ovlp_dia();
-          FullPivLU_inverse(Sdia, invS);
+        if (moving) {
+          // the two generators of the Lowdin frame at the ends of the nuclear step, as
+          // dia_magnus_step builds them, the frame change over this substep
+          CMATRIX Y0(nst, nst);  CMATRIX X0(nst, nst);
+          CMATRIX Y1(nst, nst);  CMATRIX X1(nst, nst);
+          libmeigen::sqrt_matrix(S_first, Y0, X0);
+          libmeigen::sqrt_matrix(S_last, Y1, X1);
+          CMATRIX dY(complex<double>(0.0, 1.0 / prms.dt) * (Y1 - Y0));
+          CMATRIX GA(X0 * Hvib_old * X0 + dY * X0);
+          CMATRIX GB(X1 * Hvib * X1 + dY * X1);
+          GA = 0.5 * (GA + GA.H());
+          GB = 0.5 * (GB + GB.H());
+          CMATRIX G(magnus2_generator(GA, GB, prms.dt));
+          CMATRIX Ya(nst, nst);  CMATRIX Xa(nst, nst);
+          CMATRIX Yb(nst, nst);  CMATRIX Xb(nst, nst);
+          libmeigen::sqrt_matrix(S_old, Ya, Xa);
+          libmeigen::sqrt_matrix(S_new, Yb, Xb);
+          dia_dm_lowdin_step(dt, *dyn_var.dm_dia[itraj], G, Ya, Xb);
+        } else {
+          CMATRIX invS(ham->ndia, ham->ndia);
+          invS.identity();
+          if (with_metric) { FullPivLU_inverse(S_last, invS); }
+          CMATRIX Heff(invS * magnus2_generator(Hvib_old, Hvib, invS, prms.dt));
+          L = make_Liouvillian(Heff);
+          vRHO = vectorize_density_matrix(dyn_var.dm_dia[itraj]);
+          vRHO = exp_(L, complex<double>(0.0, -dt)) * vRHO;
+          *dyn_var.dm_dia[itraj] = unvectorize_density_matrix(vRHO);
         }
-        CMATRIX Heff(invS * magnus2_generator(Hvib_old, Hvib, invS, prms.dt));
-        L = make_Liouvillian(Heff);
-        vRHO = vectorize_density_matrix(dyn_var.dm_dia[itraj]);
-        vRHO = exp_(L, complex<double>(0.0, -dt)) * vRHO;
-        *dyn_var.dm_dia[itraj] = unvectorize_density_matrix(vRHO);
       } // method == 9
 
       else {
