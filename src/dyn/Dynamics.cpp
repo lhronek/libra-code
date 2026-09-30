@@ -485,6 +485,18 @@ static void dia_rot_step(double dt, CMATRIX &C, CMATRIX &Hvib, CMATRIX &S_old,
   }
 }
 
+// the second-Magnus generator of a step whose Hamiltonian moves linearly from A to B over
+// the nuclear step dt_step: (A + B)/2 + (i dt_step/12) [A, B] - Hermitian for Hermitian A and
+// B, so exp(-i dt G) is the step's propagator (the whole-step commutator, the electronic
+// substeps dt multiply up to the one-step exponent). Under a metric S the generators are
+// S^-1 H and the commutator reads A S^-1 B - B S^-1 A, S^-1 applied outside
+static CMATRIX magnus2_generator(CMATRIX &A, CMATRIX &B, double dt_step) {
+  return 0.5 * (A + B) + complex<double>(0.0, dt_step / 12.0) * (A * B - B * A);
+}
+static CMATRIX magnus2_generator(CMATRIX &A, CMATRIX &B, CMATRIX &invS,
+                                 double dt_step) {
+  return 0.5 * (A + B) + complex<double>(0.0, dt_step / 12.0) * (A * invS * B - B * invS * A);
+}
 // the rep-0 step with the second Magnus term (methods 9 and 19, by rotations when rot is
 // set): exp(-i (A + B) dt/2 + (dt^2/12) [A, B]) with A, B the generators of the old and
 // the new frame - exact for a generator linear over the nuclear step. dt is the
@@ -499,7 +511,6 @@ static void dia_magnus_step(double dt, double dt_step, CMATRIX &C, CMATRIX &Hvib
                             CMATRIX &Hvib_new, CMATRIX &S_first, CMATRIX &S_last,
                             CMATRIX &S_old, CMATRIX &S_new, int rot) {
   int sz = Hvib_old.n_cols;
-  complex<double> fac(0.0, dt_step / 12.0);
   if (metric_moved(S_first, S_last)) {
     CMATRIX Y0(sz, sz);  CMATRIX X0(sz, sz);
     CMATRIX Y1(sz, sz);  CMATRIX X1(sz, sz);
@@ -510,7 +521,7 @@ static void dia_magnus_step(double dt, double dt_step, CMATRIX &C, CMATRIX &Hvib
     CMATRIX GB(X1 * Hvib_new * X1 + dY * X1);
     GA = 0.5 * (GA + GA.H());
     GB = 0.5 * (GB + GB.H());
-    CMATRIX G(0.5 * (GA + GB) + fac * (GA * GB - GB * GA));
+    CMATRIX G(magnus2_generator(GA, GB, dt_step));
     CMATRIX Ya(sz, sz);  CMATRIX Xa(sz, sz);
     CMATRIX Yb(sz, sz);  CMATRIX Xb(sz, sz);
     libmeigen::sqrt_matrix(S_old, Ya, Xa);
@@ -522,8 +533,7 @@ static void dia_magnus_step(double dt, double dt_step, CMATRIX &C, CMATRIX &Hvib
   } else {
     CMATRIX invS(sz, sz);
     FullPivLU_inverse(S_new, invS);
-    CMATRIX Heff(0.5 * (Hvib_old + Hvib_new) +
-                 fac * (Hvib_old * invS * Hvib_new - Hvib_new * invS * Hvib_old));
+    CMATRIX Heff(magnus2_generator(Hvib_old, Hvib_new, invS, dt_step));
     if (rot) { dia_rot_step(dt, C, Heff, S_new, S_new); }
     else { dia_exp_step(dt, C, Heff, S_new, S_new); }
   }
@@ -1084,12 +1094,9 @@ static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
           SSY_correction(Hvib, dyn_var, ham, itraj);
         }
         if (!t_identity) { Hvib.product(adjoint(T_new), Hvib, T_new); }
-        B = Hvib_old * Hvib - Hvib * Hvib_old; // [A, B], anti-Hermitian
-        Hvib += Hvib_old;
-        // -i (dt/2) * i (dt_step/6) [A, B] = (dt dt_step / 12) [A, B]
-        Hvib += complex<double>(0.0, dt_step / 6.0) * B;
+        Hvib = magnus2_generator(Hvib_old, Hvib, dt_step);
 
-        exp_(A, Hvib, complex<double>(0.0, -0.5 * dt));
+        exp_(A, Hvib, complex<double>(0.0, -dt));
         if (t_identity || t_ampl_skip) { C.product(A, C); }
         else { C.product(T_new, A, C); }
 
@@ -1559,11 +1566,9 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
           SSY_correction(Hvib, dyn_var, ham, itraj);
         }
         Hvib = T_new.H() * Hvib * T_new;
-        CMATRIX comm(Hvib_old * Hvib - Hvib * Hvib_old); // [A, B]
-        Hvib += Hvib_old;
-        Hvib += complex<double>(0.0, prms.dt / 6.0) * comm;
+        Hvib = magnus2_generator(Hvib_old, Hvib, prms.dt);
 
-        propagate_electronic_rot(0.5 * dt, C, Hvib);
+        propagate_electronic_rot(dt, C, Hvib);
         C = T_ampl * C;
 
       } // method == 19 && 119
@@ -1623,9 +1628,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
           Sdia = ham->get_ovlp_dia();
           FullPivLU_inverse(Sdia, invS);
         }
-        CMATRIX Heff(0.5 * (Hvib_old + Hvib) + complex<double>(0.0, prms.dt / 12.0) *
-                     (Hvib_old * invS * Hvib - Hvib * invS * Hvib_old));
-        Heff = invS * Heff;
+        CMATRIX Heff(invS * magnus2_generator(Hvib_old, Hvib, invS, prms.dt));
         L = make_Liouvillian(Heff);
         vRHO = vectorize_density_matrix(dyn_var.dm_dia[itraj]);
         vRHO = exp_(L, complex<double>(0.0, -dt)) * vRHO;
@@ -1746,8 +1749,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
           SSY_correction(Hvib, dyn_var, ham, itraj);
           SSY_correction(Hvib_prev, dyn_var, ham_prev, itraj);
         }
-        CMATRIX comm(Hvib_prev * Hvib - Hvib * Hvib_prev); // [A, B]
-        Hvib = 0.5 * (Hvib + Hvib_prev) + complex<double>(0.0, prms.dt / 12.0) * comm;
+        Hvib = magnus2_generator(Hvib_prev, Hvib, prms.dt);
 
         L = make_Liouvillian(Hvib);
         RHO = *dyn_var.dm_adi[itraj];
