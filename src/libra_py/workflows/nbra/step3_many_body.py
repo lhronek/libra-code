@@ -140,15 +140,7 @@ def get_step2_mb_sp_properties(_params):
     spin_components_job.append(spin_components)
 
     # Extract the uniquie SD basis states from the ci basis states
-    for ci_basis_state_index in range(len(ci_basis_raw)):
-        for sd_basis_state_index in range(len(ci_basis_raw[ci_basis_state_index])):
-
-            sd_basis_state_and_spin = [ci_basis_raw[ci_basis_state_index][sd_basis_state_index],
-                                       spin_components[ci_basis_state_index][sd_basis_state_index]]
-            key = _conf_key(sd_basis_state_and_spin)
-            if key not in seen:
-                seen.add(key)
-                sd_basis_states_unique.append(sd_basis_state_and_spin)
+    collect_unique_sd_states(ci_basis_raw, spin_components, sd_basis_states_unique, seen)
 
     # print( "Slater determinant basis states = ", sd_basis_states_unique )
     curr_step += 1
@@ -167,15 +159,7 @@ def get_step2_mb_sp_properties(_params):
                              knob="sd_capture_max_drop")
 
         # Extract the uniquie SD basis states from the ci basis states
-        for ci_basis_state_index in range(len(ci_basis_raw)):
-            for sd_basis_state_index in range(len(ci_basis_raw[ci_basis_state_index])):
-
-                sd_basis_state_and_spin = [ci_basis_raw[ci_basis_state_index][sd_basis_state_index],
-                                           spin_components[ci_basis_state_index][sd_basis_state_index]]
-                key = _conf_key(sd_basis_state_and_spin)
-                if key not in seen:
-                    seen.add(key)
-                    sd_basis_states_unique.append(sd_basis_state_and_spin)
+        collect_unique_sd_states(ci_basis_raw, spin_components, sd_basis_states_unique, seen)
         # print( "Slater determinant basis states = ", sd_basis_states_unique )
 
         # Now append the extracted excitation analysis output in _job variables
@@ -249,6 +233,20 @@ def compute_ci_energies_midpoint(ci_energies, _params):
                 ci_midpoint_energies[step].set(state, state, total_energy_mid_point + (midpoint_energy * units.ev2Ha))
 
     return ci_midpoint_energies
+
+
+def collect_unique_sd_states(ci_basis_raw, spin_components, sd_basis_states_unique, seen):
+    """The union basis of the SD configurations: every [configuration, spin] of the frame's CI states not seen
+    before is appended to sd_basis_states_unique, in the order of first appearance (seen: the keys of _conf_key
+    appended so far) - the one loop of the first step, the later steps and the relabeled configurations."""
+    for ci_basis_state_index in range(len(ci_basis_raw)):
+        for sd_basis_state_index in range(len(ci_basis_raw[ci_basis_state_index])):
+            sd_basis_state_and_spin = [ci_basis_raw[ci_basis_state_index][sd_basis_state_index],
+                                       spin_components[ci_basis_state_index][sd_basis_state_index]]
+            key = _conf_key(sd_basis_state_and_spin)
+            if key not in seen:
+                seen.add(key)
+                sd_basis_states_unique.append(sd_basis_state_and_spin)
 
 
 def _conf_key(conf):

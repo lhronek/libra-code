@@ -3592,19 +3592,15 @@ def _relabel_configurations(ci_basis_states, spin_components, perms, start_time,
         frame = []
         for i, configurations in enumerate(states):
             confs = []
-            for k, conf in enumerate(configurations):
+            for conf in configurations:
                 positions = [int(o) - lowest_orbital for o in conf]
                 if min(positions) < 0 or max(positions) >= n:
                     raise ValueError(F"the TD-DFT configuration {list(conf)} of frame {start_time + step} names an "
                                      F"orbital outside the stored window [{lowest_orbital}, {lowest_orbital + n - 1}] "
                                      F"- widen lowest_orbital / highest_orbital in step 2")
-                labeled = [int(label_of_position[p]) + lowest_orbital for p in positions]
-                confs.append(labeled)
-                key = step3_many_body._conf_key([labeled, spin_components[step][i][k]])
-                if key not in seen:
-                    seen.add(key)
-                    unique.append([labeled, spin_components[step][i][k]])
+                confs.append([int(label_of_position[p]) + lowest_orbital for p in positions])
             frame.append(confs)
+        step3_many_body.collect_unique_sd_states(frame, spin_components[step], unique, seen)
         relabeled.append(frame)
     return relabeled, unique
 
@@ -4071,10 +4067,9 @@ def run_step3_pod(params):
     pops_list = [np.eye(nblk)[frag] for _ in frames]
     hole_list = [np.full((n, nblk), np.nan) for _ in frames]
     energy_list = [np.column_stack((np.diag(h), np.full(n, np.nan))) for h in h_act]
-    # the followed block state of every diabatic state, relative to the energy-ordered basis of start_time
-    perms = [np.array([t.index(c) if c in t else -1 for c in idx]) for t in track]
-    off_order = int(sum(t != track[0] for t in track))
+    # the followed block states of the frames off the energy-ordered basis of start_time
     tracked = {str(frames[k]): [int(c) for c in track[k]] for k in range(len(frames)) if track[k] != track[0]}
+    off_order = len(tracked)
     _write_diabatization_records(res_dir_2, 'hole', dia_index, pops_list, hole_list, energy_list, start_time,
                                  operator='pod_cp2k', basis='sd',
                                  extra={"route": "pod_hamiltonian", "pod_occupied": occupied,

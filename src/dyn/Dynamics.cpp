@@ -1324,18 +1324,11 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
 
         propagate_electronic_qtag2(dt, C, Hvib, Hvib_old, Sdia, Sdia_old);
       } else if (method == 3 || method == 103) {
-        // Using exp(S^-1 * Hvib_dia * dt)
+        // exp(S^-1 Hvib_dia dt) with the mid-point Hvib - the Lowdin-frame step when the
+        // metric moves (exp(S^-1 Hvib dt) with S taken at one end conserves c^H S c only
+        // to O(dt) then)
         Hvib = 0.5 * (ham->get_hvib_dia() + ham_prev->get_hvib_dia());
-        if (metric_moved(Sdia_old, Sdia)) {
-          // exp(S^-1 Hvib dt) with S taken at one end conserves c^H S c only to
-          // O(dt) once the metric moves - the Lowdin-frame step conserves it exactly
-          propagate_electronic_lowdin(dt, C, Hvib, Sdia_old, Sdia);
-        } else {
-          CMATRIX invS(ham->ndia, ham->ndia);
-          FullPivLU_inverse(Sdia, invS);
-          Hvib = invS * Hvib;
-          propagate_electronic_nonHermitian(dt, C, Hvib);
-        }
+        dia_exp_step(dt, C, Hvib, Sdia_old, Sdia);
       }
 
       // The diabatic basis needs no reprojection - the coupling sits in
