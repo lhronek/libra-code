@@ -5579,11 +5579,12 @@ def _nbra_step_filename(params, key, itraj):
     return name
 
 
-def _cp2k_run_params(params, is_first_time, wd, act_state, force_source, nexc):
+def _cp2k_run_params(params, is_first_time, wd, act_state, force_source, nexc, nexc_override=None):
     """The parameters of one CP2K run of the driver: the execution-layer keys of params, the OT pre-convergence
     template only where the SCF starts cold (the trajectory's first call, under ot_first_call_only - later calls
     restart the diagonalization from their own previous wfn), and force_source "gs" always at the GS (drops any
-    &EXCITED_STATES section, so the parsed FORCES| block is the S0 forces)."""
+    &EXCITED_STATES section, so the parsed FORCES| block is the S0 forces). nexc_override sets the excited-root
+    count of this run over params["number_of_states"] - the force refresh needs the roots up to the new state alone."""
     run_params = {k: params[k] for k in
                   ("atom_labels", "input_template", "ot_template", "time_dependent",
                    "force_source", "cp2k_exe", "cp2k_data_dir",
@@ -5594,7 +5595,8 @@ def _cp2k_run_params(params, is_first_time, wd, act_state, force_source, nexc):
         run_params.pop("ot_template", None)
     run_params.update({"act_state": 0 if force_source == "gs" else act_state,
                        "working_directory": wd,
-                       "number_of_states": params.get("number_of_states", nexc)})
+                       "number_of_states": params.get("number_of_states", nexc) if nexc_override is None
+                       else nexc_override})
     return run_params
 
 
@@ -5608,8 +5610,10 @@ def _cp2k_force_refresh(params, itraj, coordinates, nat, nstates):
 
     def force_of(new_state):
         wd = F"{params.get('working_directory_prefix', 'wd')}_itraj{itraj}"
+        # the roots up to the new state alone (the regular call's variational roots in a smaller subspace) - a hop
+        # to the ground state needs none, CP2K aborts on NSTATES 0, so one root stays
         run_params = _cp2k_run_params(params, False, wd, new_state, params.get("force_source", "active_state"),
-                                      nstates - 1)
+                                      nstates - 1, nexc_override=max(new_state, 1))
         res = compute_state_energy_and_force(coordinates, run_params)
         e_last = np.asarray(params["E_adi_last"][itraj], dtype=float)
         e_now = np.asarray(res["E_adi"], dtype=float)
