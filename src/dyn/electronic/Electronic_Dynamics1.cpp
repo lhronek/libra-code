@@ -552,6 +552,10 @@ void propagate_electronic_qtag(double dt, CMATRIX& Coeff, CMATRIX& Hvib, CMATRIX
 }// propagate_electronic_qtag
 
 void propagate_electronic_lowdin(double dt, CMATRIX& Coeff, CMATRIX& Hvib, CMATRIX& S_old, CMATRIX& S_new){
+  propagate_electronic_lowdin(dt, Coeff, Hvib, S_old, S_new, 0);
+}
+
+void propagate_electronic_lowdin(double dt, CMATRIX& Coeff, CMATRIX& Hvib, CMATRIX& S_old, CMATRIX& S_new, int rot){
 /**
   Solves i*hbar*S*dc/dt = Hvib*c over one step of a MOVING metric S(t) -> S(t+dt) in the Lowdin
   frame b = S^1/2 c, where the generator is Hermitian and the step is unitary:
@@ -566,6 +570,8 @@ void propagate_electronic_lowdin(double dt, CMATRIX& Coeff, CMATRIX& Hvib, CMATR
   \param[in,out] Coeff The diabatic amplitudes, CMATRIX(ndia, 1) or (ndia, ntraj)
   \param[in] Hvib The vibronic Hamiltonian at the midpoint of the step
   \param[in] S_old, S_new The diabatic overlap at the start and the end of the step
+  \param[in] rot The step in the Lowdin frame: 0 - the eigen step exp(-i G dt), 1 - the sequential pairwise
+                 rotations of propagate_electronic_rot (the rep-0 methods 10-15 and 19)
 */
   int sz = Hvib.n_cols;
   CMATRIX Y0(sz, sz);  CMATRIX X0(sz, sz);
@@ -580,7 +586,8 @@ void propagate_electronic_lowdin(double dt, CMATRIX& Coeff, CMATRIX& Hvib, CMATR
   G = Xm * Hvib * Xm + complex<double>(0.0, 1.0 / dt) * ((Y1 - Y0) * Xm);
   G = 0.5 * (G + G.H());
   CMATRIX b(Y0 * Coeff);
-  propagate_electronic_eig(dt, b, G);
+  if(rot){ propagate_electronic_rot(dt, b, G); }
+  else{ propagate_electronic_eig(dt, b, G); }
   Coeff = X1 * b;
 }
 

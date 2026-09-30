@@ -452,26 +452,13 @@ static void dia_exp_step(double dt, CMATRIX &C, CMATRIX &Hvib, CMATRIX &S_old,
 // of the pairwise couplings, second order in |coupling| dt - it follows the exp_ step
 // only while the couplings of Hvib_dia stay far below hbar / dt. The rotations need
 // a Hermitian generator and an orthonormal basis, so a non-identity metric is taken
-// to its Lowdin frame b = S^1/2 c - with the frame term of a moving metric exactly as
-// propagate_electronic_lowdin builds it
+// to its Lowdin frame b = S^1/2 c - a moving metric by propagate_electronic_lowdin with
+// the rotation step inside its frame
 static void dia_rot_step(double dt, CMATRIX &C, CMATRIX &Hvib, CMATRIX &S_old,
                          CMATRIX &S_new) {
   int sz = Hvib.n_cols;
   if (metric_moved(S_old, S_new)) {
-    CMATRIX Y0(sz, sz);  CMATRIX X0(sz, sz);
-    CMATRIX Y1(sz, sz);  CMATRIX X1(sz, sz);
-    CMATRIX Ym(sz, sz);  CMATRIX Xm(sz, sz);
-    CMATRIX Sm(sz, sz);
-    Sm = 0.5 * (S_old + S_new);
-    libmeigen::sqrt_matrix(S_old, Y0, X0);
-    libmeigen::sqrt_matrix(S_new, Y1, X1);
-    libmeigen::sqrt_matrix(Sm, Ym, Xm);
-    CMATRIX G(sz, sz);
-    G = Xm * Hvib * Xm + complex<double>(0.0, 1.0 / dt) * ((Y1 - Y0) * Xm);
-    G = 0.5 * (G + G.H());
-    CMATRIX b(Y0 * C);
-    propagate_electronic_rot(dt, b, G);
-    C = X1 * b;
+    propagate_electronic_lowdin(dt, C, Hvib, S_old, S_new, 1);
   } else {
     CMATRIX X(sz, sz);  CMATRIX Y(sz, sz);
     if (libmeigen::lowdin_frame(S_new, X, Y)) {
