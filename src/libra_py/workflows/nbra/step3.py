@@ -753,6 +753,20 @@ def make_active_space(num_occ,
         return new_active_space, new_ks_homo_alpha_index, new_ks_homo_beta_index
 
 
+def _assignment_weights(O, e_rows, e_cols, alpha):
+    """The Munkres-Kuhn cost of the state followings, |O_ab|^2 exp(-(alpha (e_a - e_b))^2): O the time overlap
+    (real or complex), e_rows the energies of the rows (the followed states), e_cols those of the columns (the
+    candidate positions, the rows' again when None), alpha the width in 1/Hartree - the one formula of
+    make_cost_mat and _assign_states. No penalty under alpha 0 or without energies."""
+    O = np.asarray(O)
+    W = (O * O.conj()).real if np.iscomplexobj(O) else O * O
+    if alpha and e_rows is not None:
+        e = np.nan_to_num(np.asarray(e_rows, dtype=float))
+        ec = e if e_cols is None else np.nan_to_num(np.asarray(e_cols, dtype=float))
+        W = W * np.exp(-(alpha * (e[:, None] - ec[None, :])) ** 2)
+    return W
+
+
 def make_cost_mat(orb_mat_inp, en_mat_inp, alpha, en_mat_cols=None):
     """
 
@@ -780,21 +794,10 @@ def make_cost_mat(orb_mat_inp, en_mat_inp, alpha, en_mat_cols=None):
 
     """
 
-    nstates = orb_mat_inp.num_of_cols
-    cost_mat = MATRIX(nstates, nstates)
-    if en_mat_cols is None:
-        en_mat_cols = en_mat_inp
-
-    for a in range(0, nstates):
-        for b in range(0, nstates):
-
-            s = orb_mat_inp.get(a, b)
-            s2 = (s * s.conjugate()).real
-            dE = (en_mat_inp.get(a, a) - en_mat_cols.get(b, b)).real
-            val = s2 * math.exp(-(alpha * dE)**2)
-            cost_mat.set(a, b, val)
-
-    return cost_mat
+    e_rows = np.diag(data_conv.MATRIX2nparray(en_mat_inp)).real
+    e_cols = None if en_mat_cols is None else np.diag(data_conv.MATRIX2nparray(en_mat_cols)).real
+    W = _assignment_weights(data_conv.MATRIX2nparray(orb_mat_inp), e_rows, e_cols, alpha)
+    return data_conv.nparray2MATRIX(np.ascontiguousarray(W, dtype=np.float64))
 
 
 def _spin_block_permutation(perm_aa, perm_bb, nstates):
@@ -3264,12 +3267,7 @@ def _assign_states(O, reordering, alpha=0.0, energies=None, col_energies=None):
     if reordering not in (2, 22):
         raise ValueError(F"reordering = {reordering!r} is not a listed option - 1 (Sato), 2 (Munkres-Kuhn, "
                          F"libra_py.hungarian) and 22 (the same assignment by scipy) are")
-    weights = O ** 2
-    if alpha and energies is not None:
-        e = np.nan_to_num(np.asarray(energies, dtype=float))
-        e_cols = e if col_energies is None else np.nan_to_num(np.asarray(col_energies, dtype=float))
-        weights = weights * np.exp(-(alpha * (e[:, None] - e_cols[None, :])) ** 2)
-    return _munkres_assignment(weights, reordering)
+    return _munkres_assignment(_assignment_weights(O, energies, col_energies, alpha), reordering)
 
 
 def _state_energies(energy_records):
