@@ -522,6 +522,19 @@ void dyn_control_params::sanity_check(){
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
+  /// the frame IS the accumulated projector, and the adiabatic amplitudes
+  /// have to apply the same projector step by step - under
+  /// assume_always_consistent they take it as the identity, so C_dia = U C_adi
+  /// would mix a frame the amplitudes never saw
+  if(ham_transform_method==4 && rep_tdse==1 && assume_always_consistent==1){
+    std::cout<<"Error in dyn_control_params::sanity_check: ham_transform_method = 4"
+        <<" accumulates the per-step projector into the local-diabatization frame, which"
+        <<" the adiabatic amplitudes (rep_tdse = 1) must apply as well -"
+        <<" assume_always_consistent = 1 makes them take it as the identity; set"
+        <<" assume_always_consistent = 0\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
   /// the stored-U forward transform reads ham_dia, which only a diabatic
   /// model keeps current - and consumes the model-supplied transformation,
   /// which an adiabatic-native model applies through ham_update_method 2
