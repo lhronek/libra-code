@@ -570,6 +570,7 @@ void nHamiltonian::transform_dia2adi(int der_lvl, int lvl) {
   } // level == lvl
 
   else if (lvl > level) {
+    require_children(lvl, __func__);
     for (auto i = 0u; i < children.size(); i++) {
       children[i]->transform_dia2adi(der_lvl, lvl);
     }
@@ -641,6 +642,7 @@ void nHamiltonian::transform_adi2dia(int lvl) {
   } // level == lvl
 
   else if (lvl > level) {
+    require_children(lvl, __func__);
     for (auto i = 0u; i < children.size(); i++) {
       children[i]->transform_adi2dia(lvl);
     }
