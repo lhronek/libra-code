@@ -34,7 +34,7 @@ def read_gaussian_tddft_log_file(params):
 
             logfile_name (string): The log file name.
 
-            tolerance (float): The tolerance factor for choosing the excited states of the excitation analysis.
+            ci_threshold (float): The |C|^2 cut for choosing the excited states of the excitation analysis.
 
             number_of_states (integer): The number of excited states to be considered in the excitation analysis.
 
