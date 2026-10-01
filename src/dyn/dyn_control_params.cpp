@@ -771,53 +771,17 @@ void dyn_control_params::set_parameters(bp::dict params){
     else if(key=="sdm_norm_tolerance"){ sdm_norm_tolerance = bp::extract<double>(params.values()[i]); }
     else if(key=="dish_decoherence_event_option"){ dish_decoherence_event_option = bp::extract<int>(params.values()[i]); }
     else if(key=="decoherence_times_type"){ decoherence_times_type = bp::extract<int>(params.values()[i]); }
-    else if(key=="schwartz_decoherence_inv_alpha"){ 
-      MATRIX x( bp::extract<MATRIX>(params.values()[i]) );
-      schwartz_decoherence_inv_alpha = new MATRIX(x.n_rows, x.n_cols);      
-      for(int a=0;a<x.n_rows;a++){
-        for(int b=0;b<x.n_cols;b++){ schwartz_decoherence_inv_alpha->set(a, b, x.get(a,b));   }
-      } 
-    }
-    else if(key=="schwartz_interaction_width"){ 
-      MATRIX x( bp::extract<MATRIX>(params.values()[i]) );
-      schwartz_interaction_width = new MATRIX(x.n_rows, x.n_cols);      
-      for(int a=0;a<x.n_rows;a++){
-        for(int b=0;b<x.n_cols;b++){ schwartz_interaction_width->set(a, b, x.get(a,b));   }
-      } 
-    }
+    else if(key=="schwartz_decoherence_inv_alpha"){ set_matrix_parameter(schwartz_decoherence_inv_alpha, bp::extract<MATRIX>(params.values()[i])); }
+    else if(key=="schwartz_interaction_width"){ set_matrix_parameter(schwartz_interaction_width, bp::extract<MATRIX>(params.values()[i])); }
     else if(key=="decoherence_C_param"){ decoherence_C_param = bp::extract<double>(params.values()[i]); }
     else if(key=="decoherence_eps_param"){ decoherence_eps_param = bp::extract<double>(params.values()[i]); }
     else if(key=="dephasing_informed"){ dephasing_informed = bp::extract<int>(params.values()[i]); }
     else if(key=="instantaneous_decoherence_variant"){ instantaneous_decoherence_variant = bp::extract<int>(params.values()[i]); }
     else if(key=="collapse_option"){ collapse_option = bp::extract<int>(params.values()[i]); }
-    else if(key=="decoherence_rates"){ 
-      MATRIX x( bp::extract<MATRIX>(params.values()[i]) );
-      decoherence_rates = new MATRIX(x.n_rows, x.n_cols);      
-      for(int a=0;a<x.n_rows;a++){
-        for(int b=0;b<x.n_cols;b++){ decoherence_rates->set(a, b, x.get(a,b));   }
-      } 
-    }
-    else if(key=="ave_gaps"){ 
-      MATRIX x( bp::extract<MATRIX>(params.values()[i]) );
-      ave_gaps = new MATRIX(x.n_rows, x.n_cols);      
-      for(int a=0;a<x.n_rows;a++){
-        for(int b=0;b<x.n_cols;b++){ ave_gaps->set(a, b, x.get(a,b));   }
-      } 
-    }
-    else if(key=="wp_width"){ 
-      MATRIX x( bp::extract<MATRIX>(params.values()[i]) );
-      wp_width = new MATRIX(x.n_rows, x.n_cols);      
-      for(int a=0;a<x.n_rows;a++){
-        for(int b=0;b<x.n_cols;b++){ wp_width->set(a, b, x.get(a,b));   }
-      } 
-    }
-    else if(key=="wp_v"){ 
-      MATRIX x( bp::extract<MATRIX>(params.values()[i]) );
-      wp_v = new MATRIX(x.n_rows, x.n_cols);      
-      for(int a=0;a<x.n_rows;a++){
-        for(int b=0;b<x.n_cols;b++){ wp_v->set(a, b, x.get(a,b));   }
-      } 
-    }
+    else if(key=="decoherence_rates"){ set_matrix_parameter(decoherence_rates, bp::extract<MATRIX>(params.values()[i])); }
+    else if(key=="ave_gaps"){ set_matrix_parameter(ave_gaps, bp::extract<MATRIX>(params.values()[i])); }
+    else if(key=="wp_width"){ set_matrix_parameter(wp_width, bp::extract<MATRIX>(params.values()[i])); }
+    else if(key=="wp_v"){ set_matrix_parameter(wp_v, bp::extract<MATRIX>(params.values()[i])); }
     else if(key=="coherence_threshold"){ coherence_threshold = bp::extract<double>(params.values()[i]); }
     else if(key=="e_mask"){ e_mask = bp::extract<double>(params.values()[i]); }
     else if(key=="use_xf_force"){ use_xf_force = bp::extract<int>(params.values()[i]); }
