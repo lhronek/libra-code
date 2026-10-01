@@ -75,18 +75,23 @@ void export_dyn_control_params_objects(){
       .def_readwrite("ehrenfest_force_option", &dyn_control_params::ehrenfest_force_option)
       .def_readwrite("ehrenfest_normalized", &dyn_control_params::ehrenfest_normalized)
       .def_readwrite("sqc_gamma", &dyn_control_params::sqc_gamma)
+      .def_readwrite("enforce_state_following", &dyn_control_params::enforce_state_following)
+      .def_readwrite("enforced_state_index", &dyn_control_params::enforced_state_index)
       .def_readwrite("time_overlap_method", &dyn_control_params::time_overlap_method)
       .def_readwrite("nac_update_method", &dyn_control_params::nac_update_method)
       .def_readwrite("nac_algo", &dyn_control_params::nac_algo)
       .def_readwrite("hvib_update_method", &dyn_control_params::hvib_update_method)    
+      .def_readwrite("do_ssy", &dyn_control_params::do_ssy)
       .def_readwrite("do_phase_correction", &dyn_control_params::do_phase_correction)
       .def_readwrite("phase_correction_tol", &dyn_control_params::phase_correction_tol)
+      .def_readwrite("do_nac_phase_correction", &dyn_control_params::do_nac_phase_correction)
       .def_readwrite("state_tracking_algo", &dyn_control_params::state_tracking_algo)
       .def_readwrite("MK_alpha", &dyn_control_params::MK_alpha)
       .def_readwrite("MK_verbosity", &dyn_control_params::MK_verbosity)
       .def_readwrite("MK_scaling_function", &dyn_control_params::MK_scaling_function)
       .def_readwrite("convergence", &dyn_control_params::convergence)
       .def_readwrite("max_number_attempts", &dyn_control_params::max_number_attempts)
+      .def_readwrite("min_probability_reordering", &dyn_control_params::min_probability_reordering)
       .def_readwrite("isNBRA", &dyn_control_params::isNBRA)
 
       ///================= Surface hopping: proposal, acceptance =======================
@@ -110,6 +115,15 @@ void export_dyn_control_params_objects(){
       ///================= QTSH specific ====================
       .def_readwrite("use_qtsh", &dyn_control_params::use_qtsh)
       .def_readwrite("qtsh_force_option", &dyn_control_params::qtsh_force_option)
+
+      ///================= KC-RPMD options ==========================================
+      .def_readwrite("use_kcrpmd", &dyn_control_params::use_kcrpmd)
+      .def_readwrite("kcrpmd_eta", &dyn_control_params::kcrpmd_eta)
+      .def_readwrite("kcrpmd_a", &dyn_control_params::kcrpmd_a)
+      .def_readwrite("kcrpmd_b", &dyn_control_params::kcrpmd_b)
+      .def_readwrite("kcrpmd_c", &dyn_control_params::kcrpmd_c)
+      .def_readwrite("kcrpmd_gamma", &dyn_control_params::kcrpmd_gamma)
+      .def_readwrite("kcrpmd_gammaKP", &dyn_control_params::kcrpmd_gammaKP)
       
       ///================= Decoherence options =========================================
       .def_readwrite("decoherence_algo", &dyn_control_params::decoherence_algo)
@@ -131,12 +145,20 @@ void export_dyn_control_params_objects(){
       .def_readwrite("use_xf_force", &dyn_control_params::use_xf_force)
       .def_readwrite("project_out_aux", &dyn_control_params::project_out_aux)
       .def_readwrite("tp_algo", &dyn_control_params::tp_algo)
+      .def_readwrite("use_td_width", &dyn_control_params::use_td_width)
       .def_readwrite("gap_correlation_time", &dyn_control_params::gap_correlation_time)
+
+      ///================= NBRA options =============================================
+      .def_readwrite("compute_dm_dia", &dyn_control_params::compute_dm_dia)
+      .def_readwrite("omp_num_threads", &dyn_control_params::omp_num_threads)
 
       ///================= Entanglement of trajectories ================================
       .def_readwrite("entanglement_opt", &dyn_control_params::entanglement_opt)
       .def_readwrite("ETHD3_alpha", &dyn_control_params::ETHD3_alpha)
       .def_readwrite("ETHD3_beta", &dyn_control_params::ETHD3_beta)
+
+      ///================= QTAG parameters ==========================================
+      .def_readwrite("qtag_pot_approx_method", &dyn_control_params::qtag_pot_approx_method)
 
 
       ///================= Bath, Constraints, and Dynamical controls ===================
@@ -152,6 +174,7 @@ void export_dyn_control_params_objects(){
       .def_readwrite("ampl_transformation_method", &dyn_control_params::ampl_transformation_method)
       .def_readwrite("assume_always_consistent", &dyn_control_params::assume_always_consistent)
       .def_readwrite("thermally_corrected_nbra", &dyn_control_params::thermally_corrected_nbra)
+      .def_readwrite("hop_force_refresh", &dyn_control_params::hop_force_refresh)
       .def_readwrite("total_energy", &dyn_control_params::total_energy)
       .def_readwrite("tcnbra_nu_therm", &dyn_control_params::tcnbra_nu_therm)
       .def_readwrite("tcnbra_nhc_size", &dyn_control_params::tcnbra_nhc_size)
