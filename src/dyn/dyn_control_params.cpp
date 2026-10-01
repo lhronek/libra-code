@@ -693,6 +693,11 @@ void dyn_control_params::sanity_check(){
 
 
 
+void dyn_control_params::set_matrix_parameter(MATRIX*& slot, const MATRIX& x){
+  if(slot != NULL){ delete slot; }
+  slot = new MATRIX(x);
+}
+
 void dyn_control_params::set_parameters(bp::dict params){
 /**
   Extract the parameters from the input dictionary

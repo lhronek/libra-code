@@ -49,6 +49,14 @@ using namespace libthermostat;
 
 
 
+// the MATRIX parameters' python setters: a copy of the matrix given (the attribute read hands the held matrix back)
+void expt_set_schwartz_decoherence_inv_alpha(dyn_control_params& prms, MATRIX& x){ dyn_control_params::set_matrix_parameter(prms.schwartz_decoherence_inv_alpha, x); }
+void expt_set_schwartz_interaction_width(dyn_control_params& prms, MATRIX& x){ dyn_control_params::set_matrix_parameter(prms.schwartz_interaction_width, x); }
+void expt_set_decoherence_rates(dyn_control_params& prms, MATRIX& x){ dyn_control_params::set_matrix_parameter(prms.decoherence_rates, x); }
+void expt_set_ave_gaps(dyn_control_params& prms, MATRIX& x){ dyn_control_params::set_matrix_parameter(prms.ave_gaps, x); }
+void expt_set_wp_width(dyn_control_params& prms, MATRIX& x){ dyn_control_params::set_matrix_parameter(prms.wp_width, x); }
+void expt_set_wp_v(dyn_control_params& prms, MATRIX& x){ dyn_control_params::set_matrix_parameter(prms.wp_v, x); }
+
 void export_dyn_control_params_objects(){
 
   // Arbitrary wavefunction
@@ -130,16 +138,17 @@ void export_dyn_control_params_objects(){
       .def_readwrite("sdm_norm_tolerance", &dyn_control_params::sdm_norm_tolerance)
       .def_readwrite("dish_decoherence_event_option", &dyn_control_params::dish_decoherence_event_option)
       .def_readwrite("decoherence_times_type", &dyn_control_params::decoherence_times_type)
-      .def_readwrite("schwartz_decoherence_inv_alpha", &dyn_control_params::schwartz_decoherence_inv_alpha)
-      .def_readwrite("schwartz_interaction_width", &dyn_control_params::schwartz_interaction_width)
+      .add_property("schwartz_decoherence_inv_alpha", make_getter(&dyn_control_params::schwartz_decoherence_inv_alpha, return_internal_reference<>()), &expt_set_schwartz_decoherence_inv_alpha)
+      .add_property("schwartz_interaction_width", make_getter(&dyn_control_params::schwartz_interaction_width, return_internal_reference<>()), &expt_set_schwartz_interaction_width)
       .def_readwrite("decoherence_C_param", &dyn_control_params::decoherence_C_param)
       .def_readwrite("decoherence_eps_param", &dyn_control_params::decoherence_eps_param)
       .def_readwrite("dephasing_informed", &dyn_control_params::dephasing_informed)
       .def_readwrite("instantaneous_decoherence_variant", &dyn_control_params::instantaneous_decoherence_variant)
       .def_readwrite("collapse_option", &dyn_control_params::collapse_option)
-      .def_readwrite("decoherence_rates", &dyn_control_params::decoherence_rates)
-      .def_readwrite("ave_gaps", &dyn_control_params::ave_gaps)
-      .def_readwrite("wp_width", &dyn_control_params::wp_width)
+      .add_property("decoherence_rates", make_getter(&dyn_control_params::decoherence_rates, return_internal_reference<>()), &expt_set_decoherence_rates)
+      .add_property("ave_gaps", make_getter(&dyn_control_params::ave_gaps, return_internal_reference<>()), &expt_set_ave_gaps)
+      .add_property("wp_width", make_getter(&dyn_control_params::wp_width, return_internal_reference<>()), &expt_set_wp_width)
+      .add_property("wp_v", make_getter(&dyn_control_params::wp_v, return_internal_reference<>()), &expt_set_wp_v)
       .def_readwrite("coherence_threshold", &dyn_control_params::coherence_threshold)
       .def_readwrite("e_mask", &dyn_control_params::e_mask)
       .def_readwrite("use_xf_force", &dyn_control_params::use_xf_force)

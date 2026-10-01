@@ -1220,6 +1220,9 @@ class dyn_control_params{
   void sanity_check();
   void set_parameters(bp::dict params);
 
+  /// the MATRIX parameters (NULL = unset) take a copy of x, the matrix held before is freed
+  static void set_matrix_parameter(MATRIX*& slot, const MATRIX& x);
+
 
 
   friend bool operator == (const dyn_control_params& n1, const dyn_control_params& n2){
