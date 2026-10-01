@@ -613,11 +613,12 @@ void nHamiltonian::transform_adi2dia(int lvl) {
   allocated but is used to collect the results of the calculations\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
-    // an all-zero transformation cannot define the diabatic picture -
-    // the model never supplied obj.basis_transform
-    if (abs(basis_transform->max_elt()) == 0.0) {
-      cout << "Error in transform_adi2dia(): the basis_transform matrix is all-zero - \
-  the model must supply obj.basis_transform for the adiabatic->diabatic transform\n";
+    // the square identity DEFAULT must not silently alias dia == adi (ham_dia = ham_adi): the
+    // transform is meaningful only for a transformation the model actually supplied - an
+    // explicit identity supply passes, as in transform_dia2adi
+    if (!basis_transform_supplied) {
+      cout << "Error in transform_adi2dia(): the adiabatic->diabatic transform consumes the \
+  model-supplied basis transformation, but obj.basis_transform was never supplied\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     // a model-supplied obj.ham_dia lives in the SAME U-basis the
