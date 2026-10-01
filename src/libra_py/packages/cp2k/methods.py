@@ -3983,8 +3983,9 @@ def run_cp2k(coords_bohr, params):
 
     def _attempt(template):
         """one whole step: the OT pre-convergence run (where configured) and
-        then the main run from `template` - a retry repeats both, so it does
-        not inherit the density a failed attempt left in the restart files"""
+        then the main run from `template` - a retry repeats both from the
+        restart files of the step's start, restored below, so it does not
+        inherit the density a failed attempt left in them"""
         main_params = dict(params)
         main_params["input_template"] = template
         if params.get("ot_template", None):
@@ -4024,22 +4025,43 @@ def run_cp2k(coords_bohr, params):
                         f"retry_templates entry that does, allow_unconverged_scf = 1 accepts the "
                         f"step regardless")
 
-    for itry, template in enumerate(templates):
-        try:
-            logfile = _attempt(template)
-            _check_converged(logfile)
-        except RuntimeError as err:
-            if itry + 1 == len(templates):
-                if len(templates) > 1:
-                    raise RuntimeError(
-                        f"CP2K failed in {wd} with the main template and all "
-                        f"{len(templates) - 1} retry_templates {templates[1:]}\n"
-                        f"last error: {err}")
-                raise
-            print(f"WARNING in run_cp2k: CP2K failed in {wd} with {template} - "
-                  f"retrying this step with {templates[itry + 1]}")
-            continue
-        break
+    # the restart files of the step's start, kept aside: a retry starts from them (the previous
+    # step's converged density), not from the density the failed attempt left behind
+    restarts = [os.path.join(wd, f"{project}-RESTART.wfn"), os.path.join(wd, f"{project}_ot-RESTART.wfn")]
+    kept = {f: f + ".step-start" for f in restarts if os.path.exists(f)}
+    for f, copy_ in kept.items():
+        shutil.copy2(f, copy_)
+
+    def _restore_restarts():
+        for f in restarts:
+            if f in kept:
+                shutil.copy2(kept[f], f)
+            elif os.path.exists(f):
+                os.remove(f)                    # the first attempt had none, so the retry has none
+
+    try:
+        for itry, template in enumerate(templates):
+            if itry > 0:
+                _restore_restarts()
+            try:
+                logfile = _attempt(template)
+                _check_converged(logfile)
+            except RuntimeError as err:
+                if itry + 1 == len(templates):
+                    if len(templates) > 1:
+                        raise RuntimeError(
+                            f"CP2K failed in {wd} with the main template and all "
+                            f"{len(templates) - 1} retry_templates {templates[1:]}\n"
+                            f"last error: {err}")
+                    raise
+                print(f"WARNING in run_cp2k: CP2K failed in {wd} with {template} - "
+                      f"retrying this step with {templates[itry + 1]}")
+                continue
+            break
+    finally:
+        for copy_ in kept.values():
+            if os.path.exists(copy_):
+                os.remove(copy_)
     return logfile
 
 
