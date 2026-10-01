@@ -409,8 +409,7 @@ def make_T_matrices(ci_coefficients, ci_basis_states, spin_components, sd_states
             data_outs.print_matrix(data_conv.nparray2CMATRIX(T))
 
         # Sanity check. Make sure sum of squared elements of columns == 1:
-        # check_norm += ci_coefficients_libra[step][i][j]**2  (the element loop - now the column sums of
-        # _normalized_columns, summed row by row in the same order)
+        # the column sums of _normalized_columns, row by row in the determinants' order
         SD2CI.append(_normalized_columns(T, step))
 
         if verbosity >= 2:
@@ -521,8 +520,7 @@ def make_T_matrices_fast(ci_coefficients, ci_basis_states, spin_components, sd_b
             data_outs.print_matrix(data_conv.nparray2CMATRIX(T))
 
         # Sanity check. Make sure sum of squared elements of columns == 1:
-        # check_norm += ci_coefficients_libra[step][i][j]**2  (the element loop - now the column sums of
-        # _normalized_columns, summed row by row in the same order)
+        # the column sums of _normalized_columns, row by row in the determinants' order
         SD2CI.append(_normalized_columns(T, step))
 
         if verbosity >= 2:

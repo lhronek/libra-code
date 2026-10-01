@@ -71,8 +71,7 @@ def convolve(X0, Y0, dx0, dx, var):
     alp = 0.5 / (var**2)
 
     # the Gaussian of every original point on the new grid as one kernel applied to all projections at once, in
-    # blocks of new-grid rows that keep the kernel under 64 MB - the former element loop evaluated N0 x N x nproj
-    # exponentials one at a time
+    # blocks of new-grid rows that keep the kernel under 64 MB
     x0 = data_conv.MATRIX2nparray(X0, np.float64)[:, 0]
     weights = dx0 * data_conv.MATRIX2nparray(Y0, np.float64) / area     # the area of each original point relative to the Gaussian's
     x = x0[0] + np.arange(N) * dx

@@ -4945,7 +4945,7 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
     # 20-100x cheaper already at a few thousand AOs. The AO overlap is
     # spin-independent, so the same S blocks serve every spin channel.
     # MATRIX products (DGEMM) through the bulk transfer, the real parts of
-    # the inputs as before
+    # the three blocks as libra matrices
     S11_m, S12_m, S22_m = (data_conv.nparray2MATRIX(np.asarray(b)) for b in (S11, S12, S22))
     St, S_prev, S_curr, P_frag = [], [], [], []
     for suff in ("", "_b"):
@@ -5214,7 +5214,7 @@ def fill_adiabatic_hamiltonians(obj, E, st_ci, s_ci=None):
         raise TypeError("a complex CI overlap reached the adiabatic Hamiltonian fill - the drivers' overlaps are real")
     E = np.asarray(E, dtype=np.float64)
     n = E.shape[0]
-    # the CI data may carry more states than the propagated ones - the former loops filled the n x n block
+    # the CI data may carry more states than the propagated ones - the n x n block of the propagated states
     St = np.asarray(st_ci, dtype=np.float64)[:n, :n]
     obj.ham_adi = data_conv.nparray2CMATRIX(np.diag(E).astype(np.complex128))
     obj.time_overlap_adi = data_conv.nparray2CMATRIX(St.astype(np.complex128))

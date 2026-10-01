@@ -145,7 +145,7 @@ def energy_gaps_ave(Hvib, itimes, nsteps):
     nitimes = len(itimes)
     nstates = Hvib[0][0].num_of_cols
 
-    # the windows accumulate in the order (data set, initial time) of the former loop
+    # the windows accumulate in the order (data set, initial time)
     acc = np.zeros((nsteps, nstates, nstates))
     for idata in range(0, ndata):
         E = _diagonal_energies(Hvib[idata])

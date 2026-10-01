@@ -181,8 +181,7 @@ def compute_trpes(_params):
 
             E_eff = np.roll(E_ext, -(icond-istep), 0) * units.au2ev    # eV, the energies this condition's trajectory sees
             TRPES_traj = np.zeros((nsteps, n_e_grid_pts))    # this initial condition's map alone - the ensemble average adds it once
-            # one Gaussian ridge per state over the whole (time, energy) grid, the states added in order as the former
-            # element loop added them - the loop evaluated nsteps x grid x nstates exponentials one at a time
+            # one Gaussian ridge per state over the whole (time, energy) grid, the states added in order
             for state in range(nstates):
                 TRPES_traj += sh_pop[:nsteps, state:state + 1] * de * np.exp(-(e_grid[np.newaxis, :] - E_eff[:, state:state + 1]) ** 2 / (2 * sigma_e ** 2))
 

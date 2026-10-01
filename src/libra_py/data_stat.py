@@ -242,8 +242,8 @@ def stat_arrays(stack):
     averages and bounds equal the loops bit for bit and the deviations to the last bit."""
     N = stack.shape[0]
     res = np.add.reduce(stack, axis=0) / float(N)
-    # the squares are rounded correctly here - the former loop's float power went through libm pow, which
-    # misses that rounding in about one case per thousand, so the deviations may differ in the last bit
+    # the squares by multiplication, correctly rounded (a float power through libm pow misses that rounding
+    # in about one case per thousand)
     res2 = np.sqrt(np.add.reduce((stack - res) ** 2, axis=0) / float(N))
     return res, res2, np.minimum.reduce(stack, axis=0), np.maximum.reduce(stack, axis=0)
 
@@ -407,7 +407,7 @@ def distribution(values, xmin, xmax, dx):
     values = np.sort(np.asarray(values, dtype=np.float64).ravel())
 
     # ============= Build the bin support ===========
-    # by repeated addition, as before - the support points are the density denominators below
+    # by repeated addition - the support points are the density denominators below
     bin_support = []
     x = xmin
     while x <= xmax:
