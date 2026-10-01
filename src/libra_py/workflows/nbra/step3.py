@@ -3712,15 +3712,16 @@ def _pod_route_hole_basis(nmo, occupied, per_block):
 
 def _cofactor_matrix(A):
     """C_ij = (-1)^(i+j) det(A without row i and column j) - for A the time overlaps of the orbitals of an occupied
-    set, the exact time overlaps of the one-hole determinants in the phase convention (-1)^i of run_step3_pod."""
+    set, the exact time overlaps of the one-hole determinants in the phase convention (-1)^i of run_step3_pod. From
+    the singular value decomposition A = U diag(s) V^T: C = det(U) det(V) U diag(prod of the other s) V^T - the
+    form holds for a singular A as well, where det(A) A^-T does not."""
+    A = np.asarray(A, dtype=float)
     n = A.shape[0]
-    C = np.empty_like(A)
-    for i in range(n):
-        rows = [r for r in range(n) if r != i]
-        for j in range(n):
-            cols = [c for c in range(n) if c != j]
-            C[i, j] = (-1.0) ** (i + j) * (np.linalg.det(A[np.ix_(rows, cols)]) if n > 1 else 1.0)
-    return C
+    if n == 1:
+        return np.ones((1, 1))
+    U, s, Vt = np.linalg.svd(A)
+    others = np.array([np.prod(np.delete(s, i)) for i in range(n)])
+    return np.linalg.det(U) * np.linalg.det(Vt) * (U * others[None, :]) @ Vt
 
 
 def run_step3_pod(params):
