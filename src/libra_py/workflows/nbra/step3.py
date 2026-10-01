@@ -3381,8 +3381,10 @@ def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=N
                              F"state {partner} of frame {start_time + i + 1} (|<{c}|{c}>| = {d[c]:.3f} below the "
                              F"threshold {min_overlap}, |<{c}|{partner}>| = {row[partner]:.3f}) - two localized "
                              F"states swap between the frames and the labels would mean other states from there "
-                             F"on: narrow the manifold or the active space, or follow the states with "
-                             F"do_diabatic_state_reordering 2")
+                             F"on: narrow the manifold or the active space, follow the states with "
+                             F"do_diabatic_state_reordering 2 (within a tracking group - one fragment's states of a "
+                             F"manifold), or let the window follow the orbital with active_space_selection "
+                             F"'identity' (across groups, or a group of one state)")
         if len(unresolved_idx):
             unresolved.append(start_time + i + 1)
         W_list[i + 1] = W_list[i + 1] * np.where(np.diag(O) < 0.0, -1.0, 1.0)
