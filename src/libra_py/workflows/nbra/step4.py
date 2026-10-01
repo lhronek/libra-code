@@ -819,7 +819,9 @@ def _set_method(params, ham_rep=0, is_nbra=0, method=0):
     elif is_nbra == 2:   # on-the-fly NBRA
         params.update({"isNBRA": 0, "is_nbra": 0})            # live per-trajectory children
         params.update({"force_method": 1, "rep_force": 1})    # state-specific forces
-        params.update({"enforce_state_following": 1})         # nuclei follow enforced_state_index (default 0) regardless of hops - the NBRA premise
+        params.update({"enforce_state_following": 1})         # nuclei follow enforced_state_index (default 0) regardless of hops - the NBRA premise:
+                                                              # the driver hands over THAT state's force (force_source gs or all_states - active_state
+                                                              # fills the hopping state's row alone, NaN elsewhere)
         params.update({"nac_update_method": 1})
         params.update({"time_overlap_method": 1})   # compute from basis_transform pairs
         params.update({"hop_acceptance_algo": 31, "momenta_rescaling_algo": 0})
