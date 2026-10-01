@@ -504,6 +504,24 @@ void dyn_control_params::sanity_check(){
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
+  /// the frame accumulates the per-step projector as the basis rotation - a
+  /// relabel projector (0, 1, 2, 4, 21, 22) is a signed permutation, which
+  /// makes the frame one too and the diabatic Hamiltonian exactly diagonal:
+  /// a propagation IN the frame (rep_tdse 0 or 2) then carries no coupling,
+  /// so it needs a rotation projector built from St (-1, 5, 6). The adiabatic
+  /// propagation (rep_tdse 1) with the frame as the analysis basis keeps the
+  /// relabel projectors - its frame Hamiltonian is the gauge-smoothed diagonal
+  if(ham_transform_method==4 && (rep_tdse==0 || rep_tdse==2) &&
+     !(state_tracking_algo==-1 || state_tracking_algo==5 || state_tracking_algo==6)){
+    std::cout<<"Error in dyn_control_params::sanity_check: ham_transform_method = 4 with"
+        <<" rep_tdse = "<<rep_tdse<<" propagates in the local-diabatization frame, which"
+        <<" accumulates the per-step projector - it requires a rotation projector"
+        <<" (state_tracking_algo -1, 5 or 6, got "<<state_tracking_algo<<"): a relabel"
+        <<" projector is a signed permutation, which leaves the frame Hamiltonian"
+        <<" exactly diagonal and the propagation coupling-free\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
   /// the stored-U forward transform reads ham_dia, which only a diabatic
   /// model keeps current - and consumes the model-supplied transformation,
   /// which an adiabatic-native model applies through ham_update_method 2
