@@ -36,6 +36,7 @@ import os
 import sys
 import math
 import copy
+import ast
 import re
 
 if sys.platform == "cygwin":
@@ -345,27 +346,22 @@ def init_tsh_data(saver, output_level, _nsteps, _ntraj, _ndof, _nadi, _ndia):
 
 
 def read_params_record(path):
-    """Scalars out of a _dyn_params.txt / _model_params.txt record (the
-    str(dict) dump written by init_tsh_savers below): int, float, bool and
-    quoted-string values keyed by 'name'. Nested containers and objects
-    are skipped - the record is not a full python literal (it may embed
-    MATRIX reprs)."""
-    out = {}
+    """The top-level scalars of a _dyn_params.txt / _model_params.txt record (the str(dict) dump written by
+    init_tsh_savers below): int, float, bool and string values keyed by name. The record is read as a python
+    literal after two rewrites - a numpy scalar repr (np.float64(1.0), np.int64(5) under numpy 2) becomes its
+    value, an object repr (<liblibra_core.MATRIX object at ...>) a placeholder string - so a key of a nested dict
+    stays inside it and never overrides the top-level one. Nested containers and objects are skipped."""
     with open(path) as f:
         txt = f.read()
-    pat = (r"'(\w+)': (-?\d+\.?\d*(?:[eE][+-]?\d+)?|True|False|'[^']*')"
-           r"(?=[,}])")
-    for m in re.finditer(pat, txt):
-        k, v = m.group(1), m.group(2)
-        if v in ("True", "False"):
-            out[k] = v == "True"
-        elif v.startswith("'"):
-            out[k] = v[1:-1]
-        elif any(c in v for c in ".eE"):
-            out[k] = float(v)
-        else:
-            out[k] = int(v)
-    return out
+    txt = re.sub(r"np\.(?:float|int|uint|bool_?|complex)\w*\(([^()]*)\)", r"\1", txt)
+    txt = re.sub(r"<[^<>]*>", "'<object>'", txt)
+    try:
+        record = ast.literal_eval(txt)
+    except (ValueError, SyntaxError) as e:
+        raise ValueError(F"{path} is not a readable parameter record: {e}") from None
+    if not isinstance(record, dict):
+        raise ValueError(F"{path} does not hold a parameter dict")
+    return {k: v for k, v in record.items() if isinstance(v, (bool, int, float, str)) and v != "<object>"}
 
 
 def init_tsh_savers(params, model_params, nsteps, ntraj, nnucl, nadi, ndia):
