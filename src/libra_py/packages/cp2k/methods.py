@@ -5697,6 +5697,13 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     only on each trajectory's first call - later calls restart
                     the diagonalization from their own previous-step wfn
                     [default: False]
+                retry_templates (list of str): the templates run_cp2k tries in
+                    turn after an unconverged SCF, each from the restart the
+                    failed attempt left [default: none]
+                allow_unconverged_scf (bool): accept an unconverged SCF instead
+                    of refusing the step [default: False]
+                project (str): the CP2K PROJECT name, the stem of the restart
+                    and output files [default: "libra"]
                 prefetch_trajectories (int): 1 = submit every trajectory's
                     chain to a thread pool on the step's first model call and
                     harvest per engine call, overlapping the CP2K runs
