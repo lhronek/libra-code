@@ -1762,17 +1762,20 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
             raise ValueError("ham_transform_method = 4 builds the square "
                              "local-diabatization frame - ndia must equal nadi "
                              F"(got {dyn_var.ndia} and {dyn_var.nadi})")
-        for key, what in (("rep_tdse", "TDSE propagation"),
-                          ("rep_sh", "surface hopping"),
-                          ("rep_force", "force evaluation")):
-            if dyn_params.get(key, 1) == 0:
+        # the diabatic values of every representation key: rep_tdse 0 (amplitudes) and 2 (the density matrix),
+        # rep_sh 0, rep_force 0
+        for key, what, dia_values in (("rep_tdse", "TDSE propagation", (0, 2)),
+                                      ("rep_sh", "surface hopping", (0,)),
+                                      ("rep_force", "force evaluation", (0,))):
+            value = int(dyn_params.get(key, 1))
+            if value in dia_values:
                 if key != "rep_force" and transform34:
                     continue
                 if key == "rep_force":
                     hint = "diabatic forces need dU/dR - keep rep_force = 1"
                 else:
-                    hint = F"use ham_transform_method = 3 or 4, or {key} = 1"
-                raise ValueError(F"{key} = 0 requests diabatic-representation {what}, "
+                    hint = F"use ham_transform_method = 3 or 4, or an adiabatic {key} (1, or 3 for the density matrix)"
+                raise ValueError(F"{key} = {value} requests diabatic-representation {what}, "
                                  F"but adiabatic-native models (ham_update_method = 2) "
                                  F"do not build the needed diabatic matrices here - {hint}")
         # Adiabatic-native models (on-the-fly drivers, file-fed NBRA) are not
