@@ -4003,10 +4003,31 @@ def run_cp2k(coords_bohr, params):
     # distorted excited-state geometries carry near-degenerate solutions the
     # mixing ping-pongs between, and every guess falls into the same cycle - so
     # a retry pays only with a template that changes the SCF itself
-    templates = [params["input_template"]] + list(params.get("retry_templates", []) or [])
+    retry = params.get("retry_templates", []) or []
+    if isinstance(retry, str):
+        raise ValueError(f"retry_templates = {retry!r} - a list of template paths is needed (a bare "
+                         f"string would be read letter by letter)")
+    templates = [params["input_template"]] + list(retry)
+    for template in templates:
+        if not os.path.isfile(template):
+            raise FileNotFoundError(f"CP2K template {template} does not exist")
+
+    def _check_converged(logfile):
+        # CP2K aborts on an unconverged SCF, but IGNORE_CONVERGENCE_FAILURE turns that abort into a
+        # warning - the run then exits 0 carrying a density, an energy and forces that never converged
+        if int(params.get("allow_unconverged_scf", 0)) == 0:
+            with open(logfile) as fp:
+                if any("SCF run NOT converged" in line for line in fp):
+                    raise RuntimeError(
+                        f"CP2K reported an unconverged SCF in {wd} ({logfile}) - its energy and "
+                        f"forces are not usable. Fix the SCF (density mixing, MAX_SCF) or add a "
+                        f"retry_templates entry that does, allow_unconverged_scf = 1 accepts the "
+                        f"step regardless")
+
     for itry, template in enumerate(templates):
         try:
             logfile = _attempt(template)
+            _check_converged(logfile)
         except RuntimeError as err:
             if itry + 1 == len(templates):
                 if len(templates) > 1:
@@ -4019,18 +4040,6 @@ def run_cp2k(coords_bohr, params):
                   f"retrying this step with {templates[itry + 1]}")
             continue
         break
-
-    # CP2K aborts on an unconverged SCF, but IGNORE_CONVERGENCE_FAILURE turns
-    # that abort into a warning - the run then exits 0 carrying a density, an
-    # energy and forces that never converged
-    if int(params.get("allow_unconverged_scf", 0)) == 0:
-        with open(logfile) as fp:
-            if any("SCF run NOT converged" in line for line in fp):
-                raise RuntimeError(
-                    f"CP2K reported an unconverged SCF in {wd} ({logfile}) - its "
-                    f"energy and forces are not usable. Fix the SCF (density "
-                    f"mixing, MAX_SCF) or add a retry_templates entry that does; "
-                    f"allow_unconverged_scf = 1 accepts the step regardless")
     return logfile
 
 
