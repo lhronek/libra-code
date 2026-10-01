@@ -324,17 +324,22 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
   is not allocated for trajectory " << traj << "\n";
           std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
-        // the frame OWNS the diabatic slot: a model-supplied
-        // basis_transform or ham_dia would define a SECOND diabatic
+        // the frame OWNS the diabatic slot: a model-supplied non-identity
+        // basis_transform or a ham_dia would define a SECOND diabatic
         // basis (model diabats vs the trajectory frame) and the
-        // amplitude machinery can serve only one
+        // amplitude machinery can serve only one - the identity the
+        // on-the-fly drivers supply is the t0 frame itself and passes
         if (ch->basis_transform_supplied) {
-          cout << "Error in the local-diabatization transform: the model supplies \
-  obj.basis_transform, but ham_transform_method = 4 defines the diabatic basis as \
-  the trajectory frame - the two conventions cannot coexist. Drop \
-  obj.basis_transform (the square identity default is the correct t0 frame), or \
-  use ham_transform_method = 3 for a model-defined diabatic basis\n";
-          std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+          CMATRIX U_id(ch->get_basis_transform());
+          U_id.identity();
+          if (abs((ch->get_basis_transform() - U_id).max_elt()) > 1e-12) {
+            cout << "Error in the local-diabatization transform: the model supplies a \
+  non-identity obj.basis_transform, but ham_transform_method = 4 defines the diabatic \
+  basis as the trajectory frame - the two conventions cannot coexist. Supply the \
+  identity (the t0 frame) or no basis_transform, or use ham_transform_method = 3 for \
+  a model-defined diabatic basis\n";
+            std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+          }
         }
         if (ch->ham_dia_supplied) {
           cout << "Error in the local-diabatization transform: the model supplies \
