@@ -29,6 +29,7 @@
 #include <exception>
 #include <stdexcept>
 #include <memory>
+#include <deque>
 #include "Dynamics.h"
 #include "Energy_and_Forces.h"
 #include "Surface_Hopping.h"
@@ -433,6 +434,72 @@ static int metric_moved(CMATRIX &S_old, CMATRIX &S_new) {
   return 0;
 }
 
+// the factorizations of a step's metric, memoized by content: compute_dynamics calls
+// propagate_electronic once per electronic substep, and the substeps of one nuclear step -
+// and every trajectory under one shared Hamiltonian - come with the same metric ends
+// S_first, S_last. The inverse and the Lowdin frame of a metric that does not move over
+// the step, the square roots of the ends of one that does, are computed once per distinct
+// pair, each on its first use. A few entries per thread, the least recently used replaced
+struct dia_metric_factors {
+  CMATRIX S_first;  CMATRIX S_last;
+  int moving;
+  int has_inverse;  CMATRIX invS;                  // S_last^-1 (a metric that does not move)
+  int lowdin_state;  CMATRIX X;  CMATRIX Y;        // its Lowdin frame X = S^-1/2, Y = S^1/2: -1 unknown, 0 identity, 1 set
+  int has_sqrt;  CMATRIX Y0;  CMATRIX X0;  CMATRIX Y1;  CMATRIX X1;   // S^1/2, S^-1/2 of the ends (a metric that moves)
+  long stamp;
+};
+static dia_metric_factors &dia_metric(CMATRIX &S_first, CMATRIX &S_last) {
+  thread_local std::deque<dia_metric_factors> memo;   // a deque: a reference handed out stays valid when a later lookup adds an entry
+  thread_local long clock = 0;
+  int sz = S_last.n_cols;
+  for (size_t k = 0; k < memo.size(); k++) {
+    dia_metric_factors &e = memo[k];
+    if (e.S_last.n_cols == sz && e.S_first.n_cols == S_first.n_cols &&
+        !metric_moved(e.S_first, S_first) && !metric_moved(e.S_last, S_last)) {
+      e.stamp = ++clock;
+      return e;
+    }
+  }
+  size_t slot = memo.size();
+  if (slot < 8) {
+    memo.push_back(dia_metric_factors());
+  } else {
+    slot = 0;
+    for (size_t k = 1; k < memo.size(); k++) { if (memo[k].stamp < memo[slot].stamp) { slot = k; } }
+  }
+  dia_metric_factors &e = memo[slot];
+  e.S_first = S_first;  e.S_last = S_last;
+  e.moving = metric_moved(S_first, S_last);
+  e.has_inverse = 0;  e.lowdin_state = -1;  e.has_sqrt = 0;
+  e.stamp = ++clock;
+  return e;
+}
+static CMATRIX &dia_metric_inverse(dia_metric_factors &e) {
+  if (!e.has_inverse) {
+    e.invS = CMATRIX(e.S_last.n_rows, e.S_last.n_cols);
+    FullPivLU_inverse(e.S_last, e.invS);
+    e.has_inverse = 1;
+  }
+  return e.invS;
+}
+static int dia_metric_lowdin(dia_metric_factors &e) {
+  if (e.lowdin_state < 0) {
+    int sz = e.S_last.n_cols;
+    e.X = CMATRIX(sz, sz);  e.Y = CMATRIX(sz, sz);
+    e.lowdin_state = libmeigen::lowdin_frame(e.S_last, e.X, e.Y);
+  }
+  return e.lowdin_state;
+}
+static void dia_metric_sqrt(dia_metric_factors &e) {
+  if (!e.has_sqrt) {
+    int sz = e.S_last.n_cols;
+    e.Y0 = CMATRIX(sz, sz);  e.X0 = CMATRIX(sz, sz);  e.Y1 = CMATRIX(sz, sz);  e.X1 = CMATRIX(sz, sz);
+    libmeigen::sqrt_matrix(e.S_first, e.Y0, e.X0);
+    libmeigen::sqrt_matrix(e.S_last, e.Y1, e.X1);
+    e.has_sqrt = 1;
+  }
+}
+
 // one exact step of i S dc/dt = Hvib c over dt with the metric moving from S_old to
 // S_new: the Lowdin-frame step when it moves, exp(-i S^-1 Hvib dt) when it does not -
 // the constant-metric form of the rep-0 method 3, shared by the 2-point steps 4-8
@@ -441,9 +508,7 @@ static void dia_exp_step(double dt, CMATRIX &C, CMATRIX &Hvib, CMATRIX &S_old,
   if (metric_moved(S_old, S_new)) {
     propagate_electronic_lowdin(dt, C, Hvib, S_old, S_new);
   } else {
-    CMATRIX invS(S_new.n_rows, S_new.n_cols);
-    FullPivLU_inverse(S_new, invS);
-    CMATRIX G(invS * Hvib);
+    CMATRIX G(dia_metric_inverse(dia_metric(S_new, S_new)) * Hvib);
     propagate_electronic_nonHermitian(dt, C, G);
   }
 }
@@ -456,16 +521,15 @@ static void dia_exp_step(double dt, CMATRIX &C, CMATRIX &Hvib, CMATRIX &S_old,
 // the rotation step inside its frame
 static void dia_rot_step(double dt, CMATRIX &C, CMATRIX &Hvib, CMATRIX &S_old,
                          CMATRIX &S_new) {
-  int sz = Hvib.n_cols;
   if (metric_moved(S_old, S_new)) {
     propagate_electronic_lowdin(dt, C, Hvib, S_old, S_new, 1);
   } else {
-    CMATRIX X(sz, sz);  CMATRIX Y(sz, sz);
-    if (libmeigen::lowdin_frame(S_new, X, Y)) {
-      CMATRIX G(X * Hvib * X);
-      CMATRIX b(Y * C);
+    dia_metric_factors &fac = dia_metric(S_new, S_new);
+    if (dia_metric_lowdin(fac)) {
+      CMATRIX G(fac.X * Hvib * fac.X);
+      CMATRIX b(fac.Y * C);
       propagate_electronic_rot(dt, b, G);
-      C = X * b;
+      C = fac.X * b;
     } else {
       propagate_electronic_rot(dt, C, Hvib);
     }
@@ -512,27 +576,25 @@ static void dia_magnus_step(double dt, double dt_step, CMATRIX &C, CMATRIX &Hvib
                             CMATRIX &S_old, CMATRIX &S_new, int rot) {
   int sz = Hvib_old.n_cols;
   if (metric_moved(S_first, S_last)) {
-    CMATRIX Y0(sz, sz);  CMATRIX X0(sz, sz);
-    CMATRIX Y1(sz, sz);  CMATRIX X1(sz, sz);
-    libmeigen::sqrt_matrix(S_first, Y0, X0);
-    libmeigen::sqrt_matrix(S_last, Y1, X1);
-    CMATRIX dY(complex<double>(0.0, 1.0 / dt_step) * (Y1 - Y0));
-    CMATRIX GA(X0 * Hvib_old * X0 + dY * X0);
-    CMATRIX GB(X1 * Hvib_new * X1 + dY * X1);
+    dia_metric_factors &fac = dia_metric(S_first, S_last);
+    dia_metric_sqrt(fac);
+    CMATRIX dY(complex<double>(0.0, 1.0 / dt_step) * (fac.Y1 - fac.Y0));
+    CMATRIX GA(fac.X0 * Hvib_old * fac.X0 + dY * fac.X0);
+    CMATRIX GB(fac.X1 * Hvib_new * fac.X1 + dY * fac.X1);
     GA = 0.5 * (GA + GA.H());
     GB = 0.5 * (GB + GB.H());
     CMATRIX G(magnus2_generator(GA, GB, dt_step));
+    // the ends of this substep - the step's own ends for a single substep
     CMATRIX Ya(sz, sz);  CMATRIX Xa(sz, sz);
     CMATRIX Yb(sz, sz);  CMATRIX Xb(sz, sz);
-    libmeigen::sqrt_matrix(S_old, Ya, Xa);
-    libmeigen::sqrt_matrix(S_new, Yb, Xb);
+    if (metric_moved(S_old, S_first)) { libmeigen::sqrt_matrix(S_old, Ya, Xa); } else { Ya = fac.Y0;  Xa = fac.X0; }
+    if (metric_moved(S_new, S_last)) { libmeigen::sqrt_matrix(S_new, Yb, Xb); } else { Yb = fac.Y1;  Xb = fac.X1; }
     CMATRIX b(Ya * C);
     if (rot) { propagate_electronic_rot(dt, b, G); }
     else { propagate_electronic_eig(dt, b, G); }
     C = Xb * b;
   } else {
-    CMATRIX invS(sz, sz);
-    FullPivLU_inverse(S_new, invS);
+    CMATRIX &invS = dia_metric_inverse(dia_metric(S_new, S_new));
     CMATRIX Heff(magnus2_generator(Hvib_old, Hvib_new, invS, dt_step));
     if (rot) { dia_rot_step(dt, C, Heff, S_new, S_new); }
     else { dia_exp_step(dt, C, Heff, S_new, S_new); }
@@ -1611,9 +1673,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
           // d rho/dt = -i (A rho - rho A^H) of that equation for the plain C C^H density
           // the rep-sync layer stores. An identity metric leaves Hvib bit-identical
           if (with_metric) {
-            CMATRIX invS(ham->ndia, ham->ndia);
-            FullPivLU_inverse(S_last, invS);
-            Hvib = invS * Hvib;
+            Hvib = dia_metric_inverse(dia_metric(S_last, S_last)) * Hvib;
           }
           L = make_Liouvillian(Hvib);
           vRHO = vectorize_density_matrix(dyn_var.dm_dia[itraj]);
@@ -1632,25 +1692,24 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         if (moving) {
           // the two generators of the Lowdin frame at the ends of the nuclear step, as
           // dia_magnus_step builds them, the frame change over this substep
-          CMATRIX Y0(nst, nst);  CMATRIX X0(nst, nst);
-          CMATRIX Y1(nst, nst);  CMATRIX X1(nst, nst);
-          libmeigen::sqrt_matrix(S_first, Y0, X0);
-          libmeigen::sqrt_matrix(S_last, Y1, X1);
-          CMATRIX dY(complex<double>(0.0, 1.0 / prms.dt) * (Y1 - Y0));
-          CMATRIX GA(X0 * Hvib_old * X0 + dY * X0);
-          CMATRIX GB(X1 * Hvib * X1 + dY * X1);
+          dia_metric_factors &fac = dia_metric(S_first, S_last);
+          dia_metric_sqrt(fac);
+          CMATRIX dY(complex<double>(0.0, 1.0 / prms.dt) * (fac.Y1 - fac.Y0));
+          CMATRIX GA(fac.X0 * Hvib_old * fac.X0 + dY * fac.X0);
+          CMATRIX GB(fac.X1 * Hvib * fac.X1 + dY * fac.X1);
           GA = 0.5 * (GA + GA.H());
           GB = 0.5 * (GB + GB.H());
           CMATRIX G(magnus2_generator(GA, GB, prms.dt));
+          // the ends of this substep - the step's own ends for a single substep
           CMATRIX Ya(nst, nst);  CMATRIX Xa(nst, nst);
           CMATRIX Yb(nst, nst);  CMATRIX Xb(nst, nst);
-          libmeigen::sqrt_matrix(S_old, Ya, Xa);
-          libmeigen::sqrt_matrix(S_new, Yb, Xb);
+          if (metric_moved(S_old, S_first)) { libmeigen::sqrt_matrix(S_old, Ya, Xa); } else { Ya = fac.Y0;  Xa = fac.X0; }
+          if (metric_moved(S_new, S_last)) { libmeigen::sqrt_matrix(S_new, Yb, Xb); } else { Yb = fac.Y1;  Xb = fac.X1; }
           dia_dm_lowdin_step(dt, *dyn_var.dm_dia[itraj], G, Ya, Xb);
         } else {
           CMATRIX invS(ham->ndia, ham->ndia);
           invS.identity();
-          if (with_metric) { FullPivLU_inverse(S_last, invS); }
+          if (with_metric) { invS = dia_metric_inverse(dia_metric(S_last, S_last)); }
           CMATRIX Heff(invS * magnus2_generator(Hvib_old, Hvib, invS, prms.dt));
           L = make_Liouvillian(Heff);
           vRHO = vectorize_density_matrix(dyn_var.dm_dia[itraj]);
