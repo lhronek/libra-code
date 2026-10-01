@@ -4234,6 +4234,14 @@ def compute_state_energy_and_force(coords_bohr, params):
             # &EXCITED_STATES template: the FORCE_EVAL total includes the
             # active state's omega (10-decimal in the excited-state block)
             E_gs = E_total - info["omega"]
+        elif params.get("force_source", "active_state") == "active_state":
+            # the force of state act_state was requested, but the run carried no
+            # excited-state block - the FORCES block is the ground state's
+            raise ValueError(
+                f"act_state = {act_state} with force_source active_state, but {logfile} carries no "
+                f"excited-state block - the template's &EXCITED_STATES section is absent or inactive "
+                f"and the FORCES block is the ground state's; activate the section (STATE is "
+                f"rewritten per step) or use force_source gs / all_states")
         else:
             # no Excited State Energy block (all_states / forces-free
             # templates run the ground state): the total IS E_gs -
@@ -5941,6 +5949,15 @@ def cp2k_compute_adi_impl(q, params, full_id):
                 "populate - segfault, verified (qs_tddfpt2_forces.F:1358 -> "
                 "xtb_ehess.F:146). Use force_source='gs'/'none' (spectrum + GS "
                 "forces work), time_dependent=False, or native xTB")
+    # the active state's force comes through an active &EXCITED_STATES
+    # section - without it the FORCES block of a TDDFPT run is the ground
+    # state's, handed over as the active state's with no diagnostic
+    if params.get("time_dependent", True) and force_source == "active_state":
+        if not _template_has_section(_template_text(params["input_template"]), "EXCITED_STATES"):
+            raise ValueError(
+                F"force_source active_state needs an active &EXCITED_STATES section in "
+                F"{params['input_template']} - without it the FORCES block is the ground state's; "
+                F"activate the section (STATE is rewritten per step) or use force_source gs / all_states")
     # the file-fed MO sources need their print in the template - the run
     # would otherwise complete and leave no MO file (a commented-out
     # &MO_MOLDEN block is the observed case)
