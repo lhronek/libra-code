@@ -3687,10 +3687,11 @@ def read_cp2k_s_csr(filename, n=None, chunk_rows=None):
         m = int(max(rows[:, 0].max(), rows[:, 1].max()))
         if n is None:
             n = m
-        elif m > n:
+        elif m != n:
+            # an overlap matrix carries its diagonal, so its triplets span the whole dimension
             raise ValueError(
-                f"triplet index {m} exceeds the declared dimension {n} "
-                f"({filename})")
+                f"the CSR overlap spans {m} functions, the declared dimension is {n} ({filename}) - "
+                f"the overlap template runs another basis than the input template")
         S = np.zeros((n, n))
         S[rows[:, 0].astype(int) - 1, rows[:, 1].astype(int) - 1] = rows[:, 2]
     else:
@@ -3721,6 +3722,10 @@ def read_cp2k_s_csr(filename, n=None, chunk_rows=None):
                     break
         if not seen:
             raise ValueError(f"empty CSR overlap file ({filename})")
+        if n is not None and hi != n:
+            raise ValueError(
+                f"the CSR overlap spans {hi} functions, the declared dimension is {n} ({filename}) - "
+                f"the overlap template runs another basis than the input template")
         if n is None and hi < S.shape[0]:                    # trim growth headroom
             S = np.ascontiguousarray(S[:hi, :hi])
     if np.abs(S - S.T).max() > 1e-10:
