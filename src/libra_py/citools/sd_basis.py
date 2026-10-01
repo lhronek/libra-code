@@ -186,9 +186,9 @@ def sd2ci_matrix(ci_data, sd_unique, lowest_orbital):
         named = ", ".join(F"{o}->{v}{'' if sp == 'alp' else ' ' + sp} ({w:.1%})"
                           for o, v, sp, w in truncated[:4])
         if dropped > 0.5:
-            # the state is MOSTLY outside the basis - the quiet one-liner
-            # below was easy to read past at 99% drops, and everything built
-            # from this column (overlaps, couplings) uses only the remnant
+            # the state is MOSTLY outside the basis - a banner once per state and process, since everything built
+            # from this column (overlaps, couplings) uses only the remnant - the one-line record below follows it
+            # at every occurrence
             if (i + 1) not in _severe_drop_warned:
                 _severe_drop_warned.add(i + 1)
                 bar = "!" * 78
@@ -198,9 +198,9 @@ def sd2ci_matrix(ci_data, sd_unique, lowest_orbital):
                 print(F"!!! representable, and its overlaps and couplings are built from that")
                 print(F"!!! remnant. Configurations outside the window: {named}")
                 print(F"!!! Widen num_occ_states/num_unocc_states (and the MO window).")
-                print(F"!!! Further occurrences for this state are muted.")
+                print(F"!!! The banner is shown once for this state, the one-line record at every occurrence.")
                 print(bar)
-        elif dropped > 1e-6:
+        if dropped > 1e-6:
             print(F"sd2ci_matrix: state {i+1}: dropped CI weight {dropped:.2e} "
                   F"outside the SD basis (column renormalized): {named} - widen "
                   F"num_occ_states/num_unocc_states or the MO window to capture it")
