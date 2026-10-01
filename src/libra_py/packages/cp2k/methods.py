@@ -5986,6 +5986,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
             os.remove(f)
 
     run_params = _cp2k_run_params(params, is_first_time, wd, act_state, force_source, nexc)
+    _prefetch_abort_check(params)                # a failed sibling chain stops this one before its CP2K run
     res = compute_state_energy_and_force(coordinates, run_params)
     E_adi_curr = res["E_adi"][:nstates]
     forces = res["forces"]
@@ -6438,7 +6439,10 @@ def _prefetch_parse_pool(params):
 
 
 def _prefetch_abort_check(params):
-    """Between chain stages: stop promptly once a sibling chain failed."""
+    """Between the stages of a prefetch chain: stop promptly once a sibling chain failed. Outside a batch
+    (prefetch_trajectories 0) the registry's flag belongs to another run of this process and is ignored."""
+    if not int(params.get("prefetch_trajectories", 0)):
+        return
     st = _PREFETCH_STATES.get(_prefetch_key(params))
     if st is not None and st.get("abort"):
         raise RuntimeError("prefetch batch aborted after a failed chain")
