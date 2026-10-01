@@ -79,6 +79,12 @@ complex<double> nHamiltonian::Ehrenfest_energy_dia(CMATRIX& ampl_dia, vector<int
     else{ cout<<"ERROR in force_dia: No Hamiltonian matching the requested id\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
   }
   else{
+    if (id_[1] < 0 || id_[1] >= (int)children.size()) {
+      cout << "Error in nHamiltonian::Ehrenfest_energy_dia(): the child index " << id_[1]
+           << " is beyond the " << children.size() << " children of this level - a shared child "
+              "(isNBRA) serves trajectory 0's index alone\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
     vector<int> next(id_.begin()+1,id_.end());
     return children[id_[1]]->Ehrenfest_energy_dia(ampl_dia, next);
   }
@@ -131,6 +137,12 @@ complex<double> nHamiltonian::Ehrenfest_energy_adi(CMATRIX& ampl_adi, vector<int
     else{ cout<<"ERROR in force_dia: No Hamiltonian matching the requested id\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
   }
   else{
+    if (id_[1] < 0 || id_[1] >= (int)children.size()) {
+      cout << "Error in nHamiltonian::Ehrenfest_energy_adi(): the child index " << id_[1]
+           << " is beyond the " << children.size() << " children of this level - a shared child "
+              "(isNBRA) serves trajectory 0's index alone\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
     vector<int> next(id_.begin()+1,id_.end());
     return children[id_[1]]->Ehrenfest_energy_adi(ampl_adi, next, transform);
   }
@@ -201,6 +213,12 @@ vector<CMATRIX> nHamiltonian::Ehrenfest_forces_tens_adi(CMATRIX& ampl_adi, vecto
     else{ cout<<"ERROR in Ehrenfest_forces_adi: No Hamiltonian matching the requested id\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
   }
   else{
+    if (id_[1] < 0 || id_[1] >= (int)children.size()) {
+      cout << "Error in nHamiltonian::Ehrenfest_forces_tens_adi(): the child index " << id_[1]
+           << " is beyond the " << children.size() << " children of this level - a shared child "
+              "(isNBRA) serves trajectory 0's index alone\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
     vector<int> next(id_.begin()+1,id_.end());
     return children[id_[1]]->Ehrenfest_forces_tens_adi(ampl_adi, next);
   }
@@ -272,6 +290,12 @@ vector<CMATRIX> nHamiltonian::Ehrenfest_forces_tens_dia(CMATRIX& ampl_dia, vecto
     else{ cout<<"ERROR in Ehrenfest_forces_dia: No Hamiltonian matching the requested id\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
   }
   else{
+    if (id_[1] < 0 || id_[1] >= (int)children.size()) {
+      cout << "Error in nHamiltonian::Ehrenfest_forces_tens_dia(): the child index " << id_[1]
+           << " is beyond the " << children.size() << " children of this level - a shared child "
+              "(isNBRA) serves trajectory 0's index alone\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
     vector<int> next(id_.begin()+1,id_.end());
     return children[id_[1]]->Ehrenfest_forces_tens_dia(ampl_dia, next);
   }

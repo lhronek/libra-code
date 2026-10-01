@@ -133,6 +133,21 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
               "isNBRA = 0 for per-trajectory children\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
+    // the collapses that edit the momenta per trajectory (MFSD and the
+    // exact-factorization family) and the XF forces split the trajectories
+    // off the shared path - the divergence sentinel below reads q alone and
+    // would see it a step late, after a wasted shared CP2K step
+    if (prms.force_method != 0 &&
+        (prms.decoherence_algo == 4 || prms.decoherence_algo == 5 ||
+         prms.decoherence_algo == 6 || prms.use_xf_force == 1)) {
+      cout << "Error in update_Hamiltonian_variables(): decoherence_algo = "
+           << prms.decoherence_algo << " / use_xf_force = " << prms.use_xf_force
+           << " edits the momenta per trajectory, but isNBRA with live forces "
+              "keeps every trajectory on the shared child Hamiltonian's path. "
+              "Use decoherence_algo -1, 0, 1, 2 or 3 and use_xf_force = 0 "
+              "there, or run with isNBRA = 0 for per-trajectory children\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
     if (prms.decoherence_times_type == 2 ||
         prms.decoherence_times_type == 4) {
       cout << "Error in update_Hamiltonian_variables(): "
