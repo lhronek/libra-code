@@ -328,7 +328,7 @@ def read_cp2k_tddfpt_log_file(params):
 
         • nao is set equal to nmo, which may not strictly hold in CP2K.
 
-        • The tolerance parameter is important for reducing the size of the CI
+        • The ci_threshold parameter is important for reducing the size of the CI
           expansion and focusing on dominant configurations.
 
     ------------------------------------------------------------------------

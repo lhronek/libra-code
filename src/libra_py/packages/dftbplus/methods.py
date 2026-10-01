@@ -706,7 +706,7 @@ def read_dftbplus_TRA_file(params):
             logfile_name ( string ): this is actualyl the TRA.dat file, but we keep it as logfile_name for ease, as many other similar
                                      type functions (for cp2k, gaussian) rely on this format internally.
             number_of_states ( int ): how many ci states to consider
-            tolerance ( float ): the tolerance for accepting SDs are members of the CI wavefunctions
+            ci_threshold ( float ): the |C|^2 cut for accepting SDs as members of the CI wavefunctions
             isUKS ( Boolean ): flag for whether or not a spin-polarized Kohn-Sham basis is being used. TRUE means
                                that a spin-polarized Kohn-Sham basis is being used.
     Returns:

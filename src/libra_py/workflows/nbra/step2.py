@@ -721,7 +721,7 @@ def run_cp2k_libint_step2(params):
         print('Done with step', step, 'Elapsed time:', time.time() - t1)
 #        if params['is_many_body']:
 #            tddft_params = {"logfile_name": f'step_{step}.log', "number_of_states": params['number_of_tddft_states'],
-#                            "isUKS": params['isUKS'], "tolerance": params['min_amplitude']}
+#                            "isUKS": params['isUKS'], "ci_threshold": params['min_amplitude']}
 #            tddft_data = CP2K_methods.read_cp2k_tddfpt_log_file(tddft_params)
 #            # Only tested for isUKS=False
 #            max_state = 0
