@@ -35,7 +35,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
 from libra_py import data_conv
-from libra_py.packages.driver_forces import fill_diagonal_forces, force_diagonals, refreshed_rows
+from libra_py.packages.driver_forces import ForceHandover, fill_diagonal_forces, force_diagonals, refreshed_rows
 
 from libra_py import data_outs, data_read, data_stat, data_conv
 from libra_py import units, molden_methods, orthogonalizations
@@ -6396,6 +6396,100 @@ def _shutdown_prefetch_pools():
 atexit.register(_shutdown_prefetch_pools)
 
 
+def _prefetch_pools(state, params, ntraj):
+    """The executors of this driver instance's registry entry, sized for ntraj chains - the chain pool returned,
+    the parse pool beside it in the entry - recycled when the sizing inputs change (a new run reuses the prefix).
+    Shared by the regular batch of a step and the force refresh of its call-back."""
+    nprocs = max(1, int(params.get("nprocs", 1)))
+    omp = max(1, int(params.get("omp_num_threads", 1)))
+    sig = (ntraj, nprocs, omp,
+           int(params.get("max_concurrent_chains", 0)),
+           int(params.get("parse_pool_workers", -1)))
+    if state.get("sig") != sig:
+        # sizing inputs changed (a new run reuses the prefix):
+        # recycle the executors
+        for key in ("pool", "parse_pool"):
+            ex = state.pop(key, None)
+            if ex is not None:
+                ex.shutdown(wait=False, cancel_futures=True)
+        state["sig"] = sig
+    if "pool" not in state:
+        # one CP2K run occupies nprocs x omp_num_threads PHYSICAL
+        # cores - the default cap packs the allocation with exactly
+        # that footprint (affinity-masked, SMT siblings collapsed -
+        # cpu_count would report the whole node's logical CPUs).
+        # Riding on top, uncounted: the parse workers (a full core
+        # each, ~1-2 s bursts when chains finish together) and the
+        # ~1-core GIL-serial python tail - brief time-sharing beats
+        # reserving cores that would idle between bursts
+        cap = int(params.get("max_concurrent_chains", 0)) or \
+            max(1, _allocation_cores() // (nprocs * omp))
+        state["pool"] = ThreadPoolExecutor(max_workers=min(cap, ntraj))
+        # the overlap parses hold the GIL for seconds when run inside a
+        # chain thread, stalling every other chain - a fork-context
+        # process pool runs them truly in parallel (parse_pool_workers:
+        # 0 disables). Forked and warmed up HERE, in the main thread,
+        # BEFORE any chain thread exists - forking a threaded process
+        # is not safe
+        pworkers = int(params.get("parse_pool_workers", min(cap, ntraj)))
+        if pworkers > 0 and multiprocessing.current_process().daemon:
+            # a daemonic worker (mp.Pool batch parallelism) cannot fork
+            # children - parses run inline in the chain threads, and the
+            # outer process pool already covers cross-batch parallelism
+            pworkers = 0
+        if pworkers > 0:
+            state["parse_pool"] = ProcessPoolExecutor(
+                max_workers=pworkers,
+                mp_context=multiprocessing.get_context("fork"))
+            warm = [state["parse_pool"].submit(time.sleep, 0.05)
+                    for _ in range(pworkers)]
+            for w in warm:
+                w.result()
+    return state["pool"]
+
+
+def _cp2k_refresh_dispatch(q, params, full_id):
+    """The engine's call-back after the hops of a step (hop_force_refresh) comes once, with
+    params["force_refresh"] = {trajectory: new state} for every trajectory to refresh, and is delivered trajectory
+    by trajectory as the regular call is: the first delivery of a call-back submits one force run per listed
+    trajectory to the pool of the regular batch (harvested by then - the hops follow the step's model calls),
+    every listed trajectory harvests its own, a trajectory not listed hands back the empty object at once. The two
+    call-backs a step may have (a relabel's before the second half kick, the hops' after it) are two batches,
+    told apart by their dicts. A failed run re-raises at its own trajectory's harvest."""
+    Id = Cpp2Py(full_id)
+    itraj = Id[-1]
+    refresh = params["force_refresh"]
+    if itraj not in refresh:
+        return ForceHandover()
+    state = _prefetch_state(params)
+    key = (int(params.get("timestep", -1)), tuple(sorted((int(k), int(v)) for k, v in refresh.items())))
+    if state.get("refresh_key") != key:
+        leftovers = state.get("refresh_futures") or {}
+        if leftovers:
+            for f in leftovers.values():
+                f.cancel()
+            raise RuntimeError(
+                F"force refresh {state['refresh_key']}: {len(leftovers)} of the submitted force runs were never "
+                F"harvested - the engine does not deliver the call-back per trajectory here; set "
+                F"prefetch_trajectories=0")
+        pool = _prefetch_pools(state, params, q.num_of_cols)
+        state["refresh_key"] = key
+        state["refresh_futures"] = {
+            j: pool.submit(cp2k_compute_adi_impl, q, params, Py2Cpp_int(list(Id[:-1]) + [j]))
+            for j in refresh}
+    fut = state["refresh_futures"].pop(itraj, None)
+    if fut is None:                     # an unexpected repeat delivery - run directly
+        return cp2k_compute_adi_impl(q, params, full_id)
+    try:
+        return fut.result()
+    except BaseException:
+        state["abort"] = True
+        for f in state["refresh_futures"].values():
+            f.cancel()
+        state["refresh_futures"] = {}
+        raise
+
+
 def _cp2k_prefetch_dispatch(q, params, full_id):
     """One batch per timestep: the first call of a step submits EVERY
     trajectory's chain (the CP2K runs + the python assembly) to a thread
@@ -6428,56 +6522,12 @@ def _cp2k_prefetch_dispatch(q, params, full_id):
                 F"not call the model per trajectory here; set "
                 F"prefetch_trajectories=0")
         ntraj = q.num_of_cols
-        nprocs = max(1, int(params.get("nprocs", 1)))
-        omp = max(1, int(params.get("omp_num_threads", 1)))
-        sig = (ntraj, nprocs, omp,
-               int(params.get("max_concurrent_chains", 0)),
-               int(params.get("parse_pool_workers", -1)))
-        if state.get("sig") != sig:
-            # sizing inputs changed (a new run reuses the prefix):
-            # recycle the executors
-            for key in ("pool", "parse_pool"):
-                ex = state.pop(key, None)
-                if ex is not None:
-                    ex.shutdown(wait=False, cancel_futures=True)
-            state["sig"] = sig
-        if "pool" not in state:
-            # one CP2K run occupies nprocs x omp_num_threads PHYSICAL
-            # cores - the default cap packs the allocation with exactly
-            # that footprint (affinity-masked, SMT siblings collapsed -
-            # cpu_count would report the whole node's logical CPUs).
-            # Riding on top, uncounted: the parse workers (a full core
-            # each, ~1-2 s bursts when chains finish together) and the
-            # ~1-core GIL-serial python tail - brief time-sharing beats
-            # reserving cores that would idle between bursts
-            cap = int(params.get("max_concurrent_chains", 0)) or \
-                max(1, _allocation_cores() // (nprocs * omp))
-            state["pool"] = ThreadPoolExecutor(max_workers=min(cap, ntraj))
-            # the overlap parses hold the GIL for seconds when run inside a
-            # chain thread, stalling every other chain - a fork-context
-            # process pool runs them truly in parallel (parse_pool_workers:
-            # 0 disables). Forked and warmed up HERE, in the main thread,
-            # BEFORE any chain thread exists - forking a threaded process
-            # is not safe
-            pworkers = int(params.get("parse_pool_workers", min(cap, ntraj)))
-            if pworkers > 0 and multiprocessing.current_process().daemon:
-                # a daemonic worker (mp.Pool batch parallelism) cannot fork
-                # children - parses run inline in the chain threads, and the
-                # outer process pool already covers cross-batch parallelism
-                pworkers = 0
-            if pworkers > 0:
-                state["parse_pool"] = ProcessPoolExecutor(
-                    max_workers=pworkers,
-                    mp_context=multiprocessing.get_context("fork"))
-                warm = [state["parse_pool"].submit(time.sleep, 0.05)
-                        for _ in range(pworkers)]
-                for w in warm:
-                    w.result()
+        pool = _prefetch_pools(state, params, ntraj)
         state["timestep"] = timestep
         state["abort"] = False
         state["futures"] = {
-            j: state["pool"].submit(cp2k_compute_adi_impl, q, params,
-                                    Py2Cpp_int(list(Id[:-1]) + [j]))
+            j: pool.submit(cp2k_compute_adi_impl, q, params,
+                           Py2Cpp_int(list(Id[:-1]) + [j]))
             for j in range(ntraj)}
     fut = state["futures"].pop(itraj, None)
     if fut is None:                     # an unexpected repeat call - run directly
@@ -6497,9 +6547,10 @@ def _cp2k_prefetch_dispatch(q, params, full_id):
 def cp2k_compute_adi(q, params, full_id):
     """Traceback-printing wrapper: C++ callers swallow Python exceptions."""
     try:
-        # the engine's call-back after a hop (hop_force_refresh) is one force run for one trajectory, outside the
-        # per-step prefetch batches
-        if int(params.get("prefetch_trajectories", 0)) and "force_refresh" not in params:
+        # the engine's call-back after the hops (hop_force_refresh) is a batch of its own on the step's pool
+        if int(params.get("prefetch_trajectories", 0)):
+            if "force_refresh" in params:
+                return _cp2k_refresh_dispatch(q, params, full_id)
             return _cp2k_prefetch_dispatch(q, params, full_id)
         return cp2k_compute_adi_impl(q, params, full_id)
     except Exception:
