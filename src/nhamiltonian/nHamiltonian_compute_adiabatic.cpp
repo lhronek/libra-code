@@ -790,6 +790,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       hvib_dia_supplied = (abs(hvib_dia->max_elt()) != 0.0);
     }
 
+    basis_transform_supplied = 0;
     has_attr = 0;
     has_attr = (int)hasattr(obj, "basis_transform");
     if (has_attr) {
@@ -812,6 +813,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       basis_transform_supplied = (abs(basis_transform->max_elt()) != 0.0);
     }
 
+    ham_dia_supplied = 0;
     has_attr = 0;
     has_attr = (int)hasattr(obj, "ham_dia");
     if (has_attr) {
