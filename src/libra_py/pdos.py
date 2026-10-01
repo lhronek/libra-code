@@ -698,6 +698,7 @@ def convolve_cp2k_pdos(params: dict):
         tmp_vec.append(block["energies"][k])
         for i in range(0, len(angular_momentum_cols)):
             cols = CP2K_methods.cp2k_pdos_component_columns(block, angular_momentum_cols[i])
+            # print("angular_momentum_cols[i]", angular_momentum_cols[i], cols)
             tmp_vec.append(float(np.sum(block["projections"][k, cols])) if cols else 0.0)
         # Now append tmp_vec into pdos_sum, we will
         # then use this pdos_sum for convolution
