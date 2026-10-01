@@ -290,39 +290,10 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
     }
 
     //============================== Time-overlaps ======================
-    /// Don't update time-overlaps
-    if (prms.time_overlap_method == 0) {
-      ;
-      ;
-    } // maybe it is already pre-computed and stored
-
-    /// Compute the time-overlap directly, using previous MO vectors
-    else if (prms.time_overlap_method == 1) { // Explicitly compute it:
-
-      CMATRIX st(nadi, nadi);
-      for (int traj = 0; traj < ntraj; traj++) {
-        st = ham_prev.children[traj]->get_basis_transform().H() *
-             ham.children[traj]->get_basis_transform();
-        // a model that supplies its own time-overlaps must not have them
-        // silently overwritten by a DISAGREEING recomputation (identity
-        // basis transforms make st = I and freeze the electronic dynamics)
-        if (ham.children[traj]->time_overlap_adi_supplied &&
-            abs((st - ham.children[traj]->get_time_overlap_adi()).max_elt()) > 1e-8) {
-          cout << "Error in the time-overlap update: the model supplies "
-                  "obj.time_overlap_adi, but time_overlap_method = 1 recomputes the "
-                  "time-overlap from the basis transforms and the two disagree - the "
-                  "supplied data would be overwritten. Use time_overlap_method = 0 "
-                  "(consume the supplied time-overlaps), or supply basis transforms "
-                  "consistent with them\n";
-          std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-        }
-        ham.children[traj]->set_time_overlap_adi_by_val(st);
-      }
-    } // 1
-    else {
-      std::cout<<"Error in update_Hamiltonian_variables(): time_overlap_method = "<<prms.time_overlap_method<<" has no branch here (implemented: 0, 1)\n";
-      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-    }
+    // the adiabatic time overlaps through the diabatic metric, St = U_prev^H S U - one owner for the
+    // step loop and the python export (the former in-loop copy left S out, a non-identity metric gave a
+    // non-unitary St: scaled HST couplings, NaN in the NPI arccos)
+    update_time_overlaps(prms, dyn_var, ham, ham_prev);
 
     // Copy the transformation matrices to the dynamics variable
     dyn_var.update_basis_transform(ham);
