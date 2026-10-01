@@ -3209,23 +3209,20 @@ def _ci_diabatization_series(params, sd_sorted, SD2CI, ci_energies, active_space
 
 
 def _munkres_assignment(weights, reordering):
-    """The column assigned to every row of a weight matrix so that the assigned weights sum to the maximum, the
-    Munkres-Kuhn step of the followings - reordering 2 libra_py.hungarian.maximize (the step of the legacy SD-state
-    reordering: the matrix padded to a square with zero rows whose padding rows take the columns left over, a
-    pure-Python loop that takes seconds on a window of a hundred orbitals), 22 scipy's linear_sum_assignment (the
-    same assignment) - as many columns as rows or more."""
+    """The column assigned to every row of a square weight matrix so that the assigned weights sum to the maximum,
+    the Munkres-Kuhn step of the followings - reordering 2 libra_py.hungarian.maximize (the step of the legacy
+    SD-state reordering, a pure-Python loop that takes seconds on a window of a hundred orbitals), 22 scipy's
+    linear_sum_assignment (the same assignment). The followings assign the states of a group, a block or a window
+    to the same positions of the next frame, so the matrix is square."""
     W = np.asarray(weights, dtype=float)
     nrow, ncol = W.shape
-    if ncol < nrow:
-        raise ValueError(F"{nrow} states cannot be assigned to {ncol} candidates - at least as many candidates are "
-                         "needed")
+    if ncol != nrow:
+        raise ValueError(F"{nrow} states against {ncol} candidates - the assignment takes a square weight matrix, the "
+                         "states of a group against the same positions of the next frame")
     col_of = np.full(nrow, -1, dtype=int)
     if reordering == 2:
-        padded = np.zeros((ncol, ncol))
-        padded[:nrow] = W
-        for row, col in hungarian.maximize(data_conv.nparray2MATRIX(padded)):
-            if row < nrow:
-                col_of[row] = col
+        for row, col in hungarian.maximize(data_conv.nparray2MATRIX(W)):
+            col_of[row] = col
     elif reordering == 22:
         rows, cols = linear_sum_assignment(W, maximize=True)
         col_of[rows] = cols
