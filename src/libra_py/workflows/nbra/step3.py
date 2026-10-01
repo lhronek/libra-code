@@ -3882,10 +3882,11 @@ def run_step3_pod(params):
                          F"output path or move the legacy files away")
 
     frames = list(range(start_time, finish_time))
-    h_full, nmo_list = [], []
+    # the block-state energies of every frame - the full h of a frame is sliced to the tracked states later
+    h_diag, nmo_list = [], []
     for k in frames:
         h, nmo = _pod_route_frame(np.load(F'{res_dir_1}/POD_cp2k_hab_{k}.npz'))
-        h_full.append(h)
+        h_diag.append(np.diag(h).copy())
         nmo_list.append(nmo)
     if any(nmo != nmo_list[0] for nmo in nmo_list):
         raise ValueError("the numbers of POD block states change along the trajectory")
@@ -3921,7 +3922,7 @@ def run_step3_pod(params):
     for f in range(nblk):
         if occupied[f] < nmo[f]:
             a, b = off[f] + occupied[f] - 1, off[f] + occupied[f]
-            gaps = [h[b, b] - h[a, a] for h in h_full]
+            gaps = [hd[b] - hd[a] for hd in h_diag]
             if min(gaps) <= 0.0:
                 raise ValueError(F"block {f}: the block state {occupied[f]} (first virtual) lies below the state "
                                  F"{occupied[f] - 1} (last occupied) at frame {frames[int(np.argmin(gaps))]} - "
@@ -3930,20 +3931,20 @@ def run_step3_pod(params):
 
     idx, frag, rank = _pod_route_hole_basis(nmo, occupied, per_block)
     n = len(idx)
-    St_full = []
-    for k in frames[:-1]:
+    # the block state that carries every diabatic state at every frame (the energy-ordered basis of start_time at
+    # the start), the printed sign of every block state followed along the trajectory - one frame's time overlaps
+    # in memory at a time, the slice over the tracked states kept
+    track = [list(idx)]
+    signs = [np.ones(n)]
+    swaps, unresolved, edges = [], [], []
+    St_act = []
+    min_continuity = 1.0
+    for i, k in enumerate(frames[:-1]):
         St_k = np.asarray(sp.load_npz(F'{res_dir_1}/St_pod_cp2k_{k}.npz').todense()).real
         ntot = St_k.shape[0] // 2
         if ntot != off[-1]:
             raise ValueError(F"St_pod_cp2k_{k}.npz carries {ntot} block states per spin, the POD prints {off[-1]}")
-        St_full.append(St_k[:ntot, :ntot])
-    # the block state that carries every diabatic state at every frame (the energy-ordered basis of start_time at
-    # the start), the printed sign of every block state followed along the trajectory
-    track = [list(idx)]
-    signs = [np.ones(n)]
-    swaps, unresolved, edges = [], [], []
-    min_continuity = 1.0
-    for i, St in enumerate(St_full):
+        St = St_k[:ntot, :ntot]
         cur = track[i]
         nxt = list(cur)
         if dia_reordering:
@@ -3952,7 +3953,7 @@ def run_step3_pod(params):
             # follows the block state assigned to the one that carried it
             for f in range(nblk):
                 cols = list(range(off[f], off[f + 1]))
-                assigned = _assign_states(St[np.ix_(cols, cols)], dia_reordering, dia_alpha, np.diag(h_full[i])[cols])
+                assigned = _assign_states(St[np.ix_(cols, cols)], dia_reordering, dia_alpha, h_diag[i][cols])
                 for c in range(n):
                     if frag[c] == f:
                         nxt[c] = cols[assigned[cur[c] - off[f]]]
@@ -4001,9 +4002,11 @@ def run_step3_pod(params):
         # the printed sign of every followed block state - an exactly zero overlap keeps the sign (np.sign would drop
         # the state from every later frame)
         signs.append(signs[-1] * np.where(np.array([St[cur[c], nxt[c]] for c in range(n)]) < 0.0, -1.0, 1.0))
-    h_act = [signs[k][:, None] * h_full[k][np.ix_(track[k], track[k])] * signs[k][None, :] for k in range(len(frames))]
-    St_act = [signs[i][:, None] * St_full[i][np.ix_(track[i], track[i + 1])] * signs[i + 1][None, :]
-              for i in range(len(St_full))]
+        St_act.append(signs[i][:, None] * St[np.ix_(cur, nxt)] * signs[i + 1][None, :])
+    h_act = []
+    for k, frame in enumerate(frames):
+        h, _ = _pod_route_frame(np.load(F'{res_dir_1}/POD_cp2k_hab_{frame}.npz'))
+        h_act.append(signs[k][:, None] * h[np.ix_(track[k], track[k])] * signs[k][None, :])
     # the one-hole determinants in the phase convention (-1)^i
     H_hole = [np.trace(h) * np.eye(n) - h for h in h_act]
     St_hole = [np.linalg.det(St) * _cofactor_matrix(St) for St in St_act]
