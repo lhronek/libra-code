@@ -238,10 +238,8 @@ dyn_control_params::dyn_control_params(const dyn_control_params& x){
   instantaneous_decoherence_variant = x.instantaneous_decoherence_variant; 
   collapse_option = x.collapse_option;
 
-  wp_width = new MATRIX( x.wp_width->n_rows, x.wp_width->n_cols );
-  *wp_width = *x.wp_width;
-  wp_v = new MATRIX( x.wp_v->n_rows, x.wp_v->n_cols );
-  *wp_v = *x.wp_v;
+  wp_width = (x.wp_width == NULL) ? NULL : new MATRIX(*x.wp_width);
+  wp_v = (x.wp_v == NULL) ? NULL : new MATRIX(*x.wp_v);
   coherence_threshold = x.coherence_threshold;
   e_mask = x.e_mask;
   use_xf_force = x.use_xf_force;
@@ -274,17 +272,13 @@ dyn_control_params::dyn_control_params(const dyn_control_params& x){
   ampl_transformation_method = x.ampl_transformation_method;
   assume_always_consistent = x. assume_always_consistent;
 
-  decoherence_rates = new MATRIX(x.decoherence_rates->n_rows, x.decoherence_rates->n_cols);  
-  *decoherence_rates = *x.decoherence_rates;
+  decoherence_rates = (x.decoherence_rates == NULL) ? NULL : new MATRIX(*x.decoherence_rates);
 
-  ave_gaps = new MATRIX( x.ave_gaps->n_rows, x.ave_gaps->n_cols );
-  *ave_gaps = *x.ave_gaps;
+  ave_gaps = (x.ave_gaps == NULL) ? NULL : new MATRIX(*x.ave_gaps);
 
-  schwartz_decoherence_inv_alpha = new MATRIX( x.schwartz_decoherence_inv_alpha->n_rows, x.schwartz_decoherence_inv_alpha->n_cols );
-  *schwartz_decoherence_inv_alpha = *x.schwartz_decoherence_inv_alpha;
+  schwartz_decoherence_inv_alpha = (x.schwartz_decoherence_inv_alpha == NULL) ? NULL : new MATRIX(*x.schwartz_decoherence_inv_alpha);
   
-  schwartz_interaction_width = new MATRIX( x.schwartz_interaction_width->n_rows, x.schwartz_interaction_width->n_cols );
-  *schwartz_interaction_width = *x.schwartz_interaction_width;
+  schwartz_interaction_width = (x.schwartz_interaction_width == NULL) ? NULL : new MATRIX(*x.schwartz_interaction_width);
 
   thermally_corrected_nbra = x.thermally_corrected_nbra;
   hop_force_refresh = x.hop_force_refresh;
