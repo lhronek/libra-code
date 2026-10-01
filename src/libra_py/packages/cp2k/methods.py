@@ -5644,6 +5644,14 @@ def _cp2k_run_params(params, is_first_time, wd, act_state, force_source, nexc, n
     return run_params
 
 
+def _remove_stale_prints(wd, project):
+    """The fixed-name print files of the previous step - the molden and the NAMD_PRINT NEWTONX input - removed
+    before a run, so that a template without the print (a retry template) cannot serve them as this step's."""
+    for stale in (F"{wd}/{project}-1_0.molden", F"{wd}/{project}-CP2K_NEWTONX-1_0.inp"):
+        if os.path.exists(stale):
+            os.remove(stale)
+
+
 def _cp2k_force_refresh(params, itraj, coordinates, nat, nstates):
     """The hand-over of the engine's call-back after a change of the active state (hop_force_refresh): the rows of
     the regular call of this step with the new state's row - one CP2K force run for that state at the same
@@ -5946,34 +5954,39 @@ def cp2k_compute_adi_impl(q, params, full_id):
     # BEFORE any CP2K time is spent. (OE_CORR had the same class of defect in
     # tddfpt_oecorr - fixed by the local CP2K patch dispatching to
     # build_tblite_ks_matrix, so it is not guarded here.)
+    # every template run_cp2k may run - the main one and the retry_templates - passes the validators
+    templates = [params["input_template"]] + list(params.get("retry_templates", []) or [])
     if params.get("time_dependent", True) and force_source in ("active_state", "all_states"):
-        if "&TBLITE" in _template_text(params["input_template"]).upper():
-            raise ValueError(
-                "CP2K's TDDFPT excited-state forces call the native-xTB Coulomb "
-                "Hessian (xtb_ehess), whose neighbor lists tblite runs never "
-                "populate - segfault, verified (qs_tddfpt2_forces.F:1358 -> "
-                "xtb_ehess.F:146). Use force_source='gs'/'none' (spectrum + GS "
-                "forces work), time_dependent=False, or native xTB")
+        for template in templates:
+            if "&TBLITE" in _template_text(template).upper():
+                raise ValueError(
+                    F"CP2K's TDDFPT excited-state forces call the native-xTB Coulomb "
+                    F"Hessian (xtb_ehess), whose neighbor lists tblite runs never "
+                    F"populate - segfault, verified (qs_tddfpt2_forces.F:1358 -> "
+                    F"xtb_ehess.F:146) - in {template}. Use force_source='gs'/'none' (spectrum + GS "
+                    F"forces work), time_dependent=False, or native xTB")
     # the active state's force comes through an active &EXCITED_STATES
     # section - without it the FORCES block of a TDDFPT run is the ground
     # state's, handed over as the active state's with no diagnostic
     if params.get("time_dependent", True) and force_source == "active_state":
-        if not _template_has_section(_template_text(params["input_template"]), "EXCITED_STATES"):
-            raise ValueError(
-                F"force_source active_state needs an active &EXCITED_STATES section in "
-                F"{params['input_template']} - without it the FORCES block is the ground state's; "
-                F"activate the section (STATE is rewritten per step) or use force_source gs / all_states")
+        for template in templates:
+            if not _template_has_section(_template_text(template), "EXCITED_STATES"):
+                raise ValueError(
+                    F"force_source active_state needs an active &EXCITED_STATES section in {template} - "
+                    F"without it the FORCES block is the ground state's; activate the section (STATE is "
+                    F"rewritten per step) or use force_source gs / all_states")
     # the file-fed MO sources need their print in the template - the run
     # would otherwise complete and leave no MO file (a commented-out
     # &MO_MOLDEN block is the observed case)
     mo_source = params.get("mo_source", "wfn")
     if mo_source in ("molden", "namd_print"):
         need = "MO_MOLDEN" if mo_source == "molden" else "NAMD_PRINT"
-        if not _template_has_section(_template_text(params["input_template"]), need):
-            raise ValueError(
-                    F"mo_source='{mo_source}' needs an active &{need} print in "
-                    F"{params['input_template']} - the run would complete and "
-                    F"leave no MO file")
+        for template in templates:
+            if not _template_has_section(_template_text(template), need):
+                raise ValueError(
+                        F"mo_source='{mo_source}' needs an active &{need} print in "
+                        F"{template} - the run would complete and "
+                        F"leave no MO file")
     wd = f"{params.get('working_directory_prefix', 'wd')}_itraj{itraj}"
 
     # ---------------- run CP2K (execution layer) ----------------
@@ -5986,6 +5999,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
             os.remove(f)
 
     run_params = _cp2k_run_params(params, is_first_time, wd, act_state, force_source, nexc)
+    _remove_stale_prints(wd, run_params.get("project", "libra"))
     _prefetch_abort_check(params)                # a failed sibling chain stops this one before its CP2K run
     res = compute_state_energy_and_force(coordinates, run_params)
     E_adi_curr = res["E_adi"][:nstates]
