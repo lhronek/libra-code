@@ -318,7 +318,9 @@ def check_sd_capture(ci_drops, nstates, max_drop, knob="dia_basis_max_drop"):
         detail = ", ".join(F"state {j}: {d:.1%}" for j, d in bad)
         raise ValueError(
             F"the SD basis captures too little of propagated states "
-            F"({detail}; limit {knob} = {max_drop:.1%}) - the "
-            F"renormalized T columns would be meaningless. Widen "
-            F"num_occ_states/num_unocc_states (and the MO window), "
-            F"reduce nstates, or raise {knob} deliberately")
+            F"({detail}, limit {knob} = {max_drop:.1%}) - the "
+            F"renormalized T columns would be meaningless. Where the SD "
+            F"window cuts the configurations, widen num_occ_states/"
+            F"num_unocc_states (and the MO window) - where the reader does "
+            F"(CP2K's MIN_AMPLITUDE, ci_threshold), lower those thresholds - "
+            F"or reduce nstates, or raise {knob} deliberately")
