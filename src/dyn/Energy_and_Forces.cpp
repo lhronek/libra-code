@@ -166,6 +166,27 @@ double average_potential_energy(bp::dict params, dyn_variables& dyn_vars, nHamil
 }
 
 
+/// the state whose surface drives each trajectory: the hopping state of the hopping representation (rep_sh), or
+/// the enforced state under enforce_state_following
+static vector<int> driving_states(dyn_control_params& prms, dyn_variables& dyn_vars){
+  vector<int> states(dyn_vars.ntraj, 0);
+  if(prms.rep_sh==1){ states = dyn_vars.act_states; }
+  else if(prms.rep_sh==0){ states = dyn_vars.act_states_dia; }
+  else{
+    std::cout<<"Error in driving_states(): rep_sh = "<<prms.rep_sh<<" has no branch here (implemented: 0, 1)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  if(prms.enforce_state_following==1){
+    for(int itraj=0; itraj<dyn_vars.ntraj; itraj++){ states[itraj] = prms.enforced_state_index; }
+  }
+  return states;
+}
+
+/// the Hamiltonian child of a trajectory - one shared child under isNBRA
+static int child_of(nHamiltonian& ham, int itraj){
+  return (itraj < (int)ham.children.size()) ? itraj : 0;
+}
+
 vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltonian& ham){
 
   int itraj;
@@ -190,22 +211,12 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
     // TSH or adiabatic (including excited states)
     // state-specific forces
 
-    vector<int> effective_states(ntraj, 0);
-    if(prms.rep_sh==1){ effective_states = dyn_vars.act_states; }
-    else if(prms.rep_sh==0){ effective_states = dyn_vars.act_states_dia; }
-    else{
-      std::cout<<"Error in potential_energies(): rep_sh = "<<prms.rep_sh<<" has no branch here (implemented: 0, 1)\n";
-      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-    }
-
-    if(prms.enforce_state_following==1){ 
-      for(itraj=0; itraj<ntraj; itraj++){ effective_states[itraj] = prms.enforced_state_index; }
-    }
+    vector<int> effective_states = driving_states(prms, dyn_vars);
 
     // Diabatic 
     if(prms.rep_force==0){  
       for(itraj=0; itraj<ntraj; itraj++){
-        id[1] = (itraj < (int)ham.children.size()) ? itraj : 0;  // NBRA: 1 shared child
+        id[1] = child_of(ham, itraj);
         int ist = effective_states[itraj];
         res[itraj] = ham.child(id[1])->get_ham_dia_lowdin().get(ist, ist).real();   
       }
@@ -213,7 +224,7 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
     // Adiabatic 
     else if(prms.rep_force==1){  
       for(itraj=0; itraj<ntraj; itraj++){
-        id[1] = (itraj < (int)ham.children.size()) ? itraj : 0;  // NBRA: 1 shared child
+        id[1] = child_of(ham, itraj);
         int ist = effective_states[itraj];
 
         //CMATRIX& T = *dyn_vars.proj_adi[itraj];
@@ -233,7 +244,7 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
     if(prms.rep_force==0){ 
       CMATRIX coeff(ndia, 1);
       for(itraj=0; itraj<ntraj; itraj++){
-        id[1] = (itraj < (int)ham.children.size()) ? itraj : 0;  // NBRA: 1 shared child
+        id[1] = child_of(ham, itraj);
         coeff = dyn_vars.ampl_dia->col(itraj);
         res[itraj] = ham.Ehrenfest_energy_dia(coeff, id).real();
         // the un-normalized Meyer-Miller potential, E = c^H H c - gamma tr(H) -
@@ -248,7 +259,7 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
     else if(prms.rep_force==1){  
       CMATRIX coeff(nadi, 1);
       for(itraj=0; itraj<ntraj; itraj++){
-        id[1] = (itraj < (int)ham.children.size()) ? itraj : 0;  // NBRA: 1 shared child
+        id[1] = child_of(ham, itraj);
         coeff = dyn_vars.ampl_adi->col(itraj);
         res[itraj] = ham.Ehrenfest_energy_adi(coeff, id, *(dyn_vars.proj_adi[itraj]) ).real();
         if(prms.ehrenfest_normalized==0){
@@ -266,23 +277,13 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
 
   else if(prms.force_method==3){ // QTSH
     
-    vector<int> effective_states(ntraj, 0);
-    if(prms.rep_sh==1){ effective_states = dyn_vars.act_states; }
-    else if(prms.rep_sh==0){ effective_states = dyn_vars.act_states_dia; }
-    else{
-      std::cout<<"Error in potential_energies(): rep_sh = "<<prms.rep_sh<<" has no branch here (implemented: 0, 1)\n";
-      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-    }
-    
-    if(prms.enforce_state_following==1){ 
-      for(itraj=0; itraj<ntraj; itraj++){ effective_states[itraj] = prms.enforced_state_index; }
-    }
+    vector<int> effective_states = driving_states(prms, dyn_vars);
     
     // Diabatic 
     if(prms.rep_force==0){ 
       CMATRIX coeff(ndia, 1);
       for(itraj=0; itraj<ntraj; itraj++){
-        id[1] = (itraj < (int)ham.children.size()) ? itraj : 0;  // NBRA: 1 shared child
+        id[1] = child_of(ham, itraj);
         int ist = effective_states[itraj];
         res[itraj] = ham.child(id[1])->get_ham_dia_lowdin().get(ist, ist).real(); // diagonal energy
         
@@ -294,7 +295,7 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
     else if(prms.rep_force==1){  
       //CMATRIX coeff(nadi, 1);
       for(itraj=0; itraj<ntraj; itraj++){
-        id[1] = (itraj < (int)ham.children.size()) ? itraj : 0;  // NBRA: 1 shared child
+        id[1] = child_of(ham, itraj);
         int ist = effective_states[itraj];
         res[itraj] = ham.get_ham_adi(id).get(ist,ist).real(); // diagonal energy
 
@@ -321,7 +322,7 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
       double c = prms.kcrpmd_c; 
       Veff = ham.kcrpmd_effective_potential(dyn_vars.y_aux_var, *dyn_vars.q, *dyn_vars.iM, beta, eta, a, b, c);
       for(itraj=0; itraj<ntraj; itraj++){
-        id[1] = (itraj < (int)ham.children.size()) ? itraj : 0;  // NBRA: 1 shared child
+        id[1] = child_of(ham, itraj);
         res[itraj] = Veff;
       }
     }
@@ -380,17 +381,7 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
 
     // TSH or adiabatic (including excited states)
     // state-specific forces   
-    vector<int> effective_states(ntraj, 0);
-    if(prms.rep_sh==1){ effective_states = dyn_vars.act_states; }
-    else if(prms.rep_sh==0){ effective_states = dyn_vars.act_states_dia; }
-    else{
-      std::cout<<"Error in update_forces(): rep_sh = "<<prms.rep_sh<<" has no branch here (implemented: 0, 1)\n";
-      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-    }
-  
-    if(prms.enforce_state_following==1){ // NBRA-like enforcement: adiabatic dynamics, in terms of forces 
-      for(int itraj=0; itraj<ntraj; itraj++){ effective_states[itraj] = prms.enforced_state_index; }
-    }
+    vector<int> effective_states = driving_states(prms, dyn_vars);
 
     if(prms.isNBRA==1 && (int)ham.children.size()==1 && ntraj>1){
       // the shared child: one force column serves every trajectory -
@@ -460,17 +451,7 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
   }// Ehrenfest
   else if(prms.force_method==3){  // QTSH forces
     // Effective force determined by the TSH procedure 
-    vector<int> effective_states(ntraj, 0);
-    if(prms.rep_sh==1){ effective_states = dyn_vars.act_states; }
-    else if(prms.rep_sh==0){ effective_states = dyn_vars.act_states_dia; }
-    else{
-      std::cout<<"Error in update_forces(): rep_sh = "<<prms.rep_sh<<" has no branch here (implemented: 0, 1)\n";
-      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-    }
-  
-    if(prms.enforce_state_following==1){ // NBRA-like enforcement: adiabatic dynamics, in terms of forces 
-      for(int itraj=0; itraj<ntraj; itraj++){ effective_states[itraj] = prms.enforced_state_index; }
-    }
+    vector<int> effective_states = driving_states(prms, dyn_vars);
 
     // Diabatic 
     if(prms.rep_force==0){  *dyn_vars.f = ham.forces_dia(effective_states).real();   }
