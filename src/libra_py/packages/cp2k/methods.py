@@ -6637,7 +6637,10 @@ def _cp2k_prefetch_dispatch(q, params, full_id):
     itraj = Id[-1]
     timestep = int(params.get("timestep", -1))
     state = _prefetch_state(params)
-    if state.get("timestep") != timestep:
+    # a new step, or a second pass over the step (the recipe's init call and the first dynamics step both
+    # evaluate t0 - the step cache serves the trajectories whose key held, the others come here again): a
+    # batch of the trajectories the cache does not serve, never a serial run per trajectory
+    if state.get("timestep") != timestep or not state.get("futures"):
         leftovers = state.get("futures") or {}
         if leftovers:
             # the engine harvested only part of the batch - it is not
@@ -6658,7 +6661,7 @@ def _cp2k_prefetch_dispatch(q, params, full_id):
         state["futures"] = {
             j: pool.submit(cp2k_compute_adi_impl, q, params,
                            Py2Cpp_int(list(Id[:-1]) + [j]))
-            for j in range(ntraj)}
+            for j in range(ntraj) if _step_cached(params, j, _step_key(q, params, j)) is None}
     fut = state["futures"].pop(itraj, None)
     if fut is None:                     # an unexpected repeat call - run directly
         return cp2k_compute_adi_impl(q, params, full_id)
@@ -6674,15 +6677,50 @@ def _cp2k_prefetch_dispatch(q, params, full_id):
         raise
 
 
+class _StepCache(dict):
+    """The per-trajectory results of the current step, kept in model_params for the run's lifetime - shared, not
+    copied, by the deep copies the dynamics makes of the dict, and a placeholder in the dict's record"""
+    def __deepcopy__(self, memo):
+        return self
+
+    def __repr__(self):
+        return "<step cache>"
+
+
+def _step_key(q, params, itraj):
+    """What one evaluation of the driver depends on: the step, the trajectory's active state (its forces) and its
+    geometry"""
+    return (int(params.get("timestep", -1)), int(params.get("act_state", {}).get(itraj, 0)),
+            data_conv.MATRIX2nparray(q.col(itraj), float).tobytes())
+
+
+def _step_cached(params, itraj, key):
+    """the trajectory's result of this step, if the step cache holds one for the same key"""
+    hit = params.get("_step_results", {}).get(itraj)
+    return hit[1] if hit is not None and hit[0] == key else None
+
+
 def cp2k_compute_adi(q, params, full_id):
-    """Traceback-printing wrapper: C++ callers swallow Python exceptions."""
+    """Traceback-printing wrapper: C++ callers swallow Python exceptions. A repeated call for the same step, active
+    state and geometry (the recipe's init call and the first dynamics step both evaluate t0) is served from the
+    step's result instead of a second CP2K evaluation."""
     try:
         # the engine's call-back after the hops (hop_force_refresh) is a batch of its own on the step's pool
-        if int(params.get("prefetch_trajectories", 0)):
-            if "force_refresh" in params:
+        if "force_refresh" in params:
+            if int(params.get("prefetch_trajectories", 0)):
                 return _cp2k_refresh_dispatch(q, params, full_id)
-            return _cp2k_prefetch_dispatch(q, params, full_id)
-        return cp2k_compute_adi_impl(q, params, full_id)
+            return cp2k_compute_adi_impl(q, params, full_id)
+        itraj = Cpp2Py(full_id)[-1]
+        key = _step_key(q, params, itraj)
+        obj = _step_cached(params, itraj, key)
+        if obj is not None:
+            return obj
+        if int(params.get("prefetch_trajectories", 0)):
+            obj = _cp2k_prefetch_dispatch(q, params, full_id)
+        else:
+            obj = cp2k_compute_adi_impl(q, params, full_id)
+        params.setdefault("_step_results", _StepCache())[itraj] = (key, obj)
+        return obj
     except Exception:
         import traceback, sys
         traceback.print_exc()

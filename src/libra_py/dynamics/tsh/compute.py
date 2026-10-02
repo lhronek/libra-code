@@ -1731,7 +1731,13 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
         ham.init_all(1, 1)
 
     # Compute internals of the Hamiltonian objects
-    model_params1 = copy.deepcopy(model_params)
+    # the init model calls run on the LIVE model_params: a driver's carried state (the
+    # previous step's data, the prefetch batch, the step cache) must reach run_dynamics,
+    # whose first step evaluates the same geometry - on a copy the driver evaluated t0 a
+    # second time. The keys the init overrides are put back after the calls
+    model_params1 = model_params
+    _init_keys = ("model", "timestep", "timestep_st")
+    _init_saved = {key: model_params[key] for key in _init_keys if key in model_params}
     # the trajectory starts at frame icond - the init model call must
     # evaluate there, or timestep-dependent models (file-fed NBRA, the
     # on-the-fly drivers) initialize every icond from frame 0
@@ -1826,6 +1832,11 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
         update_Hamiltonian_variables(dyn_params1, dyn_var, ham, ham, compute_model, model_params1, 0)
         # sys.exit(0)
         update_Hamiltonian_variables(dyn_params1, dyn_var, ham, ham, compute_model, model_params1, 1)
+    for key in _init_keys:
+        if key in _init_saved:
+            model_params[key] = _init_saved[key]
+        else:
+            model_params.pop(key, None)
 
     #sys.exit(0)
 
