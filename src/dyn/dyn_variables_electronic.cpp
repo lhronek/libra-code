@@ -1158,49 +1158,32 @@ void dyn_variables::init_active_states_dia(bp::dict _params, Random& rnd){
   }// for traj
 
   //============= For diabatic: more complicated =========================
-  if(rep==1){
-    vector<int> act_states_temp(act_states_dia);
-
-    CMATRIX pop_adi(nadi, nadi);
-    CMATRIX pop_dia(ndia, ndia);
-
-    for(traj=0; traj<ntraj; traj++){
-      i = act_states_temp[traj]; // active diabatic state
-      pop_adi *= 0.0; pop_adi.set(i, i, complex<double>(1.0, 0.0) );
-
-      // the diabatic populations of the pure adiabatic state, the S = I form - a
-      // non-orthogonal metric is resampled from the Lowdin populations below
-      pop_dia = (*basis_transform[traj]) * pop_adi * (*basis_transform[traj]).H();
-
-      vector<double> res(ndia, 0.0);
-      for(i=0; i<ndia;i++){ res[i] = pop_dia.get(i,i).real(); }
-
-      // Now select an adiabatic state according to the probabilities in the res
-      ksi = rnd.uniform(0.0, 1.0);
-      act_states_dia[traj] = hop(res, ksi);  // this is the adiabatic state that corresponds to
-                                         // the distribution of the diabatic populations
-
-
-    }// for traj
-
-  }// rep == 1
-
-  // non-orthogonal diabats: the hopping states are the Lowdin states S^-1/2 |i> and a pure
-  // diabat is a superposition of them - the initial active state follows the Lowdin
-  // populations |(S^1/2 C_dia)_i|^2 of the initial amplitudes, else the ensemble starts off
-  // the populations it is meant to track (0.023 off for a 0.3 overlap)
+  // the hopping states of non-orthogonal diabats are the Lowdin states S^-1/2 |i> and a pure diabat is a
+  // superposition of them - the initial active state follows the Lowdin populations |(S^1/2 C_dia)_i|^2 of the
+  // initial amplitudes, else the ensemble starts off the populations it is meant to track (0.023 off for a
+  // 0.3 overlap) - at S = I a rep-1 request is mapped through the pure adiabatic state's diabatic populations,
+  // one draw per trajectory either way
+  vector<int> act_states_temp(act_states_dia);
+  CMATRIX pop_adi(nadi, nadi);
+  CMATRIX pop_dia(ndia, ndia);
   for(traj=0; traj<ntraj; traj++){
     CMATRIX X(ndia, ndia);
     CMATRIX Y(ndia, ndia);
+    vector<double> res(ndia, 0.0);
     if(libmeigen::lowdin_frame(*ovlp_dia[traj], X, Y)){
       CMATRIX popL(Y * (*dm_dia[traj]) * Y);
-      vector<double> res(ndia, 0.0);
       for(i=0; i<ndia; i++){ res[i] = popL.get(i,i).real(); }
-      ksi = rnd.uniform(0.0, 1.0);
-      act_states_dia[traj] = hop(res, ksi);
     }
-  }
-
+    else if(rep==1){
+      i = act_states_temp[traj]; // active diabatic state
+      pop_adi *= 0.0; pop_adi.set(i, i, complex<double>(1.0, 0.0) );
+      pop_dia = (*basis_transform[traj]) * pop_adi * (*basis_transform[traj]).H();
+      for(i=0; i<ndia;i++){ res[i] = pop_dia.get(i,i).real(); }
+    }
+    else{ continue; }
+    ksi = rnd.uniform(0.0, 1.0);
+    act_states_dia[traj] = hop(res, ksi);
+  }// for traj
 }
 
 void dyn_variables::init_auxiliary_variables(bp::dict _params, Random& rnd){
