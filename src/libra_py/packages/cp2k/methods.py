@@ -3618,6 +3618,15 @@ def _skip_to_nth_banner(f, names, n):
     return False
 
 
+def _max_asymmetry(M, rows=512):
+    """max |M - M^T| taken in row slabs - the whole difference would hold two n x n temporaries"""
+    worst = 0.0
+    for i in range(0, M.shape[0], rows):
+        j = min(i + rows, M.shape[0])
+        worst = max(worst, float(np.abs(M[i:j] - M[:, i:j].T).max()))
+    return worst
+
+
 def read_cp2k_ao_ks_print(logfile, n_spins=1):
     """
     The AO Kohn-Sham (Hamiltonian) matrices printed by &DFT &PRINT &AO_MATRICES
@@ -3648,7 +3657,7 @@ def read_cp2k_ao_ks_print(logfile, n_spins=1):
             with open(logfile) as f:
                 _skip_to_nth_banner(f, KS_BANNERS, k)
                 H = _ao_overlap_blocks_flex(f, logfile)
-        if np.abs(H - H.T).max() > 1e-8:
+        if _max_asymmetry(H) > 1e-8:
             raise ValueError(F"parsed Kohn-Sham matrix not symmetric ({logfile})")
         out.append(0.5 * (H + H.T))
     return out
@@ -3696,7 +3705,7 @@ def read_cp2k_ao_overlap_print(logfile):
         with open(logfile) as f:
             _skip_to_overlap_banner(f)
             S = _ao_overlap_blocks_flex(f, logfile)
-    if np.abs(S - S.T).max() > 1e-10:
+    if _max_asymmetry(S) > 1e-10:
         raise ValueError(f"parsed overlap not symmetric ({logfile})")
     return S
 
@@ -3773,7 +3782,7 @@ def read_cp2k_s_csr(filename, n=None, chunk_rows=None):
                 f"the overlap template runs another basis than the input template")
         if n is None and hi < S.shape[0]:                    # trim growth headroom
             S = np.ascontiguousarray(S[:hi, :hi])
-    if np.abs(S - S.T).max() > 1e-10:
+    if _max_asymmetry(S) > 1e-10:
         raise ValueError(f"CSR overlap not symmetric ({filename})")
     return S
 
