@@ -621,14 +621,21 @@ void nHamiltonian::transform_adi2dia(int lvl) {
   model-supplied basis transformation, but obj.basis_transform was never supplied\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
+    // S U first (ndia x nadi), then (S U H) (S U)^H: every product of the
+    // chain stays ndia x nadi, where the left-to-right association ended
+    // in an ndia x ndia product (ndia^3) - the ndia x nadi temporaries are
+    // the price
+    CMATRIX SU(ndia, nadi);
+    SU.product(*ovlp_dia, *basis_transform);
+    CMATRIX SUH(ndia, nadi);
+    SUH.product(SU, *ham_adi);
     // a model-supplied obj.ham_dia lives in the SAME U-basis the
     // back-transform rebuilds into - consistent redundancy passes, a
     // disagreeing supply would be silently overwritten every step
-    // (the temporary exists only on this rare supplied path)
+    // (the rebuilt matrix is then the result itself)
     if (ham_dia_supplied) {
       CMATRIX rebuilt(ndia, ndia);
-      rebuilt.product(*ovlp_dia, *basis_transform, *ham_adi,
-                      adjoint(*basis_transform), *ovlp_dia);
+      rebuilt.product(SUH, adjoint(SU));
       if (abs((rebuilt - *ham_dia).max_elt()) > 1e-8) {
         cout << "Error in transform_adi2dia(): the model supplies obj.ham_dia, but \
   the adiabatic->diabatic transform rebuilds it as S U ham_adi U^H S and the two \
@@ -636,10 +643,11 @@ void nHamiltonian::transform_adi2dia(int lvl) {
   drop obj.ham_dia\n";
         std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
+      *ham_dia = rebuilt;
     }
-    // chained in-place product - CBLAS zgemm-backed, no per-call temporaries
-    ham_dia->product(*ovlp_dia, *basis_transform, *ham_adi,
-                     adjoint(*basis_transform), *ovlp_dia);
+    else {
+      ham_dia->product(SUH, adjoint(SU));
+    }
   } // level == lvl
 
   else if (lvl > level) {
