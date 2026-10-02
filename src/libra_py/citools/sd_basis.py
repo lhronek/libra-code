@@ -334,3 +334,11 @@ def compose_drops(a, b):
 def check_read_capture(read_drops, nstates, max_drop, knob="sd_capture_max_drop"):
     """check_sd_capture over the per-excited-state read-stage drops, the ground state (no drop) prepended"""
     check_sd_capture(np.concatenate(([0.0], read_drops)), nstates, max_drop, knob=knob)
+
+
+def refuse_tolerance_key(params):
+    """the renamed reader key: 'tolerance' became ci_threshold (the same |C|^2 cut) - a dict still carrying it is
+    refused rather than silently read with the default"""
+    if "tolerance" in params:
+        raise ValueError('tolerance was unified into "ci_threshold" (the same '
+                         "|C|^2 cut) - rename the key, the value is unchanged")

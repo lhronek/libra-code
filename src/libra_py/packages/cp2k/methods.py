@@ -27,6 +27,7 @@ from libra_py.workflows.nbra import mapping, step2_many_body
 import scipy.io as io
 import libra_py.citools.ci as ci
 from libra_py.citools.sd_basis import (make_sd_basis, sd2ci_matrix, compose_drops, check_read_capture,
+                                       refuse_tolerance_key,
                                        align_ci_state_signs, check_sd_capture)
 
 if sys.platform == "cygwin":
@@ -357,9 +358,7 @@ def read_cp2k_tddfpt_log_file(params):
     # ===================== Parameters =====================
     logfile_name = params.get("logfile_name", "output.log")
     nstates_req = params.get("number_of_states", 1)
-    if "tolerance" in params:
-        raise ValueError('tolerance was unified into "ci_threshold" (the same '
-                         "|C|^2 cut) - rename the key, the value is unchanged")
+    refuse_tolerance_key(params)
     tol = params.get("ci_threshold", 1e-6)
     isUKS = bool(params.get("isUKS", False))
     orbital_space = params.get("orbital_space", None)
@@ -597,9 +596,7 @@ def read_cp2k_tddfpt_log_file_old(params):
 
     logfile_name = params["logfile_name"]
     number_of_states = int(params["number_of_states"])
-    if "tolerance" in params:
-        raise ValueError('tolerance was unified into "ci_threshold" (the same '
-                         "|C|^2 cut) - rename the key, the value is unchanged")
+    refuse_tolerance_key(params)
     tolerance = float(params["ci_threshold"])
     isUKS = int(params["isUKS"])
 
@@ -5949,9 +5946,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
         energy-based hop acceptance/rescaling). No coupling: the engine derives
         it from the time overlap (nac_update_method 2).
     """
-    if "tolerance" in params:
-        raise ValueError('tolerance was unified into "ci_threshold" (the same '
-                         "|C|^2 cut) - rename the key, the value is unchanged")
+    refuse_tolerance_key(params)
     # ---------------- trajectory index and coordinates ----------------
     Id = Cpp2Py(full_id)
     itraj = Id[-1]

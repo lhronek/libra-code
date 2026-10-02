@@ -30,6 +30,7 @@ from libra_py import units
 from libra_py import scan
 from libra_py import data_conv
 from libra_py.citools.sd_basis import (make_sd_basis, sd2ci_matrix, check_read_capture,
+                                       refuse_tolerance_key,
                                        align_ci_state_signs, check_sd_capture)
 from libra_py import regexlib as rgl
 import libra_py.citools.ci as ci
@@ -726,9 +727,7 @@ def read_dftbplus_TRA_file(params):
 
     logfile_name = params["logfile_name"]
     number_of_states = int(params["number_of_states"])
-    if "tolerance" in params:
-        raise ValueError('tolerance was unified into "ci_threshold" (the same '
-                         "|C|^2 cut) - rename the key, the value is unchanged")
+    refuse_tolerance_key(params)
     tolerance = float(params["ci_threshold"])
     isUKS = int(params["isUKS"])
 
@@ -2679,9 +2678,7 @@ def read_dftb_orbital_info(params_):
     nstates = params.get("nstates", 2)
     orbital_space = params.get("orbital_space", None)
     wd = params.get("source_directory", "calc")
-    if "tolerance" in params:
-        raise ValueError('tolerance was unified into "ci_threshold" (the same '
-                         "|C|^2 cut) - rename the key, the value is unchanged")
+    refuse_tolerance_key(params)
     ci_threshold = params.get("ci_threshold", 0.0)
 
     # ================= SPX: excitation mappings =================
@@ -3112,9 +3109,7 @@ def dftb_compute_adi(q, params, full_id):
     >>> print(obj.ham_adi)
     >>> print(obj.dc1_adi[0])
     """
-    if "tolerance" in params:
-        raise ValueError('tolerance was unified into "ci_threshold" (the same '
-                         "|C|^2 cut) - rename the key, the value is unchanged")
+    refuse_tolerance_key(params)
     # ================= Decode trajectory index =================
     Id = Cpp2Py(full_id)
     itraj = Id[-1]

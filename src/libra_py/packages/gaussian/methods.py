@@ -21,6 +21,7 @@ import os
 import sys
 import numpy as np
 import libra_py.packages.cp2k.methods as CP2K_methods
+from libra_py.citools.sd_basis import refuse_tolerance_key
 import util.libutil as comn
 
 
@@ -62,9 +63,7 @@ def read_gaussian_tddft_log_file(params):
     # Gaussian log file name
     gaussian_log_file_name = params["logfile_name"]
     # tolerance factor
-    if "tolerance" in params:
-        raise ValueError('tolerance was unified into "ci_threshold" (the same '
-                         "|C|^2 cut) - rename the key, the value is unchanged")
+    refuse_tolerance_key(params)
     tolerance = params["ci_threshold"]
     # The unrestricted spin calculations flag
     isUKS = params["isUKS"]
