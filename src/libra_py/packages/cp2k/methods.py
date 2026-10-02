@@ -4382,6 +4382,11 @@ def mo_window_matrix(C_bra, AO, C_ket, lowest_orbital, highest_orbital):
     formed. AO is the libint MATRIX of the AO integrals, C_bra / C_ket the MO coefficient rows (nmo x nao),
     the same object for a same-time matrix. Shared by the driver's mo_overlap and the libint step-2 branch."""
     lo, hi = lowest_orbital - 1, highest_orbital
+    if np.iscomplexobj(C_bra) or np.iscomplexobj(C_ket):
+        # complex coefficients: the complex bilinear form and its real part - the real parts of the inputs
+        # would drop the Im(C) AO Im(C)^T term
+        AOn = data_conv.MATRIX2nparray(AO, np.float64)
+        return np.ascontiguousarray((np.asarray(C_bra[lo:hi]) @ AOn @ np.asarray(C_ket[lo:hi]).T).real)
     Cb = data_conv.nparray2MATRIX(C_bra[lo:hi])
     Ck = Cb if C_ket is C_bra else data_conv.nparray2MATRIX(C_ket[lo:hi])
     return data_conv.MATRIX2nparray(Cb * AO * Ck.T(), np.float64)
@@ -4851,6 +4856,17 @@ def mulliken_fragment_operators(C_win, S_ao, frag_cols):
     Returns:
         list over fragments of arrays (nwin, nwin)
     """
+    if np.iscomplexobj(C_win):
+        # complex coefficients: the complex products and their real part (the real parts of the inputs would
+        # drop the Im(C) S Im(C)^T term)
+        C_c, S_c = np.asarray(C_win), np.asarray(S_ao)
+        SC_c = S_c @ C_c.T
+        out = []
+        for cols in frag_cols:
+            ids = [int(i) for i in cols]
+            P = (C_c[:, ids] @ SC_c[ids, :]).real
+            out.append(np.ascontiguousarray(0.5 * (P + P.T)))
+        return out
     C_m = data_conv.nparray2MATRIX(np.asarray(C_win))
     S_m = data_conv.nparray2MATRIX(np.asarray(S_ao))
     nwin, n_ao = C_m.num_of_rows, C_m.num_of_cols

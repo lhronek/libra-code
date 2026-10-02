@@ -285,6 +285,16 @@ def pod_fragment_operators(pod, C_win, spin=0):
     Returns:
         list over blocks of arrays (nwin, nwin)
     """
+    if np.iscomplexobj(C_win):
+        # complex coefficients: the complex products and their real part (the float cast would drop the
+        # imaginary part with a warning alone)
+        SC_c = np.asarray(pod["S"]) @ np.asarray(C_win).T
+        out = []
+        for ib in range(pod["n_blocks"]):
+            X = np.asarray(pod["coeffs"][(ib, spin)]).T @ SC_c
+            P = (X.T @ X).real
+            out.append(np.ascontiguousarray(0.5 * (P + P.T)))
+        return out
     S_m = data_conv.nparray2MATRIX(np.asarray(pod["S"], dtype=float))
     Cw = data_conv.nparray2MATRIX(np.asarray(C_win, dtype=float))
     SC = S_m * Cw.T()                                                        # (n_ao, nwin), DGEMM
