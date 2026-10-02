@@ -4054,22 +4054,28 @@ def run_cp2k(coords_bohr, params):
     # steps), then the main diagonalization run restarts from it.
     project = params.get("project", "libra")
 
+    ot_restart = f"{project}_ot-RESTART.wfn"
+    ot_done = [False]                   # the OT run of this step completed - its restart is this step's
+
     def _attempt(template):
-        """one whole step: the OT pre-convergence run (where configured) and
-        then the main run from `template` - a retry repeats both from the
-        restart files of the step's start, restored below, so it does not
-        inherit the density a failed attempt left in them"""
+        """one whole step: the OT pre-convergence run (where configured, once per
+        step) and then the main run from `template` - a retry repeats the main run
+        from the restart files of the step's start, restored below, so it does not
+        inherit the density a failed attempt left in them, and starts from the OT
+        density the first attempt converged (the failure was the main run's)"""
         main_params = dict(params)
         main_params["input_template"] = template
         if params.get("ot_template", None):
-            ot_params = dict(params)
-            ot_params.update({"input_template": params["ot_template"],
-                              "project": f"{project}_ot",
-                              "input_name": "ot_input.inp",
-                              "act_state": 0})
-            make_cp2k_input(ot_params, working_directory=wd)
-            _execute("ot_input.inp", "ot.log")
-            main_params["wfn_restart_file"] = f"{project}_ot-RESTART.wfn"
+            if not ot_done[0]:
+                ot_params = dict(params)
+                ot_params.update({"input_template": params["ot_template"],
+                                  "project": f"{project}_ot",
+                                  "input_name": "ot_input.inp",
+                                  "act_state": 0})
+                make_cp2k_input(ot_params, working_directory=wd)
+                _execute("ot_input.inp", "ot.log")
+                ot_done[0] = True
+            main_params["wfn_restart_file"] = ot_restart
         make_cp2k_input(main_params, working_directory=wd)
         return _execute(main_params.get("input_name", "input.inp"), "out.log")
 
@@ -4107,6 +4113,8 @@ def run_cp2k(coords_bohr, params):
 
     def _restore_restarts():
         for f in restarts:
+            if f.endswith(ot_restart) and ot_done[0]:
+                continue                    # this step's converged OT density - the retry starts from it
             if f in kept:
                 shutil.copy2(kept[f], f)
             elif os.path.exists(f):
