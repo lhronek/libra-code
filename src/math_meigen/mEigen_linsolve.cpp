@@ -55,9 +55,11 @@ void least_squares_solve(MATRIX& A, MATRIX& X, MATRIX& B, int option){
     // basic one
     double rcond = std::numeric_limits<double>::epsilon() * std::min(N, M);
     if(option == 0){ lapack_gelsd(A, X, B, rcond); return; }
-    // option 1 on a square system is the LU solve as in Eigen - an exactly singular one falls
-    // through to the minimum-norm least squares
-    if(option == 1 && N == M && lapack_gesv(A, X, B) == 0){ return; }
+    // option 1 on a square system is the LU solve as in Eigen, for a full-rank system - the rank
+    // (the complete-pivoting LU with Eigen's threshold) decides first, since gesv solves a numerically
+    // singular system without a word and returns a 1e16-sized vector - a rank-deficient one takes the
+    // minimum-norm least squares
+    if(option == 1 && N == M && lapack_getc2_rank(A, rcond) == N && lapack_gesv(A, X, B) == 0){ return; }
     lapack_gelsy(A, X, B, rcond);
     return;
   }
@@ -77,7 +79,13 @@ void least_squares_solve(MATRIX& A, MATRIX& X, MATRIX& B, int option){
    // FullPivLU::solve is an exact-system solver: on a rectangular system it returned a vector that
    // is not the least-squares solution (residual 13.0 against 8.5 on a 40 x 12 test) - the complete
    // orthogonal decomposition serves that case, the LU the square one
-   if(N == M){ x = a.fullPivLu().solve(b); }
+   // and the LU solve answers a full-rank square system alone - a rank-deficient one (FullPivLU's rank,
+   // the threshold eps n) takes the minimum-norm least squares of the complete orthogonal decomposition
+   if(N == M){
+     Eigen::FullPivLU<Eigen::MatrixXd> lu(a);
+     if(lu.rank() == N){ x = lu.solve(b); }
+     else{ x = a.completeOrthogonalDecomposition().solve(b); }
+   }
    else{ x = a.completeOrthogonalDecomposition().solve(b); }
   }
   else if(option==2){
@@ -95,8 +103,9 @@ bool linsys_solver(const MATRIX& A, MATRIX& X, const MATRIX& B, const double Nor
 /**
   Adapted from the OpenBabel QEq method: solve A x = b for the column vector x - the LU solution
   first, and when it is not finite or its residual |A x - b| exceeds NormThreshold, the minimum-norm
-  SVD solution in its place (least_squares_solve options 1 and 0). Returns true when the final
-  residual is finite - above NormThreshold it is reported as a warning, not an error
+  SVD solution in its place (least_squares_solve options 1 and 0). Returns true with the solution in
+  X - a non-finite SVD residual returns false, a residual above NormThreshold is an error (the charge
+  equations have no solution to that accuracy)
 */
     if(A.n_rows!=A.n_cols){
         std::cout<<"Error: The matrix A in equation A * x = b must be square\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");  // N
@@ -132,8 +141,10 @@ bool linsys_solver(const MATRIX& A, MATRIX& X, const MATRIX& B, const double Nor
             return false;
         }
         if(resnorm > NormThreshold){
-            std::cout << "Warning, the norm of the residual is " << resnorm
-                      << " which exceeds the recommended threshold of " << NormThreshold << "\n";
+            std::cout << "Error in linsys_solver(): the residual of the SVD solution has norm " << resnorm
+                      << ", above the threshold " << NormThreshold << " - the charge equations have no solution to"
+                      << " that accuracy\n";
+            std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
     }
     return true;
