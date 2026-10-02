@@ -3840,7 +3840,9 @@ def make_cp2k_input(params, working_directory="."):
 
     # an &EXCITED_STATES block carrying OVERLAP_DELTAT is an overlap-run
     # directive, not an excited-forces request - never drop it for act_state=0
-    keep_excited = any("OVERLAP_DELTAT" in ln.upper() for ln in lines)
+    # (comment-stripped like the overlap scan - a commented-out directive is
+    # not one)
+    keep_excited = any("OVERLAP_DELTAT" in ln.split("#")[0].split("!")[0].upper() for ln in lines)
 
     # inject a DFT-level WFN_RESTART_FILE_NAME only if the template has none
     # (templates typically rely on the default restart name)
