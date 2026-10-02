@@ -836,7 +836,7 @@ def run_cp2k_libint_step2(params):
                         P_nat_a = pod_lib.pod_fragment_operators(pod_nat, mo_curr['C'][lo:hi], 0)
                         P_nat_b = pod_lib.pod_fragment_operators(pod_nat, mo_curr['C_b'][lo:hi], 1) if isUKS else P_nat_a
                         resid = float(np.max(np.abs(sum(P_nat_a) - S_a)))
-                        if resid > 1e-8:
+                        if not np.isfinite(resid) or resid > 1e-8:
                             raise ValueError(F'step {step}: the {scheme} projectors sum to S only within {resid:.2e}')
                         for f in range(pod_nat['n_blocks']):
                             scipy.sparse.save_npz(params['res_dir'] + F'/P_{scheme}{f}_ks_{step}.npz',
@@ -854,7 +854,7 @@ def run_cp2k_libint_step2(params):
                 P_pod_a = CP2K_methods.pod_cp2k_fragment_operators(pod_curr, mo_curr['C'][lo:hi], 0)
                 P_pod_b = CP2K_methods.pod_cp2k_fragment_operators(pod_curr, mo_curr['C_b'][lo:hi], 1) if isUKS else P_pod_a
                 resid = float(np.max(np.abs(sum(P_pod_a) - S_a)))
-                if resid > 1e-8:
+                if not np.isfinite(resid) or resid > 1e-8:
                     raise ValueError(F'step {step}: the POD fragment projectors sum to S only within '
                                      F'{resid:.2e} - the POD blocks do not cover all atoms or the AO orders differ')
                 for f in range(pod_curr['n_blocks']):
@@ -865,18 +865,19 @@ def run_cp2k_libint_step2(params):
                          **{F'V_b{i}_b{j}_s{sp}': v for (i, j, sp), v in pod_curr['couplings'].items()})
             if fragment_atom_lists is not None:
                 # the fragments covering all atoms sum to S - a residual there is a
-                # broken AO->atom map or a broken window
+                # broken AO->atom map or a broken window - checked before anything is written
                 P_sum = np.zeros_like(S_a)
-                for f, P in enumerate(odt_out[3]):
-                    P_a, P_b = P if isUKS else (P, P)
-                    P_sum = P_sum + P_a
-                    scipy.sparse.save_npz(params['res_dir'] + F'/P_frag{f}_ks_{step}.npz',
-                                          scipy.sparse.csc_matrix(data_conv.form_block_matrix(P_a, zero_mat, zero_mat, P_b)))
+                for P in odt_out[3]:
+                    P_sum = P_sum + (P[0] if isUKS else P)
                 if len(set().union(*[set(a) for a in fragment_atom_lists])) == len(labels_step):
                     resid = float(np.max(np.abs(P_sum - S_a)))
-                    if resid > 1e-8:
+                    if not np.isfinite(resid) or resid > 1e-8:
                         raise ValueError(F'step {step}: the fragment operators of all atoms sum to S '
                                          F'only within {resid:.2e} - the AO->atom map does not match the AO overlap')
+                for f, P in enumerate(odt_out[3]):
+                    P_a, P_b = P if isUKS else (P, P)
+                    block = scipy.sparse.csc_matrix(data_conv.form_block_matrix(P_a, zero_mat, zero_mat, P_b))
+                    scipy.sparse.save_npz(params['res_dir'] + F'/P_frag{f}_ks_{step}.npz', block)
             if counter > 0:
                 St_a, St_b = St if isUKS else (St, St)
                 St_step_sparse = scipy.sparse.csc_matrix(data_conv.form_block_matrix(St_a, zero_mat, zero_mat, St_b))

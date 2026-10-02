@@ -2956,7 +2956,7 @@ def sd_diabatization_step(sd_lists, P_frag, E_orb, kind, dia_index=None, active_
         pops_out[col] = pops[c]
         energies[col, 0] = e[c]
     dev = float(np.abs(W.T @ W - np.eye(nsd)).max())
-    if dev > 1e-8:
+    if not np.isfinite(dev) or dev > 1e-8:
         raise ValueError(F"the diabatic transformation is not orthogonal (|W^T W - 1| = {dev:.2e})")
     return W, dia_index, pops_out, pops_hole, energies
 
@@ -3195,7 +3195,7 @@ def ci_diabatization_step(T, O_hole, O_elec, E_ci, kind, dia_index=None, tol=0.2
             pops_hole[a + 1] = [v @ O @ v for O in Oh]
         energies[a + 1, 0] = v @ H @ v
     dev = float(np.abs(V.T @ V - np.eye(nci + 1)).max())
-    if dev > 1e-8:
+    if not np.isfinite(dev) or dev > 1e-8:
         raise ValueError(F"the many-body diabatic transformation is not orthogonal (|V^T V - 1| = {dev:.2e})")
     return V, dia_index, pops, pops_hole, energies
 
