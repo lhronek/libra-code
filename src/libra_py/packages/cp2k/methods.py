@@ -2509,13 +2509,29 @@ def find_cp2k_pdos_files(directory, core="*"):
     return [f for f in sorted(glob.glob(os.path.join(directory, F"{core}.pdos"))) if _cp2k_pdos_is_table(f)]
 
 
+# the m-resolved component labels of CP2K's PDOS prints (COMPONENTS), the layout the column numbering 3 = s,
+# 4 = py, ... of orbitals_cols / angular_momentum_cols assumes
+M_RESOLVED_COMPONENTS = (["s", "py", "pz", "px"] + [F"d{m:+d}" if m else "d0" for m in range(-2, 3)]
+                         + [F"f{m:+d}" if m else "f0" for m in range(-3, 4)]
+                         + [F"g{m:+d}" if m else "g0" for m in range(-4, 5)])
+
+
 def cp2k_pdos_component_columns(block, cols):
     """
     The projection columns of a block addressed in the column numbering of the CP2K <= 2025 files (3 = the
     first component, 4 the second, ...), the numbering the orbitals_cols / angular_momentum_cols parameters
-    use - the same components of either layout. Columns beyond the file's components are dropped.
+    use - the same components of either layout. The numbering is that of the m-resolved components (s, py, pz, px,
+    d-2 ... d+2, f-3 ... f+3, g-4 ... g+4): a file whose components are another set - a run printed without
+    COMPONENTS carries s, p, d as three columns - is refused, since a group summed over the columns that happen to
+    exist would mislabel the projections (p plus d under "p"). Columns of that layout beyond the file's components
+    (the d group of an element without d functions) are absent and dropped.
     """
+    components = list(block["components"])
     ncomp = block["projections"].shape[1]
+    if len(components) > 1 and components != M_RESOLVED_COMPONENTS[:len(components)]:
+        raise ValueError(F"the file's components {components} are not the m-resolved layout the column numbering "
+                         F"assumes ({M_RESOLVED_COMPONENTS[:4]} ...) - a run printed without COMPONENTS carries s, p, "
+                         F"d as three columns - print it with COMPONENTS")
     return [c - 3 for c in cols if 3 <= c < 3 + ncomp]
 
 
