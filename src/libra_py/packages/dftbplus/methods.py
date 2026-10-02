@@ -29,7 +29,7 @@ import util.libutil as comn
 from libra_py import units
 from libra_py import scan
 from libra_py import data_conv
-from libra_py.citools.sd_basis import (make_sd_basis, sd2ci_matrix,
+from libra_py.citools.sd_basis import (make_sd_basis, sd2ci_matrix, check_read_capture,
                                        align_ci_state_signs, check_sd_capture)
 from libra_py import regexlib as rgl
 import libra_py.citools.ci as ci
@@ -3285,8 +3285,7 @@ def dftb_compute_adi(q, params, full_id):
     # every propagated state's overlaps are built from its retained remnant and
     # Lowdin-renormalized - a mostly-dropped state yields well-formed but
     # meaningless couplings, so fail here (the CP2K driver's contract)
-    check_sd_capture(np.concatenate(([0.0], info["window_drops"])), nstates, cap_max_drop,
-                     knob="sd_capture_max_drop")
+    check_read_capture(info["window_drops"], nstates, cap_max_drop)
 
     #print(info)
 

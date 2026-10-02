@@ -26,7 +26,7 @@ import scipy.linalg
 from libra_py.workflows.nbra import mapping, step2_many_body
 import scipy.io as io
 import libra_py.citools.ci as ci
-from libra_py.citools.sd_basis import (make_sd_basis, sd2ci_matrix,
+from libra_py.citools.sd_basis import (make_sd_basis, sd2ci_matrix, compose_drops, check_read_capture,
                                        align_ci_state_signs, check_sd_capture)
 
 if sys.platform == "cygwin":
@@ -1308,7 +1308,7 @@ def repartition_newtonx(nx, nocc_ref, theta=0.01, occupations=None, nelec=None):
             M = np.asarray(M)
             tot2 = float(np.sum(M ** 2))
             lost2 = float(np.sum(M[:, nref:] ** 2))
-            drops[ist] = 1.0 - (1.0 - drops[ist]) * (1.0 - (lost2 / tot2 if tot2 > 0 else 0.0))
+            drops[ist] = compose_drops(drops[ist], lost2 / tot2 if tot2 > 0 else 0.0)
             R = np.zeros((M.shape[0] + k, nref))
             R[k:, :] = M[:, :nref]
             new.append(R)
@@ -4530,7 +4530,7 @@ def read_ci_data(logfile, nstates, ci_threshold=0.01, lowest_orbital=1, highest_
     rd = pp.get("ci_read_drops")
     if rd is not None:
         n = min(len(rd), len(drops))
-        drops[:n] = 1.0 - (1.0 - rd[:n]) * (1.0 - drops[:n])
+        drops[:n] = compose_drops(rd[:n], drops[:n])
     return {"E": E, "configs": basis, "amps": amps, "spins": spin,
             "window_drops": drops}
 
@@ -6307,7 +6307,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     print(F"cp2k_compute_adi: state {k + 1}: dropped CI weight {rd[k]:.2e} to "
                           F"excitations from the re-partitioned orbital(s) {moved} (a smeared "
                           F"population counted as occupied by CP2K)")
-                ci_curr["window_drops"] = 1.0 - (1.0 - rd) * (1.0 - ci_curr["window_drops"])
+                ci_curr["window_drops"] = compose_drops(rd, ci_curr["window_drops"])
             if amps_prealigned:
                 # fold the wfn-virtual-range truncation into the capture
                 # metric - those X rows were cut before ci_data_from_newtonx
@@ -6317,7 +6317,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     print(F"cp2k_compute_adi: state {k + 1}: dropped CI weight "
                           F"{tw[k]:.2e} to the wfn virtual range (fewer wfn MOs "
                           F"than NAMD-print rows)")
-                ci_curr["window_drops"] = 1.0 - (1.0 - tw) * (1.0 - ci_curr["window_drops"])
+                ci_curr["window_drops"] = compose_drops(tw, ci_curr["window_drops"])
         else:
             amps_prealigned = False
             if isUKS:
@@ -6351,7 +6351,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
             rd = ci_curr.get("window_drops")
             if rd is not None:
                 n = min(len(rd), len(ci_drops) - 1)
-                ci_drops[1:1 + n] = 1.0 - (1.0 - ci_drops[1:1 + n]) * (1.0 - rd[:n])
+                ci_drops[1:1 + n] = compose_drops(ci_drops[1:1 + n], rd[:n])
             # every propagated state's overlaps are built from its window
             # remnant - a mostly-dropped state yields well-formed but
             # meaningless couplings, so fail here rather than propagate them
@@ -6374,8 +6374,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
             # the read-stage loss is the whole capture metric on this backend
             rd = ci_curr.get("window_drops")
             if rd is not None:
-                check_sd_capture(np.concatenate(([0.0], rd)), nstates,
-                                 cap_max_drop, knob="sd_capture_max_drop")
+                check_read_capture(rd, nstates, cap_max_drop)
             st_ci = ci_overlap_citools(St_mo, ci_prev, ci_curr, homo, LO, HI, nstates)
             align_ci_state_signs(st_ci, ci_curr)
         else:

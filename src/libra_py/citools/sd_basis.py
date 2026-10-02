@@ -324,3 +324,13 @@ def check_sd_capture(ci_drops, nstates, max_drop, knob="dia_basis_max_drop"):
             F"num_unocc_states (and the MO window) - where the reader does "
             F"(CP2K's MIN_AMPLITUDE, ci_threshold), lower those thresholds - "
             F"or reduce nstates, or raise {knob} deliberately")
+
+
+def compose_drops(a, b):
+    """the weight lost to two successive cuts of a renormalized vector: 1 - (1 - a)(1 - b) (arrays or scalars)"""
+    return 1.0 - (1.0 - a) * (1.0 - b)
+
+
+def check_read_capture(read_drops, nstates, max_drop, knob="sd_capture_max_drop"):
+    """check_sd_capture over the per-excited-state read-stage drops, the ground state (no drop) prepended"""
+    check_sd_capture(np.concatenate(([0.0], read_drops)), nstates, max_drop, knob=knob)

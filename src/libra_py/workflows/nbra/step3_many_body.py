@@ -42,7 +42,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 
 import util.libutil as comn
-from libra_py.citools.sd_basis import check_sd_capture
+from libra_py.citools.sd_basis import check_sd_capture, check_read_capture
 from libra_py import units as units
 from libra_py import influence_spectrum as infsp
 from libra_py import data_visualize, data_conv, data_read, data_stat, data_outs
@@ -123,9 +123,7 @@ def get_step2_mb_sp_properties(_params):
     # nothing downstream can ever see the lost weight
     rd = params.get("ci_read_drops")
     if rd is not None:
-        check_sd_capture(np.concatenate(([0.0], rd)), 1 + len(rd),
-                         float(params.get("sd_capture_max_drop", 0.5)),
-                         knob="sd_capture_max_drop")
+        check_read_capture(rd, 1 + len(rd), float(params.get("sd_capture_max_drop", 0.5)))
 
     # print( excitation_energies )
     # print( ci_basis_raw )
@@ -154,9 +152,7 @@ def get_step2_mb_sp_properties(_params):
         ci_coefficients_raw_norm = step2_many_body.normalize_ci_coefficients(ci_coefficients_raw_unnorm)
         rd = params.get("ci_read_drops")
         if rd is not None:
-            check_sd_capture(np.concatenate(([0.0], rd)), 1 + len(rd),
-                             float(params.get("sd_capture_max_drop", 0.5)),
-                             knob="sd_capture_max_drop")
+            check_read_capture(rd, 1 + len(rd), float(params.get("sd_capture_max_drop", 0.5)))
 
         # Extract the uniquie SD basis states from the ci basis states
         collect_unique_sd_states(ci_basis_raw, spin_components, sd_basis_states_unique, seen)
