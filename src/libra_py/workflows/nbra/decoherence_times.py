@@ -48,6 +48,14 @@ def _gap_stack(E):
     return np.abs(E[:, :, None] - E[:, None, :])
 
 
+def _window(E, it, nsteps, idata):
+    """The nsteps energies from step it of data set idata - a window past the end of the series is refused (the
+    slice would truncate silently while the averages still divide by nsteps)."""
+    if it < 0 or it + nsteps > len(E):
+        raise ValueError(F"the window [{it}, {it + nsteps}) runs past the {len(E)} steps of data set {idata}")
+    return E[it:it + nsteps]
+
+
 def _times_from_std(dE_std, nstates):
     """The decoherence-time matrix of a gap-fluctuation standard deviation (a.u.): sqrt(12/5) / std, a
     state with itself 1e10."""
@@ -151,7 +159,7 @@ def energy_gaps_ave(Hvib, itimes, nsteps):
         E = _diagonal_energies(Hvib[idata])
         for it_indx in range(0, nitimes):
             it = itimes[it_indx]
-            acc = acc + _gap_stack(E[it:it + nsteps])
+            acc = acc + _gap_stack(_window(E, it, nsteps, idata))
     acc = acc / float(nitimes * ndata)
     return [data_conv.nparray2MATRIX(g) for g in acc]
 
@@ -308,7 +316,7 @@ def decoherence_times_ave(Hvib, itimes, nsteps, verbosity=0):
             it = itimes[it_indx]
 
             # ========== Fluctuations for a given sub-trajectory ===========
-            de = _gap_stack(E[it:it + nsteps])
+            de = _gap_stack(_window(E, it, nsteps, idata))
 
             # ============== Averages for this sub-trajectory ==================
             # we only care about dE_ave, other outputs are not used here
