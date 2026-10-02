@@ -568,9 +568,7 @@ def save_hdf5_2D(saver, i, states, txt_type=0):
 
     # Trajectory-resolved instantaneous adiabatic states
     # Format: saver.add_dataset("states", (_nsteps, _ntraj), "I")
-    ntraj = len(states)
-    for itraj in range(ntraj):
-        saver.save_multi_scalar(t, itraj, "states", states[itraj])
+    saver.save_vector(t, "states", states)
 
 
 def save_hdf5_2D_new(saver, i, dyn_var, ham, txt_type=0):
