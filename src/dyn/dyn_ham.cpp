@@ -362,6 +362,19 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
   different diabatic bases. Drop obj.ham_dia, or run without ham_transform_method = 4\n";
           std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
+        // the same ownership for the vibronic slot: a supplied obj.hvib_dia
+        // is read in the model's diabatic basis (hvib_update_method 0
+        // consumes it as is, 1 validates the rebuild against it) while
+        // ham_dia here is the frame rotation - under this transform the
+        // engine builds hvib_dia from the rotated ham_dia itself
+        if (ch->hvib_dia_supplied) {
+          cout << "Error in the local-diabatization transform: the model supplies \
+  obj.hvib_dia, but ham_transform_method = 4 defines the diabatic basis as the \
+  trajectory frame and builds hvib_dia from the rotated ham_dia - the supplied one is \
+  in another basis. Drop obj.hvib_dia, or use ham_transform_method = 3 for a \
+  model-defined diabatic basis\n";
+          std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+        }
         // chained in-place product - CBLAS zgemm-backed
         ch->ham_dia->product(adjoint(*dyn_var.ld_frame[traj]),
                              *ch->ham_adi, *dyn_var.ld_frame[traj]);
