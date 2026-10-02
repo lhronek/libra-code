@@ -158,7 +158,6 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
       *ham_dia = extract<CMATRIX>(obj.attr("ham_dia")); 
     }
   
-    has_attr=0;
     has_attr = (int)hasattr(obj,"ovlp_dia");        
     if(has_attr){ 
 
@@ -169,7 +168,6 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
     }
 //exit(0);
 
-    has_attr=0;
     has_attr = (int)hasattr(obj,"nac_dia");        
     nac_dia_supplied = 0;
     if(has_attr){    
@@ -181,7 +179,6 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
       nac_dia_supplied = (abs(nac_dia->max_elt()) != 0.0);
     }
 
-    has_attr=0;
     has_attr = (int)hasattr(obj,"hvib_dia");        
     hvib_dia_supplied = 0;
     if(has_attr){    
@@ -193,7 +190,6 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
       hvib_dia_supplied = (abs(hvib_dia->max_elt()) != 0.0);
     }
     
-    has_attr=0;
     has_attr = (int)hasattr(obj,"dc1_dia");        
     if(has_attr){  
 
@@ -207,7 +203,6 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
     }
 
 
-    has_attr=0;
     has_attr = (int)hasattr(obj,"d1ham_dia");        
     if(has_attr){  
 
@@ -221,7 +216,6 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
     }
 //exit(0);
 
-    has_attr=0;
     has_attr = (int)hasattr(obj,"d2ham_dia");        
     if(has_attr){  
 
@@ -237,8 +231,6 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
       for(int i=0;i<nnucl*nnucl;i++){    *d2ham_dia[i] = _d2ham_dia[i];  }
     }
 
-    has_attr=0;
-    has_attr=0;
     has_attr = (int)hasattr(obj,"basis_transform");
     basis_transform_supplied = 0;
     if(has_attr){

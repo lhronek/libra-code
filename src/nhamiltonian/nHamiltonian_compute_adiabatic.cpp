@@ -744,7 +744,6 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       }
     }
 
-    has_attr = 0;
     has_attr = (int)hasattr(obj, "nac_adi");
     nac_adi_supplied = 0;
     if (has_attr) {
@@ -764,7 +763,6 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       nac_adi_supplied = (abs(nac_adi->max_elt()) != 0.0);
     }
 
-    has_attr = 0;
     has_attr = (int)hasattr(obj, "hvib_adi");
     hvib_adi_supplied = 0;
     if (has_attr) {
@@ -784,7 +782,6 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       hvib_adi_supplied = (abs(hvib_adi->max_elt()) != 0.0);
     }
 
-    has_attr = 0;
     has_attr = (int)hasattr(obj, "hvib_dia");
     hvib_dia_supplied = 0;
     if (has_attr) {
@@ -800,7 +797,6 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
     }
 
     basis_transform_supplied = 0;
-    has_attr = 0;
     has_attr = (int)hasattr(obj, "basis_transform");
     if (has_attr) {
 
@@ -823,7 +819,6 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
     }
 
     ham_dia_supplied = 0;
-    has_attr = 0;
     has_attr = (int)hasattr(obj, "ham_dia");
     if (has_attr) {
 
@@ -845,7 +840,6 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       ham_dia_supplied = (abs(ham_dia->max_elt()) != 0.0);
     }
 
-    has_attr = 0;
     has_attr = (int)hasattr(obj, "ovlp_dia");
     if (has_attr) {
 
@@ -865,7 +859,6 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       ovlp_dia_supplied = 1;
     }
 
-    has_attr = 0;
     has_attr = (int)hasattr(obj, "time_overlap_adi");
     time_overlap_adi_supplied = 0;
     if (has_attr) {
@@ -885,7 +878,6 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       time_overlap_adi_supplied = (abs(time_overlap_adi->max_elt()) != 0.0);
     }
 
-    has_attr = 0;
     has_attr = (int)hasattr(obj, "dc1_adi");
     if (has_attr) {
 
@@ -910,7 +902,6 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       //}
     }
 
-    has_attr = 0;
     has_attr = (int)hasattr(obj, "d1ham_adi");
     if (has_attr) {
 
@@ -925,7 +916,6 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       }
     }
 
-    has_attr = 0;
     has_attr = (int)hasattr(obj, "d2ham_adi");
     if (has_attr) {
 
@@ -944,7 +934,6 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
     }
 
     // Additional properties that may be needed in some NBRA calculations:
-    has_attr = 0;
     has_attr = (int)hasattr(obj, "gs_kinetic_energy");
     if (has_attr) {
 
