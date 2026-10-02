@@ -794,36 +794,15 @@ def read_trajectory_xyz_file(file_name: str, step: int):
 
     """
 
-    f = open(file_name, 'r')
-    lines = f.readlines()
-    f.close()
+    # the frame through the shared reader (Angstrom, cached lines), converted to Bohr
+    labels, xyz = data_read.read_atom_coords(file_name, step)
+    q = data_conv.nparray2MATRIX(np.asarray(xyz, dtype=float).reshape(-1, 1) * units.Angst)
 
-    # The number of atoms for each time step in the .xyz file of the trajectory.
-    number_of_atoms = int(lines[0].split()[0])
-
-    q = MATRIX(3 * number_of_atoms, 1)
-
-    # Write the coordinates of the 't' th step in file coord-t.xyz
-    f = open('coord-%d' % step + '.xyz', 'w')
-
-    # This is used to skip the first two lines for each time step.
-    n = number_of_atoms + 2
-
-    # Write the coordinates of the 'step'th time step into the file
-    for i in range(n * step, n * (step + 1)):
-        f.write(lines[i])
-    f.close()
-
-    labels = []
-    for i in range(number_of_atoms):
-        tmp = lines[n * step + 2 + i].split()
-        labels.append(tmp[0])
-        x = float(tmp[1]) * units.Angst  # convert Angstrom to Bohr
-        y = float(tmp[2]) * units.Angst  # convert Angstrom to Bohr
-        z = float(tmp[3]) * units.Angst  # convert Angstrom to Bohr
-        q.set(3 * i + 0, 0, x)
-        q.set(3 * i + 1, 0, y)
-        q.set(3 * i + 2, 0, z)
+    # Write the coordinates of the 'step'th time step into the file coord-step.xyz
+    lines = data_read.read_lines_cached(file_name)
+    n = len(labels) + 2
+    with open('coord-%d' % step + '.xyz', 'w') as f:
+        f.writelines(lines[n * step:n * (step + 1)])
 
     return labels, q
 
@@ -848,23 +827,9 @@ def read_velocity_xyz_file(file_name: str, step: int):
 
     """
 
-    f = open(file_name, 'r')
-    lines = f.readlines()
-    f.close()
-
-    number_of_atoms = int(lines[0].split()[0])
-    v = MATRIX(3 * number_of_atoms, 1)
-    n = number_of_atoms + 2
-
-    labels = []
-    for i in range(number_of_atoms):
-        tmp = lines[n * step + 2 + i].split()
-        labels.append(tmp[0])
-        v.set(3 * i + 0, 0, float(tmp[1]))
-        v.set(3 * i + 1, 0, float(tmp[2]))
-        v.set(3 * i + 2, 0, float(tmp[3]))
-
-    return labels, v
+    # the frame through the shared reader (cached lines) - the file's velocities are atomic units already
+    labels, vel = data_read.read_atom_coords(file_name, step)
+    return labels, data_conv.nparray2MATRIX(np.asarray(vel, dtype=float).reshape(-1, 1))
 
 
 def CP2K_input_static(cp2k_sample_energy_input: str, project_name: str,
@@ -1641,29 +1606,9 @@ def extract_coordinates(trajectory_xyz_file_name: str, time_step: int):
 
         coordinates (list): The list of the x, y, and z coordinates.
     """
-    # Reading the file and its lines
-    file = open(trajectory_xyz_file_name, 'r')
-    lines = file.readlines()
-    file.close()
-    # number of atoms obtianed from the first line of
-    # the xyz file
-    natoms = int(lines[0].split()[0])
-    # the coordinates list
-    coordinates = []
-    # start lines
-    start_l = time_step * (natoms + 2)
-    # end line
-    end_l = (time_step + 1) * (natoms + 2)
-    for i in range(start_l + 2, end_l):
-        tmp = lines[i].split()
-        name = tmp[0]
-        # turn Angstrom into Bohr unit
-        x = float(tmp[1]) * units.Angst
-        y = float(tmp[2]) * units.Angst
-        z = float(tmp[3]) * units.Angst
-        coordinates.append([name, x, y, z])
-
-    return coordinates
+    # the frame through the shared reader (Angstrom, cached lines), each row [label, x, y, z] in Bohr
+    labels, xyz = data_read.read_atom_coords(trajectory_xyz_file_name, time_step)
+    return [[name] + [float(v) * units.Angst for v in row] for name, row in zip(labels, xyz)]
 
 
 def find_basis_set(basis_set_files_path: list, unique_atoms: list, basis_set_names: list):
