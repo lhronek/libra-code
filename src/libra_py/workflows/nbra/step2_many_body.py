@@ -176,15 +176,9 @@ def get_excitation_analysis_output(params):
         logfile_name = F"{logfile_directory}/step_{curr_step}.log"
         params.update({"logfile_name": logfile_name})
         # Extract the excitation energies and their configurations from the output file.
-        out = CP2K_methods.read_cp2k_tddfpt_log_file(params)
-        if len(out) == 2:
-            # the devel parser returns (info, [E_Ha, configs, amps, spins]) -
-            # this chain and its consumers expect the master 4-tuple with eV
-            excitation_energies = np.array(out[1][0]) / units.ev2Ha
-            ci_basis_raw, ci_coefficients_raw_unnorm, spin_components = \
-                out[1][1], out[1][2], out[1][3]
-        else:
-            excitation_energies, ci_basis_raw, ci_coefficients_raw_unnorm, spin_components = out
+        # this chain and its consumers expect the master 4-tuple with eV, whichever form the reader returned
+        excitation_energies, ci_basis_raw, ci_coefficients_raw_unnorm, spin_components = \
+            CP2K_methods.tddfpt_log_ci_tuple(CP2K_methods.read_cp2k_tddfpt_log_file(params))
 
     elif es_software == "gaussian":
 

@@ -4509,6 +4509,23 @@ def align_mo_phases(C_prev_aligned, data_curr, St_mo):
 # ========================= TDDFPT CI data ==================================
 
 
+def tddfpt_log_ci_tuple(out):
+    """The CI data of read_cp2k_tddfpt_log_file as the master 4-tuple (E_eV, configs, amplitudes, spins) whichever
+    form the reader returned - the devel pair (info, [E_Ha, configs, amplitudes, spins]) or the 4-tuple itself.
+    Energies as a float array in eV, configs as lists of lists, amplitudes as float arrays, spins as lists (all
+    'alp' when the reader gave none)."""
+    if len(out) == 2:
+        info, data = out
+        E_ev = np.asarray(data[0], dtype=float) / units.ev2Ha
+        basis = [np.asarray(c, dtype=int).tolist() for c in data[1]]
+        coeff = [np.asarray(a, dtype=float) for a in data[2]]
+        spin = list(data[3]) if len(data) > 3 else [["alp"] * len(b) for b in basis]
+        return E_ev, basis, coeff, spin
+    E_ev, basis, coeff, spin = out
+    return (np.asarray(E_ev, dtype=float), [list(b) for b in basis], [np.asarray(a, dtype=float) for a in coeff],
+            list(spin))
+
+
 def read_ci_data(logfile, nstates, ci_threshold=0.01, lowest_orbital=1, highest_orbital=int(1e10),
                  isUKS=False):
     """
@@ -4538,22 +4555,11 @@ def read_ci_data(logfile, nstates, ci_threshold=0.01, lowest_orbital=1, highest_
     pp = {"logfile_name": logfile, "number_of_states": nstates,
           "ci_threshold": ci_threshold,
           "isUKS": bool(isUKS), "lowest_orbital": lowest_orbital, "highest_orbital": highest_orbital}
-    out = read_cp2k_tddfpt_log_file(pp)
-    if len(out) == 2:
-        # devel branch: (info, [E_Ha, configs, amplitudes, spins])
-        info, data = out
-        E = np.asarray(data[0], dtype=float)[:nstates]
-        basis = [np.asarray(c, dtype=int).tolist() for c in data[1][:nstates]]
-        coeff = [np.asarray(a, dtype=float) for a in data[2][:nstates]]
-        spin = (list(data[3][:nstates]) if len(data) > 3
-                else [["alp"] * len(b) for b in basis])
-    else:
-        # master branch: (E_eV, configs, amplitudes, spins)
-        E_ev, basis, coeff, spin = out
-        E = np.array(E_ev[:nstates]) * units.ev2Ha
-        basis = [list(b) for b in basis[:nstates]]
-        coeff = coeff[:nstates]
-        spin = spin[:nstates]
+    E_ev, basis, coeff, spin = tddfpt_log_ci_tuple(read_cp2k_tddfpt_log_file(pp))
+    E = E_ev[:nstates] * units.ev2Ha
+    basis = [list(b) for b in basis[:nstates]]
+    coeff = coeff[:nstates]
+    spin = spin[:nstates]
     # the parser reads only orbital_space - clip the configs to the
     # requested window here, as ci_data_from_newtonx does (out-of-window
     # amplitudes cannot be represented in the windowed overlap machinery)
