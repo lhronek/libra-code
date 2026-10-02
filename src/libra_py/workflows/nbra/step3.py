@@ -1977,6 +1977,13 @@ def sort_unique_SD_basis(E_ks, sd_states_unique, sd_states_reindexed, _params):
     sd_states_unique_sorted = []
     SD_energy_corr = [0.0] * len(sd_states_reindexed)
     nstates_sd = len(sd_states_reindexed)
+    # the descriptors name the excitations alone: a basis led by the reference determinant (the SCF
+    # ground state) carries one determinant more than descriptors, the frozen-orbital bases of
+    # sd_charge +-1 (koopmans_sd_basis) one descriptor per determinant
+    offset = nstates_sd - len(sd_states_unique)
+    if offset not in (0, 1):
+        raise ValueError(F"{nstates_sd} determinants against {len(sd_states_unique)} descriptors - the basis carries "
+                         "either the reference determinant first (one more) or one descriptor per determinant")
     reindex_nsteps = []
 
     for step in range(fstep - istep):
@@ -2012,15 +2019,9 @@ def sort_unique_SD_basis(E_ks, sd_states_unique, sd_states_reindexed, _params):
 
                 # print( sd_states_reindexed_sorted[step][ state ], ( E_sd[step].get( state, state ) - E_sd[step].get( 0, 0 ) ).real * units.au2ev )
 
-                # This is reindexing the list of SD bases at this time step according to their energies
-                # We are adding the ground state SD later, so skip it for now. In this list sd_states_unique,
-                # the ground state is not there - this list is the single-particle transitions (and spin) given by the
-                # ES software. So, for example, if nstates_sd = 4, we take only the first 3, because the ground state is not
-                # in sd_states_unique
-                # Ex) sd_states_unique = [  [ ['28,29'], ['alp'] ] , [ ['27,29'], ['alp'] ] , [ ['26,29'], ['alp'] ] ]
-                # 28 = homo
-                if state < nstates_sd - 1:
-                    sd_states_unique_sorted[step].append(sd_states_unique[state])
+                # the reference determinant (offset 1) has no descriptor - the descriptors follow the excitations
+                if state >= offset:
+                    sd_states_unique_sorted[step].append(sd_states_unique[state - offset])
 
         elif sorting_type == "energy":
 
@@ -2034,8 +2035,9 @@ def sort_unique_SD_basis(E_ks, sd_states_unique, sd_states_reindexed, _params):
                 sd_states_reindexed_sorted[step].append(sd_states_reindexed[int(reindex[i])])
                 # print( sd_states_reindexed_sorted[step][i], ( E_sd[step].get( i, i ) - E_sd[step].get( 0, 0 ) ).real * units.au2ev )
 
-            for i in range(1, len(reindex)):
-                sd_states_unique_sorted[step].append(sd_states_unique[int(reindex[i]) - 1])
+            for i in range(len(reindex)):
+                if int(reindex[i]) >= offset:
+                    sd_states_unique_sorted[step].append(sd_states_unique[int(reindex[i]) - offset])
 
     return E_sd, sd_states_unique_sorted, sd_states_reindexed_sorted, reindex_nsteps
 
@@ -2073,6 +2075,13 @@ def sort_unique_SD_basis_scipy(step, sd_states_unique, sd_states_reindexed, _par
 
     SD_energy_corr = [0.0] * len(sd_states_reindexed)
     nstates_sd = len(sd_states_reindexed)
+    # the descriptors name the excitations alone: a basis led by the reference determinant (the SCF
+    # ground state) carries one determinant more than descriptors, the frozen-orbital bases of
+    # sd_charge +-1 (koopmans_sd_basis) one descriptor per determinant
+    offset = nstates_sd - len(sd_states_unique)
+    if offset not in (0, 1):
+        raise ValueError(F"{nstates_sd} determinants against {len(sd_states_unique)} descriptors - the basis carries "
+                         "either the reference determinant first (one more) or one descriptor per determinant")
     reindex_nsteps = []
 
     # At this step, compute the energy of the SD
@@ -2109,15 +2118,9 @@ def sort_unique_SD_basis_scipy(step, sd_states_unique, sd_states_reindexed, _par
 
             sd_states_reindexed_sorted.append(sd_states_reindexed[state])
 
-            # This is reindexing the list of SD bases at this time step according to their energies
-            # We are adding the ground state SD later, so skip it for now. In this list sd_states_unique,
-            # the ground state is not there - this list is the single-particle transitions (and spin) given by the
-            # ES software. So, for example, if nstates_sd = 4, we take only the first 3, because the ground state is not
-            # in sd_states_unique
-            # Ex) sd_states_unique = [  [ ['28,29'], ['alp'] ] , [ ['27,29'], ['alp'] ] , [ ['26,29'], ['alp'] ] ]
-            # 28 = homo
-            if state < nstates_sd - 1:
-                sd_states_unique_sorted.append(sd_states_unique[state])
+            # the reference determinant (offset 1) has no descriptor - the descriptors follow the excitations
+            if state >= offset:
+                sd_states_unique_sorted.append(sd_states_unique[state - offset])
 
     elif sorting_type == "energy":
 
@@ -2129,8 +2132,9 @@ def sort_unique_SD_basis_scipy(step, sd_states_unique, sd_states_reindexed, _par
             sd_states_reindexed_sorted.append(sd_states_reindexed[int(reindex[i])])
         E_this_sd = E_this_sd[reindex]
 
-        for i in range(1, len(reindex)):
-            sd_states_unique_sorted.append(sd_states_unique[int(reindex[i]) - 1])
+        for i in range(len(reindex)):
+            if int(reindex[i]) >= offset:
+                sd_states_unique_sorted.append(sd_states_unique[int(reindex[i]) - offset])
     # print('Flag E_this_sd:',E_this_sd.shape)
     # print('Flag E_this_sd itself:',E_this_sd)
     # print('Flag np.diag(E_this_sd):',np.diag(E_this_sd))
@@ -4573,6 +4577,10 @@ def run_step3_sd_nacs_libint(params):
         if params['isUKS']:
             raise ValueError("sd_charge needs a closed-shell reference (isUKS 0) - an "
                              "unrestricted reference is already the ion, use its own SD basis")
+        if params['is_many_body']:
+            raise ValueError("sd_charge needs the single-determinant route (is_many_body False) - the TD-DFT "
+                             "configurations of the neutral reference do not combine with the ion's "
+                             "frozen-orbital basis")
         # the reference is the first reindexed determinant of the closed-shell basis
         sd_unique_basis, sd_states_reindexed = koopmans_sd_basis(sd_states_reindexed[0], sd_charge,
                                                                  len(ks_active_space) // 2)
