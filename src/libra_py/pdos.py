@@ -481,6 +481,9 @@ def cp2k_pdos(_params):
                     print(F"The file {filename} is not found.")
                 if os.path.exists(filename):
                     block = CP2K_methods.read_cp2k_pdos(filename)
+                    if block["e_fermi"] is None:
+                        raise ValueError(F"{filename}: the header carries no E(Fermi) - the energy window [emin, emax] "
+                                         F"of the pDOS is relative to the Fermi level")
                     Ef = block["e_fermi"] * units.au2ev
                     # convert to eV
                     # For debug
