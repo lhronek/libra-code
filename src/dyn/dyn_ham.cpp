@@ -113,6 +113,18 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
               "run with isNBRA = 0 for per-trajectory children\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
+    // the transform-4 frame rotates the shared child's ham_dia by ONE
+    // frame - a tracking algorithm whose projector reads per-trajectory
+    // data (4: the momenta) diverges the trajectories' frames
+    if (prms.ham_transform_method == 4 && prms.state_tracking_algo == 4) {
+      cout << "Error in update_Hamiltonian_variables(): state_tracking_algo = 4 "
+              "builds per-trajectory projectors from the momenta, but isNBRA "
+              "with ham_transform_method = 4 rotates the single shared child "
+              "Hamiltonian by one frame. Use a tracking algorithm that reads "
+              "the shared Hamiltonian alone (-1, 0, 1, 2, 21, 22, 5, 6), or "
+              "run with isNBRA = 0 for per-trajectory children\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
     // the shared-child peninsula: state-enforced, rescaling-free live
     // forces are trajectory-invariant, so one force column serves all
     // trajectories (classical-path on-the-fly NBRA - the cp2k driver's
@@ -332,6 +344,21 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
       // (post-half-step, post-rescaling) - the stale flag limits the
       // rotation to the passes where V or ham_adi actually changed
       int nchildren = ham.children.size();
+      // one shared child (isNBRA) takes trajectory 0's frame - every
+      // trajectory's frame must be that one, or the amplitudes of the
+      // others are converted with a frame their Hamiltonian is not in
+      if (nchildren == 1 && dyn_var.ntraj > 1) {
+        for (int itraj = 1; itraj < dyn_var.ntraj; itraj++) {
+          double spread = abs((*dyn_var.ld_frame[itraj] - *dyn_var.ld_frame[0]).max_elt());
+          if (spread > 1e-10) {
+            cout << "Error in the local-diabatization transform: the frame of trajectory "
+                 << itraj << " differs from trajectory 0's (max |dV| = " << spread
+                 << ") while isNBRA keeps a single shared child Hamiltonian, rotated by "
+                    "one frame - the projectors must be trajectory-invariant under isNBRA = 1\n";
+            std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+          }
+        }
+      }
       for (int traj = 0; traj < nchildren; traj++) {
         nHamiltonian *ch = ham.children[traj];
         if (ch->ham_adi_mem_status == 0 || ch->ham_dia_mem_status == 0) {
