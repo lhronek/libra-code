@@ -3234,7 +3234,9 @@ def dftb_compute_adi(q, params, full_id):
         # StateCouplings state's forces to FRC.DAT - the reruns would be
         # redundant, the fill below consumes the file directly
         for s in range(1, dftb_run_params.get("NrOfExcitations", 1) + 1):
-            if s == dftb_params["StateOfInterest"]:
+            # with the keyword excluded (the Niehaus parser) the regular run
+            # computed no single-state excited force - every state is rerun
+            if s == dftb_params.get("StateOfInterest"):
                 continue
             forces_all[s] = _dftb_state_forces(coordinates, dftb_params, prms1, wd, s)
 
