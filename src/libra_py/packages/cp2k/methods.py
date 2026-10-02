@@ -6545,46 +6545,45 @@ def _prefetch_pools(state, params, ntraj):
     sig = (ntraj, nprocs, omp,
            int(params.get("max_concurrent_chains", 0)),
            int(params.get("parse_pool_workers", -1)))
-    if state.get("sig") != sig:
-        # sizing inputs changed (a new run reuses the prefix):
-        # recycle the executors
-        for key in ("pool", "parse_pool"):
-            ex = state.pop(key, None)
-            if ex is not None:
-                ex.shutdown(wait=False, cancel_futures=True)
-        state["sig"] = sig
-    if "pool" not in state:
-        # one CP2K run occupies nprocs x omp_num_threads PHYSICAL
-        # cores - the default cap packs the allocation with exactly
-        # that footprint (affinity-masked, SMT siblings collapsed -
-        # cpu_count would report the whole node's logical CPUs).
-        # Riding on top, uncounted: the parse workers (a full core
-        # each, ~1-2 s bursts when chains finish together) and the
-        # ~1-core GIL-serial python tail - brief time-sharing beats
-        # reserving cores that would idle between bursts
-        cap = int(params.get("max_concurrent_chains", 0)) or \
-            max(1, _allocation_cores() // (nprocs * omp))
-        state["pool"] = ThreadPoolExecutor(max_workers=min(cap, ntraj))
-        # the overlap parses hold the GIL for seconds when run inside a
-        # chain thread, stalling every other chain - a fork-context
-        # process pool runs them truly in parallel (parse_pool_workers:
-        # 0 disables). Forked and warmed up HERE, in the main thread,
-        # BEFORE any chain thread exists - forking a threaded process
-        # is not safe
-        pworkers = int(params.get("parse_pool_workers", min(cap, ntraj)))
-        if pworkers > 0 and multiprocessing.current_process().daemon:
-            # a daemonic worker (mp.Pool batch parallelism) cannot fork
-            # children - parses run inline in the chain threads, and the
-            # outer process pool already covers cross-batch parallelism
-            pworkers = 0
-        if pworkers > 0:
-            state["parse_pool"] = ProcessPoolExecutor(
-                max_workers=pworkers,
-                mp_context=multiprocessing.get_context("fork"))
-            warm = [state["parse_pool"].submit(time.sleep, 0.05)
-                    for _ in range(pworkers)]
-            for w in warm:
-                w.result()
+    if state.get("sig") == sig:
+        return state["pool"]                # the executors exist exactly while the signature holds
+    # sizing inputs changed (a new run reuses the prefix): recycle the executors
+    for key in ("pool", "parse_pool"):
+        ex = state.pop(key, None)
+        if ex is not None:
+            ex.shutdown(wait=False, cancel_futures=True)
+    state["sig"] = sig
+    # one CP2K run occupies nprocs x omp_num_threads PHYSICAL
+    # cores - the default cap packs the allocation with exactly
+    # that footprint (affinity-masked, SMT siblings collapsed -
+    # cpu_count would report the whole node's logical CPUs).
+    # Riding on top, uncounted: the parse workers (a full core
+    # each, ~1-2 s bursts when chains finish together) and the
+    # ~1-core GIL-serial python tail - brief time-sharing beats
+    # reserving cores that would idle between bursts
+    cap = int(params.get("max_concurrent_chains", 0)) or \
+        max(1, _allocation_cores() // (nprocs * omp))
+    state["pool"] = ThreadPoolExecutor(max_workers=min(cap, ntraj))
+    # the overlap parses hold the GIL for seconds when run inside a
+    # chain thread, stalling every other chain - a fork-context
+    # process pool runs them truly in parallel (parse_pool_workers:
+    # 0 disables). Forked and warmed up HERE, in the main thread,
+    # BEFORE any chain thread exists - forking a threaded process
+    # is not safe
+    pworkers = int(params.get("parse_pool_workers", min(cap, ntraj)))
+    if pworkers > 0 and multiprocessing.current_process().daemon:
+        # a daemonic worker (mp.Pool batch parallelism) cannot fork
+        # children - parses run inline in the chain threads, and the
+        # outer process pool already covers cross-batch parallelism
+        pworkers = 0
+    if pworkers > 0:
+        state["parse_pool"] = ProcessPoolExecutor(
+            max_workers=pworkers,
+            mp_context=multiprocessing.get_context("fork"))
+        warm = [state["parse_pool"].submit(time.sleep, 0.05)
+                for _ in range(pworkers)]
+        for w in warm:
+            w.result()
     return state["pool"]
 
 
