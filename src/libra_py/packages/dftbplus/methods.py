@@ -3199,6 +3199,11 @@ def dftb_compute_adi(q, params, full_id):
         "working_directory": wd,
         "gen_file": dftb_run_params.get("gen_file", "x1.gen"),
     }
+    force_source = params.get("force_source", "active_state")
+    if force_source not in ("active_state", "all_states"):
+        raise ValueError(F"dftb_compute_adi: unknown force_source "
+                         F"'{force_source}' - use 'active_state' or "
+                         F"'all_states'")
     if "force_refresh" in params:
         # the engine's call-back after a hop (hop_force_refresh): the new state's force, nothing else
         return _dftb_force_refresh(params, itraj, coordinates, nat, ndof, dftb_params, prms1, wd)
@@ -3219,11 +3224,6 @@ def dftb_compute_adi(q, params, full_id):
     # "all_states" reruns the excited calculation per remaining state in a
     # subdirectory (SCC restarted from the converged charges, couplings and
     # spectroscopy outputs off) so every d1ham_adi diagonal gets its gradient
-    force_source = params.get("force_source", "active_state")
-    if force_source not in ("active_state", "all_states"):
-        raise ValueError(F"dftb_compute_adi: unknown force_source "
-                         F"'{force_source}' - use 'active_state' or "
-                         F"'all_states'")
     forces_all = {}
     if (params.get("read_forces", False) and force_source == "all_states"
             and not os.path.exists(F"{wd}/FRC.DAT")):
