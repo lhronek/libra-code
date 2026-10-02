@@ -120,10 +120,9 @@ void rescale_along_vector(double E_old, double E_new, MATRIX& p, MATRIX& invM, M
 
   if(det<0.0){  // Frustrated hops!
 
-    if(fabs(a_ij)>1e-12){  // only consider reversals, if the couplings are sizable
-      if(do_reverse){     gamma_ij = b_ij / a_ij;}
-      else{ gamma_ij = 0.0;  }
-    }
+    // the reversal p -> p - (b/a) t is the reflection of p along t, defined for every direction
+    // (a = t M^-1 t / 2 > 0 whenever t != 0) - a weak direction reverses as a strong one does
+    if(do_reverse && a_ij > 0.0){ gamma_ij = b_ij / a_ij; }
     else{ gamma_ij = 0.0;  }
 
   }
