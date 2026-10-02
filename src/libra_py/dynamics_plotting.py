@@ -44,6 +44,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 
 import util.libutil as comn
+import libra_py.data_visualize as data_visualize
 
 import matplotlib.pyplot as plt   # plots
 # from matplotlib.mlab import griddata
@@ -309,7 +310,7 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
     plt.ylabel('Energy, a.u.')
     for it_indx, it in enumerate(which_ham_dia):
         plt.plot(grid, ham_dia[it_indx], label='$H_{%i, %i}$' %
-                 (it[0], it[1]), linewidth=5, color=colors[clrs_index[it_indx]])
+                 (it[0], it[1]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
     plt.legend()
 
     plt.subplot(1, 2, 2)
@@ -318,7 +319,7 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
     plt.ylabel('Energy, a.u.')
     for it_indx, it in enumerate(which_ham_adi):
         plt.plot(grid, ham_adi[it_indx], label='$H_{%i, %i}$' %
-                 (it[0], it[1]), linewidth=5, color=colors[clrs_index[it_indx]])
+                 (it[0], it[1]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
     plt.legend()
     plt.show()
     # plt.clf()
@@ -333,7 +334,7 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
     plt.ylabel('Derivative energy, a.u.')
     for it_indx, it in enumerate(which_d1ham_dia):
         plt.plot(grid, d1ham_dia[it_indx], label='$dH_{%i, %i} / dR_{%i}$' %
-                 (it[1], it[2], it[0]), linewidth=5, color=colors[clrs_index[it_indx]])
+                 (it[1], it[2], it[0]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
     plt.legend()
 
     plt.subplot(1, 2, 2)
@@ -342,7 +343,7 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
     plt.ylabel('Derivative energy, a.u.')
     for it_indx, it in enumerate(which_d1ham_adi):
         plt.plot(grid, d1ham_adi[it_indx], label='$dH_{%i, %i} / dR_{%i}$' %
-                 (it[1], it[2], it[0]), linewidth=5, color=colors[clrs_index[it_indx]])
+                 (it[1], it[2], it[0]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
     plt.legend()
     plt.show()
     # plt.clf()
@@ -357,7 +358,7 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
     plt.ylabel('Derivative coupling, a.u.')
     for it_indx, it in enumerate(which_dc1_dia):
         plt.plot(grid, dc1_dia[it_indx], label='$< \\psi_{%i} | dR_{%i} | \\psi_{%i} >$' % (
-            it[1], it[0], it[2]), linewidth=5, color=colors[clrs_index[it_indx]])
+            it[1], it[0], it[2]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
     plt.legend()
 
     plt.subplot(1, 2, 2)
@@ -366,7 +367,7 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
     plt.ylabel('Derivative energy, a.u.')
     for it_indx, it in enumerate(which_dc1_adi):
         plt.plot(grid, dc1_adi[it_indx], label='$< \\psi_{%i} | dR_{%i} | \\psi_{%i} >$' % (
-            it[1], it[0], it[2]), linewidth=5, color=colors[clrs_index[it_indx]])
+            it[1], it[0], it[2]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
     plt.legend()
     plt.show()
     # plt.clf()
@@ -587,7 +588,7 @@ def plot_surfaces(_compute_model, _param_sets, states_of_interest, xmin, xmax, d
             plt.ylabel('Energy, a.u.')
             for k1 in states_of_interest:
                 plt.plot(X, hdia[k1], label='$H_{%i%i}$' %
-                         (k1, k1), linewidth=_linewidth, color=colors[clrs_index[k1]])
+                         (k1, k1), linewidth=_linewidth, color=data_visualize.curve_color(colors, clrs_index, k1))
             plt.legend()
 
             plt.subplot(1, 2, 2)
@@ -598,7 +599,8 @@ def plot_surfaces(_compute_model, _param_sets, states_of_interest, xmin, xmax, d
             # plt.ylabel('Energy, a.u.')
             plt.yticks([])
             for k1 in states_of_interest:
-                plt.plot(X, hadi[k1], label='$E_{%i}$' % (k1), linewidth=_linewidth, color=colors[clrs_index[k1]])
+                plt.plot(X, hadi[k1], label='$E_{%i}$' % (k1), linewidth=_linewidth,
+                         color=data_visualize.curve_color(colors, clrs_index, k1))
             plt.legend()
 
             if save_figures:
@@ -633,9 +635,9 @@ def plot_surfaces(_compute_model, _param_sets, states_of_interest, xmin, xmax, d
                 plt.ylabel('Projection')
 
                 for k1 in range(nstates):
-                    # plt.plot(X, uij[k1][k2], label='$dia_{%i} | adi_{%i}$' % (k1, k2), linewidth=7, color = colors[clrs_index[k1]])
+                    # plt.plot(X, uij[k1][k2], label='$dia_{%i} | adi_{%i}$' % (k1, k2), linewidth=7, color = data_visualize.curve_color(colors, clrs_index, k1))
                     plt.plot(X, uij[k1][k2], label='$< \\psi^{dia}_{%i} | \\psi^{adi}_{%i} >$' % (
-                        k1, k2), linewidth=_linewidth, color=colors[clrs_index[k1]])
+                        k1, k2), linewidth=_linewidth, color=data_visualize.curve_color(colors, clrs_index, k1))
             plt.legend()
 
             if save_figures:
@@ -665,8 +667,10 @@ def plot_surfaces(_compute_model, _param_sets, states_of_interest, xmin, xmax, d
 
             for k1 in states_of_interest:
                 plt.plot(X, hdia[k1], label='$H_{%i%i}$' %
-                         (k1, k1), linewidth=_linewidth, ls="--", color=colors[clrs_index[k1]])
-                plt.plot(X, hadi[k1], label='$E_{%i}$' % (k1), linewidth=_linewidth, color=colors[clrs_index[k1]])
+                         (k1, k1), linewidth=_linewidth, ls="--",
+                         color=data_visualize.curve_color(colors, clrs_index, k1))
+                plt.plot(X, hadi[k1], label='$E_{%i}$' % (k1), linewidth=_linewidth,
+                         color=data_visualize.curve_color(colors, clrs_index, k1))
             plt.legend()
 
             plt.subplot(1, 2, 2)
@@ -680,10 +684,12 @@ def plot_surfaces(_compute_model, _param_sets, states_of_interest, xmin, xmax, d
                 for k2 in states_of_interest:
                     if k2 > k1:
                         plt.plot(X, nac[k1][k2], label='$NAC_{%i%i}$' %
-                                 (k1, k2), linewidth=_linewidth, color=colors[clrs_index[cnt]])
+                                 (k1, k2), linewidth=_linewidth,
+                                 color=data_visualize.curve_color(colors, clrs_index, cnt))
                         if show_nac_abs:
                             plt.plot(X, nac_abs[k1][k2], label='$NAC_{%i%i}$' % (
-                                k1, k2), linewidth=_linewidth, ls="--", color=colors[clrs_index[cnt + 1]])
+                                k1, k2), linewidth=_linewidth, ls="--",
+                                color=data_visualize.curve_color(colors, clrs_index, cnt + 1))
                         cnt = cnt + 1
             plt.legend()
 

@@ -537,7 +537,7 @@ def plot_1D_png(ax, plt_params, prefix, snap, states,
     # ====== Plot =======
     for i in range(nstates):
         ax.plot(data[0], data[1 + i], label=F"{labels[i]}",
-                linewidth=linewidth[i], color=_colors[_clrs_index[i]])
+                linewidth=linewidth[i], color=data_visualize.curve_color(_colors, _clrs_index, i))
         ax.legend()
 
     filename = F"{prefix}/{snap}.png"
