@@ -428,14 +428,24 @@ namespace {
 #ifdef HAVE_LAPACK
 
 // the rank from a completed complete-pivoting factorization: the pivots above rel_threshold
-// times the largest one (Eigen's FullPivLU rule with its default threshold eps n)
+// times the input's scale max |A_ij| - the first pivot of the complete pivoting (Eigen's FullPivLU
+// rule with its default threshold eps n). The factored diagonal cannot normalize the test: getc2
+// replaces a pivot below SMIN = eps |a_max| (SMLNUM for an all-zero input) by SMIN itself, so an
+// all-zero matrix would come back full rank
 template <typename T>
-int pivots_above(const T* a, int n, double rel_threshold){
-  double pmax = 0.0;
-  for(int i = 0; i < n; i++){ pmax = std::max(pmax, std::abs(a[(std::size_t)i*n + i])); }
+int pivots_above(const T* a, int n, double rel_threshold, double scale){
+  // an all-zero input: getc2 left SMLNUM on the diagonal, above any multiple of the zero scale
+  if(scale == 0.0){ return 0; }
   int rank = 0;
-  for(int i = 0; i < n; i++){ if(std::abs(a[(std::size_t)i*n + i]) > rel_threshold * pmax){ rank++; } }
+  for(int i = 0; i < n; i++){ if(std::abs(a[(std::size_t)i*n + i]) > rel_threshold * scale){ rank++; } }
   return rank;
+}
+
+template <typename T>
+double input_scale(const T* a, std::size_t count){
+  double scale = 0.0;
+  for(std::size_t i = 0; i < count; i++){ scale = std::max(scale, (double)std::abs(a[i])); }
+  return scale;
 }
 
 // the factors of P A Q = L U from the packed column-major LU and the sequential interchanges
@@ -476,7 +486,7 @@ int lapack_getc2_rank(const MATRIX& A, double rel_threshold){
   int n_ = n, lda = n, info = 0;
   dgetc2_(&n_, ws.a.data(), &lda, ws.iwork.data(), jpiv.data(), &info);
   if(info < 0){ fail(fn, info_text("dgetc2", info)); }
-  return pivots_above(ws.a.data(), n, rel_threshold);
+  return pivots_above(ws.a.data(), n, rel_threshold, input_scale(A.M, (std::size_t)n*n));
 #else
   (void)A; (void)rel_threshold;
   fail(fn, MISSING);
@@ -500,7 +510,7 @@ int lapack_getc2_rank(const CMATRIX& A, double rel_threshold){
   int n_ = n, lda = n, info = 0;
   zgetc2_(&n_, ws.a.data(), &lda, ws.iwork.data(), jpiv.data(), &info);
   if(info < 0){ fail(fn, info_text("zgetc2", info)); }
-  return pivots_above(ws.a.data(), n, rel_threshold);
+  return pivots_above(ws.a.data(), n, rel_threshold, input_scale(A.M, (std::size_t)n*n));
 #else
   (void)A; (void)rel_threshold;
   fail(fn, MISSING);
