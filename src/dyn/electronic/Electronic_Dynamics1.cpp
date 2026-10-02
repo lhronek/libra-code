@@ -383,11 +383,13 @@ void propagate_electronic_nonHermitian(double dt, CMATRIX& Coeff, CMATRIX& Hvib)
   int sz = Hvib.n_cols;  
 
   // Transform the Hamiltonian accordingly:
-  CMATRIX I(sz, sz);  I.load_identity();
+  // the identity and the adjoint Hamiltonian below are unread: the left eigenvectors
+  // come from the inverse of R, not from a separate solve of the adjoint problem
+  //CMATRIX I(sz, sz);  I.load_identity();
   CMATRIX R(sz, sz); // right eigenvectors:  A * R = R * D
   CMATRIX L(sz, sz); // left eigenvectors:   L * A  = D * L <=> A.H() * L.H() = L.H() * D
   CMATRIX Heig(sz, sz); // eigenvalues - same for Hvib and HvibH, but the eigenvectors are different
-  CMATRIX HvibH(sz,sz); HvibH = Hvib.H(); 
+  //CMATRIX HvibH(sz,sz); HvibH = Hvib.H(); 
   CMATRIX expH(sz, sz);  
 
   // a genuinely non-Hermitian Hvib (e.g. S^-1 * Hvib_dia) needs the
