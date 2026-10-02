@@ -119,7 +119,10 @@ void sqrt_matrix(CMATRIX& S, CMATRIX& S_half, CMATRIX& S_i_half, double thresh){
 
 void sqrt_matrix(CMATRIX& S, CMATRIX& S_half, CMATRIX& S_i_half){
 
-  sqrt_matrix(S, S_half, S_i_half, -1.0, 0);
+  // the default singularity guard: a root below 1e-8 (an eigenvalue at the double-precision floor,
+  // 1e-16) is a singular metric - S^-1/2 would carry 1e8-sized garbage, inf or NaN into everything
+  // built from it - every caller takes this default
+  sqrt_matrix(S, S_half, S_i_half, 1e-8, 0);
 
 }
 
@@ -178,7 +181,10 @@ void sqrt_matrix(MATRIX& S, MATRIX& S_half, MATRIX& S_i_half, double thresh){
 
 void sqrt_matrix(MATRIX& S, MATRIX& S_half, MATRIX& S_i_half){
 
-  sqrt_matrix(S, S_half, S_i_half, -1.0, 0);
+  // the default singularity guard: a root below 1e-8 (an eigenvalue at the double-precision floor,
+  // 1e-16) is a singular metric - S^-1/2 would carry 1e8-sized garbage, inf or NaN into everything
+  // built from it - every caller takes this default
+  sqrt_matrix(S, S_half, S_i_half, 1e-8, 0);
 
 }
 
