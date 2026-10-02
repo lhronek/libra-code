@@ -184,6 +184,9 @@ public:
   int hvib_dia_supplied;
   int nac_adi_supplied;
   int nac_dia_supplied;
+  ///< whether the model object ever supplied ovlp_dia - a child never given a metric holds the
+  ///< identity of its allocation, which the dynamical variables need not scan
+  int ovlp_dia_supplied;
   ///< the model supplied its own dia->adi transformation - the
   ///< stored-U transforms (ham_transform_method 2) require it: the
   ///< square identity default must not silently alias dia == adi

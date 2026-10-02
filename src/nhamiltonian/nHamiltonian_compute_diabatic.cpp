@@ -165,6 +165,7 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
       check_cmatrix(obj, "ovlp_dia", ndia, ndia);
       if(ovlp_dia_mem_status==0){ init_ovlp_dia(); }
       *ovlp_dia = extract<CMATRIX>(obj.attr("ovlp_dia"));   
+      ovlp_dia_supplied = 1;
     }
 //exit(0);
 

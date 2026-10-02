@@ -41,6 +41,7 @@ void dyn_variables::allocate_electronic_vars(){
     dm_adi = vector<CMATRIX*>(ntraj);
     basis_transform = vector<CMATRIX*>(ntraj);
     ovlp_dia = vector<CMATRIX*>(ntraj);
+    ovlp_dia_is_identity = vector<int>(ntraj, 1);
 
     for(int itraj=0; itraj<ntraj; itraj++){
       proj_adi[itraj] = new CMATRIX(nadi, nadi);
@@ -436,6 +437,7 @@ dyn_variables::dyn_variables(const dyn_variables& x){
       *basis_transform[itraj] = *x.basis_transform[itraj];
       *ovlp_dia[itraj] = *x.ovlp_dia[itraj];
     }
+    ovlp_dia_is_identity = x.ovlp_dia_is_identity;
     act_states = x.act_states;
     act_states_dia = x.act_states_dia;
 
@@ -653,6 +655,7 @@ dyn_variables::~dyn_variables(){
     dm_adi.clear();
     basis_transform.clear();
     ovlp_dia.clear();
+    ovlp_dia_is_identity.clear();
     
     delete ampl_dia;
     delete ampl_adi;

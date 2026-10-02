@@ -862,6 +862,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
         PyErr_Print();
         throw;
       }
+      ovlp_dia_supplied = 1;
     }
 
     has_attr = 0;

@@ -180,8 +180,24 @@ void dyn_variables::update_basis_transform(nHamiltonian& Ham){
   for(int itraj=0; itraj<ntraj; itraj++){
     nHamiltonian* ham = Ham.children[ (itraj < nchildren) ? itraj : 0 ];
     *basis_transform[itraj] = *(ham->basis_transform);
-    if(ham->ovlp_dia_mem_status){ *ovlp_dia[itraj] = *(ham->ovlp_dia); }
-    else{ ovlp_dia[itraj]->load_identity(); }
+    // a supplied metric is copied and scanned once over its storage (the
+    // conversions skip their metric products on an identity), a child never
+    // given a metric holds the identity of its allocation, and the identity
+    // slot is refilled only when it held a metric before
+    if(ham->ovlp_dia_mem_status && ham->ovlp_dia_supplied){
+      *ovlp_dia[itraj] = *(ham->ovlp_dia);
+      int identity = 1;
+      complex<double>* Sm = ovlp_dia[itraj]->M;
+      for(int k=0; k<ndia*ndia && identity; k++){
+        double re = Sm[k].real() - ((k % (ndia + 1) == 0) ? 1.0 : 0.0);
+        if(std::abs(re) > 1e-12 || std::abs(Sm[k].imag()) > 1e-12){ identity = 0; }
+      }
+      ovlp_dia_is_identity[itraj] = identity;
+    }
+    else{
+      if(!ovlp_dia_is_identity[itraj]){ ovlp_dia[itraj]->load_identity(); }
+      ovlp_dia_is_identity[itraj] = 1;
+    }
   }// for itraj
 }
 
@@ -214,7 +230,8 @@ void dyn_variables::update_amplitudes(dyn_control_params& dyn_params){
     /// Diabatic wfc representation
     if(dyn_params.rep_tdse==0){
       cd = ampl_dia->col(traj);
-      ca.product(adjoint(U), (*ovlp_dia[traj]) * cd);
+      if(ovlp_dia_is_identity[traj]){ ca.product(adjoint(U), cd); }
+      else{ ca.product(adjoint(U), (*ovlp_dia[traj]) * cd); }
       for(int i=0;i<nadi;i++){ ampl_adi->set(i, traj, ca.get(i,0) ); }
     }
     /// Adiabatic wfc representation
@@ -305,7 +322,8 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params){
     if(rep==0){
       cd = ampl_dia->col(traj);
       dm_dia[traj]->product(cd, adjoint(cd));
-      ca.product(adjoint(U), (*ovlp_dia[traj]) * cd);
+      if(ovlp_dia_is_identity[traj]){ ca.product(adjoint(U), cd); }
+      else{ ca.product(adjoint(U), (*ovlp_dia[traj]) * cd); }
       dm_adi[traj]->product(ca, adjoint(ca));
     }
     /// Adiabatic wfc representation
@@ -318,8 +336,11 @@ void dyn_variables::update_density_matrix(dyn_control_params& dyn_params){
     }
     /// Diabatic DM representation
     else if(rep==2){
-      CMATRIX su0((*ovlp_dia[traj]) * U);
-      dm_adi[traj]->product(adjoint(su0), *dm_dia[traj], su0);
+      if(ovlp_dia_is_identity[traj]){ dm_adi[traj]->product(adjoint(U), *dm_dia[traj], U); }
+      else{
+        CMATRIX su0((*ovlp_dia[traj]) * U);
+        dm_adi[traj]->product(adjoint(su0), *dm_dia[traj], su0);
+      }
     }
     /// Adiabatic DM representation
     else if(rep==3){
@@ -1042,7 +1063,11 @@ void dyn_variables::init_active_states(bp::dict _params, Random& rnd){
 
       // the adiabatic populations of the pure diabat: C_adi = U^H S C_dia with the cached
       // metric (identity when the model supplies none)
-      pop_adi = (*basis_transform[traj]).H() * (*ovlp_dia[traj]) * pop_dia * (*ovlp_dia[traj]) * (*basis_transform[traj]);
+      if(ovlp_dia_is_identity[traj]){ pop_adi = (*basis_transform[traj]).H() * pop_dia * (*basis_transform[traj]); }
+      else{
+        pop_adi = (*basis_transform[traj]).H() * (*ovlp_dia[traj]) * pop_dia
+                  * (*ovlp_dia[traj]) * (*basis_transform[traj]);
+      }
 
       vector<double> res(nadi, 0.0);
       for(i=0; i<nadi;i++){ res[i] = pop_adi.get(i,i).real(); }
@@ -1170,7 +1195,8 @@ void dyn_variables::init_active_states_dia(bp::dict _params, Random& rnd){
     CMATRIX X(ndia, ndia);
     CMATRIX Y(ndia, ndia);
     vector<double> res(ndia, 0.0);
-    if(libmeigen::lowdin_frame(*ovlp_dia[traj], X, Y)){
+    if(!ovlp_dia_is_identity[traj]){
+      libmeigen::sqrt_matrix(*ovlp_dia[traj], Y, X);
       CMATRIX popL(Y * (*dm_dia[traj]) * Y);
       for(i=0; i<ndia; i++){ res[i] = popL.get(i,i).real(); }
     }
@@ -1394,7 +1420,10 @@ void dyn_variables:: set_active_states_diff_rep(int rep_sh, Random& rnd){
       U = (*basis_transform[traj]);// * (*proj_adi[traj]);
 
       { CMATRIX X_(ndia, ndia); CMATRIX Y_(ndia, ndia);
-        if(libmeigen::lowdin_frame(*ovlp_dia[traj], X_, Y_)){ pop_dia = Y_ * U * pop_adi * U.H() * Y_; }
+        if(!ovlp_dia_is_identity[traj]){
+          libmeigen::sqrt_matrix(*ovlp_dia[traj], Y_, X_);
+          pop_dia = Y_ * U * pop_adi * U.H() * Y_;
+        }
         else{ pop_dia = U * pop_adi * U.H(); } }
       
       vector<double> diag_els(ndia, 0.0);
@@ -1418,7 +1447,10 @@ void dyn_variables:: set_active_states_diff_rep(int rep_sh, Random& rnd){
       U = (*basis_transform[traj]);// * (*proj_adi[traj]);
 
       { CMATRIX X_(ndia, ndia); CMATRIX Y_(ndia, ndia);
-        if(libmeigen::lowdin_frame(*ovlp_dia[traj], X_, Y_)){ pop_adi = U.H() * Y_ * pop_dia * Y_ * U; }
+        if(!ovlp_dia_is_identity[traj]){
+          libmeigen::sqrt_matrix(*ovlp_dia[traj], Y_, X_);
+          pop_adi = U.H() * Y_ * pop_dia * Y_ * U;
+        }
         else{ pop_adi = U.H() * pop_dia * U; } }
       
       vector<double> diag_els(nadi, 0.0);
@@ -1546,7 +1578,8 @@ vector<double> dyn_variables::compute_average_se_pop(int rep){
     CMATRIX X(ndia, ndia);
     CMATRIX Y(ndia, ndia);
     for(int traj=0; traj<ntraj; traj++){
-      if(libmeigen::lowdin_frame(*ovlp_dia[traj], X, Y)){
+      if(!ovlp_dia_is_identity[traj]){
+        libmeigen::sqrt_matrix(*ovlp_dia[traj], Y, X);
         CMATRIX popL(Y * (*dm_dia[traj]) * Y);
         for(int i=0; i<sz; i++){ res[i] += popL.get(i,i).real(); }
       }
@@ -1716,7 +1749,10 @@ vector<double> dyn_variables::compute_average_sh_pop_TR(int rep){
       U = (*basis_transform[traj]);// * (*proj_adi[traj]);
 
       { CMATRIX X_(ndia, ndia); CMATRIX Y_(ndia, ndia);
-        if(libmeigen::lowdin_frame(*ovlp_dia[traj], X_, Y_)){ pop_dia = Y_ * U * pop_adi * U.H() * Y_; }
+        if(!ovlp_dia_is_identity[traj]){
+          libmeigen::sqrt_matrix(*ovlp_dia[traj], Y_, X_);
+          pop_dia = Y_ * U * pop_adi * U.H() * Y_;
+        }
         else{ pop_dia = U * pop_adi * U.H(); } }
       for(j=0; j<ndia; j++){ res[j] += pop_dia.get(j,j).real(); }
     }
@@ -1740,7 +1776,10 @@ vector<double> dyn_variables::compute_average_sh_pop_TR(int rep){
       U = (*basis_transform[traj]);// * (*proj_adi[traj]);
 
       { CMATRIX X_(ndia, ndia); CMATRIX Y_(ndia, ndia);
-        if(libmeigen::lowdin_frame(*ovlp_dia[traj], X_, Y_)){ pop_adi = U.H() * Y_ * pop_dia * Y_ * U; }
+        if(!ovlp_dia_is_identity[traj]){
+          libmeigen::sqrt_matrix(*ovlp_dia[traj], Y_, X_);
+          pop_adi = U.H() * Y_ * pop_dia * Y_ * U;
+        }
         else{ pop_adi = U.H() * pop_dia * U; } }
       for(j=0; j<nadi; j++){ res[j] += pop_adi.get(j,j).real(); }
     }
