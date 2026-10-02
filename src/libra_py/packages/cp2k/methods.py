@@ -2465,9 +2465,14 @@ def read_cp2k_pdos_blocks(filename):
             header.append(lines[i].strip())
             i += 1
         rows = []
-        while i < n and lines[i].strip() and not lines[i].strip().startswith("#"):
-            rows.append([float(x) for x in lines[i].split()])
+        first_row = i
+        # the rows run to the next header or the end of the file - a blank line inside the table ends nothing
+        while i < n and not lines[i].strip().startswith("#"):
+            if lines[i].strip():
+                rows.append([float(x) for x in lines[i].split()])
             i += 1
+        if not rows:
+            raise ValueError(F"{filename}: the header block ending at line {first_row} has no data rows")
         blocks.append(_cp2k_pdos_block(filename, header, rows))
     if not blocks:
         raise ValueError(F"{filename}: no projected-DOS table found")
