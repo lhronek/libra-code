@@ -2614,6 +2614,10 @@ def read_dftb_orbital_info(params_):
         min_vir, max_vir : int
             Minimum and maximum virtual orbital indices involved in excitations.
 
+        window_drops : np.ndarray, shape (nci,)
+            The fraction of every state's X+Y weight below ci_threshold (the
+            amplitudes themselves stay unnormalized).
+
     MOs : np.ndarray, shape (nao, nact)
         Active-space MO coefficient matrix:
 
@@ -2752,6 +2756,7 @@ def read_dftb_orbital_info(params_):
 
     min_occ, max_occ = 10000000, 0
     min_vir, max_vir = 10000000, 0
+    drops = []
     for i in range(nci):
 
         vec = np.array(results[i]["vector"], dtype=float)   # shape (nconf,)
@@ -2762,6 +2767,11 @@ def read_dftb_orbital_info(params_):
 
         filtered_vec = vec[mask]
         filtered_confs = conf_arr[mask]
+        # the fraction of the vector's weight the threshold cut - the amplitudes
+        # stay unnormalized (the sd2ci drops count it), the fraction feeds the
+        # driver's capture check on every path
+        total = float(np.dot(vec, vec))
+        drops.append(1.0 - float(np.dot(filtered_vec, filtered_vec)) / total if total > 0.0 else 0.0)
 
         for iconf in filtered_confs:
             if iconf[0]<min_occ:
@@ -2827,6 +2837,7 @@ def read_dftb_orbital_info(params_):
         "isUKS": spin_polarized,
         "nocc_alpha": nocc_up,
         "nocc_beta": nocc_dn,
+        "window_drops": np.array(drops),
     }
 
     return info, MOs, data
@@ -3026,6 +3037,11 @@ def dftb_compute_adi(q, params, full_id):
             dropped weight, which on this driver includes the ci_threshold
             loss (the reader keeps the truncated amplitudes unnormalized),
             checked at every step.
+        sd_capture_max_drop : float, default=0.5
+            The largest CI weight a propagated state may lose to the
+            ci_threshold truncation at the read, on every path (the CI
+            overlaps are built from the retained remnant and
+            Lowdin-renormalized) - checked at every step.
         odin_max_ang_mom : dict, optional
             Maximum angular momentum per element for ODIN.
         force_source : str, optional
@@ -3145,6 +3161,9 @@ def dftb_compute_adi(q, params, full_id):
                          'route (ham_transform_method = 3, hvib_update_method = 0)')
     if not 0.0 <= dia_max_drop <= 1.0:
         raise ValueError(F"dia_basis_max_drop must be in [0, 1], got {dia_max_drop}")
+    cap_max_drop = float(params.get("sd_capture_max_drop", 0.5))
+    if not 0.0 <= cap_max_drop <= 1.0:
+        raise ValueError(F"sd_capture_max_drop must be in [0, 1], got {cap_max_drop}")
 
     # ================= Run DFTB+ =================
     dftb_params = copy.deepcopy(dftb_run_params)
@@ -3254,6 +3273,11 @@ def dftb_compute_adi(q, params, full_id):
     }
 
     info, MO_curr, data_curr = read_dftb_orbital_info(read_params)
+    # every propagated state's overlaps are built from its retained remnant and
+    # Lowdin-renormalized - a mostly-dropped state yields well-formed but
+    # meaningless couplings, so fail here (the CP2K driver's contract)
+    check_sd_capture(np.concatenate(([0.0], info["window_drops"])), nstates, cap_max_drop,
+                     knob="sd_capture_max_drop")
 
     #print(info)
 
