@@ -229,7 +229,8 @@ def mat_stat(X):
 
     """
 
-    # the series as one (N, rows, cols) stack through the bulk transfer (a CMATRIX contributes its real part)
+    # the series as one (N, rows, cols) stack through the bulk transfer (a CMATRIX is refused by the conversion -
+    # cmat_stat serves complex series)
     stack = np.stack([data_conv.MATRIX2nparray(x, np.float64) for x in X])
     res, res2, dw_bound, up_bound = stat_arrays(stack)
     return (data_conv.nparray2MATRIX(res), data_conv.nparray2MATRIX(res2),

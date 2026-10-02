@@ -407,7 +407,7 @@ def MATRIX2nparray(data, _dtype=np.complex128):
     N = data.num_of_rows
     M = data.num_of_cols
     # one buffer copy (liblinalg copy_to_buffer) in the matrix's own element type, then the requested
-    # dtype - a complex matrix into a real dtype keeps its real part
+    # dtype - a complex matrix into a real dtype is refused, the caller takes .real or .imag explicitly
     native = {CMATRIX: np.complex128, MATRIX: np.float64, IMATRIX: np.int32}
     kind = next((k for k in native if isinstance(data, k)), None)
     if kind is None:
@@ -421,7 +421,8 @@ def MATRIX2nparray(data, _dtype=np.complex128):
     if np.dtype(_dtype) == res.dtype:
         return res
     if np.iscomplexobj(res) and not np.issubdtype(np.dtype(_dtype), np.complexfloating):
-        res = res.real
+        raise ValueError(F"MATRIX2nparray: a CMATRIX into {np.dtype(_dtype)} - request a complex dtype and take .real "
+                         "or .imag explicitly")
     return res.astype(_dtype)
 
     """
