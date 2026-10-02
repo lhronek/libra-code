@@ -3022,8 +3022,10 @@ def dftb_compute_adi(q, params, full_id):
             frontier windows keep rep:0 dynamics affordable.
         dia_basis_max_drop : float, default=0.5
             With dia_basis="sd", the largest CI weight a propagated state may
-            lose to the ci_threshold truncation before the driver raises
-            (checked at every step).
+            carry outside the SD window before the driver raises - the sd2ci
+            dropped weight, which on this driver includes the ci_threshold
+            loss (the reader keeps the truncated amplitudes unnormalized),
+            checked at every step.
         odin_max_ang_mom : dict, optional
             Maximum angular momentum per element for ODIN.
         force_source : str, optional

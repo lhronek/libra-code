@@ -5874,10 +5874,12 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     overlap_backend="sd"
                 dia_basis_max_drop (float): with dia_basis="sd", the largest
                     CI weight a PROPAGATED state may carry outside the SD
-                    basis (the sd2ci dropped weight, checked at every step) -
-                    beyond it the renormalized T column is noise and the
-                    driver raises - widen num_occ_states/num_unocc_states or
-                    reduce nstates to satisfy the contract    [default 0.5]
+                    basis - the sd2ci dropped weight composed with the
+                    read-stage loss (window_drops: the reader renormalizes
+                    after its threshold and MO-window cut), checked at every
+                    step - beyond it the renormalized T column is noise and
+                    the driver raises - widen num_occ_states/num_unocc_states
+                    or reduce nstates to satisfy the contract    [default 0.5]
                 occupation_threshold (float): a population up to this fraction
                     of the full occupation on an orbital above the electron-
                     count reference (or missing from one below it) is treated
