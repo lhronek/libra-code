@@ -5,8 +5,9 @@
   buffer protocol: a C-contiguous numpy array of the matrix's element type
   (float64 for MATRIX, complex128 for CMATRIX, int32 for IMATRIX) holding
   exactly n_rows x n_cols elements is copied in one memcpy, in either direction.
-  The item size, the format and the total length are checked, so a wrong dtype
-  or shape throws instead of reading garbage. libra_py.data_conv builds its
+  The item size, the format, the total length and the two-dimensional shape are
+  checked, so a wrong dtype or shape throws instead of reading garbage.
+  libra_py.data_conv builds its
   numpy conversions on these - the element-wise set/get loops took 0.8 s per
   1000 x 1000 matrix each way.
 */

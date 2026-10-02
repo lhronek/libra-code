@@ -44,12 +44,19 @@ void checked_view(const char* fn, const M& mat, boost::python::object obj, int f
              "C-contiguous buffer - pass a C-contiguous numpy array of the matrix's element type");
   }
   std::size_t need = sizeof(T) * (std::size_t)mat.n_rows * (std::size_t)mat.n_cols;
+  // the shape as well as the byte count: a same-size array of another shape (a transpose, a flat vector) would
+  // be copied in the wrong layout, which symmetric operands hide
+  bool shaped = (view.ndim == 2) && (view.shape != NULL) &&
+                (view.shape[0] == (Py_ssize_t)mat.n_rows) && (view.shape[1] == (Py_ssize_t)mat.n_cols);
   bool ok = (view.itemsize == (Py_ssize_t)sizeof(T)) && format_matches(view.format, expected_format<T>()) &&
-            ((std::size_t)view.len == need);
+            ((std::size_t)view.len == need) && shaped;
   if(!ok){
     std::ostringstream o;
     o<<"the buffer does not match the "<<mat.n_rows<<" x "<<mat.n_cols<<" matrix of "<<sizeof(T)<<"-byte '"<<expected_format<T>()
-     <<"' elements ("<<need<<" bytes): got itemsize "<<view.itemsize<<", format '"<<(view.format ? view.format : "")<<"', "<<view.len<<" bytes";
+     <<"' elements ("<<need<<" bytes): got itemsize "<<view.itemsize<<", format '"<<(view.format ? view.format : "")<<"', "<<view.len
+     <<" bytes, shape (";
+    for(int d = 0; d < view.ndim; d++){ o<<(d ? ", " : "")<<(view.shape ? view.shape[d] : -1); }
+    o<<")";
     PyBuffer_Release(&view);
     fail(fn, o.str());
   }
