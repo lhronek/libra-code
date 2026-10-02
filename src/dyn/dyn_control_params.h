@@ -302,7 +302,7 @@ class dyn_control_params{
 
 
   /** 
-    The minimal magnutude of the matrix element for which we'll be computing the phase correction
+    The minimal magnitude of the matrix element for which we'll be computing the phase correction
     If the overlap is zero, then we don't really care about the phase, but if it is not, then this
     parameter sets out threshold for when we do.  [ default: 1e-3 ]
   */
@@ -311,7 +311,7 @@ class dyn_control_params{
   
   /**
     New phase correction, directly applied to NACs. Intended to be used mostly with state_tracking_algo == 4,
-    although can be useful with other state treacking algorithms. Should not be used together with 
+    although can be useful with other state tracking algorithms. Should not be used together with 
     `do_phase_correction`
 
     Options:

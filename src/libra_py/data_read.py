@@ -477,7 +477,7 @@ def _lines_cached(filename, _stamp):
 
 def read_atom_coords(filename, step):
     """
-    This function reads the trajectory xyz file and returns the atoms and coordiantes of step^th geometry.
+    This function reads the trajectory xyz file and returns the atoms and coordinates of step^th geometry.
     Args:
         filename (string): The path to the trajectory xyz file.
         step (integer): The step to be extracted.

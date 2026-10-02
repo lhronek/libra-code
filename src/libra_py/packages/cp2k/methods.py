@@ -759,7 +759,7 @@ def cp2k_distribute(istep, fstep, nsteps_this_job, cp2k_positions, cp2k_input, c
     # Making the job directories in the wd folder like job0, job1, ...
     os.system("mkdir job" + str(curr_job_number) + "")
 
-    # Chnage directory to job folder
+    # Change directory to job folder
     os.chdir("job" + str(curr_job_number) + "")
 
     # Copy the trajectory xyz file
@@ -1595,7 +1595,7 @@ def extract_coordinates(trajectory_xyz_file_name: str, time_step: int):
 
     Args:
 
-        trajcetory_xyz_file_name (string): The trajectory xyz file name.
+        trajectory_xyz_file_name (string): The trajectory xyz file name.
 
         time_step (integer): The time step.
 

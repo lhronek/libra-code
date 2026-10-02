@@ -719,7 +719,7 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
 
   } // update_type==0 || update_type==1
 
-  if (update_type == 2) { // in responce to updated electronic variables
+  if (update_type == 2) { // in response to updated electronic variables
 
   } // update_type==2
 

@@ -384,7 +384,7 @@ public:
     if (B.n_cols != C.n_rows) {
       std::cout
           << "Matrix multiplication error: Dimensions of operands must match\n";
-      std::cout << "You try to muplitpy a " << B.n_rows << " by " << B.n_cols
+      std::cout << "You try to multiply a " << B.n_rows << " by " << B.n_cols
                 << " matrix and a " << C.n_rows << " by " << C.n_cols
                 << " matrix\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");

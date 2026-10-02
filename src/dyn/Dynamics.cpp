@@ -2388,7 +2388,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   dyn_var.update_basis_transform(ham);
 
   // Recompute the orthogonalized reprojection matrices, stored in
-  // dyn_var.proj_adi this calculaitons used ham.children[i].time_overlap
+  // dyn_var.proj_adi this calculations used ham.children[i].time_overlap
   // matrix, updated in the previous step
   update_proj_adi(prms, dyn_var, ham, ham_aux);
 
