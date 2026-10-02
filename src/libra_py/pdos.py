@@ -676,9 +676,14 @@ def convolve_cp2k_pdos(params: dict):
     num_levels = len(block["energies"])
     # The energies of the levels in the requested unit
     energy_levels = block["energies"] * energy_conversion
-    # The HOMO is the level before the first unoccupied one
-    unoccupied = np.where(block["occupations"] == 0)[0]
-    homo_level = int(unoccupied.min()) - 1 if unoccupied.size > 0 else num_levels - 1
+    # the HOMO is the highest level carrying more than half of the table's full occupation (2.0 for a restricted
+    # file, 1.0 for a spin channel - a smeared file's fractions fall on either side of the Fermi level)
+    occupations = np.asarray(block["occupations"], dtype=float)
+    full = 2.0 if occupations.max() > 1.0 else 1.0
+    occupied = np.where(occupations > 0.5 * full)[0]
+    if occupied.size == 0:
+        raise ValueError(F"{cp2k_pdos_file}: block {time_step} holds no occupied level - the HOMO is undefined")
+    homo_level = int(occupied.max())
     # HOMO energy
     homo_energy = energy_levels[homo_level]
     # Minimum energy level
