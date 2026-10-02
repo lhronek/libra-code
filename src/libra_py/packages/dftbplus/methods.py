@@ -2057,6 +2057,12 @@ def write_dftb_gen(filename, atom_labels, coordinates, periodic=False):
 
 
 
+def _with_newline(text):
+    """the text terminated by a newline when it has content - an appended line or the closing brace must not land on
+    its last line"""
+    return text + "\n" if text and not text.endswith("\n") else text
+
+
 def make_dftb_input(params, ground_state=True, working_directory="."):
     """
     Generate a DFTB+ input file ("dftb_in.hsd") in a thread-safe manner.
@@ -2277,9 +2283,7 @@ def make_dftb_input(params, ground_state=True, working_directory="."):
     # and SpinConstants for open-shell runs) - a missing final newline is
     # appended - without it the closing brace or an appended line lands on
     # the last extras line and DFTB+ rejects the input
-    HamiltonianExtras = params.get("HamiltonianExtras", "")
-    if HamiltonianExtras and not HamiltonianExtras.endswith("\n"):
-        HamiltonianExtras += "\n"
+    HamiltonianExtras = _with_newline(params.get("HamiltonianExtras", ""))
 
     Filling = params.get("Filling",
                          """Fermi {
@@ -2919,9 +2923,7 @@ def _dftb_state_forces(coordinates, dftb_params, prms1, wd, s):
         "WriteXplusY": "No",
         "WriteEigenvectors": "No",
         "EigenvectorsAsText": "No",
-        "HamiltonianExtras": (lambda x: x + "\n" if x and not x.endswith("\n") else x)(
-            dftb_params.get("HamiltonianExtras", ""))
-        + "    ReadInitialCharges = Yes\n",
+        "HamiltonianExtras": _with_newline(dftb_params.get("HamiltonianExtras", "")) + "    ReadInitialCharges = Yes\n",
         "StateOfInterest": s,
         "NrOfExcitations": s,
     })
