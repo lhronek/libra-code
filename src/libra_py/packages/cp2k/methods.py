@@ -2423,6 +2423,13 @@ def _cp2k_pdos_block(filename, header, data):
         shift = e_fermi
     first_comp = 3 + (1 if has_total else 0)
     projections = data[:, first_comp:]
+    if components == ["LDOS"] and projections.shape[1] == 2:
+        # the real-space LDOS table of CP2K 2026 (qs_pdos.F): four labels over five columns, the fifth the LDOS
+        # scaled by the number of grid points - a duplicate the header does not label
+        projections = projections[:, :1]
+    if projections.shape[1] != len(components):
+        raise ValueError(F"{filename}: {projections.shape[1]} projection columns under {len(components)} labels "
+                         F"{components}")
     total = data[:, 3] if has_total else projections.sum(axis=1)
     return {"step": step, "label": label, "e_fermi": e_fermi, "e_homo": e_homo, "energy_zero": zero,
             "energies": energies + shift, "occupations": data[:, 2], "total": total,
