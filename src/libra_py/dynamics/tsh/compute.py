@@ -1842,8 +1842,8 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
             print(F"NOTE: rep_sh/rep_force 0 with non-orthogonal diabats (ovlp_dia deviates from "
                   F"identity by {s_dev:.2e}) - the diabatic hop machinery works in the Lowdin "
                   F"frame S^-1/2 |i>: the hopping states are the orthonormalized diabats, with "
-                  F"the transformed energies, forces and hopping populations (se_pop_dia stays "
-                  F"the plain |C_i|^2)")
+                  F"the transformed energies, forces and hopping populations (se_pop_dia and "
+                  F"sh_pop_dia report the Lowdin states)")
 
     # Update internal dynamical variables using the computed properties of the Hamiltonian objects
     # Set up the "rep_tdse" variable here to the representation that coinsides with the initial representation

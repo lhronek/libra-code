@@ -1530,21 +1530,38 @@ CMATRIX dyn_variables::compute_average_dm(int rep){
 
   
 vector<double> dyn_variables::compute_average_se_pop(int rep){
-
-  int sz; 
+/**
+  The ensemble-averaged SE populations of representation rep: the diagonal of the averaged density matrix,
+  except that the diabatic populations (rep 0 and 2) of non-orthogonal diabats are the Lowdin ones,
+  (S^1/2 rho S^1/2)_ii - the populations of the hopping states the SH populations count (the bare diag(rho)
+  does not sum to 1 under the normalization C^H S C = 1); at S = I the two agree
+*/
+  int sz;
   if(rep==0 || rep==2){ sz = ndia; }
   else if(rep==1 || rep==3 || rep==4){ sz = nadi; }
   else{ cout<<"Error in dyn_variables::compute_average_se_pop: rep is not allowed. "; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
-  MATRIX ave(sz, sz);
-  ave = compute_average_dm(rep).real();  
-
   vector<double> res(sz, 0.0);
+  if(rep==0 || rep==2){
+    CMATRIX X(ndia, ndia);
+    CMATRIX Y(ndia, ndia);
+    for(int traj=0; traj<ntraj; traj++){
+      if(libmeigen::lowdin_frame(*ovlp_dia[traj], X, Y)){
+        CMATRIX popL(Y * (*dm_dia[traj]) * Y);
+        for(int i=0; i<sz; i++){ res[i] += popL.get(i,i).real(); }
+      }
+      else{
+        for(int i=0; i<sz; i++){ res[i] += dm_dia[traj]->get(i,i).real(); }
+      }
+    }
+    for(int i=0; i<sz; i++){ res[i] = res[i] / (float)ntraj; }
+    return res;
+  }
 
+  MATRIX ave(sz, sz);
+  ave = compute_average_dm(rep).real();
   for(int i=0; i<sz; i++){ res[i] = ave.get(i,i); }
-
   return res;
-
 }
 
 
