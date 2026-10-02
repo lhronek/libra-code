@@ -3538,31 +3538,39 @@ def _ao_overlap_blocks_flex(it, logfile):
     return S
 
 
+# the dbcsr print writes the matrix name as the banner line - the exact names, since a suffix match took
+# CP2K's "CORE HAMILTONIAN MATRIX" and "QMMM HAMILTONIAN MATRIX" for the Kohn-Sham matrix and missed the
+# unrestricted banners (qs_ks_methods.F, xtb_matrices.F, qs_core_hamiltonian.F, qmmm_tb_methods.F)
+KS_BANNERS = ("HAMILTONIAN MATRIX",                                                 # xTB, both spin channels
+              "KOHN-SHAM MATRIX",                                                   # GPW, closed shell
+              "KOHN-SHAM MATRIX FOR ALPHA SPIN", "KOHN-SHAM MATRIX FOR BETA SPIN")  # GPW, unrestricted
+OVERLAP_BANNERS = ("OVERLAP MATRIX", "XTB OVERLAP MATRIX")
+
+
 def _skip_to_overlap_banner(f):
-    """Advance a log-file iterator past the AO-overlap banner line.
-    GPW: "OVERLAP MATRIX" - xTB: "XTB OVERLAP MATRIX"."""
+    """Advance a log-file iterator past the AO-overlap banner line (OVERLAP_BANNERS)."""
     for l in f:
-        if l.strip().endswith("OVERLAP MATRIX"):
+        if l.strip() in OVERLAP_BANNERS:
             return True
     return False
 
 
-def _count_banners(logfile, suffix):
-    """How many banner lines end with `suffix` - the AO_MATRICES prints of the
+def _count_banners(logfile, names):
+    """How many banner lines are one of `names` - the AO_MATRICES prints of the
     Hamiltonian repeat every SCF iteration, the last one is the converged matrix."""
     n = 0
     with open(logfile) as f:
         for l in f:
-            if l.strip().endswith(suffix):
+            if l.strip() in names:
                 n += 1
     return n
 
 
-def _skip_to_nth_banner(f, suffix, n):
-    """Advance a log-file iterator past the n-th (1-based) banner ending with `suffix`."""
+def _skip_to_nth_banner(f, names, n):
+    """Advance a log-file iterator past the n-th (1-based) banner line that is one of `names`."""
     seen = 0
     for l in f:
-        if l.strip().endswith(suffix):
+        if l.strip() in names:
             seen += 1
             if seen == n:
                 return True
@@ -3573,35 +3581,31 @@ def read_cp2k_ao_ks_print(logfile, n_spins=1):
     """
     The AO Kohn-Sham (Hamiltonian) matrices printed by &DFT &PRINT &AO_MATRICES
     (KOHN_SHAM_MATRIX T, NDIGITS 12) in the same MOLog block layout as the overlap print.
-    CP2K prints them at every SCF iteration (xTB banner "HAMILTONIAN MATRIX", GPW
-    "KOHN-SHAM MATRIX", one print per spin channel) - the last n_spins prints are the
-    matrices of the converged density, in the CP2K-internal AO order.
+    CP2K prints them at every SCF iteration under the matrix name (KS_BANNERS: xTB
+    "HAMILTONIAN MATRIX", GPW "KOHN-SHAM MATRIX", unrestricted GPW "KOHN-SHAM MATRIX FOR
+    ALPHA SPIN" / "... FOR BETA SPIN", one print per spin channel) - the last n_spins prints
+    are the matrices of the converged density, in the CP2K-internal AO order.
 
     Returns:
         list of np.ndarray (n, n), one per spin channel
     """
-    suffix = None
-    for cand in ("HAMILTONIAN MATRIX", "KOHN-SHAM MATRIX"):
-        if _count_banners(logfile, cand):
-            suffix = cand
-            break
-    if suffix is None:
+    total = _count_banners(logfile, KS_BANNERS)
+    if total == 0:
         raise RuntimeError(F"no AO Kohn-Sham matrix print found in {logfile} - the run needs "
                            F"&DFT &PRINT &AO_MATRICES KOHN_SHAM_MATRIX T (NDIGITS 12)")
-    total = _count_banners(logfile, suffix)
     if total < n_spins:
         raise ValueError(F"{logfile}: {total} Kohn-Sham matrix prints for {n_spins} spin channels")
     out = []
     for k in range(total - n_spins + 1, total + 1):
         with open(logfile) as f:
-            _skip_to_nth_banner(f, suffix, k)
+            _skip_to_nth_banner(f, KS_BANNERS, k)
             try:
                 H = _ao_overlap_blocks_fast(f)
             except (AssertionError, ValueError, IndexError, KeyError):
                 H = None
         if H is None:
             with open(logfile) as f:
-                _skip_to_nth_banner(f, suffix, k)
+                _skip_to_nth_banner(f, KS_BANNERS, k)
                 H = _ao_overlap_blocks_flex(f, logfile)
         if np.abs(H - H.T).max() > 1e-8:
             raise ValueError(F"parsed Kohn-Sham matrix not symmetric ({logfile})")
