@@ -2507,13 +2507,13 @@ def _cp2k_pdos_is_table(filename):
 def find_cp2k_pdos_files(directory, core="*"):
     """
     The per-MO projected-DOS files of a directory whose names match `core` (a glob without the extension,
-    e.g. "*k1*" or "*ALPHA*k2*"): the .pdos_raw files of CP2K 2026 when there are any, otherwise the .pdos
-    files that hold per-MO tables (the broadened .pdos curves of CP2K 2026 are skipped).
+    e.g. "*k1*" or "*ALPHA*k2*"): the .pdos_raw files of CP2K 2026 and the .pdos files that hold per-MO
+    tables - both generations of a directory (a trajectory continued across a CP2K upgrade), the broadened
+    .pdos curves of CP2K 2026 skipped.
     """
     raw = sorted(glob.glob(os.path.join(directory, F"{core}.pdos_raw")))
-    if raw:
-        return raw
-    return [f for f in sorted(glob.glob(os.path.join(directory, F"{core}.pdos"))) if _cp2k_pdos_is_table(f)]
+    tables = [f for f in sorted(glob.glob(os.path.join(directory, F"{core}.pdos"))) if _cp2k_pdos_is_table(f)]
+    return raw + tables
 
 
 # the m-resolved component labels of CP2K's PDOS prints (COMPONENTS), the layout the column numbering 3 = s,
