@@ -17,7 +17,7 @@
 """
 
 
-import os, sys, math, re, copy, time, glob, shlex, shutil, subprocess, atexit
+import os, sys, math, re, copy, time, glob, shlex, shutil, subprocess, threading
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import numpy as np
@@ -3923,6 +3923,21 @@ def make_cp2k_input(params, working_directory="."):
     return input_path
 
 
+# the CP2K runs of this process while they run - an aborted batch or an interrupted harvest stops them
+_RUNNING_CP2K = set()
+_RUNNING_LOCK = threading.Lock()
+
+
+def _terminate_running_cp2k():
+    """Stop every CP2K run this process started (an aborted prefetch batch, an interrupted harvest) - a chain
+    thread blocked in its run cannot read the abort flag before the run ends."""
+    with _RUNNING_LOCK:
+        running = list(_RUNNING_CP2K)
+    for proc in running:
+        if proc.poll() is None:
+            proc.terminate()
+
+
 def execute_cp2k(exe, input_name, logname, wd=".", omp_num_threads=1,
                  mpi_executable=None, nprocs=1, cp2k_data_dir=None):
     """Launch one CP2K run: argv list (no shell), OMP/data-dir env for
@@ -3941,16 +3956,22 @@ def execute_cp2k(exe, input_name, logname, wd=".", omp_num_threads=1,
     # shlex: the launcher may carry flags ("mpirun --bind-to none")
     if mpi_executable is not None and int(nprocs) > 1:
         cmd = shlex.split(str(mpi_executable)) + ["-n", str(nprocs)] + cmd
-    res = subprocess.run(cmd, cwd=wd, env=env,
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    if res.returncode != 0:
+    proc = subprocess.Popen(cmd, cwd=wd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    with _RUNNING_LOCK:
+        _RUNNING_CP2K.add(proc)
+    try:
+        _, stderr = proc.communicate()
+    finally:
+        with _RUNNING_LOCK:
+            _RUNNING_CP2K.discard(proc)
+    if proc.returncode != 0:
         tail = ""
         if os.path.exists(logfile):
             with open(logfile) as f:
                 tail = "".join(f.readlines()[-30:])
         raise RuntimeError(
-            F"CP2K failed (exit {res.returncode}) in {wd} ({input_name})\n"
-            F"stderr: {res.stderr.decode()[-2000:]}\nlog tail:\n{tail}")
+            F"CP2K failed (exit {proc.returncode}) in {wd} ({input_name})\n"
+            F"stderr: {stderr.decode()[-2000:]}\nlog tail:\n{tail}")
     return logfile
 
 
@@ -6527,15 +6548,15 @@ def _prefetch_abort_check(params):
 
 
 def _shutdown_prefetch_pools():
+    """Release every live executor - for a caller that ends a run (the tests). At interpreter exit the executors'
+    worker threads are joined before any atexit handler runs, so a registration there could stop nothing - an
+    aborted or interrupted batch terminates its CP2K runs instead (_terminate_running_cp2k)."""
     for state in _PREFETCH_STATES.values():
         for key in ("pool", "parse_pool"):
             ex = state.pop(key, None)
             if ex is not None:
                 ex.shutdown(wait=False, cancel_futures=True)
     _PREFETCH_STATES.clear()
-
-
-atexit.register(_shutdown_prefetch_pools)
 
 
 def _prefetch_pools(state, params, ntraj):
@@ -6626,6 +6647,7 @@ def _cp2k_refresh_dispatch(q, params, full_id):
         return fut.result()
     except BaseException:
         state["abort"] = True
+        _terminate_running_cp2k()
         for f in state["refresh_futures"].values():
             f.cancel()
         state["refresh_futures"] = {}
@@ -6681,8 +6703,10 @@ def _cp2k_prefetch_dispatch(q, params, full_id):
         return fut.result()
     except BaseException:
         # the failed chain aborts the run - cancel the queued sibling
-        # chains and flag the running ones to stop between stages
+        # chains, stop the running CP2K runs and flag the chains to stop
+        # between stages
         state["abort"] = True
+        _terminate_running_cp2k()
         for f in state["futures"].values():
             f.cancel()
         state["futures"] = {}
