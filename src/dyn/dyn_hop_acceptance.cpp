@@ -244,10 +244,10 @@ int can_rescale_for_hop(dyn_variables& dyn_var, nHamiltonian& ham, int traj, int
   // the NBRA fast path keeps one Hamiltonian, the child of trajectory 0
   int src = (prms.isNBRA==1) ? 0 : traj;
 
-  if(res==100 || res==101 || res==110 || res==111){
+  if(rescaling_is_uniform(res)){
     double T_i = compute_kinetic_energy(p_tr, invM, which_dofs);
     double E_i, E_f;
-    if(res==100 || res==101){
+    if(rescaling_reads_adiabatic(res)){
       CMATRIX hvib(ham.child(src)->get_ham_adi());
       E_i = hvib.get(old_st, old_st).real();
       E_f = hvib.get(new_st, new_st).real();
@@ -261,14 +261,14 @@ int can_rescale_for_hop(dyn_variables& dyn_var, nHamiltonian& ham, int traj, int
     return ((T_i > 0.0 && T_i + E_i - E_f >= 0.0) || E_i == E_f) ? 1 : 0;
   }
 
-  if(res==200 || res==201 || res==210 || res==211){
+  if(rescaling_is_directional(res)){
     CMATRIX hvib(ham.child(src)->get_ham_adi());
     double E_i = hvib.get(old_st, old_st).real();
     double E_f = hvib.get(new_st, new_st).real();
     MATRIX t(ndof, 1);
     for(int idof = 0; idof < n_active_dof; idof++){
       int dof = which_dofs[idof];
-      if(res==200 || res==201){
+      if(rescaling_along_nac(res)){
         CMATRIX nac(ham.child(traj)->get_dc1_adi(dof));
         t.set(dof, 0, nac.get(old_st, new_st).real());
       }
@@ -944,7 +944,7 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
   // an accepted hop the configured rescaling cannot pay for is refused here, before the post-hop decoherence
   // (and DISH) collapse the amplitudes onto the states returned - handle_hops_nuclear treats it as a frustrated hop
   int res = prms.momenta_rescaling_algo;
-  if(res==100 || res==101 || res==110 || res==111 || res==200 || res==201 || res==210 || res==211){
+  if(rescaling_is_uniform(res) || rescaling_is_directional(res)){
     for(itraj=0; itraj<ntraj_active; itraj++){
       traj = which_trajectories[itraj];
       if(fstates[traj] != initial_states[traj] &&
@@ -1132,7 +1132,7 @@ vector<int>& new_states, vector<int>& old_states, vector<int>& proposed_states, 
       p_tr = p.col(traj);
       double T_i = compute_kinetic_energy(p_tr, invM, which_dofs); // initial kinetic energy
       double E_i, E_f;
-      if(res==100 || res==101){
+      if(rescaling_reads_adiabatic(res)){
         // the NBRA fast path keeps one Hamiltonian, the child of trajectory 0
         hvib = ham.child(isNBRA==1 ? 0 : traj)->get_ham_adi();
         //hvib = projectors[traj].H() * hvib * projectors[traj];

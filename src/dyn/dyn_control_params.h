@@ -1238,6 +1238,16 @@ class dyn_control_params{
 
 
 
+/// the option groups of the hop machinery - the one definition of the code lists the sanity rows and the
+/// rescaling helpers read (the dispatch chains compare the codes themselves)
+int rescaling_is_uniform(int res);        ///< 100, 101, 110, 111 - the kinetic energy rescaled uniformly
+int rescaling_is_directional(int res);    ///< 200, 201, 210, 211 - the momentum rescaled along a vector
+int rescaling_along_nac(int res);         ///< 200, 201 - along the derivative coupling (210, 211: the force difference)
+int rescaling_reads_adiabatic(int res);   ///< 100, 101, 200, 201, 210, 211, 40 - adiabatic energies or vectors
+int rescaling_reads_diabatic(int res);    ///< 110, 111 - diabatic (Lowdin) energies
+int acceptance_reads_adiabatic(int acc);  ///< 10, 20, 21, 40
+int acceptance_reads_diabatic(int acc);   ///< 11
+
 } // libdyn
 }// liblibra
 

@@ -26,6 +26,17 @@ namespace libdyn{
 
 namespace bp = boost::python;
 
+
+int rescaling_is_uniform(int res){ return (res==100 || res==101 || res==110 || res==111); }
+int rescaling_is_directional(int res){ return (res==200 || res==201 || res==210 || res==211); }
+int rescaling_along_nac(int res){ return (res==200 || res==201); }
+int rescaling_reads_adiabatic(int res){
+  return (res==100 || res==101 || res==200 || res==201 || res==210 || res==211 || res==40);
+}
+int rescaling_reads_diabatic(int res){ return (res==110 || res==111); }
+int acceptance_reads_adiabatic(int acc){ return (acc==10 || acc==20 || acc==21 || acc==40); }
+int acceptance_reads_diabatic(int acc){ return (acc==11); }
+
 dyn_control_params::dyn_control_params(){
 
 /**
@@ -457,13 +468,12 @@ void dyn_control_params::sanity_check(){
   if(tsh_method >= 0){
     int acc = hop_acceptance_algo;
     int res = momenta_rescaling_algo;
-    int acc_dia = (acc==11);
     // the Boltzmann options 31-33 read the hopping representation's own energies and
     // pair with either rep_sh
-    int acc_adi = (acc==10 || acc==20 || acc==21 || acc==40);
-    int res_dia = (res==110 || res==111);
-    int res_adi = (res==100 || res==101 || res==200 || res==201 ||
-                   res==210 || res==211 || res==40);
+    int acc_dia = acceptance_reads_diabatic(acc);
+    int acc_adi = acceptance_reads_adiabatic(acc);
+    int res_dia = rescaling_reads_diabatic(res);
+    int res_adi = rescaling_reads_adiabatic(res);
     if(rep_sh==0 && (acc_adi || res_adi)){
       std::cout<<"Error in dyn_control_params::sanity_check: rep_sh = 0 hops between"
           <<" DIABATIC states, but hop_acceptance_algo = "<<acc
