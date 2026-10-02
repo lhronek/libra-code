@@ -1934,8 +1934,8 @@ int nHamiltonian::lowdin_dia(CMATRIX &X, CMATRIX &Y) {
     The Lowdin (symmetric) orthonormalization of the diabatic basis: X = S^-1/2
     and Y = S^1/2 of ovlp_dia. |lambda_i> = sum_j |j> X_ji are the orthonormal
     states closest to the diabats, identical to them at S = I - the frame the
-    diabatic hop machinery works in for non-orthogonal diabats. The metric is
-    q-independent here, as everywhere in the engine (no d1ovlp_dia exists).
+    diabatic hop machinery works in for non-orthogonal diabats. The metric may move
+    with the nuclei (dS = D + D^H, lowdin_dia_derivative) - the frame is the step's own.
     Returns 1 with X and Y filled, or 0 for an absent or identity metric (X, Y
     untouched)
   */

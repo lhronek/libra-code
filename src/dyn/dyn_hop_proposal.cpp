@@ -1657,6 +1657,10 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
   int lowdin_sh = 0;
   CMATRIX X_l(nst, nst);
   CMATRIX Y_l(nst, nst);
+  // the previous step's own frame for the previous step's density (FSSH2, FSSH3, GFSH-orig)
+  int lowdin_sh_prev = 0;
+  CMATRIX X_lp(nst, nst);
+  CMATRIX Y_lp(nst, nst);
 
   //============== Begin the TSH part ===================  
   // Proposed hops probabilities
@@ -1673,6 +1677,7 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
       // Hvib_L = X Hvib X + i (dY/dt) X through the getter below, populations |(S^1/2 c)_i|^2
       lowdin_sh = ham.child(traj)->lowdin_dia(X_l, Y_l);
       if(lowdin_sh){ dm = Y_l * dm * Y_l; }
+      lowdin_sh_prev = ham_prev.child(traj)->lowdin_dia(X_lp, Y_lp);
     }
     else{
       std::cout<<"Error in hop_proposal_probabilities(): rep_sh = "<<prms.rep_sh<<" has no branch here (implemented: 0, 1)\n";
@@ -1851,7 +1856,9 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
       }
       else if(prms.rep_sh==0){
         CMATRIX dm_prev(*dyn_var.dm_dia_prev[traj]);
-        if(lowdin_sh){ dm_prev = Y_l * dm_prev * Y_l; }
+        // the previous density in the previous step's frame - the current frame would read the frame's
+        // motion as population flux
+        if(lowdin_sh_prev){ dm_prev = Y_lp * dm_prev * Y_lp; }
         g[traj] = hopping_probabilities_fssh2(prms, dm, dm_prev, dyn_var.act_states_dia[traj]);
       }
       else{
@@ -1881,7 +1888,9 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
       }
       else if(prms.rep_sh==0){
         CMATRIX dm_prev(*dyn_var.dm_dia_prev[traj]);
-        if(lowdin_sh){ dm_prev = Y_l * dm_prev * Y_l; }
+        // the previous density in the previous step's frame - the current frame would read the frame's
+        // motion as population flux
+        if(lowdin_sh_prev){ dm_prev = Y_lp * dm_prev * Y_lp; }
         CMATRIX dm_prev_trans(dm_prev);
         g[traj] = hopping_probabilities_fssh3(prms, dm, dm_prev_trans, dyn_var.act_states_dia[traj], dyn_var.fssh3_errors[traj]);
       }
@@ -1900,7 +1909,9 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
       }
       else if(prms.rep_sh==0){
         CMATRIX dm_prev(*dyn_var.dm_dia_prev[traj]);
-        if(lowdin_sh){ dm_prev = Y_l * dm_prev * Y_l; }
+        // the previous density in the previous step's frame - the current frame would read the frame's
+        // motion as population flux
+        if(lowdin_sh_prev){ dm_prev = Y_lp * dm_prev * Y_lp; }
         g[traj] = hopping_probabilities_gfsh_orig(prms, dm, dm_prev, dyn_var.act_states_dia[traj]);
       }
       else{
