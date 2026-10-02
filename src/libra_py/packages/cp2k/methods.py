@@ -3984,6 +3984,20 @@ def execute_cp2k(exe, input_name, logname, wd=".", omp_num_threads=1,
     return logfile
 
 
+def _log_contains(path, needle, chunk=8 << 20):
+    """whether the bytes `needle` occur in the file - read in chunks that overlap by the needle's length less one,
+    a bytes search instead of a Python line loop (the ODT logs run to tens of MB per step)"""
+    with open(path, "rb") as fp:
+        tail = b""
+        while True:
+            block = fp.read(chunk)
+            if not block:
+                return False
+            if needle in tail + block:
+                return True
+            tail = block[-(len(needle) - 1):]
+
+
 def run_cp2k(coords_bohr, params):
     """
     Execute one CP2K calculation in a trajectory-specific working directory.
@@ -4105,13 +4119,12 @@ def run_cp2k(coords_bohr, params):
         # CP2K aborts on an unconverged SCF, but IGNORE_CONVERGENCE_FAILURE turns that abort into a
         # warning - the run then exits 0 carrying a density, an energy and forces that never converged
         if int(params.get("allow_unconverged_scf", 0)) == 0:
-            with open(logfile) as fp:
-                if any("SCF run NOT converged" in line for line in fp):
-                    raise RuntimeError(
-                        f"CP2K reported an unconverged SCF in {wd} ({logfile}) - its energy and "
-                        f"forces are not usable. Fix the SCF (density mixing, MAX_SCF) or add a "
-                        f"retry_templates entry that does, allow_unconverged_scf = 1 accepts the "
-                        f"step regardless")
+            if _log_contains(logfile, b"SCF run NOT converged"):
+                raise RuntimeError(
+                    f"CP2K reported an unconverged SCF in {wd} ({logfile}) - its energy and "
+                    f"forces are not usable. Fix the SCF (density mixing, MAX_SCF) or add a "
+                    f"retry_templates entry that does, allow_unconverged_scf = 1 accepts the "
+                    f"step regardless")
 
     # the restart files of the step's start, kept aside: a retry starts from them (the previous
     # step's converged density), not from the density the failed attempt left behind
@@ -6166,9 +6179,11 @@ def cp2k_compute_adi_impl(q, params, full_id):
             overlap_template = auto
         coords_prev = _carried(params, "coordinates_prev", itraj,
                                coordinates, is_first_time)
+        # the execution-layer keys and allow_unconverged_scf (a property of the run, not of a template) -
+        # retry_templates stay out, they are main-input templates and the overlap run has its own
         odt = {k: params[k] for k in ("atom_labels", "cp2k_exe", "cp2k_data_dir",
                                       "omp_num_threads", "mpi_executable", "nprocs",
-                                      "csr_chunk_rows")
+                                      "csr_chunk_rows", "allow_unconverged_scf")
                if k in params}
         odt["overlap_template"] = overlap_template
         odt["working_directory"] = f"{wd}/odt"
