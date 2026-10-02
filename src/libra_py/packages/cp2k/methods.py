@@ -194,6 +194,19 @@ def cube_file_names_cp2k(params):
 
 
 
+# the per-state dropped-weight reports of the CI readers, once per reader, state and process - the loss itself is
+# data (window_drops) and the capture check refuses it when large
+_DROP_REPORTED = set()
+
+
+def _report_drop(reader, state, text):
+    """print the reader's dropped-weight line for a state the first time this process meets it"""
+    if (reader, state) in _DROP_REPORTED:
+        return
+    _DROP_REPORTED.add((reader, state))
+    print(F"{reader}: state {state}: {text} (reported once per state and process)")
+
+
 def read_cp2k_tddfpt_log_file(params):
     """
     Parse a CP2K TD-DFPT log file and extract excitation energies and CI expansion data.
@@ -492,16 +505,16 @@ def read_cp2k_tddfpt_log_file(params):
         read_drops[i] = max(0.0, 1.0 - kept2)
         if foreign:
             foreign.sort(key=lambda x: -x[3])
-            print(F"read_cp2k_tddfpt_log_file: state {i + 1}: {sum(w for *_, w in foreign):.1%} of "
-                  F"the vector excites FROM orbital(s) above the electron-count reference "
-                  F"({nref_of['alp']}{'/' + str(nref_of['bet']) if isUKS else ''}) - counted as "
-                  F"dropped weight: " + ", ".join(F"{o}->{v}{'' if sp == 'alp' else ' ' + sp} ({w:.1%})"
-                                                   for o, v, sp, w in foreign[:4]))
+            _report_drop("read_cp2k_tddfpt_log_file (above the reference)", i + 1,
+                         F"{sum(w for *_, w in foreign):.1%} of the vector excites FROM orbital(s) above the "
+                         F"electron-count reference ({nref_of['alp']}{'/' + str(nref_of['bet']) if isUKS else ''}) "
+                         F"- counted as dropped weight: "
+                         + ", ".join(F"{o}->{v}{'' if sp == 'alp' else ' ' + sp} ({w:.1%})"
+                                     for o, v, sp, w in foreign[:4]))
         if read_drops[i] > 1e-6:
-            print(F"read_cp2k_tddfpt_log_file: state {i + 1}: dropped CI weight "
-                  F"{read_drops[i]:.2e} to the print floor + ci_threshold cut"
-                  F"{' + excitations from above the reference' if foreign else ''} "
-                  F"(vs the TDA unit norm)")
+            _report_drop("read_cp2k_tddfpt_log_file", i + 1,
+                         F"dropped CI weight {read_drops[i]:.2e} to the print floor + ci_threshold cut"
+                         F"{' + excitations from above the reference' if foreign else ''} (vs the TDA unit norm)")
 
         ci_basis.append(tmp_basis)
         ci_coefficients.append(tmp_coeffs)
@@ -4509,8 +4522,8 @@ def read_ci_data(logfile, nstates, ci_threshold=0.01, lowest_orbital=1, highest_
         a = np.array([coeff[k][j] for j in keep], dtype=float)
         drops[k] = 1.0 - float(np.sum(a ** 2)) / total2
         if drops[k] > 1e-6:
-            print(F"read_ci_data: state {k + 1}: dropped CI weight {drops[k]:.2e} to "
-                  F"the orbital window [{lo_w}, {hi_w}] (vector renormalized)")
+            _report_drop("read_ci_data", k + 1, F"dropped CI weight {drops[k]:.2e} to the orbital window "
+                         F"[{lo_w}, {hi_w}] (vector renormalized)")
         amps.append(a / np.linalg.norm(a))
     rd = pp.get("ci_read_drops")
     if rd is not None:
@@ -5273,9 +5286,8 @@ def ci_data_from_newtonx(newtonx, omegas_Ha, ci_threshold=1e-6,
                              F"configs above the threshold inside the window")
         drops[ist] = 1.0 - float(np.sum(a ** 2)) / total2
         if drops[ist] > 1e-6:
-            print(F"ci_data_from_newtonx: state {ist + 1}: dropped CI weight "
-                  F"{drops[ist]:.2e} to the threshold/MO-window clip "
-                  F"(vector renormalized)")
+            _report_drop("ci_data_from_newtonx", ist + 1, F"dropped CI weight {drops[ist]:.2e} to the "
+                         F"threshold/MO-window clip (vector renormalized)")
         a /= np.linalg.norm(a)
         configs.append(conf)
         amps.append(a)
