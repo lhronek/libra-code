@@ -50,6 +50,8 @@ from libra_py.blas_threads import blas_thread_limit
 import libra_py.units as units
 import libra_py.data_outs as data_outs
 import libra_py.data_savers as data_savers
+import libra_py.data_conv as data_conv
+import numpy as np
 import libra_py.tsh_stat as tsh_stat
 # import libra_py.dynamics as dynamics_io
 
@@ -1473,7 +1475,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                              F"Hamiltonian indexed by adiabatic state, which needs a square "
                              F"diabatic basis - here ndia = {ndia}, nadi = {nadi}")
         _H0 = ham.get_ham_dia(Py2Cpp_int([0, 0]))
-        if max(abs(_H0.get(a, b)) for a in range(ndia) for b in range(ndia)) == 0.0:
+        if np.abs(data_conv.MATRIX2nparray(_H0, complex)).max() == 0.0:
             raise ValueError(F"tsh_method = {_tshm} detects crossings in the diabatic "
                              F"Hamiltonian, but ham_dia is all-zero after the initial model "
                              F"call - supply obj.ham_dia from the model, or use rep_lz = 2 "
@@ -1801,16 +1803,14 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
             # all-zero amplitudes and a state-0 collapse
             child = Py2Cpp_int([0, 0])
             U = ham.get_basis_transform(child)
-            if all(abs(U.get(i, j)) == 0.0 for i in range(U.num_of_rows)
-                   for j in range(U.num_of_cols)):
+            if np.abs(data_conv.MATRIX2nparray(U, complex)).max() == 0.0:
                 raise ValueError("rep = 0 initialization: basis_transform is still all-zero "
                                  "after the model call - declaring ndia != nadi promises a "
                                  "model-supplied dia->adi transform (CP2K driver: "
                                  "dia_basis='sd'); square bases default to identity")
             S_dia = ham.get_ovlp_dia(child)
             G = U.H() * S_dia * U
-            dev = max(abs(G.get(i, j) - (1.0 if i == j else 0.0))
-                      for i in range(G.num_of_rows) for j in range(G.num_of_cols))
+            dev = np.abs(data_conv.MATRIX2nparray(G, complex) - np.eye(G.num_of_rows)).max()
             print(F"generic_recipe: rep = 0 init through the model basis_transform "
                   F"({U.num_of_rows}, {U.num_of_cols}); max|U^H S_dia U - 1| = {dev:.2e}")
     else:
@@ -1836,8 +1836,7 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
     # Say so once per run - the plain se_pop_dia readout stays |C_i|^2
     if int(dyn_params.get("rep_sh", 1)) == 0 or int(dyn_params.get("rep_force", 1)) == 0:
         S0 = ham.get_ovlp_dia(Py2Cpp_int([0, 0]))
-        s_dev = max(abs(S0.get(i, j) - (1.0 if i == j else 0.0))
-                    for i in range(S0.num_of_rows) for j in range(S0.num_of_cols))
+        s_dev = np.abs(data_conv.MATRIX2nparray(S0, complex) - np.eye(S0.num_of_rows)).max()
         if s_dev > 1e-12:
             print(F"NOTE: rep_sh/rep_force 0 with non-orthogonal diabats (ovlp_dia deviates from "
                   F"identity by {s_dev:.2e}) - the diabatic hop machinery works in the Lowdin "
