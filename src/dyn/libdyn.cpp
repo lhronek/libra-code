@@ -602,6 +602,11 @@ void export_dyn_hop_acceptance_objects(){
   (double E_old, double E_new, MATRIX& p, MATRIX& invM, MATRIX& t) = &can_rescale_along_vector;
   def("can_rescale_along_vector", expt_can_rescale_along_vector_v2);
 
+  int (*expt_can_rescale_for_hop_v1)
+  (dyn_variables& dyn_var, nHamiltonian& ham, int traj, int old_st, int new_st,
+   dyn_control_params& prms) = &can_rescale_for_hop;
+  def("can_rescale_for_hop", expt_can_rescale_for_hop_v1);
+
 
 
   void (*expt_rescale_along_vector_v1)
@@ -684,6 +689,12 @@ void export_dyn_hop_acceptance_objects(){
   (dyn_variables& dyn_var, nHamiltonian& ham,
   vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms) = &handle_hops_nuclear;
   def("handle_hops_nuclear", expt_handle_hops_nuclear_v1);
+
+  void (*expt_handle_hops_nuclear_v2)
+  (dyn_variables& dyn_var, nHamiltonian& ham,
+  vector<int>& new_states, vector<int>& old_states, vector<int>& proposed_states,
+  dyn_control_params& prms) = &handle_hops_nuclear;
+  def("handle_hops_nuclear", expt_handle_hops_nuclear_v2);
 
 }
 

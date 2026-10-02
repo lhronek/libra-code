@@ -38,6 +38,8 @@ namespace libdyn{
 
 int can_rescale_along_vector(double E_old, double E_new, MATRIX& p, MATRIX& invM, MATRIX& t, vector<int>& which_dofs);
 int can_rescale_along_vector(double E_old, double E_new, MATRIX& p, MATRIX& invM, MATRIX& t);
+int can_rescale_for_hop(dyn_variables& dyn_var, nHamiltonian& ham, int traj, int old_st, int new_st,
+                        dyn_control_params& prms);
 
 void rescale_along_vector(double E_old, double E_new, MATRIX& p, MATRIX& invM, MATRIX& t, int do_reverse, vector<int>& which_dofs);
 void rescale_along_vector(double E_old, double E_new, MATRIX& p, MATRIX& invM, MATRIX& t, int do_reverse);
@@ -80,6 +82,8 @@ void handle_hops_nuclear(dyn_control_params& prms,
        MATRIX& q, MATRIX& p, MATRIX& invM, CMATRIX& C,
        nHamiltonian& ham, vector<int>& new_states, vector<int>& old_states);
 */
+void handle_hops_nuclear(dyn_variables& dyn_var, nHamiltonian& ham,
+   vector<int>& new_states, vector<int>& old_states, vector<int>& proposed_states, dyn_control_params& prms);
 void handle_hops_nuclear(dyn_variables& dyn_var, nHamiltonian& ham,
    vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms);
 

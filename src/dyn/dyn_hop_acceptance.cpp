@@ -213,6 +213,83 @@ vector<double> Boltz_quant_prob(vector<double>& E, double T){
 
 
 
+static void force_nan_error(const char* where, int old_st, int new_st, int dof){
+/**
+  The force-difference hop test and the Jasper-Truhlar criterion read the forces of both states - a model handing
+  over its active state's force alone leaves the other NaN
+*/
+  std::cout<<"Error in "<<where<<": the force of state "<<old_st<<" or "<<new_st<<" along DOF "<<dof
+           <<" is NaN - the force-difference hop acceptance and momentum rescaling read the forces of both states - the"
+           <<" model handed over its active state's alone (force_source all_states hands over every state's)\n";
+  std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+}
+
+int can_rescale_for_hop(dyn_variables& dyn_var, nHamiltonian& ham, int traj, int old_st, int new_st,
+                        dyn_control_params& prms){
+/**
+  Whether the momentum change momenta_rescaling_algo configures can pay for the hop old_st -> new_st of trajectory
+  traj: the uniform scalings (100 / 101 on the adiabatic, 110 / 111 on the Lowdin diabatic energies) need a positive
+  kinetic energy over the quantum DOFs no smaller than the energy gap, the directional ones (200 / 201 along the
+  derivative coupling, 210 / 211 along the force difference) a direction can_rescale_along_vector accepts; 0 and 40
+  change no momentum here and pay for every hop. accept_hops refuses an unpayable hop before the post-hop decoherence
+  collapses the amplitudes, handle_hops_nuclear reverses the momentum of such a frustrated hop under x01 / x11
+*/
+  int res = prms.momenta_rescaling_algo;
+  if(old_st == new_st || res==0 || res==40){ return 1; }
+
+  vector<int>& which_dofs = prms.quantum_dofs;
+  int ndof = dyn_var.ndof;
+  int n_active_dof = which_dofs.size();
+  MATRIX p_tr(dyn_var.p->col(traj));
+  MATRIX& invM = *dyn_var.iM;
+  // the NBRA fast path keeps one Hamiltonian, the child of trajectory 0
+  int src = (prms.isNBRA==1) ? 0 : traj;
+
+  if(res==100 || res==101 || res==110 || res==111){
+    double T_i = compute_kinetic_energy(p_tr, invM, which_dofs);
+    double E_i, E_f;
+    if(res==100 || res==101){
+      CMATRIX hvib(ham.child(src)->get_ham_adi());
+      E_i = hvib.get(old_st, old_st).real();
+      E_f = hvib.get(new_st, new_st).real();
+    }
+    else{
+      CMATRIX hvib(ham.child(traj)->get_ham_dia_lowdin());
+      E_i = hvib.get(old_st, old_st).real();
+      E_f = hvib.get(new_st, new_st).real();
+    }
+    // no kinetic energy to draw on, or a zero momentum no factor can grow: unpayable unless isoenergetic
+    return ((T_i > 0.0 && T_i + E_i - E_f >= 0.0) || E_i == E_f) ? 1 : 0;
+  }
+
+  if(res==200 || res==201 || res==210 || res==211){
+    CMATRIX hvib(ham.child(src)->get_ham_adi());
+    double E_i = hvib.get(old_st, old_st).real();
+    double E_f = hvib.get(new_st, new_st).real();
+    MATRIX t(ndof, 1);
+    for(int idof = 0; idof < n_active_dof; idof++){
+      int dof = which_dofs[idof];
+      if(res==200 || res==201){
+        CMATRIX nac(ham.child(traj)->get_dc1_adi(dof));
+        t.set(dof, 0, nac.get(old_st, new_st).real());
+      }
+      else{
+        CMATRIX df(ham.child(traj)->get_d1ham_adi(dof));
+        if(std::isnan(df.get(old_st, old_st).real()) || std::isnan(df.get(new_st, new_st).real())){
+          force_nan_error("can_rescale_for_hop()", old_st, new_st, dof);
+        }
+        t.set(dof, 0, df.get(old_st, old_st).real() - df.get(new_st, new_st).real());
+      }
+    }
+    return can_rescale_along_vector(E_i, E_f, p_tr, invM, t, which_dofs);
+  }
+
+  std::cout<<"Error in can_rescale_for_hop(): momenta_rescaling_algo = "<<res
+           <<" has no branch here (implemented: 0, 40, 100, 101, 110, 111, 200, 201, 210, 211)\n";
+  std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+}
+
+
 double Boltz_cl_prob(double E, double T){
     /**
 
@@ -676,9 +753,7 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
           df = ham.child(traj)->get_d1ham_adi(dof);
           //df = projectors[traj].H() * df * projectors[traj];
           if(std::isnan(df.get(old_st, old_st).real()) || std::isnan(df.get(new_st, new_st).real())){
-            std::cout<<"Error in the force-difference hop test: the force of state "<<old_st<<" or "<<new_st
-                     <<" along DOF "<<dof<<" is NaN - the force-difference hop acceptance and momentum rescaling read the forces of both states - the model handed over its active state's alone (force_source all_states hands over every state's)\n";
-            std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+            force_nan_error("the force-difference hop test", old_st, new_st, dof);
           }
           dF.set(dof, 0, df.get(old_st, old_st).real() - df.get(new_st, new_st).real());
 
@@ -867,8 +942,20 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
   }
 
 
-  return fstates;
+  // an accepted hop the configured rescaling cannot pay for is refused here, before the post-hop decoherence
+  // (and DISH) collapse the amplitudes onto the states returned - handle_hops_nuclear treats it as a frustrated hop
+  int res = prms.momenta_rescaling_algo;
+  if(res==100 || res==101 || res==110 || res==111 || res==200 || res==201 || res==210 || res==211){
+    for(itraj=0; itraj<ntraj_active; itraj++){
+      traj = which_trajectories[itraj];
+      if(fstates[traj] != initial_states[traj] &&
+         !can_rescale_for_hop(dyn_var, ham, traj, initial_states[traj], fstates[traj], prms)){
+        fstates[traj] = initial_states[traj];
+      }
+    }
+  }
 
+  return fstates;
 }
 
 /*
@@ -957,29 +1044,40 @@ void handle_hops_nuclear(dyn_control_params& prms,
        MATRIX& q, MATRIX& p, MATRIX& invM, CMATRIX& C,
        nHamiltonian& ham, vector<int>& new_states, vector<int>& old_states){
 */
-void revert_unconservable_hop(vector<int>& new_states, int traj, int old_st, int new_st, dyn_control_params& prms){
+static int hop_target(dyn_variables& dyn_var, nHamiltonian& ham, int traj, int old_st, int new_st, int prop_st,
+                      dyn_control_params& prms){
 /**
-  An accepted hop whose energy difference the rescaling cannot absorb or supply is made
-  frustrated: the trajectory stays on old_st and the frustrated-hop momentum treatment of
-  the calling branch applies. A consistent acceptance/rescaling pair never gets here
-  (acceptance 10/11/20/21 test the same feasibility), so the first case is reported once
+  The state the momentum change of a trajectory refers to: the new state of an accepted hop, the proposed state of a
+  hop accept_hops refused for the energy (a frustrated hop - the x01 / x11 reversal applies), old_st when no hop was
+  proposed or a stochastic acceptance refused a payable one
 */
-  new_states[traj] = old_st;
-  static int warned = 0;
-  if(warned == 0){
-    warned = 1;
-    std::cout<<"WARNING in handle_hops_nuclear: the accepted hop "<<old_st<<" -> "<<new_st
-             <<" of trajectory "<<traj<<" cannot conserve the total energy with momenta_rescaling_algo = "
-             <<prms.momenta_rescaling_algo<<" - reverted (frustrated hop). hop_acceptance_algo = "
-             <<prms.hop_acceptance_algo<<" does not test this: the consistent pairs are 10 with 100/101,"
-             <<" 11 with 110/111, 20 with 200/201 and 21 with 210/211. Reported once per process\n";
-  }
+  if(new_st != old_st){ return new_st; }
+  if(prop_st != old_st && !can_rescale_for_hop(dyn_var, ham, traj, old_st, prop_st, prms)){ return prop_st; }
+  return old_st;
 }
 
-void handle_hops_nuclear(dyn_variables& dyn_var, nHamiltonian& ham, 
-vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms){
+static void unpayable_accepted_hop(int traj, int old_st, int new_st, dyn_control_params& prms){
+/**
+  accept_hops refuses a hop its rescaling cannot pay for (can_rescale_for_hop), so an accepted hop that reaches the
+  rescaling unpayable means the states or the momenta changed between the acceptance and the rescaling
+*/
+  std::cout<<"Error in handle_hops_nuclear(): the accepted hop "<<old_st<<" -> "<<new_st<<" of trajectory "<<traj
+           <<" cannot conserve the total energy with momenta_rescaling_algo = "<<prms.momenta_rescaling_algo
+           <<" - accept_hops refuses such a hop (can_rescale_for_hop), so the states or the momenta changed between"
+           <<" the acceptance and the rescaling\n";
+  std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+}
+
+void handle_hops_nuclear(dyn_variables& dyn_var, nHamiltonian& ham,
+vector<int>& new_states, vector<int>& old_states, vector<int>& proposed_states, dyn_control_params& prms){
 /**
   This function changes the nuclear dynamical variables after successful or frustrated hops
+
+  new_states - the states accept_hops returned, old_states - the states before the hop, proposed_states - the states
+  the proposal named: a trajectory whose proposed hop accept_hops refused for the energy (can_rescale_for_hop) is a
+  frustrated hop here and gets the momentum reversal of the x01 / x11 options, a trajectory a stochastic acceptance
+  refused (its hop payable) keeps its momentum, and an accepted hop that cannot pay is an error - accept_hops tests
+  the same payability before any collapse of the amplitudes
 
   options:
   0 - don't rescale
@@ -995,24 +1093,25 @@ vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms){
   211 - along difference of state-specific forces, reverse on frustrated hops
 
 */
+
   MATRIX q(*dyn_var.q);
   MATRIX p(*dyn_var.p);
   MATRIX invM(*dyn_var.iM);
   CMATRIX C(*dyn_var.ampl_adi);
 
   vector<int>& which_dofs = prms.quantum_dofs;
-
   int ndof = q.n_rows;
-  int n_active_dof = which_dofs.size(); 
+  int n_active_dof = which_dofs.size();
   int ntraj = q.n_cols;
-  int nst = C.n_rows;    
-  int traj, idof, dof, i;
+  int nst = C.n_rows;
+  int traj, idof, dof;
   int isNBRA = prms.isNBRA;
+  int res = prms.momenta_rescaling_algo;
+
   MATRIX p_tr(ndof, 1);
   CMATRIX hvib(nst, nst);
   CMATRIX nac(nst, nst);
   CMATRIX df(nst, nst);
-  CMATRIX U(nst, nst);
 
 
 
@@ -1020,102 +1119,47 @@ vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms){
     ; ;
   }// algo = 0
 
-  else if(prms.momenta_rescaling_algo==100 || prms.momenta_rescaling_algo==101){  // rescale momenta uniformly based on adiabatic energies
+  else if(prms.momenta_rescaling_algo==100 || prms.momenta_rescaling_algo==101 ||
+          prms.momenta_rescaling_algo==110 || prms.momenta_rescaling_algo==111){
+    // rescale momenta uniformly, based on adiabatic (100 / 101) or Lowdin diabatic (110 / 111) energies
 
     for(traj=0; traj<ntraj; traj++){
 
       int old_st = old_states[traj];
-      int new_st = new_states[traj];
+      int target = hop_target(dyn_var, ham, traj, old_st, new_states[traj], proposed_states[traj], prms);
+      if(target == old_st){ continue; }
+      int accepted = (new_states[traj] != old_st);
 
-      if(old_st!=new_st){
-
-        p_tr = p.col(traj);
-
-        double T_i = compute_kinetic_energy(p_tr, invM, which_dofs); // initial kinetic energy
-        // Do the calculations only for itraj=0 if isNBRA is 1
-        if(isNBRA==1){
-        if(traj==0){
-        hvib = ham.child(traj)->get_ham_adi();
+      p_tr = p.col(traj);
+      double T_i = compute_kinetic_energy(p_tr, invM, which_dofs); // initial kinetic energy
+      double E_i, E_f;
+      if(res==100 || res==101){
+        // the NBRA fast path keeps one Hamiltonian, the child of trajectory 0
+        hvib = ham.child(isNBRA==1 ? 0 : traj)->get_ham_adi();
         //hvib = projectors[traj].H() * hvib * projectors[traj];
-        }
-        }
-        else{
-        hvib = ham.child(traj)->get_ham_adi();
-        //hvib = projectors[traj].H() * hvib * projectors[traj];
-        }
-        double E_i = hvib.get(old_st, old_st).real();  // initial potential energy
-        double E_f = hvib.get(new_st, new_st).real();  // final potential energy  
-        double T_f = T_i + E_i - E_f;             // predicted final kinetic energy
-        // a hop the uniform scaling cannot pay for (no kinetic energy to draw on, or a
-        // zero momentum no factor can grow) is reverted - frustrated, not violated
-        if(!((T_i > 0.0 && T_f >= 0.0) || E_i == E_f)){ revert_unconservable_hop(new_states, traj, old_st, new_st, prms); }
+        E_i = hvib.get(old_st, old_st).real();  // initial potential energy
+        E_f = hvib.get(target, target).real();  // final potential energy
+      }
+      else{
+        E_i = ham.child(traj)->get_ham_dia_lowdin().get(old_st, old_st).real();  // initial potential energy
+        E_f = ham.child(traj)->get_ham_dia_lowdin().get(target, target).real();  // final potential energy
+      }
+      double T_f = T_i + E_i - E_f;             // predicted final kinetic energy
 
-        double scl_fac = 1.0;
+      double scl_fac = 1.0;
+      if(accepted){
+        if(!((T_i > 0.0 && T_f >= 0.0) || E_i == E_f)){ unpayable_accepted_hop(traj, old_st, target, prms); }
+        if(T_i > 0.0){ scl_fac = std::sqrt(T_f/T_i); }
+      }
+      else if(res==101 || res==111){ scl_fac = -1.0; }  // the frustrated hop reverses the quantum momenta
 
-        if(T_i>0.0){ 
-
-          if(T_f>=0.0){  scl_fac = std::sqrt(T_f/T_i);   }
-          else{
-            if(prms.momenta_rescaling_algo==100){  scl_fac = 1.0; }
-            else if(prms.momenta_rescaling_algo==101){  scl_fac = -1.0; }
-            else{
-              std::cout<<"Error in handle_hops_nuclear(): momenta_rescaling_algo = "<<prms.momenta_rescaling_algo<<" has no branch here (implemented: 100, 101)\n";
-              std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-            }
-          } 
-        }
-        else{ scl_fac = 1.0; }
-
-        //for(dof = 0; dof < ndof; dof++){   p.scale(dof, traj, scl_fac);  }
-        for(idof = 0; idof < n_active_dof; idof++){   
-          dof = which_dofs[idof];
-          p.scale(dof, traj, scl_fac);  
-        }
-      }// if different states
+      //for(dof = 0; dof < ndof; dof++){   p.scale(dof, traj, scl_fac);  }
+      for(idof = 0; idof < n_active_dof; idof++){
+        dof = which_dofs[idof];
+        p.scale(dof, traj, scl_fac);
+      }
     }// for traj
-  }// algo = 100 || 101
-
-  else if(prms.momenta_rescaling_algo==110 || prms.momenta_rescaling_algo==111){  // rescale momenta uniformly based on diabatic energies
-
-    for(traj=0; traj<ntraj; traj++){
-
-      int old_st = old_states[traj];
-      int new_st = new_states[traj];
-
-      if(old_st!=new_st){
-
-        p_tr = p.col(traj);
-        double T_i = compute_kinetic_energy(p_tr, invM, which_dofs); // initial kinetic energy
-        double E_i = ham.child(traj)->get_ham_dia_lowdin().get(old_st, old_st).real();  // initial potential energy
-        double E_f = ham.child(traj)->get_ham_dia_lowdin().get(new_st, new_st).real();  // final potential energy  
-        double T_f = T_i + E_i - E_f;             // predicted final kinetic energy
-        // a hop the uniform scaling cannot pay for (no kinetic energy to draw on, or a
-        // zero momentum no factor can grow) is reverted - frustrated, not violated
-        if(!((T_i > 0.0 && T_f >= 0.0) || E_i == E_f)){ revert_unconservable_hop(new_states, traj, old_st, new_st, prms); }
-
-        double scl_fac = 1.0;
-
-        if(T_i > 0.0){ 
-        if(T_f>=0.0){  scl_fac = std::sqrt(T_f/T_i);   }
-          else{
-            if(prms.momenta_rescaling_algo==110){  scl_fac = 1.0; }
-            else if(prms.momenta_rescaling_algo==111){  scl_fac = -1.0; }
-            else{
-              std::cout<<"Error in handle_hops_nuclear(): momenta_rescaling_algo = "<<prms.momenta_rescaling_algo<<" has no branch here (implemented: 110, 111)\n";
-              std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-            }
-          }      
-        }
-        else{ scl_fac = 1.0; } 
-
-        //for(dof = 0; dof < ndof; dof++){   p.scale(dof, traj, scl_fac);  }
-        for(idof = 0; idof < n_active_dof; idof++){   
-          dof = which_dofs[idof];
-          p.scale(dof, traj, scl_fac);  
-        }
-      }// if different states
-    }// for traj
-  }// algo = 110 || algo = 111
+  }// algo = 100 || 101 || 110 || 111
 
 
   else if(prms.momenta_rescaling_algo==200 || prms.momenta_rescaling_algo==201){  // rescale momenta along the derivative coupling vector
@@ -1124,86 +1168,75 @@ vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms){
     MATRIX F_old(ndof, 1);
     MATRIX F_new(ndof, 1);
     MATRIX vel(ndof, 1);
-    int do_reverse;
-
-    if(prms.momenta_rescaling_algo==200){ do_reverse = 0; }
-    else if(prms.momenta_rescaling_algo==201){ do_reverse = 1; }
-    else{
-      std::cout<<"Error in handle_hops_nuclear(): momenta_rescaling_algo = "<<prms.momenta_rescaling_algo<<" has no branch here (implemented: 200, 201)\n";
-      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-    }
+    int do_reverse = (res==201) ? 1 : 0;
 
     for(traj=0; traj<ntraj; traj++){
 
       int old_st = old_states[traj];
-      int new_st = new_states[traj];
+      int target = hop_target(dyn_var, ham, traj, old_st, new_states[traj], proposed_states[traj], prms);
+      if(target == old_st){ continue; }
+      int accepted = (new_states[traj] != old_st);
 
-      if(old_st!=new_st){
+      // the NBRA fast path keeps one Hamiltonian, the child of trajectory 0
+      hvib = ham.child(isNBRA==1 ? 0 : traj)->get_ham_adi();
 
-        // Do the calculations only for itraj=0 if isNBRA is 1
-        if(isNBRA==1){  if(traj==0){  hvib = ham.child(traj)->get_ham_adi();   }   }
-        else{ hvib = ham.child(traj)->get_ham_adi();     }
+      double E_i = hvib.get(old_st, old_st).real();  // initial potential energy
+      double E_f = hvib.get(target, target).real();  // final potential energy
 
-        double E_i = hvib.get(old_st, old_st).real();  // initial potential energy
-        double E_f = hvib.get(new_st, new_st).real();  // final potential energy  
+      dNAC = 0.0;
+      F_old = 0.0;
+      F_new = 0.0;
 
-        dNAC = 0.0;
-        F_old = 0.0;
-        F_new = 0.0;
+      for(idof = 0; idof < n_active_dof; idof++){
+        dof = which_dofs[idof];
+        nac = ham.child(traj)->get_dc1_adi(dof);
+        //nac = U.H() * nac * U;
+        //nac = projectors[traj].H() * nac * projectors[traj];
+        dNAC.set(dof, 0, nac.get(old_st, target).real() );
 
+        df = ham.child(traj)->get_d1ham_adi(dof);
+        if(std::isnan(df.get(old_st, old_st).real()) || std::isnan(df.get(target, target).real())){
+          force_nan_error("handle_hops_nuclear()", old_st, target, dof);
+        }
+        F_old.set(dof, 0, -df.get(old_st, old_st).real() );
+        F_new.set(dof, 0, -df.get(target, target).real() );
+      }
+
+      p_tr = p.col(traj);
+      for(dof = 0; dof<ndof; dof++){ vel.set(dof, 0,   p_tr.get(dof, 0) * invM.get(dof, 0) ); }
+
+      if(prms.use_Jasper_Truhlar_criterion==1){
+        // the criterion needs the PROPOSED state's force - a driver that
+        // fills only the ground and active diagonals leaves this row zero
+        // and the products below silently disable the reversal
+        int f_new_zero = 1;
         for(idof = 0; idof < n_active_dof; idof++){
-          dof = which_dofs[idof];
-          nac = ham.child(traj)->get_dc1_adi(dof);
-
-          U = *dyn_var.proj_adi[traj];
-          //nac = U.H() * nac * U;
-          //nac = projectors[traj].H() * nac * projectors[traj];
-          dNAC.set(dof, 0, nac.get(old_st, new_st).real() );
-
-          df = ham.child(traj)->get_d1ham_adi(dof);
-          if(std::isnan(df.get(old_st, old_st).real()) || std::isnan(df.get(new_st, new_st).real())){
-            std::cout<<"Error in handle_hops_nuclear(): the force of state "<<old_st<<" or "<<new_st<<" along DOF "
-                     <<dof<<" is NaN - the force-difference hop acceptance and momentum rescaling read the forces of both states - the model handed over its active state's alone (force_source all_states hands over every state's)\n";
-            std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-          }
-          F_old.set(dof, 0, -df.get(old_st, old_st).real() );
-          F_new.set(dof, 0, -df.get(new_st, new_st).real() );
+          if(F_new.get(which_dofs[idof], 0) != 0.0){ f_new_zero = 0; break; }
         }
-
-        p_tr = p.col(traj);       
-        for(dof = 0; dof<ndof; dof++){ vel.set(dof, 0,   p_tr.get(dof, 0) * invM.get(dof, 0) ); }
-
-        if(prms.use_Jasper_Truhlar_criterion==1){
-          // the criterion needs the PROPOSED state's force - a driver that
-          // fills only the ground and active diagonals leaves this row zero
-          // and the products below silently disable the reversal
-          int f_new_zero = 1;
-          for(idof = 0; idof < n_active_dof; idof++){
-            if(F_new.get(which_dofs[idof], 0) != 0.0){ f_new_zero = 0; break; }
-          }
-          static int warned_zero_f_new = 0;
-          if(f_new_zero==1 && warned_zero_f_new==0){
-            warned_zero_f_new = 1;
-            std::cout<<"WARNING in handle_hops_nuclear: the Jasper-Truhlar criterion sees an"
-                     <<" all-zero proposed-state force - reversal on frustrated hops stays off."
-                     <<" Supply all-state forces or set use_Jasper_Truhlar_criterion = 0\n";
-          }
+        static int warned_zero_f_new = 0;
+        if(f_new_zero==1 && warned_zero_f_new==0){
+          warned_zero_f_new = 1;
+          std::cout<<"WARNING in handle_hops_nuclear: the Jasper-Truhlar criterion sees an"
+                   <<" all-zero proposed-state force - reversal on frustrated hops stays off."
+                   <<" Supply all-state forces or set use_Jasper_Truhlar_criterion = 0\n";
         }
+      }
 
-        int do_reverse_actual = do_reverse;
-        if(prms.use_Jasper_Truhlar_criterion==1){
-          if( (F_old.T() * dNAC).get(0,0) * (F_new.T() * dNAC).get(0,0) < 0 ){
-            if( (vel.T() * dNAC).get(0,0) * (F_new.T() * dNAC).get(0,0) < 0 ){ ;; }
-            else{ do_reverse_actual *= 0; }
-          }else{  do_reverse_actual *= 0; }
-        }
-        
-        if(!can_rescale_along_vector(E_i, E_f, p_tr, invM, dNAC, which_dofs)){ revert_unconservable_hop(new_states, traj, old_st, new_st, prms); }
-        rescale_along_vector(E_i, E_f, p_tr, invM, dNAC, do_reverse_actual, which_dofs); 
+      int do_reverse_actual = do_reverse;
+      if(prms.use_Jasper_Truhlar_criterion==1){
+        if( (F_old.T() * dNAC).get(0,0) * (F_new.T() * dNAC).get(0,0) < 0 ){
+          if( (vel.T() * dNAC).get(0,0) * (F_new.T() * dNAC).get(0,0) < 0 ){ ;; }
+          else{ do_reverse_actual *= 0; }
+        }else{  do_reverse_actual *= 0; }
+      }
 
-        for(dof = 0; dof < ndof; dof++){   p.set(dof, traj, p_tr.get(dof, 0));     }
+      if(accepted && !can_rescale_along_vector(E_i, E_f, p_tr, invM, dNAC, which_dofs)){
+        unpayable_accepted_hop(traj, old_st, target, prms);
+      }
+      // the accepted hop takes the conserving root, the frustrated one the reversal along dNAC (do_reverse_actual)
+      rescale_along_vector(E_i, E_f, p_tr, invM, dNAC, do_reverse_actual, which_dofs);
 
-      }// if different states
+      for(dof = 0; dof < ndof; dof++){   p.set(dof, traj, p_tr.get(dof, 0));     }
 
     }// for traj
 
@@ -1227,57 +1260,41 @@ vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms){
 
 */
 
-    int do_reverse;
-
-    if(prms.momenta_rescaling_algo==210){ do_reverse = 0; }
-    else if(prms.momenta_rescaling_algo==211){ do_reverse = 1; }
-    else{
-      std::cout<<"Error in handle_hops_nuclear(): momenta_rescaling_algo = "<<prms.momenta_rescaling_algo<<" has no branch here (implemented: 210, 211)\n";
-      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-    }
-
+    int do_reverse = (res==211) ? 1 : 0;
 
     for(traj=0; traj<ntraj; traj++){
 
       int old_st = old_states[traj];
-      int new_st = new_states[traj];
+      int target = hop_target(dyn_var, ham, traj, old_st, new_states[traj], proposed_states[traj], prms);
+      if(target == old_st){ continue; }
+      int accepted = (new_states[traj] != old_st);
 
-      if(old_st!=new_st){
+      // the NBRA fast path keeps one Hamiltonian, the child of trajectory 0
+      hvib = ham.child(isNBRA==1 ? 0 : traj)->get_ham_adi();
+      //hvib = projectors[traj].H() * hvib * projectors[traj];
+      double E_i = hvib.get(old_st, old_st).real();  // initial potential energy
+      double E_f = hvib.get(target, target).real();  // final potential energy
 
-        // Do the calculations only for itraj=0 if isNBRA is 1
-        if(isNBRA==1){
-        if(traj==0){
-        hvib = ham.child(traj)->get_ham_adi();
-        //hvib = projectors[traj].H() * hvib * projectors[traj];
+      dF = 0.0;
+      for(idof = 0; idof < n_active_dof; idof++){
+        dof = which_dofs[idof];
+        df = ham.child(traj)->get_d1ham_adi(dof);
+        //df = projectors[traj].H() * df * projectors[traj];
+        if(std::isnan(df.get(old_st, old_st).real()) || std::isnan(df.get(target, target).real())){
+          force_nan_error("the force-difference hop test", old_st, target, dof);
         }
-        }
-        else{
-        hvib = ham.child(traj)->get_ham_adi();
-        //hvib = projectors[traj].H() * hvib * projectors[traj];
-        }
-        double E_i = hvib.get(old_st, old_st).real();  // initial potential energy
-        double E_f = hvib.get(new_st, new_st).real();  // final potential energy        
+        dF.set(dof, 0, df.get(old_st, old_st).real() - df.get(target, target).real());
+      }
 
-        dF = 0.0;
-        for(idof = 0; idof < n_active_dof; idof++){
-          dof = which_dofs[idof];
-          df = ham.child(traj)->get_d1ham_adi(dof);
-          //df = projectors[traj].H() * df * projectors[traj];
-          if(std::isnan(df.get(old_st, old_st).real()) || std::isnan(df.get(new_st, new_st).real())){
-            std::cout<<"Error in the force-difference hop test: the force of state "<<old_st<<" or "<<new_st
-                     <<" along DOF "<<dof<<" is NaN - the force-difference hop acceptance and momentum rescaling read the forces of both states - the model handed over its active state's alone (force_source all_states hands over every state's)\n";
-            std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-          }
-          dF.set(dof, 0, df.get(old_st, old_st).real() - df.get(new_st, new_st).real());
-        }
+      p_tr = p.col(traj);
+      if(accepted && !can_rescale_along_vector(E_i, E_f, p_tr, invM, dF, which_dofs)){
+        unpayable_accepted_hop(traj, old_st, target, prms);
+      }
+      // the accepted hop takes the conserving root, the frustrated one the reversal along dF (do_reverse)
+      rescale_along_vector(E_i, E_f, p_tr, invM, dF, do_reverse, which_dofs);
 
-        p_tr = p.col(traj);       
-        if(!can_rescale_along_vector(E_i, E_f, p_tr, invM, dF, which_dofs)){ revert_unconservable_hop(new_states, traj, old_st, new_st, prms); }
-        rescale_along_vector(E_i, E_f, p_tr, invM, dF, do_reverse, which_dofs); 
+      for(dof = 0; dof < ndof; dof++){   p.set(dof, traj, p_tr.get(dof, 0));     }
 
-        for(dof = 0; dof < ndof; dof++){   p.set(dof, traj, p_tr.get(dof, 0));     }
-   
-      }// if different states   
     }// for traj
 
   }// algo = 210 || 211
@@ -1314,6 +1331,15 @@ vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms){
 
 
 
+}// handle_hops_nuclear
+
+void handle_hops_nuclear(dyn_variables& dyn_var, nHamiltonian& ham,
+vector<int>& new_states, vector<int>& old_states, dyn_control_params& prms){
+/**
+  The handler without the proposed states: the hops accept_hops refused leave no trace here, so no frustrated hop is
+  reversed - the step loop hands the proposals over
+*/
+  handle_hops_nuclear(dyn_var, ham, new_states, old_states, new_states, prms);
 }// handle_hops_nuclear
 
 

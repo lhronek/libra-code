@@ -2832,6 +2832,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
 
     vector<int> old_states(dyn_var.act_states);
     vector<int> old_states_dia(dyn_var.act_states_dia);
+    vector<int> prop_states(ntraj, 0);
     //========================== Hop proposal and acceptance
     //================================
 
@@ -2854,7 +2855,6 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       }
 
       // Propose new discrete states for all trajectories
-      vector<int> prop_states(ntraj, 0);
       if (prms.rep_sh == 1) {
         prop_states = propose_hops(g, dyn_var.act_states, rnd);
 
@@ -2946,6 +2946,8 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
         std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
       act_states = dish(dyn_var, ham, decoherence_rates, prms, rnd);
+      // the proposals DISH refused stay inside dish - no frustrated hop reaches the rescaling
+      prop_states = act_states;
     } // DISH
 
     //====================== Momenta adjustment after successful/frustrated hops
@@ -2957,7 +2959,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       //double av_Epot = average_potential_energy(prms, dyn_var, ham);
       //cout<<"Epot (before) = "<<av_Epot<<endl;
 
-      handle_hops_nuclear(dyn_var, ham, act_states, old_states, prms);
+      handle_hops_nuclear(dyn_var, ham, act_states, old_states, prop_states, prms);
       //cout<<" active state after: "<<act_states[0]<<endl;
       dyn_var.act_states = act_states;
 
@@ -2965,7 +2967,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       //cout<<"Epot (after) = "<<av_Epot<<endl;
 
     } else {
-      handle_hops_nuclear(dyn_var, ham, act_states_dia, old_states_dia, prms);
+      handle_hops_nuclear(dyn_var, ham, act_states_dia, old_states_dia, prop_states, prms);
       dyn_var.act_states_dia = act_states_dia;
     }
 
