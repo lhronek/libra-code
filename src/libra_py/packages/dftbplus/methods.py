@@ -35,7 +35,7 @@ from libra_py import regexlib as rgl
 import libra_py.citools.ci as ci
 from libra_py import data_conv
 import libra_py.packages.cp2k.methods as CP2K_methods
-from libra_py.packages.driver_forces import refreshed_rows
+from libra_py.packages.driver_forces import fill_diagonal_forces, force_diagonals, refreshed_rows
 import libra_py.orthogonalizations as ortho
 
 # import numpy as np
@@ -3441,17 +3441,11 @@ def dftb_compute_adi(q, params, full_id):
     for i in range(nstates):
         obj.ham_adi.add(i, i, e0)      # a uniform shift is a global phase of the electronic propagation
 
-    obj.d1ham_adi = CMATRIXList()
-    for idof in range(ndof):
-        obj.d1ham_adi.append(CMATRIX(nstates, nstates))
-
     if os.path.exists(f"{wd}/FRC.DAT"):
-        forces = read_all_forces(f"{wd}/FRC.DAT")
-        for iatom in range(nat):
-            for i in range(nstates):
-                obj.d1ham_adi[3 * iatom + 0].set(i, i, complex(-forces[i, 0, iatom]))
-                obj.d1ham_adi[3 * iatom + 1].set(i, i, complex(-forces[i, 1, iatom]))
-                obj.d1ham_adi[3 * iatom + 2].set(i, i, complex(-forces[i, 2, iatom]))
+        # read_all_forces gives (nstates, 3, nat) - the helper takes (nstates, nat, 3) and refuses a file short
+        # of the propagated states
+        forces = np.transpose(read_all_forces(f"{wd}/FRC.DAT"), (0, 2, 1))
+        fill_diagonal_forces(obj, force_diagonals(nstates, ndof, nat, None, forces_all=forces))
     else:
         # no StateCouplings-driven FRC.DAT (e.g. spin-polarized runs - NACVs
         # are closed-shell upstream): the tag files carry the ground-state
@@ -3470,38 +3464,30 @@ def dftb_compute_adi(q, params, full_id):
             print(F"WARNING in dftb_compute_adi: no FRC.DAT - d1ham_adi "
                   F"carries gradients on rows 0 and {soi_row} only, the other rows are NaN (not handed over) - "
                   F"the engine refuses every option that reads them")
-        # the rows not computed are NaN - the sentinel the engine's checks read (a zero force is a force)
+        # the rows not computed are NaN - the sentinel the engine's checks read (a zero force is a force);
+        # the tag arrays are (3, nat), row 3 iat + k of the diagonals is -force[k, iat]
         rows = np.full((ndof, nstates), np.nan)
-        for iatom in range(nat):
-            for k in range(3):
-                if f_gs is not None:
-                    rows[3 * iatom + k, 0] = -f_gs[k, iatom]
-                if f_ex is not None:
-                    rows[3 * iatom + k, soi_row] = -f_ex[k, iatom]
-                for s, f_s in forces_all.items():
-                    rows[3 * iatom + k, s] = -f_s[k, iatom]
-        for idof in range(ndof):
-            for i in range(nstates):
-                obj.d1ham_adi[idof].set(i, i, complex(rows[idof, i]))
-
+        if f_gs is not None:
+            rows[:3 * nat, 0] = -np.asarray(f_gs, dtype=float).T.reshape(3 * nat)
+        if f_ex is not None:
+            rows[:3 * nat, soi_row] = -np.asarray(f_ex, dtype=float).T.reshape(3 * nat)
+        for s_, f_s in forces_all.items():
+            rows[:3 * nat, s_] = -np.asarray(f_s, dtype=float).T.reshape(3 * nat)
+        fill_diagonal_forces(obj, rows)
     # the rows handed over, for the engine's call-back after a hop
     params.setdefault("force_rows", {})[itraj] = np.array([[obj.d1ham_adi[idof].get(i, i).real for i in range(nstates)]
                                                             for idof in range(ndof)])
 
     # ================= Derivative couplings ====================
-    obj.dc1_adi = CMATRIXList()
-    for idof in range(ndof):
-        obj.dc1_adi.append(CMATRIX(nstates, nstates))
-
     if os.path.exists(f"{wd}/NACV.DAT"):
-        nacv = read_nacv(f"{wd}/NACV.DAT")
+        # read_nacv gives (nstates, nstates, 3, nat) - one matrix per degree of freedom 3 iat + k
+        nacv = np.asarray(read_nacv(f"{wd}/NACV.DAT"))
+        obj.dc1_adi = CMATRIXList()
         for iatom in range(nat):
-            for i in range(nstates):
-                for j in range(nstates):
-                    obj.dc1_adi[3 * iatom + 0].set(i, j, complex(nacv[i,j,0,iatom]))
-                    obj.dc1_adi[3 * iatom + 1].set(i, j, complex(nacv[i,j,1,iatom]))
-                    obj.dc1_adi[3 * iatom + 2].set(i, j, complex(nacv[i,j,2,iatom]))
-
+            for k in range(3):
+                obj.dc1_adi.append(data_conv.nparray2CMATRIX(nacv[:, :, k, iatom].astype(np.complex128)))
+        for idof in range(3 * nat, ndof):
+            obj.dc1_adi.append(CMATRIX(nstates, nstates))
     # no coupling is handed over: the engine derives the couplings of the followed states from time_overlap_adi
     # with its own projector (nac_update_method 2) and builds hvib_adi = H - i D (hvib_update_method 1) - a
     # driver's own follower could disagree with the engine's at an ambiguous crossing

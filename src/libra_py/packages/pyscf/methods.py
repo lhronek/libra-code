@@ -31,6 +31,7 @@ from libra_py.packages.pyscf.interfaces import ElectronicStructureStrategy, Mole
 from libra_py.packages.cp2k import methods as cp2k
 from libra_py import data_conv
 from libra_py import units
+from libra_py.packages.driver_forces import fill_diagonal_forces, force_diagonals
 
 class tmp:
     pass
@@ -126,15 +127,8 @@ def pyscf_compute_adi(q, params, full_id):
             obj.time_overlap_adi.set(i, j, complex(float(st_ci[i, j])) )
 
     # ================== Forces ===============================
-    obj.d1ham_adi = CMATRIXList()
-    for idof in range(ndof):
-        obj.d1ham_adi.append(CMATRIX(nstates, nstates))
-
-    for iatom in range(nat):
-        for i in range(nstates):
-            obj.d1ham_adi[3 * iatom + 0].set(i, i, complex(grad[i][iatom, 0]))
-            obj.d1ham_adi[3 * iatom + 1].set(i, i, complex(grad[i][iatom, 1]))
-            obj.d1ham_adi[3 * iatom + 2].set(i, i, complex(grad[i][iatom, 2]))
+    # the gradients (nstates, nat, 3) are minus the forces the shared helper takes
+    fill_diagonal_forces(obj, force_diagonals(nstates, ndof, nat, None, forces_all=-np.asarray(grad[:nstates])))
 
     # no coupling is handed over: the engine derives the couplings of the followed states from time_overlap_adi
     # with its own projector (nac_update_method 2) and builds hvib_adi = H - i D (hvib_update_method 1) - a

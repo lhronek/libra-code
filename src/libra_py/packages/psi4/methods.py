@@ -37,6 +37,7 @@ import util.libutil as comn
 
 from libra_py import units
 from libra_py import scan
+from libra_py.packages.driver_forces import fill_diagonal_forces, force_diagonals
 
 
 class tmp:
@@ -121,9 +122,7 @@ def run_psi4_adi(q, params_, full_id):
     obj = tmp()
     obj.ham_adi = CMATRIX(nstates, nstates)
     obj.hvib_adi = CMATRIX(nstates, nstates)
-    obj.d1ham_adi = CMATRIXList()
-    for idof in range(ndof):
-        obj.d1ham_adi.append(CMATRIX(nstates, nstates))
+    grads = np.zeros((nstates, natoms, 3))
 
     Id = Cpp2Py(full_id)
     indx = Id[-1]
@@ -175,9 +174,8 @@ def run_psi4_adi(q, params_, full_id):
 
         obj.ham_adi.set(istate, istate, complex(E))
         obj.hvib_adi.set(istate, istate, complex(E))
-        for iatom in range(natoms):
-            obj.d1ham_adi[3 * iatom + 0].set(istate, istate, complex(grad[iatom, 0]))
-            obj.d1ham_adi[3 * iatom + 1].set(istate, istate, complex(grad[iatom, 1]))
-            obj.d1ham_adi[3 * iatom + 2].set(istate, istate, complex(grad[iatom, 2]))
+        grads[istate] = grad
 
+    # the gradients are minus the forces the shared helper takes
+    fill_diagonal_forces(obj, force_diagonals(nstates, ndof, natoms, None, forces_all=-grads))
     return obj
