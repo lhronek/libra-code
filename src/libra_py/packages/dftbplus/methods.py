@@ -2908,6 +2908,11 @@ def _dftb_state_forces(coordinates, dftb_params, prms1, wd, s):
     os.makedirs(fs_wd, exist_ok=True)
     shutil.copy(os.path.join(wd, "charges.bin"), fs_wd)
     fs_params = dict(dftb_params)
+    # DFTB+ resolves a relative Prefix against its working directory - one level deeper here than the regular run,
+    # which runs in wd (make_dftb_input's default included)
+    sk = fs_params.get("sk_prefix", "mio/FinalSK/")
+    if not os.path.isabs(sk):
+        fs_params["sk_prefix"] = os.path.abspath(os.path.join(wd, sk)) + ("/" if sk.endswith("/") else "")
     fs_params.update({
         "StateCouplings": None,
         "WriteSPTransitions": "No",
