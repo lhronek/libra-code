@@ -160,7 +160,7 @@ def compute_trpes(_params):
     e_grid = np.linspace(emin, emax, n_e_grid_pts)
 
     TRPES = np.zeros((nsteps, n_e_grid_pts))
-    TRPES_traj = np.zeros((nsteps, n_e_grid_pts))
+    #TRPES_traj = np.zeros((nsteps, n_e_grid_pts))    # the ensemble map alone is accumulated below
 
 
     # =============== Average over all iconds ===============
@@ -172,25 +172,27 @@ def compute_trpes(_params):
             iconds_eff.append(icond)
     print(F"The effective iconds are = {iconds_eff} (dropping off meaningless iconds)")
  
-    count = 0
-    for icond_indx, icond in enumerate(iconds_eff):
+    # the hopping populations of every condition once (a condition whose file fails is reported and skipped)
+    pops, used = [], []
+    for icond in iconds_eff:
         try:
-            sh_pop = np.array([])
             print(F"Reading the file {dprefix}{icond}{dsuffix}")
             with open_hdf5(F'{dprefix}{icond}{dsuffix}', 'r') as F:
                 sh_pop = np.array(F['sh_pop_adi/data'])
-
-            E_eff = np.roll(E_ext, -(icond-istep), 0) * units.au2ev    # eV, the energies this condition's trajectory sees
-            TRPES_traj = np.zeros((nsteps, n_e_grid_pts))    # this initial condition's map alone - the ensemble average adds it once
-            # one Gaussian ridge per state over the whole (time, energy) grid, the states added in order
-            for state in range(nstates):
-                TRPES_traj += sh_pop[:nsteps, state:state + 1] * de * np.exp(-(e_grid[np.newaxis, :] - E_eff[:, state:state + 1]) ** 2 / (2 * sigma_e ** 2))
-
-            TRPES += TRPES_traj
-            count += 1
-
+            pops.append(sh_pop[:nsteps])
+            used.append(icond)
         except Exception as e:
             print(f"Error processing MSDM, icond={icond}: {e}")
+    count = len(used)
+    # one Gaussian ridge per state over the (time, energy) grid of E_ext, computed once: a condition's trajectory
+    # sees E_ext rolled by -(icond - istep) in time, so its ridge is the table's rows in that order - weighted by
+    # the condition's population of the state and added to the ensemble map
+    for state in range(nstates):
+        e_state = E_ext[:, state:state + 1] * units.au2ev
+        ridge = de * np.exp(-(e_grid[np.newaxis, :] - e_state) ** 2 / (2 * sigma_e ** 2))
+        for sh_pop, icond in zip(pops, used):
+            rows = (np.arange(nsteps) + icond - istep) % nsteps
+            TRPES += sh_pop[:, state:state + 1] * ridge[rows]
     if count > 0:
         TRPES /= count
 
