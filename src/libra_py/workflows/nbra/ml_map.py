@@ -495,7 +495,8 @@ def compute_atomic_orbital_overlap_matrix(params, step):
     return AO_S[:, new_indices][new_indices, :]
 
 
-def compute_mo_overlaps(params, eigenvectors_1, eigenvectors_2, step_1, step_2):
+def compute_mo_overlaps(params, eigenvectors_1, eigenvectors_2, step_1, step_2, lowest_orbital=None,
+                        highest_orbital=None):
     """
     This function computes the overlap between two eigenvectors
     where their geometries are given by step_1 and step_2 in
@@ -509,8 +510,10 @@ def compute_mo_overlaps(params, eigenvectors_1, eigenvectors_2, step_1, step_2):
         eigenvectors_2 (nparray): The second set of eigenvectors
         step_1 (int): The corresponding step in the molecular dynamics trajectory of eigenvectors_1
         step_2 (int): The corresponding step in the molecular dynamics trajectory of eigenvectors_2
+        lowest_orbital, highest_orbital (int or None): the MO window (1-based, inclusive) - the window rows alone
+            enter the products when given, the full nmo x nmo overlap is formed when None
     Returns:
-        MO_overlap (nparray): The molecular orbital overlap matrix
+        MO_overlap (nparray): The molecular orbital overlap matrix (the window block when a window is given)
     """
     params["sample_molden_file"] = glob.glob(f"{params['path_to_sample_files']}/*ref*molden")[0]
     sample_molden_file = params["sample_molden_file"]
@@ -543,6 +546,9 @@ def compute_mo_overlaps(params, eigenvectors_1, eigenvectors_2, step_1, step_2):
         os.system(F'rm {molden_file_2}')
     new_indices = CP2K_methods.resort_ao_matrices(l_vals)
     AO_S = AO_S[:, new_indices][new_indices, :]
+    if lowest_orbital is not None:
+        eigenvectors_1 = eigenvectors_1[lowest_orbital - 1:highest_orbital]
+        eigenvectors_2 = eigenvectors_2[lowest_orbital - 1:highest_orbital]
     MO_overlap = np.linalg.multi_dot([eigenvectors_1, AO_S, eigenvectors_2.T])
     # print(np.diag(MO_overlap))
     return MO_overlap
@@ -823,8 +829,8 @@ def compute_properties(params, models, input_scalers, output_scalers):
                              F"does not fit the {len(eigenvalues)} predicted orbitals")
         # Compute the overlaps
         if params["compute_overlap"]:
-            mo_overlap = compute_mo_overlaps(params, eigenvectors, eigenvectors, step, step)[
-                lowest_orbital - 1:highest_orbital, :][:, lowest_orbital - 1:highest_orbital]
+            mo_overlap = compute_mo_overlaps(params, eigenvectors, eigenvectors, step, step, lowest_orbital,
+                                             highest_orbital)
             # Compute the time-overlaps if we are at the next step
             zero_mat = np.zeros(mo_overlap.shape)
             if i > 0:
@@ -832,13 +838,8 @@ def compute_properties(params, models, input_scalers, output_scalers):
                 # must be the PREVIOUS and CURRENT steps of the two
                 # eigenvector sets (indices may be non-consecutive, so the
                 # tracked step_prev, not step - 1)
-                mo_time_overlap = compute_mo_overlaps(params,
-                                                      eigenvectors_prev,
-                                                      eigenvectors,
-                                                      step_prev,
-                                                      step)[lowest_orbital - 1:highest_orbital,
-                                                            :][:,
-                                                               lowest_orbital - 1:highest_orbital]
+                mo_time_overlap = compute_mo_overlaps(params, eigenvectors_prev, eigenvectors, step_prev, step,
+                                                      lowest_orbital, highest_orbital)
                 mo_time_overlap = data_conv.form_block_matrix(mo_time_overlap, zero_mat, zero_mat, mo_time_overlap)
                 mo_time_overlap_sparse = sp.csc_matrix(mo_time_overlap)
                 sp.save_npz(params["res_dir"] + F'/St_ks_{step-1}.npz', mo_time_overlap_sparse)
@@ -857,7 +858,7 @@ def compute_properties(params, models, input_scalers, output_scalers):
             sp.save_npz(params["res_dir"] + F'/S_ks_{step}.npz', mo_overlap_sparse)
             os.system(f'rm {params["path_to_input_mats"]}/{params["prefix"]}_{params["input_property"]}_{step}.npy')
         # Writing the energy files into the res directory
-        energy_mat = np.diag(eigenvalues)[lowest_orbital - 1:highest_orbital, :][:, lowest_orbital - 1:highest_orbital]
+        energy_mat = np.diag(eigenvalues[lowest_orbital - 1:highest_orbital])     # the window's diagonal alone
         zero_mat = np.zeros(energy_mat.shape)
         energy_mat = data_conv.form_block_matrix(energy_mat, zero_mat, zero_mat, energy_mat)
         energy_mat_sparse = sp.csc_matrix(energy_mat)
