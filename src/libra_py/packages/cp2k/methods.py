@@ -1192,28 +1192,49 @@ def reference_occupation(filename, isUKS=False):
 
 
 def read_cp2k_mo_occupations(filename):
-    """MO occupation numbers from the last 'MO| EIGENVALUES AND OCCUPATION
-    NUMBERS' table(s) of a CP2K log (&DFT &PRINT &MO OCCUPATION_NUMBERS T).
-
-    Returns a list of np.ndarray - one for RKS, [alpha, beta] for UKS - or None
-    when the log carries no such table. Under &SMEAR these are the fractional
-    populations (2 = full for RKS, 1 for UKS) - the wfn restart and NAMD_PRINT
-    never show them.
+    """MO occupation numbers from the last 'MO| EIGENVALUES AND OCCUPATION NUMBERS'
+    or 'MO| EIGENVALUES, OCCUPATION NUMBERS, AND ... EIGENVECTORS' table(s) of a CP2K
+    log (&DFT &PRINT &MO with OCCUPATION_NUMBERS T - qs_mo_io.F writes one row per MO
+    without the eigenvectors and blocks of columns with them - an index row, the
+    eigenvalue row, the occupation row, then the coefficient rows). Returns a list of
+    np.ndarray - one for RKS, [alpha, beta] for UKS - or None when the log carries no
+    such table. Under &SMEAR these are the fractional populations (2 = full for RKS,
+    1 for UKS) - the wfn restart and NAMD_PRINT never show them.
     """
+    row_form = re.compile(r"\s*MO\|\s+(\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s*$")
+    integers = re.compile(r"-?\d+$")
+    floats = re.compile(r"-?\d*\.\d+(?:[eE][-+]?\d+)?$")
     tables, cur, alpha_seen = [], None, False
+    blocks, pending = False, 0  # the column-block layout, the rows of a block still to come
     with open(filename, errors="ignore") as f:
         for line in f:
-            if "EIGENVALUES AND OCCUPATION NUMBERS" in line:
+            if "EIGENVALUES AND OCCUPATION NUMBERS" in line or "EIGENVALUES, OCCUPATION NUMBERS, AND" in line:
                 cur = []
                 tables.append(cur)
                 alpha_seen = alpha_seen or ("ALPHA" in line)
+                blocks, pending = "EIGENVALUES, OCCUPATION NUMBERS, AND" in line, 0
                 continue
-            if cur is not None:
-                m = re.match(r"\s*MO\|\s+(\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s*$", line)
+            if cur is None:
+                continue
+            toks = line.split()
+            if not toks or toks[0] != "MO|":
+                if cur:
+                    cur = None
+                continue
+            if not blocks:
+                m = row_form.match(line)
                 if m:
                     cur.append(float(m.group(4)))
-                elif cur and not line.strip().startswith("MO|"):
-                    cur = None
+                continue
+            vals = toks[1:]
+            if not vals:
+                continue
+            if all(integers.match(v) for v in vals):
+                pending = 2  # an index row opens a block: the eigenvalue row, then the occupation row
+            elif pending and all(floats.match(v) for v in vals):
+                pending -= 1
+                if pending == 0:
+                    cur.extend(float(v) for v in vals)
     tables = [np.asarray(x) for x in tables if x]
     if not tables:
         return None
