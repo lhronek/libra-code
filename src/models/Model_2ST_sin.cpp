@@ -35,8 +35,8 @@ vector<double> set_params_2S_1D_sin(std::string model){
   if(model=="SIN:Case1:JCC:2016:37:1626"){
     /**
     The sine-perturbed 2-state potential of Akimov
-    [Akimov, A. V. Libra: An Open-Source “methodology Discovery” Library for Quantum and Classical Dynamics Simulations.
-     J. Comput. Chem. 2016, 37, 1626–1649]
+    [Akimov, A. V. Libra: An Open-Source "methodology Discovery" Library for Quantum and Classical Dynamics Simulations.
+     J. Comput. Chem. 2016, 37, 1626-1649]
     */                                                                               
     params[0] = -0.001;  params[1] = 0.0;    params[2] = 0.0;  params[3] = 1.0;  // H00
     params[4] = 0.001;   params[5] = 0.0;    params[6] = 0.0;  params[7] = 1.0;  // H01
@@ -47,8 +47,8 @@ vector<double> set_params_2S_1D_sin(std::string model){
   else if(model=="SIN:Case2:JCC:2016:37:1626"){
     /**
     The sine-perturbed 2-state potential of Akimov
-    [Akimov, A. V. Libra: An Open-Source “methodology Discovery” Library for Quantum and Classical Dynamics Simulations.
-     J. Comput. Chem. 2016, 37, 1626–1649]
+    [Akimov, A. V. Libra: An Open-Source "methodology Discovery" Library for Quantum and Classical Dynamics Simulations.
+     J. Comput. Chem. 2016, 37, 1626-1649]
     */                                                                               
     params[0] = -0.001;  params[1] = 0.0;    params[2] = 0.0;  params[3] = 1.0;  // H00
     params[4] = 0.001;   params[5] = 0.0;    params[6] = 0.0;  params[7] = 1.0;  // H01
@@ -59,8 +59,8 @@ vector<double> set_params_2S_1D_sin(std::string model){
   else if(model=="SIN:Case3:JCC:2016:37:1626"){
     /**
     The sine-perturbed 2-state potential of Akimov
-    [Akimov, A. V. Libra: An Open-Source “methodology Discovery” Library for Quantum and Classical Dynamics Simulations.
-     J. Comput. Chem. 2016, 37, 1626–1649]
+    [Akimov, A. V. Libra: An Open-Source "methodology Discovery" Library for Quantum and Classical Dynamics Simulations.
+     J. Comput. Chem. 2016, 37, 1626-1649]
     */                                                                               
     params[0] = -0.001;  params[1] = 0.0;    params[2] = 0.0;  params[3] = 1.0;  // H00
     params[4] = 0.001;   params[5] = 0.0;    params[6] = 0.0;  params[7] = 1.0;  // H01
@@ -203,8 +203,8 @@ vector<double> set_params_2S_2D_sin(std::string model){
   if(model=="SIN:JCC:2016:37:1626"){
     /**
     The sine-perturbed 2-state potential of Akimov
-    [Akimov, A. V. Libra: An Open-Source “methodology Discovery” Library for Quantum and Classical Dynamics Simulations.
-     J. Comput. Chem. 2016, 37, 1626–1649]
+    [Akimov, A. V. Libra: An Open-Source "methodology Discovery" Library for Quantum and Classical Dynamics Simulations.
+     J. Comput. Chem. 2016, 37, 1626-1649]
     */                                                                               
     params[0]  =-0.001;  params[1]  = 0.0;    params[2]  = 0.0;  params[3]  = 1.0;  params[4]  = 0.0;  params[5]  = 1.0; // H00
     params[6]  = 0.001;  params[7]  = 0.0;    params[8]  = 0.0;  params[9]  = 1.0;  params[10] = 0.0;  params[11] = 1.0; // H01

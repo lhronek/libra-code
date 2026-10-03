@@ -49,7 +49,7 @@ vector<double> set_params_1S_1D_poly4(std::string model){
   else if(model=="Cubic:JCP:2000:113:6557"){
     /**
     The metastable state potential of Prezhdo and Pereverzev
-    [Prezhdo, O. V.; Pereverzev, Y. V. Quantized Hamilton Dynamics. J. Chem. Phys. 2000, 113, 6557–6565]
+    [Prezhdo, O. V.; Pereverzev, Y. V. Quantized Hamilton Dynamics. J. Chem. Phys. 2000, 113, 6557-6565]
     */
     params[0] = 1.0; 
     params[1] = 0.0;
@@ -61,7 +61,7 @@ vector<double> set_params_1S_1D_poly4(std::string model){
   else if(model=="DoubleWell:JCP:2002:117:2995"){
     /**
     The double well potential of Prezhdo
-    [Prezhdo, O. V. Classical Mapping for Second-Order Quantized Hamiltonian Dynamics. J. Chem. Phys. 2002, 117, 2995–3002]
+    [Prezhdo, O. V. Classical Mapping for Second-Order Quantized Hamiltonian Dynamics. J. Chem. Phys. 2002, 117, 2995-3002]
     */
     params[0] =-5.0; 
     params[1] = 0.0;

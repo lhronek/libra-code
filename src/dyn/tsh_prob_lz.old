@@ -37,7 +37,7 @@ MATRIX compute_hopping_probabilities_lz(nHamiltonian* ham, int rep, MATRIX& p, c
   \brief This function computes the surface hopping probabilities according to Landau-Zener formula. 
 
   See more details in:
-  (1) Tully, J. C. Molecular Dynamics with Electronic Transitions. J. Chem. Phys. 1990, 93, 1061–1071. - the original paper
+  (1) Tully, J. C. Molecular Dynamics with Electronic Transitions. J. Chem. Phys. 1990, 93, 1061-1071. - the original paper
   (2) Belyaev, A. K.; Lebedev, O. V. Nonadiabatic nuclear dynamics of atomic collisions based on branching classical trajectories
   Phys. Rev. A 2011, 84, 014701
 
@@ -176,7 +176,7 @@ MATRIX compute_hopping_probabilities_lz(nHamiltonian& ham, int rep, MATRIX& p, c
   \brief This function computes the surface hopping probabilities according to Landau-Zener formula. 
 
   See more details in:
-  (1) Tully, J. C. Molecular Dynamics with Electronic Transitions. J. Chem. Phys. 1990, 93, 1061–1071. - the original paper
+  (1) Tully, J. C. Molecular Dynamics with Electronic Transitions. J. Chem. Phys. 1990, 93, 1061-1071. - the original paper
   (2) Belyaev, A. K.; Lebedev, O. V. Nonadiabatic nuclear dynamics of atomic collisions based on branching classical trajectories
   Phys. Rev. A 2011, 84, 014701
 

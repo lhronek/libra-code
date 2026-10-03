@@ -13,7 +13,7 @@
   \brief The file implements the Terec and qTerec propagation method based on recursive Taylor series expansion
   
   See more in:
-  Akimov, A. V.; Kolomeisky, A. B. Recursive Taylor Series Expansion Method for Rigid-Body Molecular Dynamics. J. Chem. Theory Comput. 2011, 7, 3062–3071.
+  Akimov, A. V.; Kolomeisky, A. B. Recursive Taylor Series Expansion Method for Rigid-Body Molecular Dynamics. J. Chem. Theory Comput. 2011, 7, 3062-3071.
 
 */
 
@@ -59,7 +59,7 @@ void RigidBody::propagate_terec(double t){
 
   This is my TEylor RECursive algorithm for free rigid body
   problem. See more in:
-  Akimov, A. V.; Kolomeisky, A. B. Recursive Taylor Series Expansion Method for Rigid-Body Molecular Dynamics. J. Chem. Theory Comput. 2011, 7, 3062–3071.
+  Akimov, A. V.; Kolomeisky, A. B. Recursive Taylor Series Expansion Method for Rigid-Body Molecular Dynamics. J. Chem. Theory Comput. 2011, 7, 3062-3071.
 
   The following convention is used:
 
@@ -182,7 +182,7 @@ void RigidBody::propagate_qterec(double t){
 
   This is my TEylor RECursive algorithm for free rigid body
   problem. See more in:
-  Akimov, A. V.; Kolomeisky, A. B. Recursive Taylor Series Expansion Method for Rigid-Body Molecular Dynamics. J. Chem. Theory Comput. 2011, 7, 3062–3071.
+  Akimov, A. V.; Kolomeisky, A. B. Recursive Taylor Series Expansion Method for Rigid-Body Molecular Dynamics. J. Chem. Theory Comput. 2011, 7, 3062-3071.
 
   The following convention is used:
 

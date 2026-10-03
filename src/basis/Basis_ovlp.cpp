@@ -482,7 +482,7 @@ complex<double> SD_overlap(SD& sd_i, SD& sd_j){
   <SD(t)|SD(t')>. =  det | <psi_i(t) | psi_j(t') > |  
 
   This is based on the Lowdin formula. See, for instance:
-  (1) Ryabinkin, I. G.; Nagesh, J.; Izmaylov, A. F. Fast Numerical Evaluation of Time-Derivative Non-Adiabatic Couplings for Mixed Quantum-Classical Methods. J. Phys. Chem. Lett. 2015, 6, 4200–4203.
+  (1) Ryabinkin, I. G.; Nagesh, J.; Izmaylov, A. F. Fast Numerical Evaluation of Time-Derivative Non-Adiabatic Couplings for Mixed Quantum-Classical Methods. J. Phys. Chem. Lett. 2015, 6, 4200-4203.
 
 
 */

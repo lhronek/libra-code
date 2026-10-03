@@ -51,10 +51,10 @@ class Electronic{
   In this case, we use the Meyer-Miller-Thoss-Stock (MMTS) classically-mapped coordinates: q = Re(c), p = Im(c)
 
   See more: 
-  (1) Meyer, H.-D.; Miller, W. H. A Classical Analog for Electronic Degrees of Freedom in Nonadiabatic Collision Processes. J. Chem. Phys. 1979, 70, 3214–3223.
-  (2) Meyer, H.-D.; Miller, W. H. Analysis and Extension of Some Recently Proposed Classical Models for Electronic Degrees of Freedom. J. Chem. Phys. 1980, 72, 2272–2281.
-  (3) Thoss, M.; Stock, G. Mapping Approach to the Semiclassical Description of Nonadiabatic Quantum Dynamics. Phys. Rev. A 1999, 59, 64–79.
-  (4) Stock, G.; Thoss, M. Semiclassical Description of Nonadiabatic Quantum Dynamics. Phys. Rev. Lett. 1997, 78, 578–581.
+  (1) Meyer, H.-D.; Miller, W. H. A Classical Analog for Electronic Degrees of Freedom in Nonadiabatic Collision Processes. J. Chem. Phys. 1979, 70, 3214-3223.
+  (2) Meyer, H.-D.; Miller, W. H. Analysis and Extension of Some Recently Proposed Classical Models for Electronic Degrees of Freedom. J. Chem. Phys. 1980, 72, 2272-2281.
+  (3) Thoss, M.; Stock, G. Mapping Approach to the Semiclassical Description of Nonadiabatic Quantum Dynamics. Phys. Rev. A 1999, 59, 64-79.
+  (4) Stock, G.; Thoss, M. Semiclassical Description of Nonadiabatic Quantum Dynamics. Phys. Rev. Lett. 1997, 78, 578-581.
 
 */
 

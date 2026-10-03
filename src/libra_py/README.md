@@ -120,10 +120,10 @@
    * visualize_modes(E, R, U, w, params)
    * compute_cov(R, V, A, M, E, params)
      [Ref: Strachan, A. Normal Modes and Frequencies from Covariances in Molecular Dynamics 
-      or Monte Carlo Simulations. J. Chem. Phys. 2003, 120, 1–4]
+      or Monte Carlo Simulations. J. Chem. Phys. 2003, 120, 1-4]
    * compute_cov1(R, V, M, E, params) - same as compute_cov, but without acceleration matrix
      [Ref: Strachan, A. Normal Modes and Frequencies from Covariances in Molecular Dynamics 
-      or Monte Carlo Simulations. J. Chem. Phys. 2003, 120, 1–4]
+      or Monte Carlo Simulations. J. Chem. Phys. 2003, 120, 1-4]
    * compute_cov2(R, A, E, params)
      [Ref: Pereverzev, A.; Sewell, T. D. Obtaining the Hessian from the Force Covariance Matrix:
       Application to Crystalline Explosives PETN and RDX. J. Chem. Phys. 2015, 142, 134110]

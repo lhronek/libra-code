@@ -53,7 +53,7 @@ void RigidBody::propagate_no_squish(double t){
   \param[in] t The propagation timestep
 
   Implemented according to:
-  Ikeguchi, M. Partial Rigid-Body Dynamics in NPT, NPAT and NP$\gamma$T Ensembles for Proteins and Membranes. J. Comput. Chem. 2004, 25 (4), 529–541.
+  Ikeguchi, M. Partial Rigid-Body Dynamics in NPT, NPAT and NP$\gamma$T Ensembles for Proteins and Membranes. J. Comput. Chem. 2004, 25 (4), 529-541.
 
 */
 
