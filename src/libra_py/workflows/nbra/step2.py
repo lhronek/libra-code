@@ -823,13 +823,17 @@ def run_cp2k_libint_step2(params):
                     if isUKS:
                         H_ao.append(pod_lib.ks_matrix_from_mos(mo_curr['C_b'], mo_curr['E_b'], S_ao))
                 lo, hi = lowest_orbital - 1, highest_orbital
+                # the fragment eigenproblems and the pairwise blocks are one computation for the three POD2 schemes
+                pod2_core = None
+                if any(scheme != 'pod' for scheme in pod_schemes):
+                    pod2_core = pod_lib.pod2_core(H_ao, S_ao, mo_curr['ao_atom'], fragment_atom_lists)
                 for scheme in pod_schemes:
                     if scheme == 'pod':
                         pod_nat = pod_lib.pod_block_states(H_ao, S_ao, mo_curr['ao_atom'], fragment_atom_lists)
                     else:
                         pod_nat = pod_lib.pod2_block_states(H_ao, S_ao, mo_curr['ao_atom'], fragment_atom_lists,
                                                             {'pod2': 'none', 'pod2l': 'lowdin', 'pod2gs': 'gram_schmidt'}[scheme],
-                                                            params['pod2gs_kept_block'])
+                                                            params['pod2gs_kept_block'], core=pod2_core)
                     if scheme != 'pod2':
                         # the fragment states of these schemes form one orthonormal set: the projectors sum to S
                         # (the POD2 states are not orthogonal across fragments - no projectors, the hab file only)

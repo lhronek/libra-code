@@ -173,34 +173,16 @@ def _orthonormalize_blocks(c_raw, S_m, cols, orthogonalization, kept_block):
     return c_orth
 
 
-def pod2_block_states(H_list, S, ao_atom, fragment_atom_lists, orthogonalization="lowdin", kept_block=0):
+def pod2_core(H_list, S, ao_atom, fragment_atom_lists):
     """
-    Second-generation POD (POD2, POD2L, POD2GS - Futera and Blumberger) of one or two spin channels of an
-    AO Hamiltonian: partition first, orthogonalize within each fragment only (S_ff^-1/2, no mixing of the
-    fragments' AOs), solve the fragment eigenproblems - the states are local but not orthogonal across
-    fragments - and block-diagonalize: POD2 reads the coupling between these non-orthogonal states as it
-    is, POD2L and POD2GS first orthogonalize every donor-acceptor pair of states, symmetrically (Lowdin) or
-    keeping one fragment's state (Gram-Schmidt). The site energies are the fragment eigenvalues. The
-    fragment operators of POD2L and POD2GS come from the same orthogonalization applied to the whole set of
-    fragment states (coeffs) - POD2 keeps the non-orthogonal states there, which form no projector
-    partition. The raw local states stay available (coeffs_raw).
-
-    Args:
-        H_list, S, ao_atom, fragment_atom_lists: as in pod_block_states
-        orthogonalization (str): "none" (POD2), "lowdin" (POD2L) or "gram_schmidt" (POD2GS)
-        kept_block (int): POD2GS - the fragment whose states stay unchanged (a pair of two other
-            fragments keeps the lower-index one)
-
+    The scheme-independent part of pod2_block_states: the AO blocks of the fragments, the block-local Lowdin
+    transformations, the fragment eigenproblems (energies, eigenstates) and the pairwise blocks of every two
+    fragments (the raw couplings and the state overlaps) of every spin channel. The three POD2 schemes read one
+    core (pod2_block_states takes it through `core`) - step 2 computes it once per step.
     Returns:
-        dict: n_spins, n_blocks, n_ao_blk, S, blocks, orthogonalization, kept_block, energies {(block,
-            spin)}, couplings {(block_i, block_j, spin): the pairwise-orthogonalized couplings, (n_i, n_j)},
-            couplings_raw {the same in the non-orthogonal fragment-state basis, the POD2 block}, state_overlaps
-            {(block_i, block_j, spin): <i|j>}, coeffs {(block, spin): the whole-set orthonormalized states in the
-            AO basis, (n_ao, n_block)}, coeffs_raw {the fragment eigenstates, local and non-orthogonal}
+        dict: n_spins, n_blocks, n_ao_blk, S, blocks, cols, energies {(block, spin)}, couplings_raw
+            {(block_i, block_j, spin)}, state_overlaps {(block_i, block_j, spin)}, coeffs_raw {(block, spin)}
     """
-    if orthogonalization not in ("none", "lowdin", "gram_schmidt"):
-        raise ValueError(F"orthogonalization {orthogonalization!r} - use 'none' (POD2), 'lowdin' (POD2L) or "
-                         F"'gram_schmidt' (POD2GS)")
     S = np.asarray(S, dtype=float)
     n = S.shape[0]
     blocks = _ao_blocks(ao_atom, fragment_atom_lists)
@@ -208,9 +190,6 @@ def pod2_block_states(H_list, S, ao_atom, fragment_atom_lists, orthogonalization
     if covered != list(range(n)):
         raise ValueError(F"the fragments cover {len(covered)} of {n} AOs - every atom must belong to a fragment")
     nblk = len(blocks)
-    if not 0 <= int(kept_block) < nblk:
-        raise ValueError(F"kept_block {kept_block} outside the {nblk} fragments")
-    kept_block = int(kept_block)
     S_m = data_conv.nparray2MATRIX(S)
     ids = [_ilist(b) for b in blocks]
     cols = []
@@ -229,8 +208,7 @@ def pod2_block_states(H_list, S, ao_atom, fragment_atom_lists, orthogonalization
         sqrt_matrix(Sff, Yf, Xf)
         X.append(Xf)
     out = {"n_spins": len(H_list), "n_blocks": nblk, "n_ao_blk": [len(b) for b in blocks], "S": S, "blocks": blocks,
-           "orthogonalization": orthogonalization, "kept_block": kept_block, "energies": {}, "couplings": {},
-           "couplings_raw": {}, "state_overlaps": {}, "coeffs": {}, "coeffs_raw": {}}
+           "cols": cols, "energies": {}, "couplings_raw": {}, "state_overlaps": {}, "coeffs_raw": {}}
     for sp, H in enumerate(H_list):
         H_m = data_conv.nparray2MATRIX(np.asarray(H, dtype=float))
         C_blk = []
@@ -250,10 +228,61 @@ def pod2_block_states(H_list, S, ao_atom, fragment_atom_lists, orthogonalization
                 pop_submatrix(H_m, Hij, ids[i], ids[j])
                 Sij = MATRIX(len(blocks[i]), len(blocks[j]))
                 pop_submatrix(S_m, Sij, ids[i], ids[j])
-                H_raw = data_conv.MATRIX2nparray(C_blk[i].T() * Hij * C_blk[j], np.float64)
-                S_st = data_conv.MATRIX2nparray(C_blk[i].T() * Sij * C_blk[j], np.float64)
-                out["couplings_raw"][(i, j, sp)] = H_raw
-                out["state_overlaps"][(i, j, sp)] = S_st
+                out["couplings_raw"][(i, j, sp)] = data_conv.MATRIX2nparray(C_blk[i].T() * Hij * C_blk[j], np.float64)
+                out["state_overlaps"][(i, j, sp)] = data_conv.MATRIX2nparray(C_blk[i].T() * Sij * C_blk[j], np.float64)
+        c_raw = np.zeros((n, n))
+        for f, blk in enumerate(blocks):
+            c_raw[np.ix_(blk, cols[f])] = data_conv.MATRIX2nparray(C_blk[f], np.float64)
+            out["coeffs_raw"][(f, sp)] = c_raw[:, cols[f]].copy()
+    return out
+
+
+def pod2_block_states(H_list, S, ao_atom, fragment_atom_lists, orthogonalization="lowdin", kept_block=0, core=None):
+    """
+    Second-generation POD (POD2, POD2L, POD2GS - Futera and Blumberger) of one or two spin channels of an
+    AO Hamiltonian: partition first, orthogonalize within each fragment only (S_ff^-1/2, no mixing of the
+    fragments' AOs), solve the fragment eigenproblems - the states are local but not orthogonal across
+    fragments - and block-diagonalize: POD2 reads the coupling between these non-orthogonal states as it
+    is, POD2L and POD2GS first orthogonalize every donor-acceptor pair of states, symmetrically (Lowdin) or
+    keeping one fragment's state (Gram-Schmidt). The site energies are the fragment eigenvalues. The
+    fragment operators of POD2L and POD2GS come from the same orthogonalization applied to the whole set of
+    fragment states (coeffs) - POD2 keeps the non-orthogonal states there, which form no projector
+    partition. The raw local states stay available (coeffs_raw).
+
+    Args:
+        H_list, S, ao_atom, fragment_atom_lists: as in pod_block_states
+        orthogonalization (str): "none" (POD2), "lowdin" (POD2L) or "gram_schmidt" (POD2GS)
+        kept_block (int): POD2GS - the fragment whose states stay unchanged (a pair of two other
+            fragments keeps the lower-index one)
+
+        core (dict or None): the scheme-independent part from pod2_core (the same H_list, S, ao_atom and
+            fragments) - computed here when None - the three schemes of one step share it
+    Returns:
+        dict: n_spins, n_blocks, n_ao_blk, S, blocks, orthogonalization, kept_block, energies {(block,
+            spin)}, couplings {(block_i, block_j, spin): the pairwise-orthogonalized couplings, (n_i, n_j)},
+            couplings_raw {the same in the non-orthogonal fragment-state basis, the POD2 block}, state_overlaps
+            {(block_i, block_j, spin): <i|j>}, coeffs {(block, spin): the whole-set orthonormalized states in the
+            AO basis, (n_ao, n_block)}, coeffs_raw {the fragment eigenstates, local and non-orthogonal}
+    """
+    if orthogonalization not in ("none", "lowdin", "gram_schmidt"):
+        raise ValueError(F"orthogonalization {orthogonalization!r} - use 'none' (POD2), 'lowdin' (POD2L) or "
+                         F"'gram_schmidt' (POD2GS)")
+    if core is None:
+        core = pod2_core(H_list, S, ao_atom, fragment_atom_lists)
+    nblk = core["n_blocks"]
+    if not 0 <= int(kept_block) < nblk:
+        raise ValueError(F"kept_block {kept_block} outside the {nblk} fragments")
+    kept_block = int(kept_block)
+    blocks, cols = core["blocks"], core["cols"]
+    n = core["S"].shape[0]
+    out = {"n_spins": core["n_spins"], "n_blocks": nblk, "n_ao_blk": core["n_ao_blk"], "S": core["S"], "blocks": blocks,
+           "orthogonalization": orthogonalization, "kept_block": kept_block, "energies": dict(core["energies"]),
+           "couplings": {}, "couplings_raw": dict(core["couplings_raw"]), "state_overlaps": dict(core["state_overlaps"]),
+           "coeffs": {}, "coeffs_raw": dict(core["coeffs_raw"])}
+    for sp in range(core["n_spins"]):
+        for i in range(nblk):
+            for j in range(i + 1, nblk):
+                H_raw, S_st = core["couplings_raw"][(i, j, sp)], core["state_overlaps"][(i, j, sp)]
                 if orthogonalization == "none":
                     out["couplings"][(i, j, sp)] = H_raw
                 else:
@@ -261,14 +290,15 @@ def pod2_block_states(H_list, S, ao_atom, fragment_atom_lists, orthogonalization
                     out["couplings"][(i, j, sp)] = _pairwise_couplings(H_raw, S_st, out["energies"][(i, sp)],
                                                                        out["energies"][(j, sp)], orthogonalization, keep_first)
         c_raw = np.zeros((n, n))
-        for f, blk in enumerate(blocks):
-            c_raw[np.ix_(blk, cols[f])] = data_conv.MATRIX2nparray(C_blk[f], np.float64)
-            out["coeffs_raw"][(f, sp)] = c_raw[:, cols[f]].copy()
-        c_orth = c_raw if orthogonalization == "none" else _orthonormalize_blocks(c_raw, S_m, cols, orthogonalization, kept_block)
+        for f in range(nblk):
+            c_raw[:, cols[f]] = core["coeffs_raw"][(f, sp)]
+        if orthogonalization == "none":
+            c_orth = c_raw
+        else:
+            c_orth = _orthonormalize_blocks(c_raw, data_conv.nparray2MATRIX(core["S"]), cols, orthogonalization, kept_block)
         for f in range(nblk):
             out["coeffs"][(f, sp)] = np.ascontiguousarray(c_orth[:, cols[f]])
     return out
-
 
 def pod_fragment_operators(pod, C_win, spin=0):
     """
