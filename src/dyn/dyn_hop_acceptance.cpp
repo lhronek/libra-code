@@ -518,6 +518,12 @@ vector<int> accept_hops(dyn_control_params& prms,
        nHamiltonian& ham, vector<int>& proposed_states, vector<int>& initial_states, Random& rnd, 
        vector<int>& which_trajectories){
 */
+/// the Hamiltonian whose diagonal the Boltzmann acceptances 31-33 read: the hopping representation's
+/// own - the Lowdin-frame diabatic one under rep_sh 0, the adiabatic one under rep_sh 1
+static CMATRIX hopping_energies(dyn_control_params& prms, nHamiltonian& ham, int traj){
+  return (prms.rep_sh == 0) ? ham.child(traj)->get_ham_dia_lowdin() : ham.child(traj)->get_ham_adi();
+}
+
 vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& proposed_states,  vector<int>& initial_states,
                         dyn_control_params& prms,Random& rnd,  vector<int>& which_trajectories){
 /**
@@ -787,16 +793,8 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
       int old_st = initial_states[traj];
       int new_st = proposed_states[traj];
       // Do the calculations only for itraj=0 if isNBRA is 1
-      if(isNBRA==1){
-      if(itraj==0){
-      hvib = (prms.rep_sh == 0) ? ham.child(traj)->get_ham_dia_lowdin() : ham.child(traj)->get_ham_adi();
+      if(isNBRA==0 || itraj==0){ hvib = hopping_energies(prms, ham, traj); }
       //hvib = projectors[traj].H() * hvib * projectors[traj];
-      }
-      }
-      else{
-      hvib = (prms.rep_sh == 0) ? ham.child(traj)->get_ham_dia_lowdin() : ham.child(traj)->get_ham_adi();
-      //hvib = projectors[traj].H() * hvib * projectors[traj];
-      }
       double E_i = hvib.get(old_st, old_st).real();  // initial potential energy
       double E_f = hvib.get(new_st, new_st).real();  // final potential energy  
 
@@ -832,16 +830,8 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
       int old_st = initial_states[traj];
       int new_st = proposed_states[traj];
       // Do the calculations only for itraj=0 if isNBRA is 1
-      if(isNBRA==1){
-      if(itraj==0){
-      hvib = (prms.rep_sh == 0) ? ham.child(traj)->get_ham_dia_lowdin() : ham.child(traj)->get_ham_adi();
+      if(isNBRA==0 || itraj==0){ hvib = hopping_energies(prms, ham, traj); }
       //hvib = projectors[traj].H() * hvib * projectors[traj];
-      }
-      }
-      else{
-      hvib = (prms.rep_sh == 0) ? ham.child(traj)->get_ham_dia_lowdin() : ham.child(traj)->get_ham_adi();
-      //hvib = projectors[traj].H() * hvib * projectors[traj];
-      }
       double E_i = hvib.get(old_st, old_st).real();  // initial potential energy
       double E_f = hvib.get(new_st, new_st).real();  // final potential energy  
 
@@ -878,16 +868,8 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
       int old_st = initial_states[traj];
       int new_st = proposed_states[traj];
       // Do the calculations only for itraj=0 if isNBRA is 1
-      if(isNBRA==1){
-      if(itraj==0){
-      hvib = (prms.rep_sh == 0) ? ham.child(traj)->get_ham_dia_lowdin() : ham.child(traj)->get_ham_adi();
+      if(isNBRA==0 || itraj==0){ hvib = hopping_energies(prms, ham, traj); }
       //hvib = projectors[traj].H() * hvib * projectors[traj];
-      }
-      }
-      else{
-      hvib = (prms.rep_sh == 0) ? ham.child(traj)->get_ham_dia_lowdin() : ham.child(traj)->get_ham_adi();
-      //hvib = projectors[traj].H() * hvib * projectors[traj];
-      }
       double E_i = hvib.get(old_st, old_st).real();  // initial potential energy
       double E_f = hvib.get(new_st, new_st).real();  // final potential energy  
 
