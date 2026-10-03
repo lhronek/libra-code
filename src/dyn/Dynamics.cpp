@@ -502,13 +502,75 @@ static void dia_metric_sqrt(dia_metric_factors &e) {
   }
 }
 
+// the square roots Y = S^1/2, X = S^-1/2 of one metric, memoized by its elements: the ends
+// and midpoints of the Lowdin steps repeat (a substep's end is the next substep's start, a
+// step's end the next step's start, every trajectory of a shared Hamiltonian brings the
+// same metric). Eight entries per thread, the least recently used replaced
+struct dia_sqrt_factors {
+  CMATRIX S;  CMATRIX Y;  CMATRIX X;
+  long stamp;
+};
+static dia_sqrt_factors &dia_sqrt(CMATRIX &S) {
+  thread_local std::deque<dia_sqrt_factors> memo;   // a deque: a reference handed out stays valid when a later lookup adds an entry
+  thread_local long clock = 0;
+  int sz = S.n_cols;
+  for (size_t k = 0; k < memo.size(); k++) {
+    dia_sqrt_factors &e = memo[k];
+    if (e.S.n_cols == sz && e.S.n_rows == S.n_rows && !metric_moved(e.S, S)) {
+      e.stamp = ++clock;
+      return e;
+    }
+  }
+  size_t slot = memo.size();
+  if (slot < 8) {
+    memo.push_back(dia_sqrt_factors());
+  } else {
+    slot = 0;
+    for (size_t k = 1; k < memo.size(); k++) { if (memo[k].stamp < memo[slot].stamp) { slot = k; } }
+  }
+  dia_sqrt_factors &e = memo[slot];
+  e.S = S;
+  e.Y = CMATRIX(sz, sz);  e.X = CMATRIX(sz, sz);
+  libmeigen::sqrt_matrix(S, e.Y, e.X);
+  e.stamp = ++clock;
+  return e;
+}
+// the generator of lowdin_frame_generator (Electronic_Dynamics1.cpp) with the roots from the
+// memo - the same G = Xm Hvib Xm + i (Y1 - Y0)/dt Xm, Hermitian part, and the frame factors
+// Y0, X1 - a lookup may replace the least recently used entry, so each root is copied out
+// before the next lookup
+static void dia_lowdin_generator(double dt, CMATRIX &Hvib, CMATRIX &S_old, CMATRIX &S_new,
+                                 CMATRIX &G, CMATRIX &Y0, CMATRIX &X1) {
+  int sz = Hvib.n_cols;
+  CMATRIX Sm(sz, sz);
+  Sm = 0.5 * (S_old + S_new);
+  Y0 = dia_sqrt(S_old).Y;
+  dia_sqrt_factors &f1 = dia_sqrt(S_new);
+  CMATRIX Y1(f1.Y);
+  X1 = f1.X;
+  CMATRIX Xm(dia_sqrt(Sm).X);
+  G = Xm * Hvib * Xm + complex<double>(0.0, 1.0 / dt) * ((Y1 - Y0) * Xm);
+  G = 0.5 * (G + G.H());
+}
+// the Lowdin-frame step of propagate_electronic_lowdin on the memoized roots: b = Y0 c,
+// exp(-i G dt) (rot: the sequential rotations), c = X1 b
+static void dia_lowdin_step(double dt, CMATRIX &C, CMATRIX &Hvib, CMATRIX &S_old, CMATRIX &S_new,
+                            int rot) {
+  int sz = Hvib.n_cols;
+  CMATRIX G(sz, sz);  CMATRIX Y0(sz, sz);  CMATRIX X1(sz, sz);
+  dia_lowdin_generator(dt, Hvib, S_old, S_new, G, Y0, X1);
+  CMATRIX b(Y0 * C);
+  if (rot) { propagate_electronic_rot(dt, b, G); }
+  else { propagate_electronic_eig(dt, b, G); }
+  C = X1 * b;
+}
 // one exact step of i S dc/dt = Hvib c over dt with the metric moving from S_old to
 // S_new: the Lowdin-frame step when it moves, exp(-i S^-1 Hvib dt) when it does not -
 // the constant-metric form of the rep-0 method 3, shared by the 2-point steps 4-8
 static void dia_exp_step(double dt, CMATRIX &C, CMATRIX &Hvib, CMATRIX &S_old,
                          CMATRIX &S_new) {
   if (metric_moved(S_old, S_new)) {
-    propagate_electronic_lowdin(dt, C, Hvib, S_old, S_new);
+    dia_lowdin_step(dt, C, Hvib, S_old, S_new, 0);
   } else {
     CMATRIX G(dia_metric_inverse(dia_metric(S_new, S_new)) * Hvib);
     propagate_electronic_nonHermitian(dt, C, G);
@@ -524,7 +586,7 @@ static void dia_exp_step(double dt, CMATRIX &C, CMATRIX &Hvib, CMATRIX &S_old,
 static void dia_rot_step(double dt, CMATRIX &C, CMATRIX &Hvib, CMATRIX &S_old,
                          CMATRIX &S_new) {
   if (metric_moved(S_old, S_new)) {
-    propagate_electronic_lowdin(dt, C, Hvib, S_old, S_new, 1);
+    dia_lowdin_step(dt, C, Hvib, S_old, S_new, 1);
   } else {
     dia_metric_factors &fac = dia_metric(S_new, S_new);
     if (dia_metric_lowdin(fac)) {
@@ -1356,7 +1418,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         if (metric_moved(Sdia_old, Sdia)) {
           // a moving metric makes Hvib non-Hermitian - the generalized eigen
           // route cannot take it, the Lowdin-frame step is its exact form
-          propagate_electronic_lowdin(dt, C, Hvib, Sdia_old, Sdia);
+          dia_lowdin_step(dt, C, Hvib, Sdia_old, Sdia, 0);
         } else {
           propagate_electronic_eig(dt, C, Hvib,
                                    Sdia); // in this case C - diabatic coeffs
@@ -1367,7 +1429,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
           // the QTAG step solves Hvib Z = S Z E with one metric and keeps c^H S c for
           // that metric alone - across a metric that moves the norm is not kept, the
           // Lowdin-frame step carries the amplitudes over
-          propagate_electronic_lowdin(dt, C, Hvib, Sdia_old, Sdia);
+          dia_lowdin_step(dt, C, Hvib, Sdia_old, Sdia, 0);
         } else {
           propagate_electronic_qtag(dt, C, Hvib,
                                     Sdia); // in this case C - diabatic coeffs
@@ -1667,7 +1729,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         Hvib = 0.5 * (ham->get_hvib_dia() + ham_prev->get_hvib_dia());
         if (moving) {
           CMATRIX G(nst, nst);  CMATRIX Y0(nst, nst);  CMATRIX X1(nst, nst);
-          lowdin_frame_generator(dt, Hvib, S_old, S_new, G, Y0, X1);
+          dia_lowdin_generator(dt, Hvib, S_old, S_new, G, Y0, X1);
           dia_dm_lowdin_step(dt, *dyn_var.dm_dia[itraj], G, Y0, X1);
         } else {
           // non-orthogonal diabats: the generator of i S dC/dt = Hvib C is S^-1 Hvib,
