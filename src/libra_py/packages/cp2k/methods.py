@@ -35,11 +35,10 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
-from libra_py import data_conv
 from libra_py.packages.driver_forces import ForceHandover, fill_diagonal_forces, force_diagonals, refreshed_rows
 
 from libra_py import data_outs, data_read, data_stat, data_conv
-from libra_py import units, molden_methods, orthogonalizations
+from libra_py import units, molden_methods
 import libra_py.orthogonalizations as ortho
 
 
@@ -6215,7 +6214,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
     # anything else means the producing chain is broken NOW (the same
     # gate step2 applies to the same producer)
     for _k, _sc in enumerate(Sc_ch):
-        orthogonalizations.validate_overlap_matrix(
+        ortho.validate_overlap_matrix(
             np.asarray(_sc), F"S_mo(t) channel {_k} (cp2k driver)",
             require_identity=0.05)
     C_keys = ("C", "C_b")[:len(St_ch)]
