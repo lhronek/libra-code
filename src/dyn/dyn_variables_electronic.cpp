@@ -953,6 +953,16 @@ void dyn_variables::init_density_matrix(bp::dict _params){
 }
 
 
+// Y = S^1/2 of a trajectory's cached metric for the hopping-frame sandwiches of the samplers
+// below: 1 with Y filled for a non-identity metric, 0 (Y untouched) for the identity, where the
+// callers keep the bare transform
+static int lowdin_root(CMATRIX* S, int identity, CMATRIX& Y){
+  if(identity){ return 0; }
+  CMATRIX X_(S->n_cols, S->n_cols);
+  libmeigen::sqrt_matrix(*S, Y, X_);
+  return 1;
+}
+
 void dyn_variables::init_active_states(bp::dict _params, Random& rnd){
 
   //# Read the parameters
@@ -1063,12 +1073,10 @@ void dyn_variables::init_active_states(bp::dict _params, Random& rnd){
 
       // the adiabatic populations of the Lowdin state X e_i, the diabatic active state of the
       // hopping machinery: C_adi = U^H S X e_i = U^H Y e_i, the bare U^H e_i at S = I
-      if(ovlp_dia_is_identity[traj]){ pop_adi = (*basis_transform[traj]).H() * pop_dia * (*basis_transform[traj]); }
-      else{
-        CMATRIX X_(ndia, ndia); CMATRIX Y_(ndia, ndia);
-        libmeigen::sqrt_matrix(*ovlp_dia[traj], Y_, X_);
-        pop_adi = (*basis_transform[traj]).H() * Y_ * pop_dia * Y_ * (*basis_transform[traj]);
-      }
+      { CMATRIX Y_(ndia, ndia);
+        int lowdin = lowdin_root(ovlp_dia[traj], ovlp_dia_is_identity[traj], Y_);
+        pop_adi = lowdin ? (*basis_transform[traj]).H() * Y_ * pop_dia * Y_ * (*basis_transform[traj])
+                         : (*basis_transform[traj]).H() * pop_dia * (*basis_transform[traj]); }
 
       vector<double> res(nadi, 0.0);
       for(i=0; i<nadi;i++){ res[i] = pop_adi.get(i,i).real(); }
@@ -1420,12 +1428,9 @@ void dyn_variables:: set_active_states_diff_rep(int rep_sh, Random& rnd){
       // sandwich Y U rho U^H Y for a non-orthogonal metric, the bare U rho U^H at S = I
       U = (*basis_transform[traj]);// * (*proj_adi[traj]);
 
-      { CMATRIX X_(ndia, ndia); CMATRIX Y_(ndia, ndia);
-        if(!ovlp_dia_is_identity[traj]){
-          libmeigen::sqrt_matrix(*ovlp_dia[traj], Y_, X_);
-          pop_dia = Y_ * U * pop_adi * U.H() * Y_;
-        }
-        else{ pop_dia = U * pop_adi * U.H(); } }
+      { CMATRIX Y_(ndia, ndia);
+        int lowdin = lowdin_root(ovlp_dia[traj], ovlp_dia_is_identity[traj], Y_);
+        pop_dia = lowdin ? Y_ * U * pop_adi * U.H() * Y_ : U * pop_adi * U.H(); }
       
       vector<double> diag_els(ndia, 0.0);
       for(i=0;i<ndia; i++){ diag_els[i] = pop_dia.get(i,i).real(); }
@@ -1443,19 +1448,15 @@ void dyn_variables:: set_active_states_diff_rep(int rep_sh, Random& rnd){
       // diagonal - the coherences and the indicator in one frame (rho itself at S = I)
       U = (*basis_transform[traj]);// * (*proj_adi[traj]);
 
-      { CMATRIX X_(ndia, ndia); CMATRIX Y_(ndia, ndia);
-        if(!ovlp_dia_is_identity[traj]){
-          libmeigen::sqrt_matrix(*ovlp_dia[traj], Y_, X_);
-          pop_dia = Y_ * (*dm_dia[traj]) * Y_;
-        }
-        else{ pop_dia = *dm_dia[traj]; }
+      { CMATRIX Y_(ndia, ndia);
+        int lowdin = lowdin_root(ovlp_dia[traj], ovlp_dia_is_identity[traj], Y_);
+        pop_dia = lowdin ? Y_ * (*dm_dia[traj]) * Y_ : *dm_dia[traj];
         for(j=0;j<ndia; j++){ pop_dia.set(j,j, complex<double>(0.0, 0.0) ); }
         pop_dia.set(i, i, complex<double>(1.0, 0.0) );
 
         // the adiabatic populations of a Lowdin state X e_i: C_adi = U^H S X e_i = U^H Y e_i,
         // the bare U^H rho U at S = I
-        if(!ovlp_dia_is_identity[traj]){ pop_adi = U.H() * Y_ * pop_dia * Y_ * U; }
-        else{ pop_adi = U.H() * pop_dia * U; } }
+        pop_adi = lowdin ? U.H() * Y_ * pop_dia * Y_ * U : U.H() * pop_dia * U; }
       
       vector<double> diag_els(nadi, 0.0);
       for(i=0;i<nadi; i++){ diag_els[i] = pop_adi.get(i,i).real(); }
@@ -1752,12 +1753,9 @@ vector<double> dyn_variables::compute_average_sh_pop_TR(int rep){
       // sandwich Y U rho U^H Y for a non-orthogonal metric, the bare U rho U^H at S = I
       U = (*basis_transform[traj]);// * (*proj_adi[traj]);
 
-      { CMATRIX X_(ndia, ndia); CMATRIX Y_(ndia, ndia);
-        if(!ovlp_dia_is_identity[traj]){
-          libmeigen::sqrt_matrix(*ovlp_dia[traj], Y_, X_);
-          pop_dia = Y_ * U * pop_adi * U.H() * Y_;
-        }
-        else{ pop_dia = U * pop_adi * U.H(); } }
+      { CMATRIX Y_(ndia, ndia);
+        int lowdin = lowdin_root(ovlp_dia[traj], ovlp_dia_is_identity[traj], Y_);
+        pop_dia = lowdin ? Y_ * U * pop_adi * U.H() * Y_ : U * pop_adi * U.H(); }
       for(j=0; j<ndia; j++){ res[j] += pop_dia.get(j,j).real(); }
     }
   }// rep == 0
@@ -1775,19 +1773,15 @@ vector<double> dyn_variables::compute_average_sh_pop_TR(int rep){
       // diagonal - the coherences and the indicator in one frame (rho itself at S = I)
       U = (*basis_transform[traj]);// * (*proj_adi[traj]);
 
-      { CMATRIX X_(ndia, ndia); CMATRIX Y_(ndia, ndia);
-        if(!ovlp_dia_is_identity[traj]){
-          libmeigen::sqrt_matrix(*ovlp_dia[traj], Y_, X_);
-          pop_dia = Y_ * (*dm_dia[traj]) * Y_;
-        }
-        else{ pop_dia = *dm_dia[traj]; }
+      { CMATRIX Y_(ndia, ndia);
+        int lowdin = lowdin_root(ovlp_dia[traj], ovlp_dia_is_identity[traj], Y_);
+        pop_dia = lowdin ? Y_ * (*dm_dia[traj]) * Y_ : *dm_dia[traj];
         for(j=0;j<ndia; j++){ pop_dia.set(j,j, complex<double>(0.0, 0.0) ); }
         pop_dia.set(i, i, complex<double>(1.0, 0.0) );
 
         // the adiabatic populations of a Lowdin state X e_i: C_adi = U^H S X e_i = U^H Y e_i,
         // the bare U^H rho U at S = I
-        if(!ovlp_dia_is_identity[traj]){ pop_adi = U.H() * Y_ * pop_dia * Y_ * U; }
-        else{ pop_adi = U.H() * pop_dia * U; } }
+        pop_adi = lowdin ? U.H() * Y_ * pop_dia * Y_ * U : U.H() * pop_dia * U; }
       for(j=0; j<nadi; j++){ res[j] += pop_adi.get(j,j).real(); }
     }
   }// rep == 1
