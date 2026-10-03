@@ -12,6 +12,7 @@
 #if defined(USING_PCH)
 #include "../pch.h"
 #else
+#include <stdexcept>
 #include <Eigen/LU>
 #include <Eigen/Dense>
 #include <Eigen/Eigenvalues>
@@ -163,6 +164,20 @@ void FullPivLU_decomposition(CMATRIX& A, CMATRIX& P, CMATRIX& L, CMATRIX& U, CMA
 
 
 
+// the factor shapes of A (m x n) = U (m x m) S (m x n) V^H (n x n) - those of lapack_gesdd, demanded on the
+// Eigen path too
+static void require_svd_shapes(const char* fn, CMATRIX& A, CMATRIX& U, CMATRIX& S, CMATRIX& V){
+  int m = A.n_rows;
+  int n = A.n_cols;
+  if(m < 1 || n < 1 || U.n_rows != m || U.n_cols != m || S.n_rows != m || S.n_cols != n || V.n_rows != n || V.n_cols != n){
+    std::cout<<"Error in libmeigen::"<<fn<<" : for A "<<m<<" x "<<n<<" the factors must be U "<<m<<" x "<<m
+             <<", S "<<m<<" x "<<n<<", V "<<n<<" x "<<n<<", got U "<<U.n_rows<<" x "<<U.n_cols<<", S "<<S.n_rows
+             <<" x "<<S.n_cols<<", V "<<V.n_rows<<" x "<<V.n_cols<<"\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+}
+
+
 void JacobiSVD_decomposition(CMATRIX& A, CMATRIX& U, CMATRIX& S, CMATRIX& V){
 /** 
 
@@ -175,48 +190,35 @@ void JacobiSVD_decomposition(CMATRIX& A, CMATRIX& U, CMATRIX& S, CMATRIX& V){
 
 */
 
-  
-
-  int N = A.n_cols;
+  int m = A.n_rows;
+  int n = A.n_cols;
   int i,j;
+  require_svd_shapes("JacobiSVD_decomposition", A, U, S, V);
 
-  if(have_lapack() && N >= get_lapack_svd_min_n()){
+  if(have_lapack() && std::max(m, n) >= get_lapack_svd_min_n()){
     // LAPACK divide-and-conquer SVD (blas_interface.h): A = U S V^H in the same convention
     lapack_gesdd(A, U, S, V);
     return;
   }
-  MatrixXcd a(N,N);
-  for(i=0;i<N;i++){
-    for(j=0;j<N;j++){
-      a(i,j) = A.M[i*N+j];
-    }// for j
-  }// for i
-
+  MatrixXcd a(m,n);
+  for(i=0;i<m;i++){
+    for(j=0;j<n;j++){ a(i,j) = A.M[i*n+j]; }
+  }
 
   Eigen::JacobiSVD<Eigen::MatrixXcd> svd(a, Eigen::ComputeFullU | Eigen::ComputeFullV);
+  const MatrixXcd& u = svd.matrixU();   // m x m
+  const MatrixXcd& v = svd.matrixV();   // n x n
+  int mn = std::min(m, n);              // the singular values, descending
 
-  MatrixXcd u(N,N); 
-  MatrixXcd s(N,1); 
-  MatrixXcd v(N,N); 
+  for(i=0;i<m;i++){
+    for(j=0;j<m;j++){ U.M[i*m+j] = u(i,j); }
+  }
+  for(i=0;i<n;i++){
+    for(j=0;j<n;j++){ V.M[i*n+j] = v(i,j); }
+  }
+  S = complex<double>(0.0, 0.0);
+  for(i=0;i<mn;i++){ S.M[i*n+i] = complex<double>(svd.singularValues()(i), 0.0); }
 
-  u = svd.matrixU();
-  s = svd.singularValues();
-  v = svd.matrixV();
-
-  for(i=0;i<N;i++){
-
-    for(j=0;j<N;j++){
-
-      U.M[i*N+j] = u(i,j);
-      V.M[i*N+j] = v(i,j);
-
-      if(j==i){    S.M[i*N+i] = s(i,0); }
-      else{ S.M[i*N+j] = complex<double>(0.0, 0.0); }
-
-
-    }// for j
-  }// for i
-  
 }
 
 
@@ -232,47 +234,35 @@ void BDCSVD_decomposition(CMATRIX& A, CMATRIX& U, CMATRIX& S, CMATRIX& V){
 
 */
 
-  
-
-  int N = A.n_cols;
+  int m = A.n_rows;
+  int n = A.n_cols;
   int i,j;
+  require_svd_shapes("BDCSVD_decomposition", A, U, S, V);
 
-  if(have_lapack() && N >= get_lapack_svd_min_n()){
+  if(have_lapack() && std::max(m, n) >= get_lapack_svd_min_n()){
     // LAPACK divide-and-conquer SVD (blas_interface.h): A = U S V^H in the same convention
     lapack_gesdd(A, U, S, V);
     return;
   }
-  MatrixXcd a(N,N);
-  for(i=0;i<N;i++){
-    for(j=0;j<N;j++){
-      a(i,j) = A.M[i*N+j];
-    }// for j
-  }// for i
-
+  MatrixXcd a(m,n);
+  for(i=0;i<m;i++){
+    for(j=0;j<n;j++){ a(i,j) = A.M[i*n+j]; }
+  }
 
   Eigen::BDCSVD<Eigen::MatrixXcd> svd(a, Eigen::ComputeFullU | Eigen::ComputeFullV);
+  const MatrixXcd& u = svd.matrixU();   // m x m
+  const MatrixXcd& v = svd.matrixV();   // n x n
+  int mn = std::min(m, n);              // the singular values, descending
 
-  MatrixXcd u(N,N); 
-  MatrixXcd s(N,1); 
-  MatrixXcd v(N,N); 
+  for(i=0;i<m;i++){
+    for(j=0;j<m;j++){ U.M[i*m+j] = u(i,j); }
+  }
+  for(i=0;i<n;i++){
+    for(j=0;j<n;j++){ V.M[i*n+j] = v(i,j); }
+  }
+  S = complex<double>(0.0, 0.0);
+  for(i=0;i<mn;i++){ S.M[i*n+i] = complex<double>(svd.singularValues()(i), 0.0); }
 
-  u = svd.matrixU();
-  s = svd.singularValues();
-  v = svd.matrixV();
-
-  for(i=0;i<N;i++){
-
-    for(j=0;j<N;j++){
-
-      U.M[i*N+j] = u(i,j);
-      V.M[i*N+j] = v(i,j);
-
-      if(j==i){    S.M[i*N+i] = s(i,0); }
-      else{ S.M[i*N+j] = complex<double>(0.0, 0.0); }
-
-    }// for j
-  }// for i
-  
 }
 
 
