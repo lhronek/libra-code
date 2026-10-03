@@ -3338,7 +3338,7 @@ def _classify_continuations(d, inside, threshold):
 
 
 def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=None, reordering=0, alpha=0.0,
-                            energies=None, min_overlap=0.5):
+                            energies=None, min_overlap=math.sqrt(0.5)):
     """The localization eigenvectors carry arbitrary signs: every diabatic state follows the trajectory through the
     time overlaps of its own basis, O = W(i)^T St(i) W(i+1), and the sign of every column of W(i+1) is set by the
     sign of diag(O) (in place). reordering 0: a column whose |O_cc| falls below min_overlap does not continue itself -
@@ -3401,13 +3401,14 @@ def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=N
                 raise ValueError(F"the diabatic {basis.upper()} state {c} of frame {start_time + i} carries "
                                  F"|<{c}|{c}>| = {d[c]:.3f} into frame {start_time + i + 1} even after the reordering "
                                  F"within its group (the largest other overlap |<{c}|{partner}>| = {row[partner]:.3f}, "
-                                 F"the space carries {inside[c]:.3f} of the state, the threshold {min_overlap}) - the "
+                                 F"the space carries {inside[c]:.3f} of the state, the threshold "
+                                 F"{min_overlap:.4g}) - the "
                                  F"states mix by more than the threshold's angle within one frame: the frame spacing "
                                  F"does not resolve the crossing (a lower diabatic_state_reordering_min_overlap lets "
                                  F"the frame through and records it)")
             raise ValueError(F"the diabatic {basis.upper()} state {c} of frame {start_time + i} continues into "
                              F"state {partner} of frame {start_time + i + 1} (|<{c}|{c}>| = {d[c]:.3f} below the "
-                             F"threshold {min_overlap}, |<{c}|{partner}>| = {row[partner]:.3f}) - two localized "
+                             F"threshold {min_overlap:.4g}, |<{c}|{partner}>| = {row[partner]:.3f}) - two localized "
                              F"states swap between the frames and the labels would mean other states from there "
                              F"on: narrow the manifold or the active space, follow the states with "
                              F"do_diabatic_state_reordering 2 (within a tracking group - one fragment's states of a "
@@ -3440,7 +3441,7 @@ def _tracking_record(reordering, alpha, min_overlap, perms, swaps, unresolved, m
                 " and the states keep that identity through the crossings of swap_frames (a followed state may "
                 "lie above its lower-ranked partner from a swap frame on)" if reordering else
                 " and every state continues itself between the frames") + " - an internal mixing below the threshold "
-                "is refused, unresolved_frames lists the frames a threshold below 0.5 let through with less than 0.5, "
+                "is refused, unresolved_frames lists the frames a lower threshold let through with less than it, "
                 "edge_departures the states that left the active space ([frame, state, kept, carried by the space, "
                 "the state that took most of it])"}
 
@@ -3474,7 +3475,7 @@ def _continuity_record(St_list, start_time, reordering, alpha, min_overlap, perm
                 partner = int(np.argmax(row))
                 raise ValueError(F"the {basis} state {j} of frame {start_time + i} continues into state {partner} "
                                  F"of frame {start_time + i + 1} after the reordering (|<{j}|{j}>| = {c[j]:.3f} below "
-                                 F"the threshold {min_overlap}, |<{j}|{partner}>| = {row[partner]:.3f}, the space "
+                                 F"the threshold {min_overlap:.4g}, |<{j}|{partner}>| = {row[partner]:.3f}, the space "
                                  F"carries {inside[j]:.3f} of the state) - an internal mixing the frame spacing does "
                                  F"not resolve: a lower state_reordering_min_overlap lets the frame through and "
                                  F"records it, 0 switches the check off")
@@ -3833,10 +3834,11 @@ def run_step3_pod(params):
                 cost of the block states, exp(-(alpha dE)^2) on the block energies of the earlier frame, in
                 1/Hartree [default: 0 - no penalty].
             * **params['diabatic_state_reordering_min_overlap']** (float): the continuity threshold of the block
-                states [default: 0.5 - 60 degrees of mixing within one frame, 0 switches the check off]: below it an
-                internal mixing refuses the run, with or without a reordering, and a departure from the basis of
-                the block (the basis carries less than the threshold of the state - without a reordering) is
-                recorded in edge_departures - a threshold below 0.5 lets internal mixings through and the labels and
+                states [default: 1/sqrt(2) = 0.707 - more than half of a state's weight on its own continuation, a
+                mixing of 45 degrees within one frame, 0 switches the check off]: below it an internal mixing refuses
+                the run, with or without a reordering, and a departure from the basis of the block (the basis carries
+                less than the threshold of the state - without a reordering) is recorded in edge_departures - a
+                threshold below 1/sqrt(2) lets internal mixings through (0.5 admits 60 degrees) and the labels and
                 the report list them (unresolved_frames, min_continuity).
             * **params['state_reordering_min_overlap']** (float): the same threshold for the adiabatic states as
                 labeled by do_state_reordering 1 or 2 - refused below it after the reordering, 0 switches the check
@@ -3862,7 +3864,7 @@ def run_step3_pod(params):
                       'diabatization_scheme': 'pod_cp2k', 'apply_phase_correction': True,
                       'apply_orthonormalization': 'lowdin_cached', 'do_state_reordering': 0,
                       'state_reordering_alpha': 0.0, 'do_diabatic_state_reordering': 0,
-                      'diabatic_state_reordering_alpha': 0.0, 'diabatic_state_reordering_min_overlap': 0.5,
+                      'diabatic_state_reordering_alpha': 0.0, 'diabatic_state_reordering_min_overlap': math.sqrt(0.5),
                       'state_reordering_min_overlap': 0.5, 'active_space_selection': 'energy', 'nac_algo': 0}
     _refuse_former_names(params)
     # the keys of the SD route's Kohn-Sham basis have no reading here - num_occ_states in place of
@@ -4004,7 +4006,8 @@ def run_step3_pod(params):
                 raise ValueError(F"the POD block state {cur[c]} (block {frag[c]}, rank {rank[c]} of frame "
                                  F"{start_time}) carries |<s|s'>| = {d[c]:.3f} into frame {frames[i + 1]} even after "
                                  F"the reordering of its block (the largest other overlap {row[partner]:.3f} into the "
-                                 F"block state {partner}, the threshold {dia_min_overlap}) - the states mix by more "
+                                 F"block state {partner}, the threshold "
+                                 F"{dia_min_overlap:.4g}) - the states mix by more "
                                  F"than the threshold's angle within one frame: the frame spacing does not resolve the "
                                  F"crossing (a lower diabatic_state_reordering_min_overlap lets the frame through and "
                                  F"records it)")
@@ -4017,7 +4020,7 @@ def run_step3_pod(params):
                 where = F"the block state {partner} outside the basis"
             raise ValueError(F"the POD block state {cur[c]} (block {frag[c]}, rank {rank[c]}) of frame {frames[i]} "
                              F"continues into {where} of frame {frames[i + 1]} (|<s|s>| = {d[c]:.3f} below the "
-                             F"threshold {dia_min_overlap}, |<s|s'>| = {row[partner]:.3f}, the basis carries "
+                             F"threshold {dia_min_overlap:.4g}, |<s|s'>| = {row[partner]:.3f}, the basis carries "
                              F"{inside[c]:.3f} of the state) - two block states swap between the frames and the labels "
                              F"would mean other states from there on: narrow num_occ_states_per_block, or follow the "
                              F"states with do_diabatic_state_reordering 2")
@@ -4077,7 +4080,8 @@ def run_step3_pod(params):
             if params['do_state_reordering'] in (1, 2, 22) and sd_min_overlap > 0.0:
                 raise ValueError(F"the adiabatic hole state {j} of frame {frames[k - 1]} carries |<{j}|{j}>| = "
                                  F"{d_adi[j]:.3f} into frame {frames[k]} after the reordering, below the threshold "
-                                 F"{sd_min_overlap} (the basis carries {inside_adi[j]:.3f} of the state) - an internal "
+                                 F"{sd_min_overlap:.4g} (the basis carries {inside_adi[j]:.3f} of the state) - an "
+                                 F"internal "
                                  F"mixing the frame spacing does not resolve: a lower state_reordering_min_overlap "
                                  F"lets the frame through and records it, 0 switches the check off")
         if len(unresolved_idx):
@@ -4247,14 +4251,15 @@ def run_step3_sd_nacs_libint(params):
                 energy and the candidate position's at the earlier frame, in 1/Hartree [default: 0 - no penalty] - as
                 state_reordering_alpha for the SD states.
             * **params['diabatic_state_reordering_min_overlap']** (float): the continuity threshold of the diabatic
-                states, |O_cc| below which a state does not continue itself between two frames [default: 0.5 - a
-                mixing of 60 degrees within one frame, 0 switches the check off]. Below it, a state the space still
+                states, |O_cc| below which a state does not continue itself between two frames [default: 1/sqrt(2) =
+                0.707 - more than half of a state's weight on its own continuation, a mixing of 45 degrees within one
+                frame, 0 switches the check off]. Below it, a state the space still
                 carries (sqrt(sum_j |O_cj|^2) >= the threshold) mixed internally and the run is refused, with or
                 without a reordering - a state the space no longer carries left the active space through its edge
                 and is recorded (edge_departures in U_sd_labels.json: [frame, state, kept, carried by the space, the
                 state that took most of it]),
-                the run goes on. A threshold below 0.5 lets internal mixings through: unresolved_frames lists them
-                beside min_continuity.
+                the run goes on. A threshold below 1/sqrt(2) lets internal mixings through (0.5 admits 60 degrees):
+                unresolved_frames lists them beside min_continuity.
             * **params['state_reordering_min_overlap']** (float): the same threshold for the SD (and CI) states as
                 labeled by do_state_reordering 1 or 2: an internal mixing below it after the reordering refuses the
                 run (the frame spacing does not resolve the crossing, 0 switches the check off), an edge departure
@@ -4343,7 +4348,7 @@ def run_step3_sd_nacs_libint(params):
                       'localized_carrier': 'none', 'sd_charge': 0, 'diabatization_scheme': 'mulliken',
                       'occupancy_tolerance': 0.25,
                       'do_diabatic_state_reordering': 0, 'diabatic_state_reordering_alpha': 0.0,
-                      'diabatic_state_reordering_min_overlap': 0.5, 'state_reordering_min_overlap': 0.5,
+                      'diabatic_state_reordering_min_overlap': math.sqrt(0.5), 'state_reordering_min_overlap': 0.5,
                       'active_space_selection': 'energy', 'active_space_selection_algo': 2,
                       'active_space_selection_alpha': 0.0
                       }
