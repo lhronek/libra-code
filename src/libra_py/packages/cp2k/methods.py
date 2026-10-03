@@ -3570,26 +3570,26 @@ def _skip_to_overlap_banner(f):
     return False
 
 
-def _count_banners(logfile, names):
-    """How many banner lines are one of `names` - the AO_MATRICES prints of the
-    Hamiltonian repeat every SCF iteration, the last one is the converged matrix."""
-    n = 0
-    with open(logfile) as f:
+def _banner_offsets(logfile, names):
+    """The byte offsets of the lines that are one of `names` - the AO_MATRICES prints of the
+    Hamiltonian repeat every SCF iteration, the last one is the converged matrix. One pass
+    over the file in binary mode (the text-mode position of an iterated file is not available)."""
+    wanted = {n.encode() for n in names}
+    offsets, pos = [], 0
+    with open(logfile, "rb") as f:
         for l in f:
-            if l.strip() in names:
-                n += 1
-    return n
+            if l.strip() in wanted:
+                offsets.append(pos)
+            pos += len(l)
+    return offsets
 
 
-def _skip_to_nth_banner(f, names, n):
-    """Advance a log-file iterator past the n-th (1-based) banner line that is one of `names`."""
-    seen = 0
-    for l in f:
-        if l.strip() in names:
-            seen += 1
-            if seen == n:
-                return True
-    return False
+def _lines_from(f, offset):
+    """The decoded lines of the binary file `f` from the banner at `offset` on, the banner line itself consumed."""
+    f.seek(offset)
+    it = (l.decode(errors="replace") for l in f)
+    next(it)
+    return it
 
 
 def _max_asymmetry(M, rows=512):
@@ -3608,32 +3608,29 @@ def read_cp2k_ao_ks_print(logfile, n_spins=1):
     CP2K prints them at every SCF iteration under the matrix name (KS_BANNERS: xTB
     "HAMILTONIAN MATRIX", GPW "KOHN-SHAM MATRIX", unrestricted GPW "KOHN-SHAM MATRIX FOR
     ALPHA SPIN" / "... FOR BETA SPIN", one print per spin channel) - the last n_spins prints
-    are the matrices of the converged density, in the CP2K-internal AO order.
+    are the matrices of the converged density, in the CP2K-internal AO order. One pass over
+    the log locates the prints, the wanted ones are parsed from their offsets.
 
     Returns:
         list of np.ndarray (n, n), one per spin channel
     """
-    total = _count_banners(logfile, KS_BANNERS)
+    offsets = _banner_offsets(logfile, KS_BANNERS)
+    total = len(offsets)
     if total == 0:
         raise RuntimeError(F"no AO Kohn-Sham matrix print found in {logfile} - the run needs "
                            F"&DFT &PRINT &AO_MATRICES KOHN_SHAM_MATRIX T (NDIGITS 12)")
     if total < n_spins:
         raise ValueError(F"{logfile}: {total} Kohn-Sham matrix prints for {n_spins} spin channels")
     out = []
-    for k in range(total - n_spins + 1, total + 1):
-        with open(logfile) as f:
-            _skip_to_nth_banner(f, KS_BANNERS, k)
+    with open(logfile, "rb") as f:
+        for k in range(total - n_spins, total):
             try:
-                H = _ao_overlap_blocks_fast(f)
+                H = _ao_overlap_blocks_fast(_lines_from(f, offsets[k]))
             except (AssertionError, ValueError, IndexError, KeyError):
-                H = None
-        if H is None:
-            with open(logfile) as f:
-                _skip_to_nth_banner(f, KS_BANNERS, k)
-                H = _ao_overlap_blocks_flex(f, logfile)
-        if _max_asymmetry(H) > 1e-8:
-            raise ValueError(F"parsed Kohn-Sham matrix not symmetric ({logfile})")
-        out.append(0.5 * (H + H.T))
+                H = _ao_overlap_blocks_flex(_lines_from(f, offsets[k]), logfile)
+            if _max_asymmetry(H) > 1e-8:
+                raise ValueError(F"parsed Kohn-Sham matrix not symmetric ({logfile})")
+            out.append(0.5 * (H + H.T))
     return out
 
 
