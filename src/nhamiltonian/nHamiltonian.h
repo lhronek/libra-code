@@ -636,6 +636,8 @@ public:
   ///< In nHamiltonian_compute_QTSH.cpp and nHamiltonian_compute_QTSH_forces.cpp
   complex<double> QTSH_energy_dia(CMATRIX& ampl_dia);
   complex<double> QTSH_energy_dia(CMATRIX& ampl_dia, vector<int>& id_);
+  complex<double> QTSH_energy_dia(CMATRIX& ampl_dia, MATRIX& p, const MATRIX& invM);  ///< the coherence energy in the Lowdin frame of the diabats (get_hvib_dia_lowdin), the frame of get_ham_dia_lowdin - p, invM (nnucl x 1)
+  complex<double> QTSH_energy_dia(CMATRIX& ampl_dia, MATRIX& p, const MATRIX& invM, vector<int>& id_);
   CMATRIX QTSH_forces_dia_unit(CMATRIX& ampl_dia, int option);      ///< QTSH forces in diabatic basis
   CMATRIX QTSH_forces_dia_unit(CMATRIX& ampl_dia);                  ///< QTSH forces in diabatic basis
   CMATRIX QTSH_forces_dia(CMATRIX& ampl_dia, int lvl, int option);  ///< QTSH forces in diabatic basis

@@ -282,13 +282,16 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
     // Diabatic 
     if(prms.rep_force==0){ 
       CMATRIX coeff(ndia, 1);
+      MATRIX p_traj(dyn_vars.ndof, 1);
       for(itraj=0; itraj<ntraj; itraj++){
         id[1] = child_of(ham, itraj);
         int ist = effective_states[itraj];
         res[itraj] = ham.child(id[1])->get_ham_dia_lowdin().get(ist, ist).real(); // diagonal energy
         
         coeff = dyn_vars.ampl_dia->col(itraj);
-        res[itraj] += ham.QTSH_energy_dia(coeff, id).real(); // coherence energy
+        p_traj = dyn_vars.p->col(itraj);
+        // the coherence energy in the same Lowdin frame (the raw diabatic one at S = I)
+        res[itraj] += ham.QTSH_energy_dia(coeff, p_traj, *dyn_vars.iM, id).real();
       }
     }
     // Adiabatic 

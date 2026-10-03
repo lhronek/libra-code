@@ -67,16 +67,40 @@ CMATRIX nHamiltonian::QTSH_forces_dia_unit(CMATRIX &ampl_dia, int option) {
   }
 
   CMATRIX res(nnucl, 1);
+  CMATRIX X(ndia, ndia);
+  CMATRIX Y(ndia, ndia);
+  if (lowdin_dia(X, Y)) {
+    // the Lowdin frame of the diabats, the frame of the QTSH state energy and coherence energy
+    // (get_ham_dia_lowdin, QTSH_energy_dia with the momenta): -d^H offdiag(dH_L) d / (d^H d) on
+    // d = Y ampl_dia, dH_L the total derivative of X ham_dia X along the DOF (get_d1ham_dia_lowdin,
+    // the frame's own motion inside it) for option 0 and the Hamiltonian's derivative in the frame,
+    // X d1ham_dia X, for option 1 - the frame terms the raw-frame expressions below carry through
+    // S^-1 and dc1_dia
+    CMATRIX d(Y * ampl_dia);
+    complex<double> norm_l = (d.H() * d).M[0];
+    for (int n = 0; n < nnucl; n++) {
+      if (d1ham_dia_mem_status[n] == 0) {
+        cout << "Error in QTSH_forces_dia_unit(): the derivatives of the Hamiltonian matrix in the \
+      diabatic basis w.r.t. the nuclear DOF " << n << " is not allocated but is needed for the calculations \n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
+      CMATRIX dH((option == 0) ? get_d1ham_dia_lowdin(n) : X * (*d1ham_dia[n]) * X);
+      for (int i = 0; i < ndia; i++) { dH.set(i, i, complex<double>(0.0, 0.0)); }
+      res.M[n] = -(d.H() * dH * d).M[0];
+    }
+    res /= norm_l;
+    return res;
+  }
   CMATRIX *dtilda;
-  dtilda = new CMATRIX(nadi, nadi);
+  dtilda = new CMATRIX(ndia, ndia);
   CMATRIX *invS;
-  invS = new CMATRIX(nadi, nadi);
+  invS = new CMATRIX(ndia, ndia);
 
   FullPivLU_inverse(*ovlp_dia, *invS);
 
   complex<double> norm = (ampl_dia.H() * (*ovlp_dia) * ampl_dia).M[0];
 
-  CMATRIX *temp_diag = new CMATRIX(nadi, nadi);
+  CMATRIX *temp_diag = new CMATRIX(ndia, ndia);
 
   for (int n = 0; n < nnucl; n++) {
 
@@ -100,14 +124,14 @@ CMATRIX nHamiltonian::QTSH_forces_dia_unit(CMATRIX &ampl_dia, int option) {
       *dtilda = ((*dc1_dia[n]).H() * (*invS) * (*ham_dia) +
                  (*ham_dia) * (*invS) * (*dc1_dia[n]));
 
-      for (int i = 0; i < nadi; i++) {
+      for (int i = 0; i < ndia; i++) {
         temp_diag->set(i, i, (*d1ham_dia[n] - *dtilda).get(i, i));
       }
       res.M[n] =
           -(ampl_dia.H() * (*d1ham_dia[n] - *dtilda - *temp_diag) * ampl_dia)
                .M[0];
     } else if (option == 1) {
-      for (int i = 0; i < nadi; i++) {
+      for (int i = 0; i < ndia; i++) {
         temp_diag->set(i, i, d1ham_dia[n]->get(i, i));
       }
       res.M[n] = -(ampl_dia.H() * (*d1ham_dia[n] - *temp_diag) * ampl_dia).M[0];

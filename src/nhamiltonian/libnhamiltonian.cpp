@@ -314,6 +314,10 @@ void export_nhamiltonian_objects(){
   = &nHamiltonian::QTSH_energy_dia;
   complex<double> (nHamiltonian::*expt_QTSH_energy_dia_v2)(CMATRIX& ampl_dia, vector<int>& id_)
   = &nHamiltonian::QTSH_energy_dia;
+  complex<double> (nHamiltonian::*expt_QTSH_energy_dia_v3)(CMATRIX& ampl_dia, MATRIX& p, const MATRIX& invM)
+  = &nHamiltonian::QTSH_energy_dia;
+  complex<double> (nHamiltonian::*expt_QTSH_energy_dia_v4)(CMATRIX& ampl_dia, MATRIX& p, const MATRIX& invM, vector<int>& id_)
+  = &nHamiltonian::QTSH_energy_dia;
   
   //CMATRIX (nHamiltonian::*expt_QTSH_forces_adi_v1)(CMATRIX& ampl_adi, int lvl, int option, CMATRIX& transform)
   //= &nHamiltonian::QTSH_forces_adi;
@@ -613,6 +617,8 @@ void export_nhamiltonian_objects(){
       .def("QTSH_energy_adi", expt_QTSH_energy_adi_v2)
       .def("QTSH_energy_dia", expt_QTSH_energy_dia_v1)
       .def("QTSH_energy_dia", expt_QTSH_energy_dia_v2)
+      .def("QTSH_energy_dia", expt_QTSH_energy_dia_v3)
+      .def("QTSH_energy_dia", expt_QTSH_energy_dia_v4)
       
       .def("QTSH_forces_adi", expt_QTSH_forces_adi_v1)
       .def("QTSH_forces_adi", expt_QTSH_forces_adi_v2)
