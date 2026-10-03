@@ -2660,7 +2660,9 @@ def sd_diabatization_groups(sd_lists, kind, active_space=None, data_dim=None):
     An open-shell reference joins the manifold whose defining orbital it occupies singly
     (a hole manifold whose particle's spin partner is occupied - the cation's hole - or a
     particle manifold whose hole's partner is empty - the anion's electron): its own
-    configuration is one of the localized states.
+    configuration is one of the localized states. That reference holds ONE singly-occupied
+    orbital (a doublet) - with several it would join every one of their manifolds, and is
+    refused.
 
     Args:
         sd_lists (list of lists of int): the SDs of one step in the signed reindexed
@@ -2687,9 +2689,10 @@ def sd_diabatization_groups(sd_lists, kind, active_space=None, data_dim=None):
         singles (list of int): rows left untransformed (the reference, one-member manifolds,
             non-single excitations)
 
-    Raises ValueError for an unknown kind, for "both" when a channel's single
-    excitations do not form the complete hole x particle product or when the reference
-    is open-shell (the joint states presume a closed-shell reference).
+    Raises ValueError for an unknown kind, for a reference with more than one singly-occupied
+    orbital, for "both" when a channel's single excitations do not form the complete
+    hole x particle product or when the reference is open-shell (the joint states presume a
+    closed-shell reference).
     """
     if kind not in ("electron", "hole", "both"):
         raise ValueError(F"localized_carrier {kind!r} - use 'none', 'hole', 'electron' or 'both' (the former 'particle' "
@@ -2705,6 +2708,13 @@ def sd_diabatization_groups(sd_lists, kind, active_space=None, data_dim=None):
         partner = _spin_partner(orb, active_space, data_dim)
         return partner is not None and ((orb in ref) != (partner in ref))
 
+    if kind != "both" and active_space is not None:
+        open_shells = sorted({abs(int(o)) for o in ref if singly_occupied(o)})
+        if len(open_shells) > 1:
+            raise ValueError(F"the reference determinant holds {len(open_shells)} singly-occupied orbitals "
+                             F"{open_shells} - the localized manifolds of the '{kind}' carrier take an open-shell "
+                             "reference with one singly-occupied orbital (a doublet), which joins the manifold of "
+                             "that orbital - localize this reference with localized_carrier 'none'")
     manifolds = {}
     singles = [gs]
     for k, occ in enumerate(sets):
