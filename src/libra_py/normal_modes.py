@@ -763,6 +763,15 @@ def compute_dynmat(R, D, M, E, params):
     U_a = MATRIX(ndof, ndof)
 
     solve_eigen_nosort(D, w_a, U_a, 0)
+    # the general solver returns the eigenpairs in its backend's own order (LAPACK dgeev from eight
+    # states on, the Eigen solver below) - the mode index means the ascending eigenvalue
+    order = sorted(range(ndof), key=lambda k: w_a.get(k, k))
+    w_sorted, U_sorted = MATRIX(ndof, ndof), MATRIX(ndof, ndof)
+    for new, old in enumerate(order):
+        w_sorted.set(new, new, w_a.get(old, old))
+        for dof in range(ndof):
+            U_sorted.set(dof, new, U_a.get(dof, old))
+    w_a, U_a = w_sorted, U_sorted
 
     if verbosity > 1:
         print("Dynamic matrix:")

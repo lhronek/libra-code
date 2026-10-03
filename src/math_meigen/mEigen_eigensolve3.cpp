@@ -229,8 +229,9 @@ void solve_eigen_nosort(MATRIX* H, CMATRIX* E, CMATRIX* C, int symm){
   }
 
   if(have_lapack() && N_bas >= get_lapack_nosort_min_n()){
-    // LAPACK dgeev (blas_interface.h): the eigenvalues in Schur order with the conjugate pairs
-    // adjacent, the positive imaginary part first - the convention of the Eigen EigenSolver too
+    // LAPACK dgeev (blas_interface.h): the eigenvalues in its Schur order with the conjugate pairs
+    // adjacent, the positive imaginary part first - an order of its own, not the Eigen EigenSolver's:
+    // a caller that needs an order sorts (normal_modes does)
     CMATRIX Ef(N_bas, N_bas);
     CMATRIX Cf(N_bas, N_bas);
     if(symm==1){
@@ -374,7 +375,8 @@ void solve_eigen_nosort(MATRIX* H, MATRIX* E, MATRIX* C, int symm){
   }
 
   if(have_lapack() && N_bas >= get_lapack_nosort_min_n()){
-    // LAPACK dgeev (blas_interface.h) with the real parts of the eigenpairs kept, as the Eigen path does
+    // LAPACK dgeev (blas_interface.h) with the real parts of the eigenpairs kept, as the Eigen path does -
+    // in dgeev's own order, not the Eigen EigenSolver's
     CMATRIX Ef(N_bas, N_bas);
     CMATRIX Cf(N_bas, N_bas);
     if(symm==1){
