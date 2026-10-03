@@ -220,27 +220,18 @@ def QE_pdos(prefix, emin, emax, de, projections, Ef, outfile_prefix, do_convolve
     f2b.close()
 
     N = E.num_of_rows
-    for i in range(0, N):  # loop over grid points
-        line = str(E.get(i, 0)) + "   "
-        tot = 0.0
-        for j in range(0, nproj):
-            tot = tot + pDOSa.get(i, j)
-            line = line + str(pDOSa.get(i, j)) + "   "
-        line = line + str(tot) + "\n"
-        f2a = open(outfile_prefix + "_alp.txt", "a")
-        f2a.write(line)
-        f2a.close()
-
-    for i in range(0, N):  # loop over grid points
-        line = str(E.get(i, 0)) + "   "
-        tot = 0.0
-        for j in range(0, nproj):
-            tot = tot + pDOSb.get(i, j)
-            line = line + str(pDOSb.get(i, j)) + "   "
-        line = line + str(tot) + "\n"
-        f2b = open(outfile_prefix + "_bet.txt", "a")
-        f2b.write(line)
-        f2b.close()
+    # the rows from the arrays and each file open once - the same text (python floats, the row sum in column order)
+    e_col = data_conv.MATRIX2nparray(E, np.float64)[:, 0].tolist()
+    for M, suffix in ((pDOSa, "_alp.txt"), (pDOSb, "_bet.txt")):
+        rows = data_conv.MATRIX2nparray(M, np.float64).tolist()
+        with open(outfile_prefix + suffix, "a") as f2:
+            for i in range(0, N):  # loop over grid points
+                line = str(e_col[i]) + "   "
+                tot = 0.0
+                for v in rows[i]:
+                    tot = tot + v
+                    line = line + str(v) + "   "
+                f2.write(line + str(tot) + "\n")
 
     if nspin == 2:
         return E, pDOSa, pDOSb
@@ -363,24 +354,23 @@ def libra_pdos(_emin, _emax, _de, projections, prefix, outfile, Nel, do_convolve
 
     res = np.zeros((N, nproj + 2), dtype=float)
 
-    # Now compute projections
-    for i in range(0, N):  # loop energy grid
+    # Now compute projections - the rows from the arrays and the file open once
+    e_col = data_conv.MATRIX2nparray(E, np.float64)[:, 0].tolist()
+    rows = data_conv.MATRIX2nparray(pDOSa, np.float64).tolist()
+    with open(outfile, "a") as f2:
+        for i in range(0, N):  # loop energy grid
 
-        res[i, 0] = E.get(i, 0)
-        line = str(E.get(i, 0)) + "   "
+            res[i, 0] = e_col[i]
+            line = str(e_col[i]) + "   "
 
-        tot = 0.0
-        for j in range(0, nproj):
-            res[i, j + 1] = pDOSa.get(i, j)
-            tot = tot + pDOSa.get(i, j)
-            line = line + str(pDOSa.get(i, j)) + "   "
+            tot = 0.0
+            for j, v in enumerate(rows[i]):
+                res[i, j + 1] = v
+                tot = tot + v
+                line = line + str(v) + "   "
 
-        res[i, nproj + 1] = tot
-        line = line + str(tot) + "\n"
-
-        f2 = open(outfile, "a")
-        f2.write(line)
-        f2.close()
+            res[i, nproj + 1] = tot
+            f2.write(line + str(tot) + "\n")
 
     return res
 
@@ -534,27 +524,18 @@ def cp2k_pdos(_params):
     f2b.close()
 
     N = E.num_of_rows
-    for i in range(0, N):  # loop over grid points
-        line = str(E.get(i, 0)) + "   "
-        tot = 0.0
-        for j in range(0, nproj):
-            tot = tot + pDOSa.get(i, j)
-            line = line + str(pDOSa.get(i, j)) + "   "
-        line = line + str(tot) + "\n"
-        f2a = open(outfile_prefix + "_alp.txt", "a")
-        f2a.write(line)
-        f2a.close()
-
-    for i in range(0, N):  # loop over grid points
-        line = str(E.get(i, 0)) + "   "
-        tot = 0.0
-        for j in range(0, nproj):
-            tot = tot + pDOSb.get(i, j)
-            line = line + str(pDOSb.get(i, j)) + "   "
-        line = line + str(tot) + "\n"
-        f2b = open(outfile_prefix + "_bet.txt", "a")
-        f2b.write(line)
-        f2b.close()
+    # the rows from the arrays and each file open once - the same text (python floats, the row sum in column order)
+    e_col = data_conv.MATRIX2nparray(E, np.float64)[:, 0].tolist()
+    for M, suffix in ((pDOSa, "_alp.txt"), (pDOSb, "_bet.txt")):
+        rows = data_conv.MATRIX2nparray(M, np.float64).tolist()
+        with open(outfile_prefix + suffix, "a") as f2:
+            for i in range(0, N):  # loop over grid points
+                line = str(e_col[i]) + "   "
+                tot = 0.0
+                for v in rows[i]:
+                    tot = tot + v
+                    line = line + str(v) + "   "
+                f2.write(line + str(tot) + "\n")
 
     #if nspin == 2:                  # nspin 2 is refused above - pDOSb is the alpha copy either way
     #    return E, pDOSa, pDOSb
