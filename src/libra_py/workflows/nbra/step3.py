@@ -1101,7 +1101,7 @@ def limit_active_space(params):
     l1 = params['lowest_orbital']
     h1 = params['highest_orbital']
     sample_logfile = glob.glob(f'{params["logfile_directory"]}/*.log')[0]
-    sample_npz_file = glob.glob(f'{params["path_to_npz_files"]}/*.npz')[0]
+    sample_npz_file = sorted(glob.glob(f'{params["path_to_npz_files"]}/S_ks_*.npz'))[0]
     _check_orbital_window(params, int(sp.load_npz(sample_npz_file).shape[0]),
                           'limit_active_space')
     os.system(f'mkdir {params["path_to_save_npz_files"]}')
