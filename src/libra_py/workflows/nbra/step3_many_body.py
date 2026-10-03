@@ -112,7 +112,6 @@ def get_step2_mb_sp_properties(_params):
     spin_components_job = []
     sd_basis_states_unique = []
     # the configurations already in the unique list, as hashable keys - one set lookup per configuration
-    # instead of a scan of the growing list (steps x states x configurations x SDs comparisons before)
     seen = set()
 
     excitation_energies, ci_basis_raw, ci_coefficients_raw_unnorm, spin_components = step2_many_body.get_excitation_analysis_output(
@@ -264,7 +263,7 @@ def _configuration_rows(configurations):
 
 def _normalized_columns(T, step):
     """The CMATRIX of T with every column scaled to unit norm, the column sums taken row by row (the
-    order of the former element loop) - a column without any configuration (a CI state with no SD
+    summation order the bit-for-bit tests pin) - a column without any configuration (a CI state with no SD
     in the basis) raises instead of dividing by zero."""
     sums = np.add.reduce(np.abs(T) ** 2, axis=0)
     if not np.all(sums > 0.0):

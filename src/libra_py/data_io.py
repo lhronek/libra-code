@@ -382,8 +382,8 @@ def sort_hvib_file_names(files):
     steps = []
     kept = []
     for file in files:
-        # the step is the last run of digits of the file NAME - every digit of the full path went into the key
-        # before, so files from directories with different digits (or a basis name with digits) sorted wrongly
+        # the step is the last run of digits of the file NAME - the digits of the directories and of a basis name
+        # are no part of the key
         numbers = re.findall(r"\d+", os.path.basename(file))
         # entries without a step number (e.g. hvib_convention.json swept in
         # by a broad glob) cannot be sorted - exclude them instead of crashing

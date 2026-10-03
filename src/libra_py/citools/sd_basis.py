@@ -131,7 +131,7 @@ def sd2ci_matrix(ci_data, sd_unique, lowest_orbital):
     T = np.zeros((nsd, nstates))
     drops = np.zeros(nstates)
     T[0, 0] = 1.0
-    # the reference occupation the basis was built for, per spin channel: the
+    # the reference occupation of the basis, per spin channel: the
     # basis holds holes in [occ_lo, homo_w] and particles in [homo_w+1, vir_hi]
     # (window-relative), so a config's hole above homo_w or particle at or
     # below it is NOT an excitation of this reference at all - a different
@@ -180,7 +180,7 @@ def sd2ci_matrix(ci_data, sd_unique, lowest_orbital):
                              f"increase num_occ_states/num_unocc_states (and the MO window)")
         dropped = max(0.0, 1.0 - nrm2)
         T[:, i + 1] /= np.sqrt(nrm2)
-        # name what was dropped - a total alone hides which orbitals the
+        # name the dropped amplitudes - a total alone hides which orbitals the
         # window is missing
         truncated.sort(key=lambda x: -x[3])
         named = ", ".join(F"{o}->{v}{'' if sp == 'alp' else ' ' + sp} ({w:.1%})"

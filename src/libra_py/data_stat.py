@@ -238,8 +238,8 @@ def mat_stat(X):
 
 def stat_arrays(stack):
     """The average, standard deviation, lower and upper bound over the first axis of an (N, ...) stack -
-    the sums run in the order of the former element loops (member by member, first to last), so the
-    averages and bounds equal the loops bit for bit and the deviations to the last bit."""
+    the sums run member by member, first to last, the summation order the bit-for-bit tests pin (the
+    averages and bounds exactly, the deviations to the last bit)."""
     N = stack.shape[0]
     res = np.add.reduce(stack, axis=0) / float(N)
     # the squares by multiplication, correctly rounded (a float power through libm pow misses that rounding

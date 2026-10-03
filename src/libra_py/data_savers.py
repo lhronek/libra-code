@@ -73,7 +73,7 @@ from .hdf5_io import open_hdf5
 
 def _matrix_block(data, dtype):
     """The (C)MATRIX as one ndarray block for a dataset of dtype - a complex matrix into a real or integer
-    dataset is refused (the element assignment refused it too), a real matrix casts like its elements did."""
+    dataset is refused, a real matrix takes the dataset's dtype as h5py casts its elements."""
     if isinstance(data, CMATRIX):
         if not np.issubdtype(dtype, np.complexfloating):
             raise TypeError(F"a CMATRIX cannot be saved into a {np.dtype(dtype).name} dataset")

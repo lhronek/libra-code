@@ -166,9 +166,9 @@ def _diagonal_series(dataset, states, block_bytes=16 << 20):
 
 
 def _selected(which, n):
-    """The requested indices along an axis of length n in ascending order without repeats - the order the former
-    range scans plotted them - and the h5py selection that reads exactly those rows in one call: a plain slice when
-    every index is wanted, otherwise the list (h5py takes one increasing list per read)."""
+    """The requested indices along an axis of length n in ascending order without repeats - the plotting order of
+    the panels - and the h5py selection that reads exactly those rows in one call: a plain slice when every index
+    is wanted, otherwise the list (h5py takes one increasing list per read)."""
     sel = sorted({int(i) for i in which if i in range(n)})
     return sel, (slice(None) if sel == list(range(n)) else sel)
 
@@ -1701,7 +1701,7 @@ def hdf2xyz(labels, filename, snaps, trajectories, atoms, unit_conversion_factor
 
             md_xyz = md_xyz + F"{natoms*ntraj}\nsnapshot {isnap}\n"
 
-            # the snapshot's coordinates in one read - three element reads per atom and trajectory before
+            # the snapshot's coordinates in one read
             q_snap = f["q/data"][isnap] * unit_conversion_factor
             for itraj in trajectories:
                 for iatom in atoms:

@@ -44,7 +44,7 @@ def _diagonal_energies(Hvib):
 
 def _gap_stack(E):
     """|E_i - E_j| for every step of an (nsteps, nstates) energy array: an (nsteps, nstates, nstates) stack,
-    zero on the diagonal like the former loops that filled i < j and its mirror."""
+    symmetric with a zero diagonal."""
     return np.abs(E[:, :, None] - E[:, None, :])
 
 

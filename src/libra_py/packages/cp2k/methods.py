@@ -3543,9 +3543,8 @@ def _ao_overlap_blocks_fast(it):
 def _ao_overlap_blocks_flex(it, logfile):
     """Flexible line-by-line fallback: tolerates irregular block shapes at
     python parsing speed. Streams one block at a time into the result
-    (allocated from the first block and grown on demand), instead of
-    buffering every block as python floats - the old all-blocks buffer
-    held ~60x the final matrix."""
+    (allocated from the first block and grown on demand) - the result is the
+    only buffer."""
     S = None
     cols, rows_i, vals = None, [], []
 
@@ -4096,7 +4095,7 @@ def run_cp2k(coords_bohr, params):
         step) and then the main run from `template` - a retry repeats the main run
         from the restart files of the step's start, restored below, so it does not
         inherit the density a failed attempt left in them, and starts from the OT
-        density the first attempt converged (the failure was the main run's)"""
+        density the first attempt converged (the failure is the main run's)"""
         main_params = dict(params)
         main_params["input_template"] = template
         if params.get("ot_template", None):
@@ -4151,7 +4150,7 @@ def run_cp2k(coords_bohr, params):
             if f in kept:
                 shutil.copy2(kept[f], f)
             elif os.path.exists(f):
-                os.remove(f)                    # the first attempt had none, so the retry has none
+                os.remove(f)                    # absent at the step's start, so absent for the retry
 
     try:
         for itry, template in enumerate(templates):
@@ -4349,7 +4348,7 @@ def compute_state_energy_and_force(coords_bohr, params):
             # active state's omega (10-decimal in the excited-state block)
             E_gs = E_total - info["omega"]
         elif params.get("force_source", "active_state") == "active_state":
-            # the force of state act_state was requested, but the run carried no
+            # force_source active_state asks for the force of act_state, but the run carries no
             # excited-state block - the FORCES block is the ground state's
             raise ValueError(
                 f"act_state = {act_state} with force_source active_state, but {logfile} carries no "
@@ -5371,8 +5370,7 @@ def fill_adiabatic_hamiltonians(obj, E, st_ci, s_ci=None):
     Lowdin-orthonormalized CI overlap) or the identity. No coupling is handed over: the engine derives the
     couplings of the followed states from time_overlap_adi with its own projector (nac_update_method 2) and
     builds hvib_adi = H - i D (hvib_update_method 1) - a driver's own follower could disagree with the engine's
-    at an ambiguous crossing. The CI overlaps of the drivers are real - a complex one is refused, as the former
-    element casts float(...) refused it."""
+    at an ambiguous crossing. The CI overlaps of the drivers are real - a complex one is refused."""
     if np.iscomplexobj(st_ci) or (s_ci is not None and np.iscomplexobj(s_ci)):
         raise TypeError("a complex CI overlap reached the adiabatic Hamiltonian fill - the drivers' overlaps are real")
     E = np.asarray(E, dtype=np.float64)
@@ -6070,9 +6068,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
     # calls the native-xTB Coulomb Hessian (xtb_ehess), whose neighbor lists a
     # tblite run never populates - hard segfault, verified
     # (qs_tddfpt2_forces.F:1358 -> xtb_ehess.F:146 - unfixed upstream). Refuse
-    # BEFORE any CP2K time is spent. (OE_CORR had the same class of defect in
-    # tddfpt_oecorr - fixed by the local CP2K patch dispatching to
-    # build_tblite_ks_matrix, so it is not guarded here.)
+    # BEFORE any CP2K time is spent. (OE_CORR is not guarded: the local CP2K
+    # patch dispatches tddfpt_oecorr to build_tblite_ks_matrix.)
     # every template run_cp2k may run - the main one and the retry_templates - passes the validators
     templates = [params["input_template"]] + list(params.get("retry_templates", []) or [])
     if params.get("time_dependent", True) and force_source in ("active_state", "all_states"):
@@ -6363,8 +6360,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
                 ci_curr["window_drops"] = compose_drops(rd, ci_curr["window_drops"])
             if amps_prealigned:
                 # fold the wfn-virtual-range truncation into the capture
-                # metric - those X rows were cut before ci_data_from_newtonx
-                # could count them, and the renormalization hides the loss
+                # metric - the wfn virtual range cuts those X rows before ci_data_from_newtonx
+                # counts them, and the renormalization hides the loss
                 tw = (trunc2 / total2)[:len(ci_curr["window_drops"])]
                 for k in np.nonzero(tw > 1e-6)[0]:
                     _report_drop("cp2k_compute_adi (the wfn virtual range)", k + 1,
