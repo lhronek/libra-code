@@ -84,6 +84,29 @@ void solve_eigen(MATRIX* H, CMATRIX* E, CMATRIX* C, int symm){
  here we actually specialize the generalized eigensolver.
 */
 
+  if(H->n_rows!=H->n_cols){
+    std::cout<<"Error in solve_eigen: The H matrix must be square\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  if(H->n_cols!=C->n_rows){  // N_bas
+    std::cout<<"Error in solve_eigen: The # of cols of H and the # of rows of C matrices must be equal\n";
+    std::cout<<"Make sure C is allocated \n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  if(C->n_cols!=E->n_rows){  // N_mo
+    std::cout<<"Error in solve_eigen: The # of cols of C and the # of rows of E matrices must be equal\n";
+    std::cout<<"Make sure C and E are allocated \n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  if(C->n_cols!=E->n_cols){  // N_mo
+    std::cout<<"Error in solve_eigen: The # of cols of C and the # of cols of E matrices must be equal\n";
+    std::cout<<"Make sure C and E are allocated \n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  if(C->n_cols<1 || C->n_cols>H->n_cols){  // the eigenpairs requested
+    std::cout<<"Error in solve_eigen: The # of cols of C (the eigenpairs requested) must be between 1 and the size of H\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
   int N_bas = H->n_cols;
   if(have_lapack() && N_bas >= get_lapack_eigen_min_n()){
     // the real standard problem goes straight to dsyevd (blas_interface.h), the real eigenpairs

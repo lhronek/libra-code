@@ -189,6 +189,10 @@ void solve_eigen(CMATRIX* H, CMATRIX* S, CMATRIX* E, CMATRIX* C, int symm){
   // The above two conditions imply E is square matrix
   int N_bas = H->n_cols;
   int N_mo  = C->n_cols;
+  if(N_mo<1 || N_mo>N_bas){  // the eigenpairs requested
+    std::cout<<"Error in solve_eigen: The # of cols of C (the eigenpairs requested) must be between 1 and the size of H\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
   if(have_lapack() && N_bas >= get_lapack_eigen_min_n()){
     // LAPACK divide-and-conquer path (blas_interface.h): the kernel reads one triangle and
@@ -330,6 +334,10 @@ void solve_eigen(MATRIX* H, MATRIX* S, CMATRIX* E, CMATRIX* C, int symm){
   // The above two conditions imply E is square matrix
   int N_bas = H->n_cols;
   int N_mo  = C->n_cols;
+  if(N_mo<1 || N_mo>N_bas){  // the eigenpairs requested
+    std::cout<<"Error in solve_eigen: The # of cols of C (the eigenpairs requested) must be between 1 and the size of H\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
   if(have_lapack() && N_bas >= get_lapack_eigen_min_n()){
     // LAPACK path through the real kernel (blas_interface.h) - the real symmetric pair has real
@@ -485,6 +493,10 @@ void solve_eigen(MATRIX* H, MATRIX* S, MATRIX* E, MATRIX* C, int symm){
   // The above two conditions imply E is square matrix
   int N_bas = H->n_cols;
   int N_mo  = C->n_cols;
+  if(N_mo<1 || N_mo>N_bas){  // the eigenpairs requested
+    std::cout<<"Error in solve_eigen: The # of cols of C (the eigenpairs requested) must be between 1 and the size of H\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
   if(have_lapack() && N_bas >= get_lapack_eigen_min_n()){
     // LAPACK divide-and-conquer path (blas_interface.h): symm = 0 keeps the kernel's fail-loud

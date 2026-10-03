@@ -71,6 +71,10 @@ void solve_eigen_nosort(CMATRIX* H, CMATRIX* E, CMATRIX* C, int symm){
   // The above two conditions imply E is square matrix
   int N_bas = H->n_cols;
   int N_mo  = C->n_cols;
+  if(N_mo<1 || N_mo>N_bas){  // the eigenpairs requested
+    std::cout<<"Error in solve_eigen_nosort: The # of cols of C (the eigenpairs requested) must be between 1 and the size of H\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
   if(have_lapack() && N_bas >= get_lapack_nosort_min_n()){
     // LAPACK zgeev (blas_interface.h) on the full matrix, then the order of the Eigen
@@ -219,6 +223,10 @@ void solve_eigen_nosort(MATRIX* H, CMATRIX* E, CMATRIX* C, int symm){
   // The above two conditions imply E is square matrix
   int N_bas = H->n_cols;
   int N_mo  = C->n_cols;
+  if(N_mo<1 || N_mo>N_bas){  // the eigenpairs requested
+    std::cout<<"Error in solve_eigen_nosort: The # of cols of C (the eigenpairs requested) must be between 1 and the size of H\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
   if(have_lapack() && N_bas >= get_lapack_nosort_min_n()){
     // LAPACK dgeev (blas_interface.h): the eigenvalues in Schur order with the conjugate pairs
@@ -360,6 +368,10 @@ void solve_eigen_nosort(MATRIX* H, MATRIX* E, MATRIX* C, int symm){
   // The above two conditions imply E is square matrix
   int N_bas = H->n_cols;
   int N_mo  = C->n_cols;
+  if(N_mo<1 || N_mo>N_bas){  // the eigenpairs requested
+    std::cout<<"Error in solve_eigen_nosort: The # of cols of C (the eigenpairs requested) must be between 1 and the size of H\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
   if(have_lapack() && N_bas >= get_lapack_nosort_min_n()){
     // LAPACK dgeev (blas_interface.h) with the real parts of the eigenpairs kept, as the Eigen path does
