@@ -45,6 +45,10 @@ void least_squares_solve(MATRIX& A, MATRIX& X, MATRIX& B, int option){
   int K = B.n_cols;
   int i,j;
 
+  if(option < 0 || option > 3){
+    std::cout<<"Error in least_squares_solve(): option = "<<option<<" has no branch here (implemented: 0, 1, 2, 3)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
   if(have_lapack() && std::max(N, M) >= get_lapack_lstsq_min_n()){
     // LAPACK (blas_interface.h) with Eigen's rank threshold eps min(N, M): the SVD driver for option
