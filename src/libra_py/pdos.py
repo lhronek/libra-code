@@ -343,7 +343,9 @@ def libra_pdos(_emin, _emax, _de, projections, prefix, outfile, Nel, do_convolve
         E, pDOSa = convolve(en, dosa, de, de_new, var)
         # E, pDOSb = convolve(en0, dosb, de, de_new, var)
     else:
-        E = MATRIX(dosa)
+        #E = MATRIX(dosa)     # the DOS matrix is not the energy axis - the grid and the DOS copy follow
+        E = MATRIX(en)
+        pDOSa = MATRIX(dosa)
 
     # Convert the energy axis back to eV
     E *= (1.0 / units.ev2Ha)
@@ -352,6 +354,7 @@ def libra_pdos(_emin, _emax, _de, projections, prefix, outfile, Nel, do_convolve
     f2.write("Ef = %5.3f eV\n" % (Ef / units.ev2Ha))
     f2.close()
 
+    N = E.num_of_rows     # the convolved grid holds N0 mult rows - the writer and res follow it
     res = np.zeros((N, nproj + 2), dtype=float)
 
     # Now compute projections - the rows from the arrays and the file open once
