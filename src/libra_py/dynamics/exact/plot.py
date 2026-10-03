@@ -38,7 +38,7 @@ import sys
 import math
 import copy
 
-import h5py
+#import h5py  # the files open through hdf5_io.open_hdf5
 import numpy as np
 import matplotlib.pyplot as plt   # plots
 
@@ -49,6 +49,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 
 import util.libutil as comn
 import libra_py.units as units
+from libra_py.hdf5_io import open_hdf5
 import libra_py.data_outs as data_outs
 import libra_py.data_conv as data_conv
 import libra_py.data_savers as data_savers
@@ -302,7 +303,7 @@ def plot_hdf5(plot_params, ax=plt, use_default_ax=True):
 
     out_prefix = prefix
 
-    with h5py.File(F"{prefix}/{filename}", 'r') as f:
+    with open_hdf5(F"{prefix}/{filename}", 'r') as f:
 
         t = None
         if "time" in properties_to_save:

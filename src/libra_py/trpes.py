@@ -19,7 +19,7 @@
 """
 
 import numpy as np
-import h5py
+#import h5py  # the files open through hdf5_io.open_hdf5
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import scipy.sparse as sp
@@ -28,6 +28,7 @@ from matplotlib.ticker import FormatStrFormatter
 
 from liblibra_core import *
 from libra_py import units
+from libra_py.hdf5_io import open_hdf5
 import libra_py.packages.cp2k.methods as cp2k
 import util.libutil as comn
 
@@ -131,7 +132,7 @@ def compute_trpes(_params):
 
     # ================== Determine the time length ===============
     nstps = 0
-    with h5py.File(F'{dprefix}{iconds[0]}{dsuffix}', 'r') as F:
+    with open_hdf5(F'{dprefix}{iconds[0]}{dsuffix}', 'r') as F:
         sh_pop = np.array(F['sh_pop_adi/data'])
         nstps = sh_pop.shape[0] # how many time-points
 
@@ -176,7 +177,7 @@ def compute_trpes(_params):
         try:
             sh_pop = np.array([])
             print(F"Reading the file {dprefix}{icond}{dsuffix}")
-            with h5py.File(F'{dprefix}{icond}{dsuffix}', 'r') as F:
+            with open_hdf5(F'{dprefix}{icond}{dsuffix}', 'r') as F:
                 sh_pop = np.array(F['sh_pop_adi/data'])
 
             E_eff = np.roll(E_ext, -(icond-istep), 0) * units.au2ev    # eV, the energies this condition's trajectory sees

@@ -22,10 +22,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.sparse as sp
 from scipy.optimize import curve_fit
-import h5py
+#import h5py  # the files open through hdf5_io.open_hdf5
 import warnings
 from scipy.constants import physical_constants
 from libra_py import units
+from libra_py.hdf5_io import open_hdf5
 from libra_py.units import au2ev, au2fs
 from libra_py.workflows.nbra import lz, step4
 from libra_py import data_outs, data_conv
@@ -99,7 +100,7 @@ def calculate_excess_energies(adiabatic_energies, methods, icond_range, method_d
                     
                     else:
                         path = f'{method}_{method_dir_prefix}_{icond}{method_dir_suffix}.hdf'
-                        with h5py.File(path, 'r') as f:
+                        with open_hdf5(path, 'r') as f:
                             sh_pop = np.array(f['sh_pop_adi/data'])
                             time = np.array(f['time/data'])[0:params["icond_end"]] * au2fs  
                         

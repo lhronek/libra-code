@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt   # plots
 import numpy as np
 import scipy.sparse as sp
 from scipy.optimize import curve_fit
-import h5py
+#import h5py  # the files open through hdf5_io.open_hdf5
 from scipy.constants import physical_constants
 from scipy.special import stdtrit
 
@@ -36,6 +36,7 @@ from scipy.special import stdtrit
 # import libra_py.common_utils as comn
 import util.libutil as comn
 from libra_py import units
+from libra_py.hdf5_io import open_hdf5
 # from libra_py.workflows.nbra import lz, step4
 # from libra_py import data_outs, data_conv
 
@@ -109,7 +110,7 @@ def fit_namd_data(
 
         for icond in iconds:
             try:
-                with h5py.File(f'{method}_icond_{icond}/mem_data.hdf', 'r') as F:
+                with open_hdf5(f'{method}_icond_{icond}/mem_data.hdf', 'r') as F:
                     sh_pop = np.array(F['sh_pop_adi/data'][:, 0])
                     md_time = np.array(F['time/data'][:]) * units.au2fs
             except FileNotFoundError:

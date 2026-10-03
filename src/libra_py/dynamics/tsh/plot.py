@@ -34,7 +34,7 @@ import sys
 import math
 import copy
 
-import h5py
+#import h5py  # the files open through hdf5_io.open_hdf5
 import numpy as np
 import matplotlib.pyplot as plt
 # from matplotlib.mlab import griddata
@@ -45,6 +45,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import libra_py.data_visualize as davis
 import libra_py.units as units
+from libra_py.hdf5_io import open_hdf5
 
 import util.libutil as comn
 
@@ -1013,7 +1014,7 @@ def plot_dynamics(plot_params_):
     def _save(name):
         plt.savefig(F"{out_prefix}/{name}.{fmt}", dpi=plot_params["dpi"])
 
-    with h5py.File(F"{prefix}/{filename}", 'r') as f:
+    with open_hdf5(F"{prefix}/{filename}", 'r') as f:
 
         # ===== Energy Components vs. Time =========
         if "energies" in what_to_plot:
@@ -1262,7 +1263,7 @@ def plot_dyn(plot_params):
     def _save(name):
         plt.savefig(F"{out_prefix}/{name}.{fmt}", dpi=300)
 
-    with h5py.File(F"{prefix}/{filename}", 'r') as f:
+    with open_hdf5(F"{prefix}/{filename}", 'r') as f:
 
         _figsize = (24, 24)
         # the time axis once per file - every panel below is plotted against it
@@ -1677,7 +1678,7 @@ def hdf2xyz(labels, filename, snaps, trajectories, atoms, unit_conversion_factor
 
     md_xyz = ""
 
-    with h5py.File(filename, 'r') as f:
+    with open_hdf5(filename, 'r') as f:
 
         for isnap in snaps:
 
@@ -2231,7 +2232,7 @@ def plot_dynamics_xf(plot_params_):
     def _save(name):
         plt.savefig(F"{out_prefix}/{name}.{fmt}", dpi=plot_params["dpi"])
 
-    with h5py.File(F"{prefix}/{filename}", 'r') as f:
+    with open_hdf5(F"{prefix}/{filename}", 'r') as f:
 
         # ===== Coordinates vs Time  =========
         if "q_aux" in what_to_plot:

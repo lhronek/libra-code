@@ -22,7 +22,7 @@ import os
 import sys
 import numpy as np
 import scipy.sparse as sp
-import h5py
+#import h5py  # the files open through hdf5_io.open_hdf5
 import time
 from libra_py.workflows.nbra.mp_context import MP_CTX as _MP_CTX
 if sys.platform == "cygwin":
@@ -31,6 +31,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import libra_py.units as units
 from libra_py import data_conv
+from libra_py.hdf5_io import open_hdf5
 import libra_py.data_read as data_read
 import util.libutil as comn
 import libra_py.dynamics.tsh.compute as tsh_dynamics
@@ -376,7 +377,7 @@ def process_batch(args):
         # Compute the transition probability from a patch dynamics 
         T = np.zeros((nstep_patch, nstates, nstates)) # (timestep in a patch, init, dest)
         for ist in range(nstates):
-            with h5py.File(F"{path_to_save_patch}/{prefix_patch}" +
+            with open_hdf5(F"{path_to_save_patch}/{prefix_patch}" +
                            F"n{nbatches}_ibatch{ibatch}_n{npatches}_ipatch{ipatch}_n{nstates}_istate{ist}/mem_data.hdf", 'r') as f:
                 pop_adi_data = np.array(f["se_pop_adi/data"])
             T[:, ist, :] = pop_adi_data[1:,:]
@@ -526,7 +527,7 @@ def run_sum_crude(rpi_sum_params):
             pop_patch.fill(0.0)
             T.fill(0.0)
             for ist in range(nstates):
-                with h5py.File(F"{path_to_save_patch}/{prefix_patch}" +
+                with open_hdf5(F"{path_to_save_patch}/{prefix_patch}" +
                                F"n{nbatches}_ibatch{ibatch}_n{npatches}_ipatch{ipatch}_n{nstates}_istate{ist}/mem_data.hdf", 'r') as f:
                     pop_adi_data = np.array(f["se_pop_adi/data"])
             

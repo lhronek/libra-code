@@ -157,9 +157,9 @@ def bundled_shin_metiu_dvr_path(model: int) -> Path:
 def load_shin_metiu_dvr_data(filename: str | Path) -> ShinMetiuDVRData:
     """Load a Shin-Metiu DVR HDF5 file into an immutable data object."""
 
-    import h5py
+    from libra_py.hdf5_io import open_hdf5
 
-    with h5py.File(filename, "r") as handle:
+    with open_hdf5(filename, "r") as handle:
         return ShinMetiuDVRData(
             R_grid=handle["R_grid"][:],
             eigvals=handle["eigvals"][:],

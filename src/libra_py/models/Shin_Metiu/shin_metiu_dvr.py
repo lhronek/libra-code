@@ -1,8 +1,9 @@
 import numpy as np
-import h5py
+#import h5py  # the files open through hdf5_io.open_hdf5
 from scipy.special import erf
 from functools import reduce
 from liblibra_core import *
+from libra_py.hdf5_io import open_hdf5
 
 """
 .. module:: models_shin_meitu and dvr calculations
@@ -351,7 +352,7 @@ def dump_dvr_to_hdf5(R_grids, results, dvr_filename):
         H_deri_info[i, :, :] = results[i].H_deri
         nac_info[i, :, :] = results[i].nac
 
-    with h5py.File(dvr_filename, 'w') as f:
+    with open_hdf5(dvr_filename, 'w') as f:
         f.create_dataset('R_grid', data=R_grids)
         f.create_dataset('eigvals', data=eigvals_info)
         f.create_dataset('H_deri', data=H_deri_info)
@@ -376,7 +377,7 @@ def interpolateDVR_from_file(R, filename):
     - filename : str
         Name of the input HDF5 file.
     """
-    with h5py.File(filename, 'r') as f:
+    with open_hdf5(filename, 'r') as f:
         R_grid_info = f['R_grid'][:]
         eigvals_info = f['eigvals'][:]
         H_deri_info = f['H_deri'][:]

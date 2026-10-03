@@ -19,6 +19,7 @@ try:
     import h5py
 except ImportError:  # pragma: no cover - exercised only without optional h5py
     h5py = None
+from ...hdf5_io import open_hdf5
 
 
 class FaultTolerantSaver:
@@ -155,7 +156,7 @@ class HDF5Saver:
         if self.flush_stride < 1:
             raise ValueError("flush_stride must be positive")
         self._save_count = 0
-        self.file = h5py.File(self.path, mode)
+        self.file = open_hdf5(self.path, mode)
         self.steps = self.file.require_group("steps")
         self.file.attrs.setdefault("format", "libra_py.dyn.savers.hdf5")
 
@@ -268,7 +269,7 @@ class HDF5TimeSeriesSaver:
         self.flush_stride = int(flush_stride)
         if self.flush_stride < 1:
             raise ValueError("flush_stride must be positive")
-        self.file = h5py.File(self.path, mode)
+        self.file = open_hdf5(self.path, mode)
         self.data = self.file.require_group("data")
         self.file.attrs.setdefault("format", "libra_py.dyn.savers.hdf5_timeseries")
         self._count = int(self.file.attrs.get("nrecords", 0))
@@ -476,7 +477,7 @@ def load_hdf5_steps(
 
     path = _resolve_hdf5_path(path, output_dir, filename)
     records = []
-    with h5py.File(path, "r") as handle:
+    with open_hdf5(path, "r") as handle:
         steps = handle.get("steps")
         if steps is None:
             return records
@@ -510,7 +511,7 @@ def load_hdf5_timeseries(
         raise ImportError("load_hdf5_timeseries requires the optional 'h5py' package")
 
     path = _resolve_hdf5_path(path, output_dir, filename)
-    with h5py.File(path, "r") as handle:
+    with open_hdf5(path, "r") as handle:
         group = handle.get("data")
         if group is None:
             return {}

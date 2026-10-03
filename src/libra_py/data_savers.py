@@ -51,7 +51,7 @@ __email__ = "alexvakimov@gmail.com"
 __url__ = "https://quantum-dynamics-hub.github.io/libra/index.html"
 
 
-import h5py
+#import h5py  # the files open through hdf5_io.open_hdf5
 import numpy as np
 
 import os
@@ -68,6 +68,7 @@ import util.libutil as comn
 from . import units
 from . import data_read
 from . import data_conv
+from .hdf5_io import open_hdf5
 
 
 def _matrix_block(data, dtype):
@@ -84,30 +85,6 @@ def _vector_row(data):
     """A 1D sequence (a list, a libra vector or an ndarray) as one ndarray row."""
     return data if isinstance(data, np.ndarray) else np.asarray(list(data))
 
-_warned_locking = False
-
-
-def _open_hdf5(filename, mode):
-    """Open an HDF5 file without taking the HDF5 file lock.
-
-    The savers are the file's only writer and re-open it on every saved step, so
-    a concurrent reader that holds the default lock (any h5py.File(f, "r") without
-    locking=False, e.g. a monitoring script) would abort the run with
-    BlockingIOError on the next save. Not locking removes that failure mode -
-    correctness of a reader that races the writer is the reader's concern.
-    """
-    global _warned_locking
-    try:
-        return h5py.File(filename, mode, locking=False)
-    except TypeError:
-        # h5py below 3.5 has no locking argument - only the environment can
-        # protect the run there
-        if not _warned_locking:
-            print("WARNING in data_savers: this h5py cannot disable HDF5 file locking "
-                  "(needs h5py >= 3.5) - a concurrent reader holding the lock can abort "
-                  "the run. Export HDF5_USE_FILE_LOCKING=FALSE before starting python")
-            _warned_locking = True
-        return h5py.File(filename, mode)
 
 
 
@@ -288,7 +265,7 @@ class mem_saver:
         # for key in self.np_data.keys():
         #    print(key, self.np_data[key] )
 
-        with _open_hdf5(filename, mode) as f:
+        with open_hdf5(filename, mode) as f:
 
             for data_name in data_names:
                 if data_name in self.np_data.keys():
@@ -422,7 +399,7 @@ class hdf5_saver:
         self.r_compression_level = 4
         self.i_compression_level = 9
 
-        with _open_hdf5(self.filename, "w") as f:
+        with open_hdf5(self.filename, "w") as f:
             g = f.create_group("default")
             g.create_dataset("data", data=[])
 
@@ -469,7 +446,7 @@ class hdf5_saver:
 
         """
 
-        with _open_hdf5(self.filename, "a") as f:
+        with open_hdf5(self.filename, "a") as f:
             g = f.create_group(data_set_name)
             g.attrs["dim"] = dim
             g.attrs["data_type"] = data_type
@@ -512,13 +489,13 @@ class hdf5_saver:
     def save_scalar(self, istep, data_name, data):
 
         if data_name in self.keywords:
-            with _open_hdf5(self.filename, "a") as f:
+            with open_hdf5(self.filename, "a") as f:
                 f[F"{data_name}/data"][istep] = data
 
     def save_multi_scalar(self, istep, iscal, data_name, data):
 
         if data_name in self.keywords:
-            with _open_hdf5(self.filename, "a") as f:
+            with open_hdf5(self.filename, "a") as f:
                 f[F"{data_name}/data"][istep, iscal] = data
 
     def save_vector(self, istep, data_name, data):
@@ -528,7 +505,7 @@ class hdf5_saver:
         """
         if data_name in self.keywords:
             row = _vector_row(data)
-            with _open_hdf5(self.filename, "a") as f:
+            with open_hdf5(self.filename, "a") as f:
                 dset = f[F"{data_name}/data"]
                 dset[istep, :len(row)] = row.astype(dset.dtype, copy=False)
 
@@ -546,7 +523,7 @@ class hdf5_saver:
 
             nx, ny = data.num_of_rows, data.num_of_cols
 
-            with _open_hdf5(self.filename, "a") as f:
+            with open_hdf5(self.filename, "a") as f:
 
                 dset = f[F"{data_name}/data"]
                 dset[istep, :nx, :ny] = _matrix_block(data, dset.dtype).astype(dset.dtype, copy=False)   # one write, not nx x ny
@@ -565,7 +542,7 @@ class hdf5_saver:
 
             nx, ny = data.num_of_rows, data.num_of_cols
 
-            with _open_hdf5(self.filename, "a") as f:
+            with open_hdf5(self.filename, "a") as f:
 
                 dset = f[F"{data_name}/data"]
                 dset[istep, imatrix, :nx, :ny] = _matrix_block(data, dset.dtype).astype(dset.dtype, copy=False)
@@ -584,7 +561,7 @@ class hdf5_saver:
 
             nx, ny = data.num_of_rows, data.num_of_cols
 
-            with _open_hdf5(self.filename, "a") as f:
+            with open_hdf5(self.filename, "a") as f:
 
                 dset = f[F"{data_name}/data"]
                 dset[istep, imatrix, imatrix2, :nx, :ny] = _matrix_block(data, dset.dtype).astype(dset.dtype, copy=False)

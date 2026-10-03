@@ -20,9 +20,10 @@
 """
 
 import numpy as np
-import h5py
+#import h5py  # the files open through hdf5_io.open_hdf5
 from functools import reduce
 from liblibra_core import *
+from libra_py.hdf5_io import open_hdf5
 import util.libutil as comn
 
 # constants
@@ -66,7 +67,7 @@ def load_dvr_from_file(filename: str) -> DVRData:
         DVRData : the digital form of the data stored in the file
     """
 
-    with h5py.File(filename, 'r') as f:
+    with open_hdf5(filename, 'r') as f:
         return DVRData(
             R_grid=f['R_grid'][:],
             eigvals=f['eigvals'][:],
