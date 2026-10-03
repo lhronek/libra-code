@@ -1259,7 +1259,12 @@ def repartition_newtonx(nx, nocc_ref, theta=0.01, occupations=None, nelec=None):
     refs = [int(x) for x in nocc_ref] if is_uks else [int(nocc_ref)]
     channels = [("", refs[0])] + ([("_b", refs[1])] if is_uks else [])
     maxocc = 1.0 if is_uks else 2.0
-    drops = np.zeros(len(nx["X"]))
+    # an excitation vector is normalized over both spin channels together - the weight lost to the
+    # excitations from the moved orbitals is a fraction of that joint norm, summed over the channels
+    nstates = len(nx["X"])
+    tot2 = np.array([sum(float(np.sum(np.asarray(nx["X" + s][ist]) ** 2)) for s, _ in channels)
+                     for ist in range(nstates)])
+    lost2 = np.zeros(nstates)
     moved = []
     for ic, (s, nref) in enumerate(channels):
         Xs = nx["X" + s]
@@ -1310,13 +1315,12 @@ def repartition_newtonx(nx, nocc_ref, theta=0.01, occupations=None, nelec=None):
         new = []
         for ist, M in enumerate(Xs):
             M = np.asarray(M)
-            tot2 = float(np.sum(M ** 2))
-            lost2 = float(np.sum(M[:, nref:] ** 2))
-            drops[ist] = compose_drops(drops[ist], lost2 / tot2 if tot2 > 0 else 0.0)
+            lost2[ist] += float(np.sum(M[:, nref:] ** 2))
             R = np.zeros((M.shape[0] + k, nref))
             R[k:, :] = M[:, :nref]
             new.append(R)
         nx["X" + s] = new
+    drops = np.divide(lost2, tot2, out=np.zeros(nstates), where=tot2 > 0)
     return nx, drops, moved
 
 
@@ -6302,13 +6306,13 @@ def cp2k_compute_adi_impl(q, params, full_id):
             if np.any(repart_drops > 0.0):
                 # the weight lost to excitations from the re-partitioned orbitals
                 # belongs in the capture metric like every other truncation, and
-                # is reported per state like every other truncation - a large
+                # is reported once per state like every other truncation - a large
                 # loss under the cap must not pass in silence
                 rd = repart_drops[:len(ci_curr["window_drops"])]
                 for k in np.nonzero(rd > 1e-6)[0]:
-                    print(F"cp2k_compute_adi: state {k + 1}: dropped CI weight {rd[k]:.2e} to "
-                          F"excitations from the re-partitioned orbital(s) {moved} (a smeared "
-                          F"population counted as occupied by CP2K)")
+                    _report_drop("cp2k_compute_adi (the re-partition)", k + 1,
+                                 F"dropped CI weight {rd[k]:.2e} to excitations from the re-partitioned "
+                                 F"orbital(s) {moved} (a smeared population counted as occupied by CP2K)")
                 ci_curr["window_drops"] = compose_drops(rd, ci_curr["window_drops"])
             if amps_prealigned:
                 # fold the wfn-virtual-range truncation into the capture
@@ -6316,9 +6320,9 @@ def cp2k_compute_adi_impl(q, params, full_id):
                 # could count them, and the renormalization hides the loss
                 tw = (trunc2 / total2)[:len(ci_curr["window_drops"])]
                 for k in np.nonzero(tw > 1e-6)[0]:
-                    print(F"cp2k_compute_adi: state {k + 1}: dropped CI weight "
-                          F"{tw[k]:.2e} to the wfn virtual range (fewer wfn MOs "
-                          F"than NAMD-print rows)")
+                    _report_drop("cp2k_compute_adi (the wfn virtual range)", k + 1,
+                                 F"dropped CI weight {tw[k]:.2e} to the wfn virtual range (fewer wfn MOs than "
+                                 F"NAMD-print rows)")
                 ci_curr["window_drops"] = compose_drops(tw, ci_curr["window_drops"])
         else:
             amps_prealigned = False
