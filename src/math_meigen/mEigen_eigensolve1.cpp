@@ -21,6 +21,8 @@
 #include "mEigen.h"
 #include "../math_linalg/blas_interface.h"
 #include <cstdlib>
+#include <atomic>
+#include <mutex>
 
 /// liblibra namespace
 namespace liblibra{
@@ -65,36 +67,36 @@ static void require_hermitian_pair(const T1* H, const T1* S, int N, const char* 
 // LAPACK_EIGEN_MIN_N_DEFAULT, overridden once by the LIBRA_LAPACK_EIGEN_MIN_N environment
 // variable and at any time by set_lapack_eigen_min_n
 static const int LAPACK_EIGEN_MIN_N_DEFAULT = 96;
-static int lapack_eigen_min_n = -1;
+static std::atomic<int> lapack_eigen_min_n{-1};
 // solve_eigen_nosort: the Eigen general solvers fall behind dgeev/zgeev already at a few states
 // (real 8: 30 vs 36 us, 32: 2.9 ms vs 0.36 ms, 600: 748 s vs 0.9 s - measured 2026-09-04), so the
 // general kernels take over almost at once
 static const int LAPACK_NOSORT_MIN_N_DEFAULT = 8;
-static int lapack_nosort_min_n = -1;
+static std::atomic<int> lapack_nosort_min_n{-1};
 // the LU inverse: dgetri/zgetri beat Eigen's FullPivLU at every complex size (0.8 vs 1.2 us at
 // 2 states, 50x at 600) and from ~32 states for real matrices (measured 2026-09-04), so the kernel
 // is the default at every size
 static const int LAPACK_INVERSE_MIN_N_DEFAULT = 1;
-static int lapack_inverse_min_n = -1;
+static std::atomic<int> lapack_inverse_min_n{-1};
 // the determinant (measured 2026-09-04, one OpenBLAS thread): getrf beats Eigen at every
 // complex size (det 3.6 vs 1.8 us at 8 states, 597 vs 125 us at 64, FullPivLU_det 5.4 s vs
 // 0.03 s at 600) and from ~100 states for real det (Eigen's real LU determinant is the faster
 // one between ~8 and ~64: 60 vs 102 us at 64) - the complex Slater-determinant overlaps are
 // the hot path, so the kernel is the default at every size
 static const int LAPACK_DET_MIN_N_DEFAULT = 1;
-static int lapack_det_min_n = -1;
+static std::atomic<int> lapack_det_min_n{-1};
 // the complete-pivoting LU (rank, P L U Q): LAPACK's unblocked getc2 against Eigen's FullPivLU
 static const int LAPACK_FULLPIV_MIN_N_DEFAULT = 1;
-static int lapack_fullpiv_min_n = -1;
+static std::atomic<int> lapack_fullpiv_min_n{-1};
 // the SVD (measured 2026-09-04, one OpenBLAS thread, complex): Eigen's JacobiSVD / BDCSVD keep only
 // the 2 x 2 case (0.7 / 1.8 vs 5.4 us), gesdd is equal at 3 and ahead from 4 on (8: 174 / 167 vs
 // 15-27 us, 128: 0.84 s / 10.6 ms vs 5 ms, 600: BDCSVD 424 ms vs 294 ms)
 static const int LAPACK_SVD_MIN_N_DEFAULT = 3;
-static int lapack_svd_min_n = -1;
+static std::atomic<int> lapack_svd_min_n{-1};
 // the Cholesky factor: Eigen's LLT is the faster one below ~100 states (64: 16 vs 22 us), potrf
 // from there (128: 107 vs 80 us, 600: 5.4 vs 4.4 ms)
 static const int LAPACK_LLT_MIN_N_DEFAULT = 96;
-static int lapack_llt_min_n = -1;
+static std::atomic<int> lapack_llt_min_n{-1};
 // least_squares_solve (measured 2026-09-05, one OpenBLAS thread, square systems, one right-hand
 // side, Eigen vs LAPACK us): the crossover depends on the option - the LU solve (option 1, dgesv)
 // wins from 8 states on (8: 2.8 vs 2.4, 128: 1631 vs 390, 600: 140 ms vs 12 ms), the SVD (option 0)
@@ -103,30 +105,38 @@ static int lapack_llt_min_n = -1;
 // knob by the larger dimension of A: 128 keeps the small FSSH3 systems (option 3) on Eigen and
 // hands the large ones to LAPACK
 static const int LAPACK_LSTSQ_MIN_N_DEFAULT = 128;
-static int lapack_lstsq_min_n = -1;
+static std::atomic<int> lapack_lstsq_min_n{-1};
 
-static int read_min_n(int& value, int dflt, const char* env_name, const char* fn){
-  if(value < 1){
-    const char* env = std::getenv(env_name);
-    value = dflt;
-    if(env != NULL && env[0] != 0){
-      int v = std::atoi(env);
-      if(v < 1){
-        std::cout<<"Error in libmeigen::"<<fn<<" : "<<env_name<<" must be a positive integer, got '"<<env<<"'\n";
-        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-      }
-      value = v;
+// the knobs are read from the OpenMP loops of the engine (one atomic load once set) and written by the
+// setters and by the first read, which takes the environment under one lock
+static std::mutex min_n_mutex;
+
+static int read_min_n(std::atomic<int>& value, int dflt, const char* env_name, const char* fn){
+  int v = value.load(std::memory_order_acquire);
+  if(v >= 1){ return v; }
+  std::lock_guard<std::mutex> guard(min_n_mutex);
+  v = value.load(std::memory_order_acquire);
+  if(v >= 1){ return v; }
+  v = dflt;
+  const char* env = std::getenv(env_name);
+  if(env != NULL && env[0] != 0){
+    int e = std::atoi(env);
+    if(e < 1){
+      std::cout<<"Error in libmeigen::"<<fn<<" : "<<env_name<<" must be a positive integer, got '"<<env<<"'\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
+    v = e;
   }
-  return value;
+  value.store(v, std::memory_order_release);
+  return v;
 }
 
-static void write_min_n(int& value, int n, const char* fn){
+static void write_min_n(std::atomic<int>& value, int n, const char* fn){
   if(n < 1){
     std::cout<<"Error in libmeigen::"<<fn<<" : the size must be a positive integer, got "<<n<<"\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
-  value = n;
+  value.store(n, std::memory_order_release);
 }
 
 int get_lapack_eigen_min_n(){ return read_min_n(lapack_eigen_min_n, LAPACK_EIGEN_MIN_N_DEFAULT, "LIBRA_LAPACK_EIGEN_MIN_N", "get_lapack_eigen_min_n"); }
