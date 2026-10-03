@@ -1061,12 +1061,13 @@ void dyn_variables::init_active_states(bp::dict _params, Random& rnd){
       i = dia_act_states_temp[traj]; // active diabatic state
       pop_dia *= 0.0; pop_dia.set(i, i, complex<double>(1.0, 0.0) );
 
-      // the adiabatic populations of the pure diabat: C_adi = U^H S C_dia with the cached
-      // metric (identity when the model supplies none)
+      // the adiabatic populations of the Lowdin state X e_i, the diabatic active state of the
+      // hopping machinery: C_adi = U^H S X e_i = U^H Y e_i, the bare U^H e_i at S = I
       if(ovlp_dia_is_identity[traj]){ pop_adi = (*basis_transform[traj]).H() * pop_dia * (*basis_transform[traj]); }
       else{
-        pop_adi = (*basis_transform[traj]).H() * (*ovlp_dia[traj]) * pop_dia
-                  * (*ovlp_dia[traj]) * (*basis_transform[traj]);
+        CMATRIX X_(ndia, ndia); CMATRIX Y_(ndia, ndia);
+        libmeigen::sqrt_matrix(*ovlp_dia[traj], Y_, X_);
+        pop_adi = (*basis_transform[traj]).H() * Y_ * pop_dia * Y_ * (*basis_transform[traj]);
       }
 
       vector<double> res(nadi, 0.0);
@@ -1438,19 +1439,22 @@ void dyn_variables:: set_active_states_diff_rep(int rep_sh, Random& rnd){
   else{
     for(traj=0; traj<ntraj; traj++){
       i = act_states_dia[traj]; // active diabatic state
-      pop_dia = *dm_dia[traj];
-      for(j=0;j<ndia; j++){ pop_dia.set(j,j, complex<double>(0.0, 0.0) ); }
-      pop_dia.set(i, i, complex<double>(1.0, 0.0) );
-
-      // the adiabatic populations of a Lowdin state X e_i: C_adi = U^H S X e_i = U^H Y e_i,
-      // the bare U^H rho U at S = I
+      // the Lowdin-frame density Y rho Y carries the indicator of the active Lowdin state on its
+      // diagonal - the coherences and the indicator in one frame (rho itself at S = I)
       U = (*basis_transform[traj]);// * (*proj_adi[traj]);
 
       { CMATRIX X_(ndia, ndia); CMATRIX Y_(ndia, ndia);
         if(!ovlp_dia_is_identity[traj]){
           libmeigen::sqrt_matrix(*ovlp_dia[traj], Y_, X_);
-          pop_adi = U.H() * Y_ * pop_dia * Y_ * U;
+          pop_dia = Y_ * (*dm_dia[traj]) * Y_;
         }
+        else{ pop_dia = *dm_dia[traj]; }
+        for(j=0;j<ndia; j++){ pop_dia.set(j,j, complex<double>(0.0, 0.0) ); }
+        pop_dia.set(i, i, complex<double>(1.0, 0.0) );
+
+        // the adiabatic populations of a Lowdin state X e_i: C_adi = U^H S X e_i = U^H Y e_i,
+        // the bare U^H rho U at S = I
+        if(!ovlp_dia_is_identity[traj]){ pop_adi = U.H() * Y_ * pop_dia * Y_ * U; }
         else{ pop_adi = U.H() * pop_dia * U; } }
       
       vector<double> diag_els(nadi, 0.0);
@@ -1767,19 +1771,22 @@ vector<double> dyn_variables::compute_average_sh_pop_TR(int rep){
 
     for(traj=0; traj<ntraj; traj++){
       i = effective_states[traj]; // active diabatic state
-      pop_dia = *dm_dia[traj];
-      for(j=0;j<ndia; j++){ pop_dia.set(j,j, complex<double>(0.0, 0.0) ); }
-      pop_dia.set(i, i, complex<double>(1.0, 0.0) );
-
-      // the adiabatic populations of a Lowdin state X e_i: C_adi = U^H S X e_i = U^H Y e_i,
-      // the bare U^H rho U at S = I
+      // the Lowdin-frame density Y rho Y carries the indicator of the active Lowdin state on its
+      // diagonal - the coherences and the indicator in one frame (rho itself at S = I)
       U = (*basis_transform[traj]);// * (*proj_adi[traj]);
 
       { CMATRIX X_(ndia, ndia); CMATRIX Y_(ndia, ndia);
         if(!ovlp_dia_is_identity[traj]){
           libmeigen::sqrt_matrix(*ovlp_dia[traj], Y_, X_);
-          pop_adi = U.H() * Y_ * pop_dia * Y_ * U;
+          pop_dia = Y_ * (*dm_dia[traj]) * Y_;
         }
+        else{ pop_dia = *dm_dia[traj]; }
+        for(j=0;j<ndia; j++){ pop_dia.set(j,j, complex<double>(0.0, 0.0) ); }
+        pop_dia.set(i, i, complex<double>(1.0, 0.0) );
+
+        // the adiabatic populations of a Lowdin state X e_i: C_adi = U^H S X e_i = U^H Y e_i,
+        // the bare U^H rho U at S = I
+        if(!ovlp_dia_is_identity[traj]){ pop_adi = U.H() * Y_ * pop_dia * Y_ * U; }
         else{ pop_adi = U.H() * pop_dia * U; } }
       for(j=0; j<nadi; j++){ res[j] += pop_adi.get(j,j).real(); }
     }
