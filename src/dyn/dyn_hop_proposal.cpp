@@ -1634,8 +1634,11 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
 
   int ndof = dyn_var.ndof;
   int ntraj = dyn_var.ntraj;
-  int nst = dyn_var.nadi;
-  if(prms.rep_tdse==0 || prms.rep_tdse==2){ nst = dyn_var.ndia; }
+  // the states of the hopping representation: the proposal reads dm_adi / hvib_adi under rep_sh 1 and the
+  // Lowdin-frame dm_dia / hvib_dia under rep_sh 0, whatever representation the TDSE runs in
+  int nst = (prms.rep_sh==0) ? dyn_var.ndia : dyn_var.nadi;
+  //if(prms.rep_tdse==0 || prms.rep_tdse==2){ nst = dyn_var.ndia; }  // the TDSE representation's size for the
+  //                                                                   // hopping representation's matrices
 
   int isNBRA = prms.isNBRA;
 
@@ -1669,7 +1672,7 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
     if(prms.rep_sh==1){
       dm = *dyn_var.dm_adi[traj];
       //if(prms.rep_tdse==0 || prms.rep_tdse==2){ dm = *dyn_var.dm_dia[traj]; }
-      if(prms.rep_tdse==2){ dm = *dyn_var.dm_dia[traj]; }
+      //if(prms.rep_tdse==2){ dm = *dyn_var.dm_dia[traj]; }  // a diabatic density in the adiabatic hop (rep_sh 1)
     }
     else if(prms.rep_sh==0){
       dm = *dyn_var.dm_dia[traj];
@@ -1700,7 +1703,7 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
       if(prms.rep_sh==1){
         Hvib = ham.child(traj)->get_hvib_adi();
         //if(prms.rep_tdse==0 || prms.rep_tdse==2){ Hvib = ham.child(traj)->get_hvib_dia(); }
-        if(prms.rep_tdse==2){ Hvib = ham.child(traj)->get_hvib_dia(); }
+        //if(prms.rep_tdse==2){ Hvib = ham.child(traj)->get_hvib_dia(); }  // a diabatic generator in the adiabatic hop
       }
       else{
         pop_submatrix(*dyn_var.p, p_traj, nucl_stenc_x, nucl_stenc_y);
@@ -1851,7 +1854,7 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
 
       if(prms.rep_sh==1){
         CMATRIX& dm_prev = *dyn_var.dm_adi_prev[traj];
-        if(prms.rep_tdse==2){ dm = *dyn_var.dm_dia_prev[traj]; }
+        //if(prms.rep_tdse==2){ dm = *dyn_var.dm_dia_prev[traj]; }  // the PREVIOUS diabatic density as the current adiabatic one
         g[traj] = hopping_probabilities_fssh2(prms, dm, dm_prev, dyn_var.act_states[traj]);
       }
       else if(prms.rep_sh==0){
@@ -1870,7 +1873,7 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
 
       if(prms.rep_sh==1){
         CMATRIX& dm_prev = *dyn_var.dm_adi_prev[traj];
-        if(prms.rep_tdse==2){ dm = *dyn_var.dm_dia_prev[traj]; }
+        //if(prms.rep_tdse==2){ dm = *dyn_var.dm_dia_prev[traj]; }  // the PREVIOUS diabatic density as the current adiabatic one
 
         //cout<<"Coordinates\n";    dyn_var.q->show_matrix();
 
@@ -1904,7 +1907,7 @@ nHamiltonian& ham, nHamiltonian& ham_prev){
  
       if(prms.rep_sh==1){
         CMATRIX& dm_prev = *dyn_var.dm_adi_prev[traj];
-        if(prms.rep_tdse==2){ dm = *dyn_var.dm_dia_prev[traj]; }
+        //if(prms.rep_tdse==2){ dm = *dyn_var.dm_dia_prev[traj]; }  // the PREVIOUS diabatic density as the current adiabatic one
         g[traj] = hopping_probabilities_gfsh_orig(prms, dm, dm_prev, dyn_var.act_states[traj]);
       }
       else if(prms.rep_sh==0){
