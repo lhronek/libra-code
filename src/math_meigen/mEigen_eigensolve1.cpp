@@ -243,6 +243,7 @@ void solve_eigen(CMATRIX* H, CMATRIX* S, CMATRIX* E, CMATRIX* C, int symm){
   if(solution.info()!=Success){ cout<<"Eigen fails\n";   std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
 
+  *E = 0.0;
   // Copy results into output matrices
   for(i=0;i<N_mo;i++){
 
