@@ -215,32 +215,44 @@ int lowdin_frame(CMATRIX& S, CMATRIX& X, CMATRIX& Y){
   return 1;
 }
 
-void sqrt_matrix_derivative(CMATRIX& S, CMATRIX& dS, CMATRIX& dY, CMATRIX& dX){
+void metric_eigenpairs(CMATRIX& S, CMATRIX& V, vector<double>& s){
 /**
-  Derivatives of Y = S^1/2 and X = S^-1/2 along a Hermitian variation dS of a positive-definite S.
-  With S = V s V^H (Daleckii-Krein): (V^H dF V)_ab = (V^H dS V)_ab (f(s_a) - f(s_b))/(s_a - s_b), the
-  divided differences written in their cancellation-free forms 1/(sqrt(s_a) + sqrt(s_b)) and
-  -1/(sqrt(s_a) sqrt(s_b) (sqrt(s_a) + sqrt(s_b))), which are the derivatives f' on the diagonal.
-  The eigenpairs of S from zheevd, the LAPACK kernel at every matrix size when the build linked it (the eigen size threshold of solve_eigen does not apply), the Eigen solver otherwise
+  The eigenpairs S = V diag(s) V^H of a Hermitian metric, for the frame functions below: zheevd, the LAPACK kernel
+  at every matrix size when the build linked it (the eigen size threshold of solve_eigen does not apply), the Eigen
+  solver otherwise. The divided differences of the derivatives are gauge-invariant (V G V^H with G built from
+  V^H dS V), so either solver's eigenvector phases serve
 */
   int n = S.n_cols;
-  if(S.n_rows != n || dS.n_rows != n || dS.n_cols != n || dY.n_rows != n || dY.n_cols != n || dX.n_rows != n || dX.n_cols != n){
-    cout<<"Error in libmeigen::sqrt_matrix_derivative : S, dS, dY and dX must all be "<<n<<" x "<<n<<" matrices\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  if(S.n_rows != n || V.n_rows != n || V.n_cols != n){
+    cout<<"Error in libmeigen::metric_eigenpairs : S and V must be square matrices of one size\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
-  CMATRIX s(n, n);
-  CMATRIX V(n, n);
-  // the divided differences are gauge-invariant (V GY V^H with GY built from V^H dS V),
-  // so either eigensolver serves
-  if(have_lapack()){ lapack_heevd(S, s, V); }
-  else{ solve_eigen(S, s, V, 0); }
+  CMATRIX e(n, n);
+  if(have_lapack()){ lapack_heevd(S, e, V); }
+  else{ solve_eigen(S, e, V, 0); }
+  s.assign(n, 0.0);
+  for(int a=0; a<n; a++){ s[a] = e.get(a,a).real(); }
+}
+
+void sqrt_matrix_derivative(CMATRIX& V, vector<double>& s, CMATRIX& dS, CMATRIX& dY, CMATRIX& dX){
+/**
+  Derivatives of Y = S^1/2 and X = S^-1/2 along a Hermitian variation dS of a positive-definite S, from the
+  eigenpairs S = V diag(s) V^H (metric_eigenpairs) - the form for a caller that holds the eigenpairs of an unchanged
+  metric across variations. Daleckii-Krein: (V^H dF V)_ab = (V^H dS V)_ab (f(s_a) - f(s_b))/(s_a - s_b), the divided
+  differences written in their cancellation-free forms 1/(sqrt(s_a) + sqrt(s_b)) and
+  -1/(sqrt(s_a) sqrt(s_b) (sqrt(s_a) + sqrt(s_b))), which are the derivatives f' on the diagonal
+*/
+  int n = V.n_cols;
+  if(V.n_rows != n || (int)s.size() != n || dS.n_rows != n || dS.n_cols != n || dY.n_rows != n || dY.n_cols != n || dX.n_rows != n || dX.n_cols != n){
+    cout<<"Error in libmeigen::sqrt_matrix_derivative : V, dS, dY and dX must all be "<<n<<" x "<<n<<" matrices and s must hold "<<n<<" eigenvalues\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
   CMATRIX W(n, n);
   W = V.H() * dS * V;
   CMATRIX GY(n, n);
   CMATRIX GX(n, n);
   for(int a=0; a<n; a++){
     for(int b=0; b<n; b++){
-      double sa = s.get(a,a).real();
-      double sb = s.get(b,b).real();
+      double sa = s[a];
+      double sb = s[b];
       if(sa <= 0.0 || sb <= 0.0){
         cout<<"Error in libmeigen::sqrt_matrix_derivative : the metric is not positive definite (eigenvalue "<<std::min(sa, sb)<<")\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
@@ -252,6 +264,21 @@ void sqrt_matrix_derivative(CMATRIX& S, CMATRIX& dS, CMATRIX& dY, CMATRIX& dX){
   }
   dY = V * GY * V.H();
   dX = V * GX * V.H();
+}
+
+void sqrt_matrix_derivative(CMATRIX& S, CMATRIX& dS, CMATRIX& dY, CMATRIX& dX){
+/**
+  Derivatives of Y = S^1/2 and X = S^-1/2 along a Hermitian variation dS of a positive-definite S - the eigenpairs
+  of S computed here (metric_eigenpairs) and the derivatives from them (the overload above)
+*/
+  int n = S.n_cols;
+  if(S.n_rows != n || dS.n_rows != n || dS.n_cols != n || dY.n_rows != n || dY.n_cols != n || dX.n_rows != n || dX.n_cols != n){
+    cout<<"Error in libmeigen::sqrt_matrix_derivative : S, dS, dY and dX must all be "<<n<<" x "<<n<<" matrices\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  CMATRIX V(n, n);
+  vector<double> s;
+  metric_eigenpairs(S, V, s);
+  sqrt_matrix_derivative(V, s, dS, dY, dX);
 }
 
 

@@ -187,6 +187,17 @@ public:
   ///< whether the model object ever supplied ovlp_dia - a child never given a metric holds the
   ///< identity of its allocation, which the dynamical variables need not scan
   int ovlp_dia_supplied;
+  ///< the Lowdin frame of ovlp_dia, memoized by the metric's elements (lowdin_cache_S): X = S^-1/2, Y = S^1/2 and,
+  ///< for the frame's derivative, the eigenpairs S = V diag(s) V^H - filled on first use (lowdin_cache_ready), refilled
+  ///< when the elements change, not copied with the content (a copy refills from its own metric). The state: -1
+  ///< unknown, 0 identity metric, 1 frame set - lowdin_cache_eig: the eigenpairs set
+  int lowdin_cache_state;
+  int lowdin_cache_eig;
+  CMATRIX lowdin_cache_S;
+  CMATRIX lowdin_cache_X;
+  CMATRIX lowdin_cache_Y;
+  CMATRIX lowdin_cache_V;
+  vector<double> lowdin_cache_s;
   ///< the model supplied its own dia->adi transformation - the
   ///< stored-U transforms (ham_transform_method 2) require it: the
   ///< square identity default must not silently alias dia == adi
@@ -422,6 +433,8 @@ public:
   CMATRIX get_d1ham_dia(int i);
   CMATRIX get_d1ham_dia(int i, vector<int>& id_);
   int lowdin_dia(CMATRIX& X, CMATRIX& Y);       ///< Lowdin frame of the diabats: X = S^-1/2, Y = S^1/2 of ovlp_dia. Returns 0 (X, Y untouched) for an absent or identity metric
+  int lowdin_cache_ready();                    ///< the frame of the current ovlp_dia in the memo, refilled when the metric's elements changed - its state (0 absent or identity, 1 set)
+  void lowdin_cache_eigenpairs();              ///< the memoized metric's eigenpairs for the frame's derivative, once per refill
   CMATRIX get_ham_dia_lowdin();                  ///< X ham_dia X - the diabatic Hamiltonian in the Lowdin frame (ham_dia itself at S = I)
   int lowdin_dia_derivative(int n, CMATRIX& X, CMATRIX& Y, CMATRIX& dX, CMATRIX& dY);  ///< the Lowdin frame and its derivative along nuclear DOF n from dS = dc1_dia[n] + dc1_dia[n]^H. Returns the lowdin_dia status, dX = dY = 0 for a constant metric
   CMATRIX get_hvib_dia_lowdin(MATRIX& p, const MATRIX& invM);   ///< X hvib_dia X + i (dY/dt) X - the vibronic generator of the Lowdin frame, p and invM (nnucl x 1)

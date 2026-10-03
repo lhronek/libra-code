@@ -219,6 +219,8 @@ void nHamiltonian::init_mem_status(int ndia_, int nadi_, int nnucl_) {
   nac_adi_supplied = 0;
   nac_dia_supplied = 0;
   ovlp_dia_supplied = 0;
+  lowdin_cache_state = -1;
+  lowdin_cache_eig = 0;
   basis_transform_supplied = 0;
   ham_dia_supplied = 0;
   time_overlap_dia = nullptr;
@@ -522,6 +524,9 @@ void nHamiltonian::copy_level_content(nHamiltonian *src) {
   nac_adi_supplied = src->nac_adi_supplied;
   nac_dia_supplied = src->nac_dia_supplied;
   ovlp_dia_supplied = src->ovlp_dia_supplied;
+  // the Lowdin frame memo is not copied - the copy refills it from its own ovlp_dia on first use
+  lowdin_cache_state = -1;
+  lowdin_cache_eig = 0;
   basis_transform_supplied = src->basis_transform_supplied;
   ham_dia_supplied = src->ham_dia_supplied;
   time_overlap_adi_supplied = src->time_overlap_adi_supplied;
@@ -1931,22 +1936,61 @@ CMATRIX nHamiltonian::get_dc1_dia(int i, vector<int> &id_) {
   }
 }
 
+int nHamiltonian::lowdin_cache_ready() {
+  /**
+    The Lowdin frame of the current ovlp_dia in the memo (lowdin_cache_*): refilled when the metric's
+    elements differ from the memoized ones (a model whose metric moves refills once per step, a
+    constant metric once), the eigenpairs left to lowdin_cache_eigenpairs. Returns the frame's state:
+    0 for an absent or identity metric, 1 with the frame set
+  */
+  if (ovlp_dia_mem_status == 0) { return 0; }
+  int fresh = (lowdin_cache_state >= 0) && (lowdin_cache_S.n_rows == ndia) && (lowdin_cache_S.n_cols == ndia);
+  for (int i = 0; i < ndia && fresh; i++) {
+    for (int j = 0; j < ndia; j++) {
+      if (lowdin_cache_S.get(i, j) != ovlp_dia->get(i, j)) { fresh = 0; break; }
+    }
+  }
+  if (!fresh) {
+    lowdin_cache_S = *ovlp_dia;
+    CMATRIX X(ndia, ndia);
+    CMATRIX Y(ndia, ndia);
+    lowdin_cache_state = lowdin_frame(*ovlp_dia, X, Y);
+    if (lowdin_cache_state) { lowdin_cache_X = X;  lowdin_cache_Y = Y; }
+    lowdin_cache_eig = 0;
+  }
+  return lowdin_cache_state;
+}
+
+void nHamiltonian::lowdin_cache_eigenpairs() {
+  /**
+    The eigenpairs S = V diag(s) V^H of the memoized metric for the frame's derivative - once per refill
+  */
+  if (lowdin_cache_eig) { return; }
+  lowdin_cache_V = CMATRIX(ndia, ndia);
+  metric_eigenpairs(lowdin_cache_S, lowdin_cache_V, lowdin_cache_s);
+  lowdin_cache_eig = 1;
+}
+
 int nHamiltonian::lowdin_dia(CMATRIX &X, CMATRIX &Y) {
   /**
     The Lowdin (symmetric) orthonormalization of the diabatic basis: X = S^-1/2
     and Y = S^1/2 of ovlp_dia. |lambda_i> = sum_j |j> X_ji are the orthonormal
     states closest to the diabats, identical to them at S = I - the frame the
     diabatic hop machinery works in for non-orthogonal diabats. The metric may move
-    with the nuclei (dS = D + D^H, lowdin_dia_derivative) - the frame is the step's own.
-    Returns 1 with X and Y filled, or 0 for an absent or identity metric (X, Y
-    untouched)
+    with the nuclei (dS = D + D^H, lowdin_dia_derivative) - the frame is the step's own,
+    memoized by the metric's elements (lowdin_cache_ready: one factorization per distinct
+    metric, the readers of a step share it). Returns 1 with X and Y filled, or 0 for an
+    absent or identity metric (X, Y untouched)
   */
   if (ovlp_dia_mem_status == 0) { return 0; }
   if (X.n_rows != ndia || X.n_cols != ndia || Y.n_rows != ndia || Y.n_cols != ndia) {
     cout << "Error in lowdin_dia: X and Y must be " << ndia << " x " << ndia << " matrices\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
-  return lowdin_frame(*ovlp_dia, X, Y);
+  if (lowdin_cache_ready() == 0) { return 0; }
+  X = lowdin_cache_X;
+  Y = lowdin_cache_Y;
+  return 1;
 }
 
 int nHamiltonian::lowdin_dia_derivative(int n, CMATRIX &X, CMATRIX &Y, CMATRIX &dX, CMATRIX &dY) {
@@ -1956,7 +2000,8 @@ int nHamiltonian::lowdin_dia_derivative(int n, CMATRIX &X, CMATRIX &Y, CMATRIX &
     dS = D_n + D_n^H with D_ij = <i|d j> - a basis without dc1_dia has, by that
     contract, a constant metric (compute_dynamics refuses a metric that moved over the
     step while dS vanishes, where this derivative is read: the diabatic forces, the
-    Lowdin hopping generator).
+    Lowdin hopping generator). The eigenpairs of the metric come from the frame memo
+    (lowdin_cache_eigenpairs - once per distinct metric, not per DOF).
     Returns the lowdin_dia status (0 = identity metric,
     nothing filled) - dX and dY are zero when dc1_dia[n] is absent or dS vanishes
   */
@@ -1977,7 +2022,10 @@ int nHamiltonian::lowdin_dia_derivative(int n, CMATRIX &X, CMATRIX &Y, CMATRIX &
       if (std::abs(dS.get(i, j)) > 0.0) { moving = 1; break; }
     }
   }
-  if (moving) { sqrt_matrix_derivative(*ovlp_dia, dS, dY, dX); }
+  if (moving) {
+    lowdin_cache_eigenpairs();
+    sqrt_matrix_derivative(lowdin_cache_V, lowdin_cache_s, dS, dY, dX);
+  }
   return 1;
 }
 
@@ -1996,7 +2044,8 @@ CMATRIX nHamiltonian::get_hvib_dia_lowdin(MATRIX &p, const MATRIX &invM) {
   /**
     The vibronic Hamiltonian in the Lowdin frame: X hvib_dia X + i (dY/dt) X, the generator
     of i db/dt for b = Y C_dia. The second term is the motion of the frame itself,
-    dY/dt = sum_n v_n dY_n with dY_n from dS_n = dc1_dia[n] + dc1_dia[n]^H - together the two
+    dY/dt = sum_n v_n dY_n with dY_n from dS_n = dc1_dia[n] + dc1_dia[n]^H - the derivative is
+    linear in the variation, so it is taken once along dS = sum_n v_n dS_n. Together the two
     terms are Hermitian, X hvib_dia X alone is not once the metric moves. It vanishes for a
     constant metric. p and invM are (nnucl x 1)
   */
@@ -2005,15 +2054,29 @@ CMATRIX nHamiltonian::get_hvib_dia_lowdin(MATRIX &p, const MATRIX &invM) {
   CMATRIX Y(ndia, ndia);
   if (lowdin_dia(X, Y) == 0) { return H; }
   CMATRIX res(X * H * X);
-  CMATRIX dX(ndia, ndia);
-  CMATRIX dY(ndia, ndia);
+  CMATRIX dS(ndia, ndia);
+  int moving = 0;
   for (int n = 0; n < nnucl; n++) {
     if (dc1_dia_mem_status[n] == 0) { continue; }
     double v = p.get(n, 0) * invM.get(n, 0);
     if (v == 0.0) { continue; }
-    lowdin_dia_derivative(n, X, Y, dX, dY);
-    res += complex<double>(0.0, v) * (dY * X);
+    dS += v * (*dc1_dia[n] + (*dc1_dia[n]).H());
+    moving = 1;
   }
+  for (int i = 0; i < ndia && moving; i++) {
+    int any = 0;
+    for (int j = 0; j < ndia; j++) {
+      if (std::abs(dS.get(i, j)) > 0.0) { any = 1; break; }
+    }
+    if (any) { break; }
+    if (i == ndia - 1) { moving = 0; }
+  }
+  if (!moving) { return res; }
+  CMATRIX dX(ndia, ndia);
+  CMATRIX dY(ndia, ndia);
+  lowdin_cache_eigenpairs();
+  sqrt_matrix_derivative(lowdin_cache_V, lowdin_cache_s, dS, dY, dX);
+  res += complex<double>(0.0, 1.0) * (dY * X);
   return res;
 }
 
