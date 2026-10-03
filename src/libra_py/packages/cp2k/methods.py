@@ -2474,8 +2474,49 @@ def read_cp2k_pdos_blocks(filename):
 
 
 def read_cp2k_pdos(filename, block=-1):
-    """One block of read_cp2k_pdos_blocks - by default the last one stored in the file."""
-    return read_cp2k_pdos_blocks(filename)[block]
+    """One block of read_cp2k_pdos_blocks: the last table stored in the file by default (block -1), or the table of
+    that index (IndexError past the end). One pass over the file that keeps the lines of one table at a time and
+    parses the wanted one - an appended .pdos of a long run holds hundreds of tables and the caller wants one
+    (the tables before it are dropped as they close). Another negative index goes through
+    read_cp2k_pdos_blocks."""
+    if block < -1:
+        return read_cp2k_pdos_blocks(filename)[block]
+    header, rows, kept, nblocks, in_header, first_row = [], [], None, 0, False, 0
+
+    def close_block():
+        nonlocal kept, nblocks
+        if not rows:
+            raise ValueError(F"{filename}: the header block ending at line {first_row} has no data rows")
+        if block < 0 or nblocks == block:
+            kept = (header, rows)
+        nblocks += 1
+
+    with open(filename) as f:
+        for i, line in enumerate(f):
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                if not in_header and header:
+                    close_block()
+                    if block >= 0 and kept is not None:
+                        break
+                    header, rows = [], []
+                in_header = True
+                header.append(stripped)
+            else:
+                if in_header:
+                    first_row = i
+                in_header = False
+                if header and stripped:
+                    rows.append(stripped)
+        else:
+            if header:
+                close_block()
+    if nblocks == 0:
+        raise ValueError(F"{filename}: no projected-DOS table found")
+    if kept is None:
+        raise IndexError(F"{filename} holds {nblocks} block(s), block {block} is out of range")
+    hdr, rws = kept
+    return _cp2k_pdos_block(filename, hdr, [[float(x) for x in r.split()] for r in rws])
 
 
 def _cp2k_pdos_is_table(filename):
