@@ -26,8 +26,9 @@ from liblibra_core import MATRIX, intList, solve_eigen, sqrt_matrix, pop_submatr
 from libra_py import data_conv
 
 
-def _ao_blocks(ao_atom, fragment_atom_lists):
-    """The AO index lists (0-based, ascending) of the fragments (1-based atom lists, disjoint)."""
+def ao_blocks(ao_atom, fragment_atom_lists):
+    """The AO index lists (0-based, ascending) of the fragments (1-based atom lists, disjoint) from the AO-to-atom
+    map ao_atom (0-based atom index per AO, in the AO order of the matrices the lists index)."""
     ao_atom = np.asarray(ao_atom, dtype=int)
     natom = int(ao_atom.max()) + 1
     seen = set()
@@ -35,12 +36,16 @@ def _ao_blocks(ao_atom, fragment_atom_lists):
     for f, atoms in enumerate(fragment_atom_lists):
         atoms = [int(a) for a in atoms]
         if not atoms or min(atoms) < 1 or max(atoms) > natom:
-            raise ValueError(F"fragment {f} atom list {atoms} is empty or outside 1..{natom}")
+            raise ValueError(F"fragment {f} atom list {atoms} is empty or outside 1..{natom} (1-based atom indices)")
         if seen & set(atoms):
-            raise ValueError(F"fragment {f} shares atoms {sorted(seen & set(atoms))} with an earlier fragment")
+            raise ValueError(F"fragment {f} shares atoms {sorted(seen & set(atoms))} with an earlier fragment - "
+                             "fragments must be disjoint")
         seen |= set(atoms)
         blocks.append([int(i) for i in np.flatnonzero(np.isin(ao_atom + 1, atoms))])
     return blocks
+
+
+_ao_blocks = ao_blocks      # the former name
 
 
 def _ilist(idx):
@@ -77,7 +82,7 @@ def pod_block_states(H_list, S, ao_atom, fragment_atom_lists):
     """
     S = np.asarray(S, dtype=float)
     n = S.shape[0]
-    blocks = _ao_blocks(ao_atom, fragment_atom_lists)
+    blocks = ao_blocks(ao_atom, fragment_atom_lists)
     covered = sorted(i for b in blocks for i in b)
     if covered != list(range(n)):
         raise ValueError(F"the fragments cover {len(covered)} of {n} AOs - every atom must belong to a fragment")
@@ -195,7 +200,7 @@ def pod2_core(H_list, S, ao_atom, fragment_atom_lists):
     """
     S = np.asarray(S, dtype=float)
     n = S.shape[0]
-    blocks = _ao_blocks(ao_atom, fragment_atom_lists)
+    blocks = ao_blocks(ao_atom, fragment_atom_lists)
     covered = sorted(i for b in blocks for i in b)
     if covered != list(range(n)):
         raise ValueError(F"the fragments cover {len(covered)} of {n} AOs - every atom must belong to a fragment")

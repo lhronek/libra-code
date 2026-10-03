@@ -5062,20 +5062,9 @@ def mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev_bohr, coords_curr_bohr,
         if ao_atom is None:
             raise ValueError("fragment operators need the AO->atom map of the wfn "
                              "loader (mo_source='wfn') - the molden route has none")
-        natom = int(np.max(ao_atom)) + 1
-        seen = set()
-        frag_cols = []
-        for f, atoms in enumerate(fragment_atom_lists):
-            atoms = [int(a) for a in atoms]
-            if not atoms or min(atoms) < 1 or max(atoms) > natom:
-                raise ValueError(F"fragment {f} atom list {atoms} is empty or outside "
-                                 F"1..{natom} (1-based atom indices)")
-            if seen & set(atoms):
-                raise ValueError(F"fragment {f} shares atoms {sorted(seen & set(atoms))} "
-                                 F"with an earlier fragment - fragments must be disjoint")
-            seen |= set(atoms)
-            # column j of C is the AO idx[j] of the file order
-            frag_cols.append(np.flatnonzero(np.isin(ao_atom[idx] + 1, atoms)))
+        from libra_py import pod as _pod
+        # column j of C is the AO idx[j] of the file order - the fragments' AO lists by the POD module's mapper
+        frag_cols = [np.asarray(b, dtype=int) for b in _pod.ao_blocks(np.asarray(ao_atom)[idx], fragment_atom_lists)]
     # window BEFORE contracting: O(win * nao^2) instead of O(nao^3) -
     # 20-100x cheaper already at a few thousand AOs. The AO overlap is
     # spin-independent, so the same S blocks serve every spin channel.
