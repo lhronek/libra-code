@@ -2986,13 +2986,15 @@ def fragment_operator_count(res_dir, prefix, step):
 
 
 def _sd_diabatization_series(params, sd_sorted, active_space, start_time, finish_time, kind):
-    """W, the diabatic index, the populations and the orbital energies of every step
-    start_time..finish_time-1, from the step-2 fragment operators and orbital energies sliced
-    to the active space, in the orthonormal-orbital layout (_fragment_operators_of_step)."""
+    """W, the diabatic index, the populations, the orbital energies and the fragment operators of every
+    step start_time..finish_time-1, from the step-2 fragment operators and orbital energies sliced
+    to the active space, in the orthonormal-orbital layout (_fragment_operators_of_step) - the
+    operators returned for the CI series, which localizes the same steps."""
     prefix, nfrag = _fragment_operator_prefix(params, params['path_to_npz_files'], start_time)
-    W_list, pops_list, hole_list, energy_list, dia_index = [], [], [], [], None
+    W_list, pops_list, hole_list, energy_list, operators, dia_index = [], [], [], [], [], None
     for i, step in enumerate(range(start_time, finish_time)):
         P_frag, E_orb = _fragment_operators_of_step(params, prefix, nfrag, step, active_space)
+        operators.append(P_frag)
         W, dia_index, pops, pops_hole, energies = sd_diabatization_step(sd_sorted[i], P_frag, E_orb, kind, dia_index,
                                                                         active_space, params['data_dim'],
                                                                         params['occupancy_tolerance'])
@@ -3000,7 +3002,7 @@ def _sd_diabatization_series(params, sd_sorted, active_space, start_time, finish
         pops_list.append(pops)
         hole_list.append(pops_hole)
         energy_list.append(energies)
-    return W_list, dia_index, pops_list, hole_list, energy_list
+    return W_list, dia_index, pops_list, hole_list, energy_list, operators
 
 
 def _fragment_operator_prefix(params, res_dir_1, start_time):
@@ -3211,15 +3213,21 @@ def ci_diabatization_step(T, O_hole, O_elec, E_ci, kind, dia_index=None, tol=0.2
     return V, dia_index, pops, pops_hole, energies
 
 
-def _ci_diabatization_series(params, sd_sorted, SD2CI, ci_energies, active_space, start_time, finish_time, kind):
+def _ci_diabatization_series(params, sd_sorted, SD2CI, ci_energies, active_space, start_time, finish_time, kind,
+                             fragment_operators=None):
     """V, the diabatic index, the populations and the energies of every step start_time..finish_time-1 in the CI
     basis: the step-2 fragment operators as SD-space hole / electron operators (sd_fragment_operators), carried
     through the T matrices and localized (ci_diabatization_step) - ci_energies holds the excitation energies of
-    the CI states of every step."""
-    prefix, nfrag = _fragment_operator_prefix(params, params['path_to_npz_files'], start_time)
+    the CI states of every step. fragment_operators: the per-step operators the SD series built (its last
+    return) - loaded and orthonormalized here when None."""
+    if fragment_operators is None:
+        prefix, nfrag = _fragment_operator_prefix(params, params['path_to_npz_files'], start_time)
     V_list, pops_list, hole_list, energy_list, dia_index = [], [], [], [], None
     for i, step in enumerate(range(start_time, finish_time)):
-        P_frag, _ = _fragment_operators_of_step(params, prefix, nfrag, step, active_space, with_energies=False)
+        if fragment_operators is not None:
+            P_frag = fragment_operators[i]
+        else:
+            P_frag, _ = _fragment_operators_of_step(params, prefix, nfrag, step, active_space, with_energies=False)
         O_hole, O_elec = sd_fragment_operators(sd_sorted[i], P_frag)
         V, dia_index, pops, pops_hole, energies = ci_diabatization_step(SD2CI[i], O_hole, O_elec, ci_energies[i],
                                                                         kind, dia_index,
@@ -4668,7 +4676,7 @@ def run_step3_sd_nacs_libint(params):
                          F"the {own_carrier} only, use localized_carrier '{own_carrier}' or 'none'")
     W_dia = None
     if localized_carrier != 'none':
-        W_dia, dia_index, dia_pops, dia_hole, dia_energies = _sd_diabatization_series(
+        W_dia, dia_index, dia_pops, dia_hole, dia_energies, dia_operators = _sd_diabatization_series(
             params, sd_states_reindexed_sorted, ks_active_space, start_time, finish_time, localized_carrier)
     if params['is_many_body']:
         # Add midpoint energies for CI states in here
@@ -4698,7 +4706,7 @@ def run_step3_sd_nacs_libint(params):
         if W_dia is not None:
             V_dia, ci_dia_index, ci_pops, ci_hole, ci_dia_energies = _ci_diabatization_series(
                 params, sd_states_reindexed_sorted, SD2CI, ci_energies, ks_active_space, start_time, finish_time,
-                localized_carrier)
+                localized_carrier, fragment_operators=dia_operators)
 
         # We create the var_pool whether we use the multiprocessing or not
         var_pool = make_var_pool(params, sd_states_reindexed_sorted, start_time, finish_time)
