@@ -153,6 +153,18 @@ def _time_axis(hdf_file):
     return hdf_file["time/data"][:] / units.fs2au
 
 
+def _diagonal_series(dataset, states, block_bytes=16 << 20):
+    """The diagonal elements [:, s, s] of a (steps, n, n) dataset for the states s in `states`, as a (steps,
+    len(states)) array read in blocks of steps that fit block_bytes - the density block of a long run with many
+    states runs to gigabytes, its diagonals to kilobytes."""
+    nsteps, n = dataset.shape[0], dataset.shape[1]
+    step = max(1, block_bytes // max(1, n * dataset.shape[2] * dataset.dtype.itemsize))
+    out = np.empty((nsteps, len(states)), dtype=dataset.dtype)
+    for a in range(0, nsteps, step):
+        out[a:a + step] = dataset[a:a + step][:, states, states]
+    return out
+
+
 def _selected(which, n):
     """The requested indices along an axis of length n in ascending order without repeats - the order the former
     range scans plotted them - and the h5py selection that reads exactly those rows in one call: a plain slice when
@@ -762,17 +774,22 @@ def add_populations(plt, hdf_file, plot_params_, pop_type):
                     "sh_pop_adi_TR", "sh_pop_dia_TR", "mash_pop_adi", "mash_pop_dia"]:
         if F"{pop_type}/data" in hdf_file.keys():
             res = 1
-            # the time axis and the population block once, every state's series sliced from it
+            # the time axis once and the selected states' series in one read each - the density diagonals in
+            # blocks of steps (the whole density block of a long run with many states runs to gigabytes)
             t = _time_axis(hdf_file)
-            P = hdf_file[F"{pop_type}/data"][:]
-            for indx, istate in enumerate(_selected(which_states, nstates)[0]):
-                if pop_type in ["D_dia", "D_adi"]:
-                    series = P[:, istate, istate]
-                elif pop_type == "SH_pop":
-                    series = P[:, istate, 0]
-                else:
-                    series = P[:, istate]
-                plt.plot(t, series, label=F"state {istate}", linewidth=Lw, color=_color(colors, clrs_index, indx))
+            P = hdf_file[F"{pop_type}/data"]
+            states, selection = _selected(which_states, nstates)
+            if not states:
+                series = np.empty((len(t), 0))
+            elif pop_type in ["D_dia", "D_adi"]:
+                series = _diagonal_series(P, states)
+            elif pop_type == "SH_pop":
+                series = P[:, selection, 0]
+            else:
+                series = P[:, selection]
+            for indx, istate in enumerate(states):
+                plt.plot(t, series[:, indx], label=F"state {istate}", linewidth=Lw,
+                         color=_color(colors, clrs_index, indx))
 
     plt.legend(fontsize=legend_fontsize)
     plt.tight_layout()
@@ -1267,7 +1284,7 @@ def plot_dyn(plot_params):
 
         _figsize = (24, 24)
         # the time axis once per file - every panel below is plotted against it
-        t = f["time/data"][:]
+        t = f["time/data"][:] if output_level >= 1 else None    # a level-0 file carries no time axis
 
         if output_level >= 1:
 
