@@ -309,26 +309,18 @@ def decoherence_times_ave(Hvib, itimes, nsteps, verbosity=0):
     nstates = Hvib[0][0].num_of_cols
 
     # Compute a concatenated stack of gap magnitudes for all sub-trajectories
-    dE = []
-    for idata in range(0, ndata):
-        E = _diagonal_energies(Hvib[idata])
-        for it_indx in range(0, nitimes):
-            it = itimes[it_indx]
-
-            # ========== Fluctuations for a given sub-trajectory ===========
-            de = _gap_stack(_window(E, it, nsteps, idata))
-
-            # ============== Averages for this sub-trajectory ==================
-            # we only care about dE_ave, other outputs are not used here
-            dE_ave = np.add.reduce(de, axis=0) / float(nsteps)
-
-            # ============== Subtract the sub-trajectory-specific average =============
-            dE.append(de - dE_ave)
-
-    # Compute the statistics of the obtained data set
-    # the dE_ave should be zero, considering the transformations above
-    # we only care about dE_std, other outputs are not used here
-    dE_ave, dE_std, dE_dw_bound, dE_up_bound = data_stat.stat_arrays(np.concatenate(dE, axis=0))
+    # the centred gaps of every window, row by row and window after window - the statistics over them without a
+    # concatenated stack (one window held at a time, two passes)
+    def centred_rows():
+        for idata in range(0, ndata):
+            E = _diagonal_energies(Hvib[idata])
+            for it_indx in range(0, nitimes):
+                it = itimes[it_indx]
+                de = _gap_stack(_window(E, it, nsteps, idata))
+                dE_ave = np.add.reduce(de, axis=0) / float(nsteps)
+                for row in de - dE_ave:
+                    yield row
+    dE_ave, dE_std, dE_dw_bound, dE_up_bound = data_stat.stat_members(centred_rows)
 
     decoh_times = _times_from_std(dE_std, nstates)
     decoh_rates = decoherence_times2rates(decoh_times)

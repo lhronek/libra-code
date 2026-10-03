@@ -231,8 +231,7 @@ def mat_stat(X):
 
     # the series as one (N, rows, cols) stack through the bulk transfer (a CMATRIX is refused by the conversion -
     # cmat_stat serves complex series)
-    stack = np.stack([data_conv.MATRIX2nparray(x, np.float64) for x in X])
-    res, res2, dw_bound, up_bound = stat_arrays(stack)
+    res, res2, dw_bound, up_bound = stat_members(lambda: (data_conv.MATRIX2nparray(x, np.float64) for x in X))
     return (data_conv.nparray2MATRIX(res), data_conv.nparray2MATRIX(res2),
             data_conv.nparray2MATRIX(dw_bound), data_conv.nparray2MATRIX(up_bound))
 
@@ -247,6 +246,31 @@ def stat_arrays(stack):
     # in about one case per thousand)
     res2 = np.sqrt(np.add.reduce((stack - res) ** 2, axis=0) / float(N))
     return res, res2, np.minimum.reduce(stack, axis=0), np.maximum.reduce(stack, axis=0)
+
+
+def stat_members(members):
+    """stat_arrays without the stack: `members` is a callable that gives a fresh iterable of the equal-shape
+    members on each call (two passes - the sums and the bounds, then the deviations), the sums member by member
+    in the iteration order, so the results equal stat_arrays on the stacked members bit for bit while one member
+    is held at a time."""
+    n, res, lo, hi = 0, None, None, None
+    for x in members():
+        x = np.asarray(x, dtype=np.float64)
+        if res is None:
+            res, lo, hi = x.copy(), x.copy(), x.copy()
+        else:
+            res = res + x
+            lo = np.minimum(lo, x)
+            hi = np.maximum(hi, x)
+        n += 1
+    if n == 0:
+        raise ValueError("stat_members: no members")
+    res = res / float(n)
+    dev = None
+    for x in members():
+        d = (np.asarray(x, dtype=np.float64) - res) ** 2
+        dev = d if dev is None else dev + d
+    return res, np.sqrt(dev / float(n)), lo, hi
 
 
 def cmat_stat(X):
