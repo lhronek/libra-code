@@ -136,22 +136,32 @@ def _pairwise_couplings(H_raw, S_st, E_i, E_j, orthogonalization, keep_first):
     return (h - s * e_kept) / np.sqrt(1.0 - s**2)
 
 
-def _orthonormalize_blocks(c_raw, S_m, cols, orthogonalization, kept_block):
+def _orthonormalize_blocks(c_raw, S_m, cols, orthogonalization, kept_block, blocks, overlaps):
     """
     The whole-set counterpart of the pairwise orthogonalization, for the fragment operators (a
     projector partition needs one orthonormal set): Lowdin - c (c^T S c)^-1/2 over all fragment
     states at once - Gram-Schmidt - the kept block untouched, every other block (in index order)
     projected orthogonal to the blocks before it and re-orthonormalized within itself by its own
     Lowdin step, so its states stay as close to the fragment eigenstates as the projection allows.
+    The states of a fragment live on its own AOs (blocks), so the whole-set overlap c^T S c is
+    assembled from the fragment blocks: the diagonal blocks c_f^T S_ff c_f and the pairwise
+    overlaps `overlaps` {(i, j): c_i^T S_ij c_j, i < j} the caller holds.
     """
     n = c_raw.shape[0]
-    c_m = data_conv.nparray2MATRIX(c_raw)
+    S = np.asarray(data_conv.MATRIX2nparray(S_m, np.float64)) if not isinstance(S_m, np.ndarray) else S_m
     if orthogonalization == "lowdin":
-        S_st = c_m.T() * S_m * c_m                                       # DGEMM
+        S_st = np.zeros((n, n))
+        for f, blk in enumerate(blocks):
+            cf = c_raw[np.ix_(blk, cols[f])]
+            S_st[np.ix_(cols[f], cols[f])] = cf.T @ S[np.ix_(blk, blk)] @ cf
+        for (i, j), S_ij in overlaps.items():
+            S_st[np.ix_(cols[i], cols[j])] = S_ij
+            S_st[np.ix_(cols[j], cols[i])] = S_ij.T
         Y = MATRIX(n, n)
         T = MATRIX(n, n)
-        sqrt_matrix(S_st, Y, T)
-        return data_conv.MATRIX2nparray(c_m * T, np.float64)
+        sqrt_matrix(data_conv.nparray2MATRIX(S_st), Y, T)
+        return data_conv.MATRIX2nparray(data_conv.nparray2MATRIX(c_raw) * T, np.float64)
+    S_m = data_conv.nparray2MATRIX(S) if isinstance(S_m, np.ndarray) else S_m
     order = [kept_block] + [g for g in range(len(cols)) if g != kept_block]
     c_orth = c_raw.copy()
     done = []
@@ -295,7 +305,8 @@ def pod2_block_states(H_list, S, ao_atom, fragment_atom_lists, orthogonalization
         if orthogonalization == "none":
             c_orth = c_raw
         else:
-            c_orth = _orthonormalize_blocks(c_raw, data_conv.nparray2MATRIX(core["S"]), cols, orthogonalization, kept_block)
+            overlaps = {(i, j): core["state_overlaps"][(i, j, sp)] for i in range(nblk) for j in range(i + 1, nblk)}
+            c_orth = _orthonormalize_blocks(c_raw, core["S"], cols, orthogonalization, kept_block, blocks, overlaps)
         for f in range(nblk):
             out["coeffs"][(f, sp)] = np.ascontiguousarray(c_orth[:, cols[f]])
     return out
