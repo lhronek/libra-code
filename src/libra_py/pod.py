@@ -23,7 +23,7 @@ fragment's state (Gram-Schmidt).
 """
 import numpy as np
 from liblibra_core import MATRIX, intList, solve_eigen, sqrt_matrix, pop_submatrix, have_lapack, lapack_syevd, set_from_buffer
-from libra_py import data_conv
+from libra_py import data_conv, orthogonalizations
 
 
 def ao_blocks(ao_atom, fragment_atom_lists):
@@ -81,6 +81,7 @@ def pod_block_states(H_list, S, ao_atom, fragment_atom_lists):
             spin): block MOs in the AO basis, (n_ao, n_ao_block)}, blocks (the AO index lists)
     """
     S = np.asarray(S, dtype=float)
+    orthogonalizations.validate_overlap_matrix(S, "the AO overlap of pod_block_states")
     n = S.shape[0]
     blocks = ao_blocks(ao_atom, fragment_atom_lists)
     covered = sorted(i for b in blocks for i in b)
@@ -199,6 +200,7 @@ def pod2_core(H_list, S, ao_atom, fragment_atom_lists):
             {(block_i, block_j, spin)}, state_overlaps {(block_i, block_j, spin)}, coeffs_raw {(block, spin)}
     """
     S = np.asarray(S, dtype=float)
+    orthogonalizations.validate_overlap_matrix(S, "the AO overlap of pod2_core")
     n = S.shape[0]
     blocks = ao_blocks(ao_atom, fragment_atom_lists)
     covered = sorted(i for b in blocks for i in b)
