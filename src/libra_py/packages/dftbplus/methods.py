@@ -3493,7 +3493,7 @@ def dftb_compute_adi(q, params, full_id):
             print(F"WARNING in dftb_compute_adi: no FRC.DAT - d1ham_adi "
                   F"carries gradients on rows 0 and {soi_row} only, the other rows are NaN (not handed over) - "
                   F"the engine refuses every option that reads them")
-        # the rows not computed are NaN - the sentinel the engine's checks read (a zero force is a force);
+        # the rows not computed are NaN - the sentinel the engine's checks read (a zero force is a force) -
         # the tag arrays are (3, nat), row 3 iat + k of the diagonals is -force[k, iat]
         rows = np.full((ndof, nstates), np.nan)
         if f_gs is not None:
