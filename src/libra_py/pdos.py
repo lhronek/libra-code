@@ -463,7 +463,7 @@ def cp2k_pdos(_params):
     en = MATRIX(N, 1)      # energy of the grid points
     # Matrix for alpha spin-orbitals dos.get(i,proj) - dos for level i projected on projection proj
     dosa = MATRIX(N, nproj)
-    dosb = MATRIX(N, nproj)  # Matrix for beta  spin-orbitals
+    #dosb = MATRIX(N, nproj)  # Matrix for beta  spin-orbitals - never filled, pDOSb is the alpha copy
     for i in range(0, N):
         en.set(i, 0, emin + i * de)   # this is a scale centered on Ef
 
@@ -473,6 +473,7 @@ def cp2k_pdos(_params):
     nsnaps = float(len(snapshots))
 
     for snap in snapshots:
+        parsed = {}      # one parse per file - the projections and elements of a snapshot name the same files
         for proj in projections:  # loop over all projection
             ang_mom = proj[0]
             atoms = proj[1]
@@ -489,7 +490,9 @@ def cp2k_pdos(_params):
                 if not os.path.exists(filename):
                     print(F"The file {filename} is not found.")
                 if os.path.exists(filename):
-                    block = CP2K_methods.read_cp2k_pdos(filename)
+                    if filename not in parsed:
+                        parsed[filename] = CP2K_methods.read_cp2k_pdos(filename)
+                    block = parsed[filename]
                     if block["e_fermi"] is None:
                         raise ValueError(F"{filename}: the header carries no E(Fermi) - the energy window [emin, emax] "
                                          F"of the pDOS is relative to the Fermi level")
@@ -516,11 +519,12 @@ def cp2k_pdos(_params):
 
     # ============= Optional convolution =================
 
-    E, pDOSa, pDOSb = MATRIX(en), MATRIX(dosa), MATRIX(dosb)
+    E, pDOSa = MATRIX(en), MATRIX(dosa)
 
     if do_convolve:
         E, pDOSa = convolve(en, dosa, de, de_new, var)
-        E, pDOSb = convolve(en, dosb, de, de_new, var)
+    # one spin channel (nspin 2 is refused above): the beta curve is the alpha one, in the _bet file as in the return
+    pDOSb = MATRIX(pDOSa)
 
     # ============= Print out ==================
 
@@ -552,11 +556,12 @@ def cp2k_pdos(_params):
         f2b.write(line)
         f2b.close()
 
-    if nspin == 2:
-        return E, pDOSa, pDOSb
-    else:
-        pDOSb = MATRIX(pDOSa)
-        return E, pDOSa, pDOSb
+    #if nspin == 2:                  # nspin 2 is refused above - pDOSb is the alpha copy either way
+    #    return E, pDOSa, pDOSb
+    #else:
+    #    pDOSb = MATRIX(pDOSa)
+    #    return E, pDOSa, pDOSb
+    return E, pDOSa, pDOSb
 
 
 def pdos_plot(plt, E, pDOSa, pDOSb, _params):
