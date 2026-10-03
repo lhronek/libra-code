@@ -1239,7 +1239,8 @@ def repartition_newtonx(nx, nocc_ref, theta=0.01, occupations=None, nelec=None):
     integer-occupation SD basis represents it.
     Args:
         nx (dict): read_cp2k_newtonx_output result (a modified copy is returned)
-        nocc_ref (int or [int, int]): the electron-count reference
+        nocc_ref (int or [int, int]): the electron-count reference - one count for RKS data,
+            [alpha, beta] for UKS data (the spin treatment of nx decides, a mismatch raises)
         theta (float): population tolerance, fraction of the full occupation
         occupations (list of np.ndarray or None): read_cp2k_mo_occupations
         nelec (list of int or None): per-channel electron counts for the sum check
@@ -1249,7 +1250,13 @@ def repartition_newtonx(nx, nocc_ref, theta=0.01, occupations=None, nelec=None):
     """
     nx = dict(nx)
     is_uks = nx.get("nspin", 1) == 2 and nx.get("X_b") is not None
-    refs = list(nocc_ref) if is_uks else [int(nocc_ref)]
+    pair = isinstance(nocc_ref, (list, tuple, np.ndarray))
+    if pair != is_uks or (pair and len(nocc_ref) != 2):
+        raise ValueError(
+            F"repartition_newtonx: the NAMD_PRINT data are {'spin-polarized' if is_uks else 'spin-restricted'} but "
+            F"nocc_ref = {nocc_ref!r} is {'a sequence' if pair else 'one count'} - the electron-count reference is "
+            F"[alpha, beta] for UKS data and one integer for RKS data")
+    refs = [int(x) for x in nocc_ref] if is_uks else [int(nocc_ref)]
     channels = [("", refs[0])] + ([("_b", refs[1])] if is_uks else [])
     maxocc = 1.0 if is_uks else 2.0
     drops = np.zeros(len(nx["X"]))
