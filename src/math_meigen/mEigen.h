@@ -82,7 +82,7 @@ void solve_eigen_nosort(CMATRIX& H, CMATRIX& E, CMATRIX& C, int symm);       ///
 ///< Mixed MATRIX-CMATRIX versions
 void solve_eigen_nosort(MATRIX* H, CMATRIX* E, CMATRIX* C, int symm);        ///< pointers  
 void solve_eigen_nosort(MATRIX& H, CMATRIX& E, CMATRIX& C, int symm);        ///< references
-int get_lapack_eigen_min_n();        ///< solve_eigen takes the LAPACK kernels of blas_interface.h from this matrix size on and the Eigen solver below it (whose eigenvector signs the small-model certifiers pin) - the LIBRA_LAPACK_EIGEN_MIN_N environment variable overrides the built-in default at first use
+int get_lapack_eigen_min_n();        ///< solve_eigen takes the LAPACK kernels of blas_interface.h from this matrix size on and the Eigen solver below it (whose eigenvector signs the small-model certifiers pin) - the LIBRA_LAPACK_EIGEN_MIN_N environment variable overrides the built-in default at first use - the matrix functions (sqrt_matrix, sqrt_matrix_derivative, exp_matrix, lowdin_frame) take the kernels at every size
 void set_lapack_eigen_min_n(int n);  ///< 1 = every size through LAPACK, a huge value = Eigen everywhere
 int get_lapack_nosort_min_n();       ///< the same switch for solve_eigen_nosort (the general dgeev/zgeev kernels) - its own, much lower default, LIBRA_LAPACK_NOSORT_MIN_N overrides it
 void set_lapack_nosort_min_n(int n);

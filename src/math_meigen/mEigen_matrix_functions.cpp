@@ -35,7 +35,8 @@ namespace libmeigen{
 
 void sqrt_matrix(CMATRIX& S, CMATRIX& S_half, CMATRIX& S_i_half, double thresh, int do_phase_correction){
 /**
-  This function computes S^{1/2} and S^{-1/2} for given matrix S
+  This function computes S^{1/2} and S^{-1/2} for given matrix S - the eigenpairs from zheevd,
+  the LAPACK kernel at every matrix size when the build linked it (the eigen size threshold of solve_eigen does not apply), the Eigen solver otherwise
   \param[in] S Input matrix
   \param[out] S_half Computed S^{1/2} matrix
   \param[out] S_i_half Computed S^{-1/2} matrix
@@ -129,8 +130,9 @@ void sqrt_matrix(CMATRIX& S, CMATRIX& S_half, CMATRIX& S_i_half){
 void sqrt_matrix(MATRIX& S, MATRIX& S_half, MATRIX& S_i_half, double thresh, int do_phase_correction){
 /**
   S^{1/2} and S^{-1/2} of a real symmetric positive-definite S - the real counterpart of the
-  CMATRIX version: the eigenpairs from LAPACK dsyevd when the build linked it (the Eigen solver
-  otherwise), the back-transforms as dgemm-backed MATRIX products. A negative eigenvalue has no
+  CMATRIX version: the eigenpairs from LAPACK dsyevd when the build linked it, at every matrix
+  size (the eigen size threshold of solve_eigen does not apply), from the Eigen solver otherwise,
+  the back-transforms as dgemm-backed MATRIX products. A negative eigenvalue has no
   real root and is refused, a root below thresh stops with the singularity message (thresh <= 0
   disables that check)
   \param[in] S Input matrix
@@ -218,7 +220,8 @@ void sqrt_matrix_derivative(CMATRIX& S, CMATRIX& dS, CMATRIX& dY, CMATRIX& dX){
   Derivatives of Y = S^1/2 and X = S^-1/2 along a Hermitian variation dS of a positive-definite S.
   With S = V s V^H (Daleckii-Krein): (V^H dF V)_ab = (V^H dS V)_ab (f(s_a) - f(s_b))/(s_a - s_b), the
   divided differences written in their cancellation-free forms 1/(sqrt(s_a) + sqrt(s_b)) and
-  -1/(sqrt(s_a) sqrt(s_b) (sqrt(s_a) + sqrt(s_b))), which are the derivatives f' on the diagonal
+  -1/(sqrt(s_a) sqrt(s_b) (sqrt(s_a) + sqrt(s_b))), which are the derivatives f' on the diagonal.
+  The eigenpairs of S from zheevd, the LAPACK kernel at every matrix size when the build linked it (the eigen size threshold of solve_eigen does not apply), the Eigen solver otherwise
 */
   int n = S.n_cols;
   if(S.n_rows != n || dS.n_rows != n || dS.n_cols != n || dY.n_rows != n || dY.n_cols != n || dX.n_rows != n || dX.n_cols != n){
@@ -255,7 +258,8 @@ void sqrt_matrix_derivative(CMATRIX& S, CMATRIX& dS, CMATRIX& dY, CMATRIX& dX){
 
 void exp_matrix(CMATRIX& res, CMATRIX& S, complex<double> dt, int do_phase_correction){
 /**
-  This function computes exp(S*dt) for a given matrix S
+  This function computes exp(S*dt) for a given matrix S - the eigenpairs from zheevd,
+  the LAPACK kernel at every matrix size when the build linked it (the eigen size threshold of solve_eigen does not apply), the Eigen solver otherwise
   \param[in] S input matrix
   \param[in] dt scaling factor
 
