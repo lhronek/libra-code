@@ -13,6 +13,8 @@
 #include <stdexcept>
 #include "blas_interface.h"
 #include <limits>
+#include <vector>
+#include <Eigen/Dense>
 
 
 /// liblibra 
@@ -26,7 +28,8 @@ namespace liblinalg{
 void solve_linsys(CMATRIX& C,CMATRIX& D, CMATRIX& X,double eps,int maxiter,double omega){
 /**
   Solve C X = D: the exact LU solution for a square nonsingular C, the minimum-norm least-squares
-  solution otherwise (zgesv / zgelsy of blas_interface.h) - the solution the over-relaxed Gauss-Seidel
+  solution otherwise (zgesv behind a rank test and zgelsy of blas_interface.h, Eigen's complete-pivoting LU
+  and complete orthogonal decomposition without the backend) - the solution the over-relaxed Gauss-Seidel
   iteration on the normal equations C^H C X = C^H D (S. Simons, Math. Gazette 80, 567 (1996)) converged
   to when it converged. That iteration squared the condition number, stopped on the size of its step
   and returned silently at maxiter, so a loose eps accepted a wrong X and a tight one never finished.
@@ -42,21 +45,44 @@ void solve_linsys(CMATRIX& C,CMATRIX& D, CMATRIX& X,double eps,int maxiter,doubl
       {std::cout<<"Error: The number of cols of matrices X and D in equation CX = D must be equal\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); } // p
 
   (void)eps; (void)maxiter; (void)omega;
-  if(!have_lapack()){
-    std::cout<<"Error in solve_linsys (CMATRIX): the direct solve needs the LAPACK backend (WITH_LAPACK)\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-  }
   int n = C.n_rows;
   int m = C.n_cols;
+  int k = D.n_cols;
   double rcond = std::numeric_limits<double>::epsilon() * std::min(n, m);
-  if(n == m && lapack_gesv(C, X, D) == 0){ return; }
-  lapack_gelsy(C, X, D, rcond);
+  if(have_lapack()){
+    // the LU solve answers a full-rank square system alone - the rank (the complete-pivoting LU with Eigen's
+    // threshold eps min(n, m)) decides first, since zgesv solves a numerically singular system without a word
+    // and returns a 1e16-sized vector - a rank-deficient or rectangular system takes the minimum-norm least
+    // squares of zgelsy
+    if(n == m && lapack_getc2_rank(C, rcond) == n && lapack_gesv(C, X, D) == 0){ return; }
+    lapack_gelsy(C, X, D, rcond);
+    return;
+  }
+  // without the backend: Eigen's complete-pivoting LU (the same rank threshold) for a full-rank square
+  // system, the minimum-norm solution of its complete orthogonal decomposition otherwise
+  Eigen::MatrixXcd a(n, m), b(n, k), x(m, k);
+  for(int i = 0; i < n; i++){
+    for(int j = 0; j < m; j++){ a(i, j) = C.M[i*m + j]; }
+    for(int j = 0; j < k; j++){ b(i, j) = D.M[i*k + j]; }
+  }
+  if(n == m){
+    Eigen::FullPivLU<Eigen::MatrixXcd> lu(a);
+    if(lu.rank() == n){ x = lu.solve(b); }
+    else{ x = a.completeOrthogonalDecomposition().solve(b); }
+  }
+  else{ x = a.completeOrthogonalDecomposition().solve(b); }
+  for(int i = 0; i < m; i++){
+    for(int j = 0; j < k; j++){ X.M[i*k + j] = x(i, j); }
+  }
 }
+
 
 
 void solve_linsys1(CMATRIX& C, CMATRIX& X,double eps,int maxiter,double omega){
 /**
   The homogeneous case C X = 0 from the starting vector X: the orthogonal projection of X onto the null
-  space of C (the SVD of blas_interface.h, singular values below eps_machine min(n, m) times the largest
+  space of C (the SVD of blas_interface.h, Eigen's Jacobi SVD without the backend - singular values below
+  eps_machine min(n, m) times the largest
   count as zero). A nonsingular C leaves the zero vector. This is the fixed point the removed Gauss-Seidel
   iteration on C^H C x = 0 approached from X - a null-space vector for a singular C, zero otherwise.
   Inputs: C (n x m), X (m x 1) the start
@@ -69,28 +95,38 @@ void solve_linsys1(CMATRIX& C, CMATRIX& X,double eps,int maxiter,double omega){
       {std::cout<<"Error: The number of cols of matrices X and D in equation CX = D must be equal\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); } // p
 
   (void)eps; (void)maxiter; (void)omega;
-  if(!have_lapack()){
-    std::cout<<"Error in solve_linsys1 (CMATRIX): the null-space projection needs the LAPACK backend (WITH_LAPACK)\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-  }
   int n = C.n_rows;
   int m = C.n_cols;
   int mn = std::min(n, m);
-  CMATRIX U(n, n);
-  CMATRIX S(n, m);
+  // the singular values (descending) and the right singular vectors, from the backend or from Eigen
+  std::vector<double> sv(mn, 0.0);
   CMATRIX V(m, m);
-  lapack_gesdd(C, U, S, V);
-  double smax = (mn > 0) ? S.get(0, 0).real() : 0.0;
+  if(have_lapack()){
+    CMATRIX U(n, n);
+    CMATRIX S(n, m);
+    lapack_gesdd(C, U, S, V);
+    for(int q = 0; q < mn; q++){ sv[q] = S.get(q, q).real(); }
+  }
+  else{
+    Eigen::MatrixXcd a(n, m);
+    for(int i = 0; i < n; i++){ for(int j = 0; j < m; j++){ a(i, j) = C.M[i*m + j]; } }
+    Eigen::JacobiSVD<Eigen::MatrixXcd> svd(a, Eigen::ComputeFullV);
+    for(int q = 0; q < mn; q++){ sv[q] = svd.singularValues()(q); }
+    for(int i = 0; i < m; i++){ for(int q = 0; q < m; q++){ V.set(i, q, svd.matrixV()(i, q)); } }
+  }
+  double smax = (mn > 0) ? sv[0] : 0.0;
   double thresh = std::numeric_limits<double>::epsilon() * mn * smax;
   CMATRIX proj(m, 1);
   proj = complex<double>(0.0, 0.0);
-  for(int k = 0; k < m; k++){
-    if(k < mn && S.get(k, k).real() > thresh){ continue; }
+  for(int q = 0; q < m; q++){
+    if(q < mn && sv[q] > thresh){ continue; }
     complex<double> coef(0.0, 0.0);
-    for(int i = 0; i < m; i++){ coef += std::conj(V.get(i, k)) * X.get(i, 0); }
-    for(int i = 0; i < m; i++){ proj.set(i, 0, proj.get(i, 0) + V.get(i, k) * coef); }
+    for(int i = 0; i < m; i++){ coef += std::conj(V.get(i, q)) * X.get(i, 0); }
+    for(int i = 0; i < m; i++){ proj.set(i, 0, proj.get(i, 0) + V.get(i, q) * coef); }
   }
   X = proj;
 }
+
 
 void dft(CMATRIX& in,CMATRIX& out){
 /**
