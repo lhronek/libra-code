@@ -41,6 +41,7 @@ import math
 import copy
 import re
 import numpy as np
+from libra_py import data_conv
 if sys.platform == "cygwin":
     from cyglibra_core import *
 elif sys.platform == "linux" or sys.platform == "linux2":
@@ -119,15 +120,14 @@ def add_matrix2file(filename, t, X):
 
     """
 
-    nrows = X.num_of_rows
-    ncols = X.num_of_cols
+    #nrows = X.num_of_rows     # the elements come through the buffer transfer below, not get() by get()
+    #ncols = X.num_of_cols
 
     f = open(filename, "a")
 
     line = "%5.3f" % (t)
-    for a in range(nrows):
-        for b in range(ncols):
-            line = line + " %8.5f" % (X.get(a, b))
+    for v in data_conv.MATRIX2nparray(X, np.float64).ravel().tolist():
+        line = line + " %8.5f" % (v)
     line = line + "\n"
 
     f.write(line)
@@ -152,15 +152,14 @@ def add_cmatrix2file(filename, t, X):
 
     """
 
-    nrows = X.num_of_rows
-    ncols = X.num_of_cols
+    #nrows = X.num_of_rows     # the elements come through the buffer transfer below, not get() by get()
+    #ncols = X.num_of_cols
 
     f = open(filename, "a")
 
     line = "%5.3f" % (t)
-    for a in range(nrows):
-        for b in range(ncols):
-            line = line + " %8.5f %8.5f" % (X.get(a, b).real, X.get(a, b).imag)
+    for v in data_conv.MATRIX2nparray(X, np.complex128).ravel().tolist():
+        line = line + " %8.5f %8.5f" % (v.real, v.imag)
     line = line + "\n"
 
     f.write(line)
@@ -270,13 +269,9 @@ def file2matrix(filename, nrows, ncols):
                                "should be %5i, but we've got %5i (ncols = %i, nrows = %i)"
                                % (ncols * nrows + 1, sz, ncols, nrows))
 
-        res_i = MATRIX(nrows, ncols)
-        cnt = 1
-        for a in range(nrows):
-            for b in range(ncols):
-                res_i.set(a, b, float(tmp[cnt]))
-                cnt += 1
-        res.append(res_i)
+        # the values parsed by float(), the matrix filled through the buffer transfer
+        vals = np.fromiter((float(x) for x in tmp[1:]), dtype=np.float64, count=nrows * ncols)
+        res.append(data_conv.nparray2MATRIX(vals.reshape(nrows, ncols)))
 
     return res
 
@@ -319,16 +314,10 @@ def file2cmatrix(filename, nrows, ncols):
                                "should be %5i, but we've got %5i (ncols = %i, nrows = %i)"
                                % (2 * ncols * nrows + 1, sz, ncols, nrows))
 
-        res_i = CMATRIX(nrows, ncols)
-        cnt = 1
-        for a in range(nrows):
-            for b in range(ncols):
-                re = float(tmp[cnt])
-                im = float(tmp[cnt + 1])
-                res_i.set(a, b, complex(re, im))
-                cnt += 2
-
-        res.append(res_i)
+        # the real and imaginary parts parsed by float() in their pairs - the interleaved doubles are the complex128
+        # layout, so the view casts them - the matrix filled through the buffer transfer
+        vals = np.fromiter((float(x) for x in tmp[1:]), dtype=np.float64, count=2 * nrows * ncols)
+        res.append(data_conv.nparray2CMATRIX(vals.view(np.complex128).reshape(nrows, ncols)))
 
     return res
 
