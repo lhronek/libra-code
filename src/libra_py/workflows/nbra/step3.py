@@ -2978,7 +2978,7 @@ def fragment_operator_count(res_dir, prefix, step):
 def _sd_diabatization_series(params, sd_sorted, active_space, start_time, finish_time, kind):
     """W, the diabatic index, the populations and the orbital energies of every step
     start_time..finish_time-1, from the step-2 fragment operators and orbital energies sliced
-    to the active space (Lowdin-orthonormalized when the SD overlaps are)."""
+    to the active space, in the orthonormal-orbital layout (_fragment_operators_of_step)."""
     prefix, nfrag = _fragment_operator_prefix(params, params['path_to_npz_files'], start_time)
     W_list, pops_list, hole_list, energy_list, dia_index = [], [], [], [], None
     for i, step in enumerate(range(start_time, finish_time)):
@@ -3015,13 +3015,14 @@ def _fragment_operator_prefix(params, res_dir_1, start_time):
 
 def _fragment_operators_of_step(params, prefix, nfrag, step, active_space, with_energies=True):
     """The step-2 fragment operators and the orbital-energy operator of one step sliced to the active space (through
-    the orbital relabeling of active_space_selection 'identity'), Lowdin-orthonormalized when the SD overlaps are
-    (the orthonormal-orbital layout sd_diabatization_step and sd_fragment_operators read) - the energies None when
-    the caller does not read them."""
+    the orbital relabeling of active_space_selection 'identity') in the orthonormal-orbital layout
+    sd_diabatization_step and sd_fragment_operators read: expressed in the Lowdin orbitals X = S_ks^-1/2 whenever
+    the step's orbital overlap S_ks is not the identity (the SD-level apply_orthonormalization of the time overlaps
+    is another transform and no condition here) - the energies None when the caller does not read them."""
     P_frag = [_window_matrix(params, F'{prefix}{f}_ks', step, active_space) for f in range(nfrag)]
     E_orb = _window_matrix(params, 'E_ks', step, active_space) if with_energies else None
-    if params['apply_orthonormalization'] != "none":
-        s_ks = _window_matrix(params, 'S_ks', step, active_space)
+    s_ks = _window_matrix(params, 'S_ks', step, active_space)
+    if np.any(s_ks != np.eye(s_ks.shape[0])):
         X = orthogonalizations.get_Lowdin_scipy(s_ks)
         P_frag = [X.T @ P @ X for P in P_frag]
         if with_energies:
