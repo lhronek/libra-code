@@ -684,11 +684,13 @@ def convolve_cp2k_pdos(params: dict):
     # The angular momentum columns in the .pdos files
     angular_momentum_cols = params["angular_momentum_cols"]
 
-    # The per-MO tables of the file (one block per appended iteration in the CP2K <= 2025 files)
-    blocks = CP2K_methods.read_cp2k_pdos_blocks(cp2k_pdos_file)
-    if time_step >= len(blocks):
-        raise ValueError(F"{cp2k_pdos_file} holds {len(blocks)} block(s), time_step {time_step} is out of range")
-    block = blocks[time_step]
+    # the selected per-MO table alone is read for the data (read_cp2k_pdos keeps one table of an appended file at a
+    # time), the first table for the energy grid: a sweep over the time steps of one file returns its rows on one axis
+    try:
+        block = CP2K_methods.read_cp2k_pdos(cp2k_pdos_file, time_step)
+    except IndexError as err:
+        raise ValueError(F"time_step {time_step}: {err}")
+    first = block if time_step == 0 else CP2K_methods.read_cp2k_pdos(cp2k_pdos_file, 0)
     # Number of energy levels considered for PDOS
     num_levels = len(block["energies"])
     # The energies of the levels in the requested unit
@@ -703,10 +705,10 @@ def convolve_cp2k_pdos(params: dict):
     homo_level = int(occupied.max())
     # HOMO energy
     homo_energy = energy_levels[homo_level]
-    # Minimum energy level
-    min_energy = energy_levels[0]
-    # Maximum energy level
-    max_energy = energy_levels[-1]
+    # the grid spans the first table's levels
+    grid_levels = first["energies"] * energy_conversion
+    min_energy = grid_levels[0]
+    max_energy = grid_levels[-1]
     # Now we make an equispaced energy vector from min_energy ad max_energy with npoints.
     energy_grid = np.linspace(min_energy - 2, max_energy + 2, npoints)
     energy_grid = np.array(energy_grid)
