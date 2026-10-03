@@ -1954,7 +1954,10 @@ int nHamiltonian::lowdin_dia_derivative(int n, CMATRIX &X, CMATRIX &Y, CMATRIX &
     The Lowdin frame X = S^-1/2, Y = S^1/2 and its derivative along nuclear DOF n.
     The metric gradient is the Hermitian part of the diabatic derivative coupling,
     dS = D_n + D_n^H with D_ij = <i|d j> - a basis without dc1_dia has, by that
-    contract, a constant metric. Returns the lowdin_dia status (0 = identity metric,
+    contract, a constant metric (compute_dynamics refuses a metric that moved over the
+    step while dS vanishes, where this derivative is read: the diabatic forces, the
+    Lowdin hopping generator).
+    Returns the lowdin_dia status (0 = identity metric,
     nothing filled) - dX and dY are zero when dc1_dia[n] is absent or dS vanishes
   */
   int status = lowdin_dia(X, Y);

@@ -424,7 +424,9 @@ void SSY_correction(CMATRIX &Ham, dyn_variables &dyn_var, nHamiltonian &ham,
 }
 
 // the diabatic metric changed over the step (any element, exactly) - the rep-0
-// propagators then take the Lowdin-frame step instead of their constant-metric form
+// propagators then take the Lowdin-frame step instead of their constant-metric form,
+// and compute_dynamics demands a model dS = dc1_dia + dc1_dia^H where the frame's
+// derivative is read
 static int metric_moved(CMATRIX &S_old, CMATRIX &S_new) {
   for (int i = 0; i < S_old.n_rows; i++) {
     for (int j = 0; j < S_old.n_cols; j++) {
@@ -2386,6 +2388,46 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
 
   // Copy diabatic-to-adiabatic basis transformation to the dynamical variable
   dyn_var.update_basis_transform(ham);
+
+  // the Lowdin frame's derivative reads the metric's motion from dS = dc1_dia + dc1_dia^H
+  // (the contract of lowdin_dia_derivative - init_all allocates dc1_dia as zeros for a model
+  // without them): a metric that moved over the step while dS vanishes for every DOF has no
+  // derivative source, and its readers - the diabatic state and QTSH forces (force_method 1
+  // or 3 under rep_force 0) and the Lowdin hopping generator (any hop method under rep_sh 0)
+  // - would take the frame as static. Refused where both metrics of the step are at hand -
+  // a run without those readers (no forces, no hops - the pure propagation on a moving
+  // metric) needs no dc1_dia
+  int reads_frame_derivative = ((prms.force_method == 1 || prms.force_method == 3) && prms.rep_force == 0) ||
+                               (prms.tsh_method != -1 && prms.rep_sh == 0);
+  if (reads_frame_derivative) {
+    for (int c = 0; c < (int)ham.children.size(); c++) {
+      if (dyn_var.ovlp_dia_is_identity[c]) { continue; }
+      nHamiltonian* now = ham.children[c];
+      nHamiltonian* was = ham_aux.children[c];
+      if (now->ovlp_dia_mem_status == 0 || was->ovlp_dia_mem_status == 0) { continue; }
+      if (!metric_moved(*was->ovlp_dia, *now->ovlp_dia)) { continue; }
+      int moving = 0;
+      for (int n = 0; n < now->nnucl && !moving; n++) {
+        if (now->dc1_dia_mem_status[n] == 0) { continue; }
+        CMATRIX dS(*now->dc1_dia[n] + (*now->dc1_dia[n]).H());
+        for (int i = 0; i < dS.n_rows && !moving; i++) {
+          for (int j = 0; j < dS.n_cols; j++) {
+            if (std::abs(dS.get(i, j)) > 0.0) { moving = 1; break; }
+          }
+        }
+      }
+      if (!moving) {
+        std::cout << "Error in compute_dynamics(): the diabatic metric of trajectory " << c
+                  << " moved over the step, but the model's dc1_dia give dS = dc1_dia + dc1_dia^H = 0 "
+                  << "for every nuclear DOF (absent, or without a Hermitian part) - the Lowdin frame's "
+                  << "derivative (the diabatic forces under rep_force 0, the Lowdin hopping generator "
+                  << "under rep_sh 0) reads the metric's motion from dS and would take the frame as "
+                  << "static. Supply dc1_dia consistent with the metric, keep the metric constant, or "
+                  << "run without forces and hops\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
+    }
+  }
 
   // Recompute the orthogonalized reprojection matrices, stored in
   // dyn_var.proj_adi this calculations used ham.children[i].time_overlap
