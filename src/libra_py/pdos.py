@@ -56,7 +56,7 @@ def convolve(X0, Y0, dx0, dx, var):
 
     """
 
-    mult = int(dx0 / dx)     # making grid mult times bigger
+    mult = int(round(dx0 / dx))     # making grid mult times bigger - the ratio rounded, dx0 = mult dx checked below
     print("multiplication factor is = ", mult)
     print("original grid spacing = ", dx0)
     print("new grid spacing = ", dx)
@@ -75,6 +75,11 @@ def convolve(X0, Y0, dx0, dx, var):
     # (745 = -ln of the smallest double): the weights placed on the fine grid and convolved with g once per
     # projection
     x0 = data_conv.MATRIX2nparray(X0, np.float64)[:, 0]
+    # the new grid refines the uniform X0: x[k] = x0[0] + k dx with dx0 = mult dx - another input has no grid the
+    # Gaussians land on
+    if abs(mult * dx - dx0) > 1e-12 * dx0 or np.abs(x0 - (x0[0] + np.arange(N0) * dx0)).max() > 1e-12 * dx0:
+        raise ValueError(F"convolve: dx0 = {dx0} has to be an integer multiple of dx = {dx} and X0 the uniform "
+                         F"grid of spacing dx0 - the new grid is X0 refined {mult} times")
     weights = dx0 * data_conv.MATRIX2nparray(Y0, np.float64) / area     # the area of each original point relative to the Gaussian's
     x = x0[0] + np.arange(N) * dx
     lmax = int(math.ceil(math.sqrt(745.0 / alp) / dx))
