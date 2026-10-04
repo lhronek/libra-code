@@ -3156,7 +3156,7 @@ def ci_diabatization_step(T, O_hole, O_elec, E_ci, kind, dia_index=None, tol=0.2
     try:
         if kind in ("hole", "both"):
             Oh = [Te.T @ O @ Te for O in O_hole]
-            wh, frag_h, ph, _ = localize_fragment_block(Oh, list(range(nci)), H, tol)
+            wh, frag_h, _, _ = localize_fragment_block(Oh, list(range(nci)), H, tol)
         if kind in ("electron", "both"):
             Oe = [Te.T @ O @ Te for O in O_elec]
     except ValueError as err:
@@ -3169,7 +3169,7 @@ def ci_diabatization_step(T, O_hole, O_elec, E_ci, kind, dia_index=None, tol=0.2
                 continue
             wb = wh[:, block]
             try:
-                wp, frag_p, pp, _ = localize_fragment_block([wb.T @ O @ wb for O in Oe], list(range(len(block))),
+                wp, frag_p, _, _ = localize_fragment_block([wb.T @ O @ wb for O in Oe], list(range(len(block))),
                                                             wb.T @ H @ wb, tol)
             except ValueError as err:
                 raise ValueError(F"many-body diabatization, electrons of the hole-on-fragment-{f_h} states: {err}{hint}") from err
@@ -3184,7 +3184,7 @@ def ci_diabatization_step(T, O_hole, O_elec, E_ci, kind, dia_index=None, tol=0.2
             labels.append(("loc", 0, f, sum(1 for x in frag_h[:c] if x == f)))
     else:
         try:
-            wp, frag_p, pp, _ = localize_fragment_block(Oe, list(range(nci)), H, tol)
+            wp, frag_p, _, _ = localize_fragment_block(Oe, list(range(nci)), H, tol)
         except ValueError as err:
             raise ValueError(F"many-body diabatization: {err}{hint}") from err
         for c, f in enumerate(frag_p):
