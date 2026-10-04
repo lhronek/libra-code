@@ -56,19 +56,17 @@ def _window(E, it, nsteps, idata):
     return E[it:it + nsteps]
 
 
+NO_DECOHERENCE_TIME = 1.0e+10   # a state with itself, and a pair whose gap does not fluctuate
+
+
 def _times_from_std(dE_std, nstates):
-    """The decoherence-time matrix of a gap-fluctuation standard deviation (a.u.): sqrt(12/5) / std, a
-    state with itself 1e10."""
+    """The decoherence-time matrix of a gap-fluctuation standard deviation (a.u.): sqrt(12/5) / std, a state
+    with itself and a pair whose gap does not fluctuate NO_DECOHERENCE_TIME."""
     decoh_times = MATRIX(nstates, nstates)
     for a in range(0, nstates):
         for b in range(0, nstates):
-            if a == b:
-                decoh_times.set(a, a, 1.0e+10)
-            else:
-                de = float(dE_std[a, b])
-                if de > 0.0:
-                    tau = math.sqrt(12.0 / 5.0) / de
-                    decoh_times.set(a, b, tau)
+            de = float(dE_std[a, b]) if a != b else 0.0
+            decoh_times.set(a, b, math.sqrt(12.0 / 5.0) / de if de > 0.0 else NO_DECOHERENCE_TIME)
     return decoh_times
 
 __all__ = ["decoherence_times2rates",
@@ -187,7 +185,9 @@ def decoherence_times(Hvib, verbosity=0):
 
     """
 
-    # Compute energy gaps
+    # a standard deviation needs two steps
+    if len(Hvib) < 2:
+        raise ValueError(F"the gap fluctuation needs two steps at least, got {len(Hvib)}")
     dE = _gap_stack(_diagonal_energies(Hvib))
     dE_ave, dE_std, dE_dw_bound, dE_up_bound = data_stat.stat_arrays(dE)
 
@@ -307,6 +307,9 @@ def decoherence_times_ave(Hvib, itimes, nsteps, verbosity=0):
     ndata = len(Hvib)
     nitimes = len(itimes)
     nstates = Hvib[0][0].num_of_cols
+    # every window is centred by its own mean - a window of one step has no fluctuation
+    if nsteps < 2:
+        raise ValueError(F"the gap fluctuation needs a window of two steps at least, got {nsteps}")
 
     # Compute a concatenated stack of gap magnitudes for all sub-trajectories
     # the centred gaps of every window, row by row and window after window - the statistics over them without a
