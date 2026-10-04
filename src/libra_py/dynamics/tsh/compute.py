@@ -374,7 +374,12 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                   trajectory frame - smooth by construction, the materialized
                   local-diabatization picture. The frame OWNS the diabatic slot:
                   the saved basis_transform is V^H (the frame, not a model
-                  transform), and the frame is not persisted across restarts ]
+                  transform), and the frame is not persisted across restarts.
+                  A propagation in the frame (rep_tdse 0 or 2) needs a rotation
+                  projector (state_tracking_algo -1, 5 or 6): a relabel projector
+                  makes the frame a signed permutation and the frame Hamiltonian
+                  a gauge-smoothed diagonal, admitted as the analysis readout of
+                  the adiabatic propagation (rep_tdse 1) alone ]
 
                 With ham_update_method = 2 (adiabatic-native models) option 1 is
                 skipped: such a model never populates the diabatic Hamiltonian, so
