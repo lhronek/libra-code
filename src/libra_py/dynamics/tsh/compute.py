@@ -1172,7 +1172,11 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                     "Etherm", "E_NHC", "dEkin_ave", "dEpot_ave", "dEtot_ave", "tcnbra_thermostat_energy", "Ekin_ave_qtsh" ]
                 - 2: 2-D info - Relevant variables to request to save: ["states", "states_dia", "se_pop_adi", "se_pop_dia",
                     "sh_pop_adi", "sh_pop_dia", "sh_pop_adi_TR", "sh_pop_dia_TR", "mash_pop_adi", "mash_pop_dia", 
-                    "sqc_pop_adi", "sqc_pop_dia", "fssh3_average_errors"]
+                    "sqc_pop_adi", "sqc_pop_dia", "fssh3_average_errors"] - the active state of the representation
+                    a run does not hop in (states_dia under rep_sh 1, states under rep_sh 0) is redrawn every step
+                    from the density transformed with its diagonal set to the active-state indicator (Tempelaar
+                    and Reichman 2018), so its changes are samples, not hops, and sh_pop_dia / sh_pop_adi count
+                    those samples while sh_pop_dia_TR / sh_pop_adi_TR carry their expectation
                 - 3: 3-D info - Relevant variables to request to save: [ "SH_pop", "SH_pop_raw", "D_adi", "D_adi_raw", 
                     "D_dia", "D_dia_raw", "q", "p", "f", "Cadi", "Cdia", "coherence_adi", "coherence_dia", "q_mm", "p_mm",
                     "wp_width", "p_quant", "VP", "f_xf", "qtsh_f_nc" ]
