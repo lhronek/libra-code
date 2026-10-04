@@ -348,12 +348,14 @@ def init_tsh_data(saver, output_level, _nsteps, _ntraj, _ndof, _nadi, _ndia):
 def read_params_record(path):
     """The top-level scalars of a _dyn_params.txt / _model_params.txt record (the str(dict) dump written by
     init_tsh_savers below): int, float, bool and string values keyed by name. The record is read as a python
-    literal after two rewrites - a numpy scalar repr (np.float64(1.0), np.int64(5) under numpy 2) becomes its
-    value, an object repr (<liblibra_core.MATRIX object at ...>) a placeholder string - so a key of a nested dict
-    stays inside it and never overrides the top-level one. Nested containers and objects are skipped."""
+    literal after three rewrites - a numpy scalar repr (np.float64(1.0), np.int64(5) under numpy 2) becomes its
+    value, a range repr (range(0, 11) - a runner's state selection) its list, an object repr
+    (<liblibra_core.MATRIX object at ...>) a placeholder string - so a key of a nested dict stays inside it and never
+    overrides the top-level one. Nested containers and objects are skipped."""
     with open(path) as f:
         txt = f.read()
     txt = re.sub(r"np\.(?:float|int|uint|bool_?|complex)\w*\(([^()]*)\)", r"\1", txt)
+    txt = re.sub(r"range\(([-\d, ]*)\)", lambda m: str(list(range(*[int(a) for a in m.group(1).split(",")]))), txt)
     txt = re.sub(r"<[^<>]*>", "'<object>'", txt)
     try:
         record = ast.literal_eval(txt)
