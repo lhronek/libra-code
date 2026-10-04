@@ -554,6 +554,13 @@ void export_dyn_decoherence_objects(){
 
 
   vector<MATRIX> (*expt_Gu_Franco_v1)(dyn_control_params& prms, CMATRIX& amplitudes) = &Gu_Franco;
+  def("Gu_Franco", expt_Gu_Franco_v1);
+  vector<MATRIX> (*expt_schwartz_1_dm_v1)(dyn_control_params& prms, vector<CMATRIX>& dm_adi, nHamiltonian& ham, MATRIX& inv_alp) = &schwartz_1_dm;
+  def("schwartz_1_dm", expt_schwartz_1_dm_v1);
+  vector<MATRIX> (*expt_schwartz_1_dm_v2)(dyn_control_params& prms, vector<CMATRIX>& dm_adi, MATRIX& p, nHamiltonian& ham, MATRIX& w) = &schwartz_1_dm;
+  def("schwartz_1_dm", expt_schwartz_1_dm_v2);
+  vector<MATRIX> (*expt_Gu_Franco_dm_v1)(dyn_control_params& prms, vector<CMATRIX>& dm_adi) = &Gu_Franco_dm;
+  def("Gu_Franco_dm", expt_Gu_Franco_dm_v1);
 
 
   ///================== In dyn_methods_dish.cpp  =======================

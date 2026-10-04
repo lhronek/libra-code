@@ -50,8 +50,9 @@ class DynControlParams:
     #: 2 diabatic density matrix
     #: 3 adiabatic density matrix
     #:   2 and 3 propagate the density matrix alone - the amplitudes keep their t0 values: the Ehrenfest and QTSH
-    #:   forces and energies (force_method 2 / 3) take their density-matrix forms tr(A rho) there, the C++ sanity_check
-    #:   refuses the other readers (tsh_method 5, decoherence_algo other than -1 / 9, decoherence_times_type 2 / 4 / 5),
+    #:   forces and energies (force_method 2 / 3) and the decoherence rates (decoherence_times_type 2 / 4 / 5) take their
+    #:   density-matrix forms tr(A rho) there, the C++ sanity_check refuses the other readers (tsh_method 5,
+    #:   decoherence_algo other than -1 / 9),
     #:   an explicit Cadi / Cdia / q_mm / p_mm in properties_to_save is refused
     #:   and the default list drops them
     #: 4 MMST adiabatic wfc - reserved, not implemented (rejected by the C++ sanity_check)
@@ -436,10 +437,12 @@ class DynControlParams:
     #: -1 set all dephasing rates to zero [ default ]
     #:  0 use the rates read out from the input 
     #:  1 use the energy-based decoherence method (EDC)    
-    #:  2 Schwartz - mean-field Force-based decoherence (Schwartz 1), using inv_alpha
+    #:  2 Schwartz - mean-field Force-based decoherence (Schwartz 1), using inv_alpha (under rep_tdse 2 / 3 the
+    #:    mean-field force comes from the density matrix)
     #:  3 Schwartz - pair-wise-based decoherence, (Schwartz 2), using inv_alpha
-    #:  4 Schwartz - mean-field Force-based decoherence (Schwartz 1), but using interaction width
-    #:  5 Gu-Franco 
+    #:  4 Schwartz - mean-field Force-based decoherence (Schwartz 1), but using interaction width (under rep_tdse
+    #:    2 / 3 from the density matrix as well)
+    #:  5 Gu-Franco (|rho_ij| sqrt(4 lambda kB T) - under rep_tdse 2 / 3 read from the density matrix)
     decoherence_times_type: int = -1
 
     #: Schwartz 1/alpha parameters (ndof, 1)

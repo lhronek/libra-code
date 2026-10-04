@@ -2719,8 +2719,14 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   }
 
   else if (prms.decoherence_times_type == 2) {
-    decoherence_rates = schwartz_1(prms, *dyn_var.ampl_adi, ham,
-                                   *prms.schwartz_decoherence_inv_alpha);
+    // the density-matrix representations (rep_tdse 2 / 3) hand the propagated densities - their amplitudes
+    // keep the t0 values
+    if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
+      decoherence_rates = schwartz_1_dm(prms, dyn_var.dm_adi, ham, *prms.schwartz_decoherence_inv_alpha);
+    } else {
+      decoherence_rates = schwartz_1(prms, *dyn_var.ampl_adi, ham,
+                                     *prms.schwartz_decoherence_inv_alpha);
+    }
   }
 
   else if (prms.decoherence_times_type == 3) {
@@ -2729,12 +2735,20 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   }
 
   else if (prms.decoherence_times_type == 4) {
-    decoherence_rates = schwartz_1(prms, *dyn_var.ampl_adi, *dyn_var.p, ham,
-                                   *prms.schwartz_interaction_width);
+    if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
+      decoherence_rates = schwartz_1_dm(prms, dyn_var.dm_adi, *dyn_var.p, ham, *prms.schwartz_interaction_width);
+    } else {
+      decoherence_rates = schwartz_1(prms, *dyn_var.ampl_adi, *dyn_var.p, ham,
+                                     *prms.schwartz_interaction_width);
+    }
   }
 
   else if (prms.decoherence_times_type == 5) {
-    decoherence_rates = Gu_Franco(prms, *dyn_var.ampl_adi);
+    if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
+      decoherence_rates = Gu_Franco_dm(prms, dyn_var.dm_adi);
+    } else {
+      decoherence_rates = Gu_Franco(prms, *dyn_var.ampl_adi);
+    }
   }
   else {
     std::cout<<"Error in compute_dynamics(): decoherence_times_type = "<<prms.decoherence_times_type<<" has no branch here (implemented: -1, 0, 1, 2, 3, 4, 5)\n";

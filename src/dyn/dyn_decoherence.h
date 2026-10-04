@@ -112,6 +112,14 @@ vector<MATRIX> schwartz_2(dyn_control_params& prms, nHamiltonian& ham, MATRIX& i
 
 
 vector<MATRIX> Gu_Franco(dyn_control_params& prms, CMATRIX& amplitudes);
+// the density-matrix forms of the amplitude-based rates - the density-matrix representations (rep_tdse 2 / 3)
+// hand their per-trajectory densities (dyn_variables::dm_adi), the CMATRIXList forms serve python
+vector<MATRIX> schwartz_1_dm(dyn_control_params& prms, vector<CMATRIX*>& dm_adi, nHamiltonian& ham, MATRIX& inv_alp);
+vector<MATRIX> schwartz_1_dm(dyn_control_params& prms, vector<CMATRIX*>& dm_adi, MATRIX& p, nHamiltonian& ham, MATRIX& w);
+vector<MATRIX> Gu_Franco_dm(dyn_control_params& prms, vector<CMATRIX*>& dm_adi);
+vector<MATRIX> schwartz_1_dm(dyn_control_params& prms, vector<CMATRIX>& dm_adi, nHamiltonian& ham, MATRIX& inv_alp);
+vector<MATRIX> schwartz_1_dm(dyn_control_params& prms, vector<CMATRIX>& dm_adi, MATRIX& p, nHamiltonian& ham, MATRIX& w);
+vector<MATRIX> Gu_Franco_dm(dyn_control_params& prms, vector<CMATRIX>& dm_adi);
 
 
 ///================  In dyn_methods_dish.cpp  ===================================

@@ -536,5 +536,118 @@ vector<MATRIX> Gu_Franco(dyn_control_params &prms, CMATRIX &amplitudes) {
   return res;
 }
 
+
+vector<MATRIX> schwartz_1_dm(dyn_control_params &prms, vector<CMATRIX *> &dm_adi, nHamiltonian &ham, MATRIX &inv_alp) {
+  /**
+    The density-matrix form of schwartz_1(prms, amplitudes, ham, inv_alp): the mean-field force comes from the
+    per-trajectory densities (Ehrenfest_forces_adi_dm, the same force for a pure state) - the density-matrix
+    representations (rep_tdse 2 / 3) propagate rho alone, their amplitudes keep the t0 values
+    dm_adi - ntraj densities CMATRIX(nstates, nstates), inv_alp - MATRIX(ndof, 1)
+    Return: ntraj MATRIX(nstates, nstates) - the diagonal holds 1/tau_i
+  */
+  int ndof = ham.nnucl;
+  int nstates = ham.nadi;
+  int ntraj = ham.children.size();
+  MATRIX F_mf(ndof, ntraj);
+  MATRIX F_st(ndof, ntraj);
+  vector<MATRIX> res(ntraj, MATRIX(nstates, nstates));
+  int option = 0; // default value for NAC-based integrators
+  if (prms.electronic_integrator == 0 || prms.electronic_integrator == 1 ||
+      prms.electronic_integrator == 2 || prms.electronic_integrator == 9 ||
+      prms.electronic_integrator == 10 || prms.electronic_integrator == 11 ||
+      prms.electronic_integrator == 12 || prms.electronic_integrator == 19) {
+    option = 1;
+  }
+  F_mf = ham.Ehrenfest_forces_adi_dm(dm_adi, 1, option, 0.0, 1).real();
+  for (int i = 0; i < nstates; i++) {
+    vector<int> act_states(ntraj, i);
+    F_st = ham.forces_adi(act_states).real();
+    for (int itraj = 0; itraj < ntraj; itraj++) {
+      double tau_inv2 = 0.0;
+      for (int idof = 0; idof < ndof; idof++) {
+        double dF = F_mf.get(idof, itraj) - F_st.get(idof, itraj);
+        tau_inv2 += 0.25 * inv_alp.get(idof, 0) * dF * dF;
+      }
+      res[itraj].set(i, i, sqrt(tau_inv2));
+    } // for itraj
+  } // for i
+  return res;
+}
+
+vector<MATRIX> schwartz_1_dm(dyn_control_params &prms, vector<CMATRIX *> &dm_adi, MATRIX &p, nHamiltonian &ham,
+                             MATRIX &w) {
+  /**
+    The density-matrix form of schwartz_1(prms, amplitudes, p, ham, w) - the interaction-width variant, the
+    mean-field force from the per-trajectory densities (option 0 as the amplitude form takes it)
+    dm_adi - ntraj densities CMATRIX(nstates, nstates), p - MATRIX(ndof, ntraj), w - MATRIX(ndof, 1)
+  */
+  int ndof = ham.nnucl;
+  int nstates = ham.nadi;
+  int ntraj = ham.children.size();
+  double w2;
+  MATRIX F_mf(ndof, ntraj);
+  MATRIX F_st(ndof, ntraj);
+  vector<MATRIX> res(ntraj, MATRIX(nstates, nstates));
+  int option = 0;
+  F_mf = ham.Ehrenfest_forces_adi_dm(dm_adi, 1, option, 0.0, 1).real();
+  for (int i = 0; i < nstates; i++) {
+    vector<int> act_states(ntraj, i);
+    F_st = ham.forces_adi(act_states).real();
+    for (int itraj = 0; itraj < ntraj; itraj++) {
+      double tau_inv2 = 0.0;
+      for (int idof = 0; idof < ndof; idof++) {
+        double dF = F_mf.get(idof, itraj) - F_st.get(idof, itraj);
+        w2 = pow(w.get(idof, 0), 2.0);
+        tau_inv2 += 0.25 * pow(4 * M_PI / (w2 * p.get(idof, itraj)), 2.0) * dF * dF;
+      }
+      res[itraj].set(i, i, sqrt(tau_inv2));
+    } // for itraj
+  } // for i
+  return res;
+}
+
+vector<MATRIX> Gu_Franco_dm(dyn_control_params &prms, vector<CMATRIX *> &dm_adi) {
+  /**
+    The density-matrix form of Gu_Franco(prms, amplitudes): the rate 1/tau_ij = |rho_ij| sqrt(4 lambda kB T) read
+    from the per-trajectory densities (the amplitude form builds the same rho = c c^H)
+  */
+  int ntraj = dm_adi.size();
+  if (ntraj == 0) { return vector<MATRIX>(); }
+  int nstates = dm_adi[0]->n_rows;
+  vector<MATRIX> res(ntraj, MATRIX(nstates, nstates));
+  double reorg_energy = prms.reorg_energy;
+  double T = prms.Temperature;
+  double kB = boltzmann / hartree;
+  double pref = sqrt(4.0 * reorg_energy * kB * T);
+  for (int itraj = 0; itraj < ntraj; itraj++) {
+    CMATRIX &loc_dm = *dm_adi[itraj];
+    for (int i = 0; i < nstates; i++) {
+      for (int j = 0; j < nstates; j++) {
+        res[itraj].set(i, j, std::abs(loc_dm.get(i, j)) * pref);
+      }
+    }
+  }
+  return res;
+}
+
+// the python-facing forms: a CMATRIXList of densities in place of the pointer vector
+static vector<CMATRIX *> dm_pointers(vector<CMATRIX> &dms) {
+  vector<CMATRIX *> ptrs(dms.size());
+  for (std::size_t i = 0; i < dms.size(); i++) { ptrs[i] = &dms[i]; }
+  return ptrs;
+}
+vector<MATRIX> schwartz_1_dm(dyn_control_params &prms, vector<CMATRIX> &dm_adi, nHamiltonian &ham, MATRIX &inv_alp) {
+  vector<CMATRIX *> ptrs(dm_pointers(dm_adi));
+  return schwartz_1_dm(prms, ptrs, ham, inv_alp);
+}
+vector<MATRIX> schwartz_1_dm(dyn_control_params &prms, vector<CMATRIX> &dm_adi, MATRIX &p, nHamiltonian &ham, MATRIX &w) {
+  vector<CMATRIX *> ptrs(dm_pointers(dm_adi));
+  return schwartz_1_dm(prms, ptrs, p, ham, w);
+}
+vector<MATRIX> Gu_Franco_dm(dyn_control_params &prms, vector<CMATRIX> &dm_adi) {
+  vector<CMATRIX *> ptrs(dm_pointers(dm_adi));
+  return Gu_Franco_dm(prms, ptrs);
+}
+
 } // namespace libdyn
 } // namespace liblibra

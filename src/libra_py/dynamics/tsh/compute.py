@@ -346,9 +346,10 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - 2: diabatic representation, density matrix (e.g. Liouville's picture)
                 - 3: adiabatic representation, density matrix (e.g. Liouville's picture)
                      2 and 3 propagate the density matrix alone - the amplitudes keep their t0 values: the
-                     Ehrenfest and QTSH forces and energies (force_method 2 / 3) take their density-matrix
-                     forms tr(A rho) there, sanity_check refuses the other readers (tsh_method 5,
-                     decoherence_algo other than -1 / 9, decoherence_times_type 2 / 4 / 5), an explicit
+                     Ehrenfest and QTSH forces and energies (force_method 2 / 3) and the decoherence rates
+                     (decoherence_times_type 2 / 4 / 5) take their density-matrix forms tr(A rho) there,
+                     sanity_check refuses the other readers (tsh_method 5, decoherence_algo other than
+                     -1 / 9), an explicit
                      Cadi / Cdia / q_mm / p_mm in properties_to_save is refused and the default list drops them
                 - 4: MMST adiabatic representation, wfc - reserved, not implemented (rejected by
                      sanity_check - use rep_tdse 1 with force_method 2 and sqc_gamma)
@@ -790,9 +791,11 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - 0: use the rates read out from the input
                 - 1: use the energy-based decoherence method (EDC)
                 - 2: Schwartz - mean-field Force-based decoherence with `schwartz_decoherence_inv_alpha`
+                     (under rep_tdse 2 / 3 the mean-field force comes from the density matrix)
                 - 3: Schwartz - pair-wise-based decoherences 
                 - 4: Schwartz - mean-field Force-based decoherence with `schwartz_interaction_width`
-                - 5: Gu-Franco 
+                     (under rep_tdse 2 / 3 from the density matrix as well)
+                - 5: Gu-Franco (|rho_ij| sqrt(4 lambda kB T) - under rep_tdse 2 / 3 read from the density matrix)
 
                 With isNBRA == 1 and ntraj > 1 options 2 and 4 are rejected -
                 Schwartz 1 builds per-trajectory mean-field forces on the single

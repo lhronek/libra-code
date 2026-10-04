@@ -330,8 +330,9 @@ void dyn_control_params::sanity_check(){
 
   /// the density-matrix representations propagate the density matrix alone - the amplitudes keep their t0
   /// values (update_amplitudes has nothing to convert there), so every option that reads or rewrites them is
-  /// refused: DISH, the amplitude-acting decoherence corrections and the amplitude-based decoherence rates
-  /// (the Ehrenfest and QTSH forces and energies, force_method 2 / 3, take their density-matrix forms there)
+  /// refused: DISH and the amplitude-acting decoherence corrections (the Ehrenfest and QTSH forces and energies,
+  /// force_method 2 / 3, and the decoherence rates, decoherence_times_type 2 / 4 / 5, take their density-matrix
+  /// forms there)
   if(rep_tdse==2 || rep_tdse==3){
     if(tsh_method==5){
       std::cout<<"Error in dyn_control_params::sanity_check: tsh_method = 5 (DISH) proposes its hops and collapses"
@@ -344,13 +345,6 @@ void dyn_control_params::sanity_check(){
           <<" amplitudes (0 SDM, 1 ID-A, 3 BCSH, 4 MFSD, 5 SHXF, 6 MQCXF, 7 DISH rev2023, 8 ID-dia), which"
           <<" rep_tdse = "<<rep_tdse<<" (a density-matrix representation) never updates after t0 - the density-matrix"
           <<" representations admit decoherence_algo -1 and 9 (the coherence factors)\n";
-      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-    }
-    if(decoherence_times_type==2 || decoherence_times_type==4 || decoherence_times_type==5){
-      std::cout<<"Error in dyn_control_params::sanity_check: decoherence_times_type = "<<decoherence_times_type
-          <<" computes the decoherence rates from the amplitudes (2 and 4 Schwartz, 5 Gu-Franco), which rep_tdse = "
-          <<rep_tdse<<" (a density-matrix representation) never updates after t0 - use -1, 0, 1 (EDC) or 3 (Schwartz"
-          <<" from the Hamiltonian)\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
