@@ -5438,9 +5438,6 @@ def cp2k_compute_adi_nbra(q, params, full_id):
 
         Optional keys
         -------------
-        dt : float, default=41.0
-            Nuclear time step (atomic units).
-
         ci_threshold : float, default=1e-6
             CI truncation, |C|^2 > ci_threshold.
 
@@ -5503,12 +5500,6 @@ def cp2k_compute_adi_nbra(q, params, full_id):
     - Time-overlaps are computed at the CI level using molecular orbital overlaps
       and CI coefficients from consecutive steps.
 
-    - Derivative couplings are approximated via:
-          d_ij = (S_ij - S_ji) / (2 * dt)
-
-      and included in the vibronic Hamiltonian as:
-          H_ij = -i * d_ij  (off-diagonal terms)
-
     - Active space selection:
         * If `nelec_act_space` is None → full orbital space is used.
         * Otherwise, a truncated space around HOMO is constructed.
@@ -5569,7 +5560,7 @@ def cp2k_compute_adi_nbra(q, params, full_id):
     lowest_orbital = params["lowest_orbital"]
 
     # ================= Read parameters =================
-    dt = float(params.get("dt", 41.0))
+    #dt = float(params.get("dt", 41.0)) # no coupling is derived here, the time step is the engine's
     atom_labels = params["atom_labels"]
 
     wd_prefix = params.get("working_directory_prefix", "wd")

@@ -2993,8 +2993,6 @@ def dftb_compute_adi(q, params, full_id):
 
         Optional / Internal (updated in-place):
         --------------------------------------
-        dt : float, default=41.0
-            Nuclear time step in atomic units.
         dftb_run_params : dict
             Parameters for DFTB+ calculations, e.g. NrOfExcitations, sk_prefix.
         dftb_exe : str, default="dftb+"
@@ -3094,10 +3092,9 @@ def dftb_compute_adi(q, params, full_id):
     - Overlap matrices are computed by doubling the geometry (previous + current step)
       and running ODIN.
     - Forces are extracted from `autotest.tag` for the active state.
-    - Derivative couplings are estimated from the anti-symmetric part of the
-      time-overlap matrix divided by 2*dt:
-          Hvib_ij = E_i δ_ij - i d_ij
-          d_ij = (S_ij - S_ji) / (2 dt)
+    - No coupling is handed over - the engine derives the couplings of the followed
+      states from the time overlap (nac_update_method 2) and builds
+      Hvib_ij = E_i δ_ij - i d_ij (hvib_update_method 1).
     - Energies are in Hartree, time in atomic units, coordinates in Bohr,
       and overlaps are dimensionless.
     - `is_first_time` and `act_state` are dictionaries keyed by trajectory index,
@@ -3141,7 +3138,7 @@ def dftb_compute_adi(q, params, full_id):
                                F"calls of a trajectory")
 
     # ================= Read parameters =================
-    dt = float(params.get("dt", 41.0))
+    #dt = float(params.get("dt", 41.0)) # no coupling is derived here, the time step is the engine's
     dftb_run_params = params.get("dftb_run_params", {})
     atom_labels = params["atom_labels"]
     energy_zero = params.get("energy_zero", 0.0 )
