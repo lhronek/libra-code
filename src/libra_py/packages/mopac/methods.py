@@ -583,11 +583,6 @@ def mopac_compute_adi(q, params, full_id):
 
             Default: 2
 
-        dt : float
-            Nuclear time step in atomic units.
-
-            Default: 1.0 * units.fs2au
-
         working_directory_prefix : str
             Prefix used when creating trajectory-specific working
             directories.
@@ -696,13 +691,9 @@ def mopac_compute_adi(q, params, full_id):
       calculation and assigned to the diagonal elements of the adiabatic
       Hamiltonian.
 
-    - Nonadiabatic couplings are computed from antisymmetrized
-      time-overlaps using
-
-        dij = (Sij(t,t+dt) - Sji(t,t+dt)) / (2*dt)
-
-      and incorporated into the off-diagonal elements of the vibronic
-      Hamiltonian.
+    - No coupling is handed over - the engine derives the couplings of the followed
+      states from the time overlap (nac_update_method 2) and builds
+      Hvib_ij = E_i δ_ij - i d_ij (hvib_update_method 1).
 
     - For the first time step of a trajectory, the current electronic
       structure information is reused as the previous-step data so that
@@ -744,7 +735,7 @@ def mopac_compute_adi(q, params, full_id):
     energy_zero = params.get("energy_zero", 0.0 )
     orbital_space = params.get("orbital_space", None)
     nstates = params.get("nstates", 2)
-    dt = params.get("dt", 1.0 * units.fs2au)
+    #dt = params.get("dt", 1.0 * units.fs2au) # no coupling is derived here, the time step is the engine's
     wd_prefix = params.get("working_directory_prefix", "wd")
     mopac_input_prefix = params.get("mopac_input_prefix", "input_")
     mopac_output_prefix = params.get("mopac_output_prefix", "output_")

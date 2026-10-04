@@ -68,7 +68,7 @@ def pyscf_compute_adi(q, params, full_id):
     _nelecas = params.get("nelecas", 2)
 
     # ================= Read parameters =================
-    dt = float(params.get("dt", 41.0))
+    #dt = float(params.get("dt", 41.0)) # no coupling is derived here, the time step is the engine's
     _atom_labels = params["atom_labels"]
     
     # ================= Previous coordinates =================
