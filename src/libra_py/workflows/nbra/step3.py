@@ -54,6 +54,11 @@ import libra_py.units as units
 import libra_py.data_read as data_read
 import libra_py.data_conv as data_conv
 import libra_py.hungarian as hungarian
+
+# the continuity floor of a followed state: more than half of its weight on its own continuation (cos 45 degrees) -
+# the default of state_reordering_min_overlap and diabatic_state_reordering_min_overlap, the edge and record floor
+# of _classify_continuations
+CONTINUITY_FLOOR = math.sqrt(0.5)
 from libra_py import orthogonalizations
 from libra_py.orthogonalizations import (validate_overlap_matrix,
                                          get_Lowdin_scipy,
@@ -3318,27 +3323,28 @@ def _partner(row, taken):
 
 
 def _classify_continuations(d, inside, threshold):
-    """The states of a frame whose continuation |<c|c>| = d falls below max(threshold, 0.5), classified by what the
-    space carries of them (inside = sqrt(sum_j |<c|j>|^2) over the space's states): EDGES - the space carries less
-    than max(threshold, 0.5) of the state, it left the space through its edge (recorded by every writer, the remedy
-    is the space), MIXED - the space carries the state but no single state does, below the threshold (an internal
-    mixing within one frame - refused after a reordering while the threshold is above 0), UNRESOLVED - carried, below
-    0.5 (let through and recorded). Three index arrays in the states' order - the one rule of the SD, CI, diabatic,
+    """The states of a frame whose continuation |<c|c>| = d falls below max(threshold, CONTINUITY_FLOOR), classified
+    by what the space carries of them (inside = sqrt(sum_j |<c|j>|^2) over the space's states): EDGES - the space
+    carries less than that floor of the state, it left the space through its edge (recorded by every writer, the
+    remedy is the space), MIXED - the space carries the state but no single state does, below the threshold (an
+    internal mixing within one frame - refused after a reordering while the threshold is above 0), UNRESOLVED -
+    carried, below the floor (let through and recorded). Three index arrays in the states' order - the one rule of
+    the SD, CI, diabatic,
     orbital and POD continuations, whose edge records share the shape [frame, state, kept, carried by the space,
     the state that took most of it (_partner)]."""
     d = np.asarray(d, dtype=float)
     inside = np.asarray(inside, dtype=float)
-    floor = max(float(threshold), 0.5)
+    floor = max(float(threshold), CONTINUITY_FLOOR)
     below = np.where(d < floor)[0]
     edges = np.array([c for c in below if inside[c] < floor], dtype=int)
     carried = [c for c in below if inside[c] >= floor]
     mixed = np.array([c for c in carried if d[c] < threshold], dtype=int)
-    unresolved = np.array([c for c in carried if d[c] < 0.5], dtype=int)
+    unresolved = np.array([c for c in carried if d[c] < CONTINUITY_FLOOR], dtype=int)
     return edges, mixed, unresolved
 
 
 def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=None, reordering=0, alpha=0.0,
-                            energies=None, min_overlap=math.sqrt(0.5)):
+                            energies=None, min_overlap=CONTINUITY_FLOOR):
     """The localization eigenvectors carry arbitrary signs: every diabatic state follows the trajectory through the
     time overlaps of its own basis, O = W(i)^T St(i) W(i+1), and the sign of every column of W(i+1) is set by the
     sign of diag(O) (in place). reordering 0: a column whose |O_cc| falls below min_overlap does not continue itself -
@@ -3354,15 +3360,15 @@ def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=N
     space carries less than min_overlap of it, sqrt(sum_j |O_cj|^2) < min_overlap - the state left the active space
     through its edge, the reordering has nothing to assign and the remedy is the space, so the frame is recorded
     (edges) and the run goes on - or an INTERNAL MIXING when the space carries it but no single state does (the
-    states mixed by more than the threshold's angle within one frame, 0.5 = 60 degrees), which is refused: the frame
-    spacing does not resolve that crossing. A threshold below 0.5 lets internal mixings through and records those
-    below 0.5.
+    states mixed by more than the threshold's angle within one frame, 1/sqrt(2) = 45 degrees), which is refused: the
+    frame spacing does not resolve that crossing. A threshold below the floor lets internal mixings through and records
+    those below it.
 
     Returns:
         perms (list of arrays): perms[i][c] is the column, in the energy order of frame i, that carries the state
             c of start_time (the identity for start_time itself) - the rows of the per-frame records follow it
         swaps (list of int): the frames at which the assignment differs from the previous frame's
-        unresolved (list of int): the frames let through with an internal continuation below 0.5
+        unresolved (list of int): the frames let through with an internal continuation below the floor
         min_continuity (float): the smallest |O_cc| of the run
         edges (list of lists): the edge departures as [frame, state, |O_cc|, the weight kept in the space]
     """
@@ -3454,8 +3460,8 @@ def _continuity_record(St_list, start_time, reordering, alpha, min_overlap, perm
     more than the threshold's angle within one frame, the frame spacing does not resolve the crossing, min_overlap
     0 switches the check off), never refused in the energy order (reordering 0: a crossing of adiabatic states is the
     convention there and is left to the propagation). Returns the record: the frames let through with an internal
-    continuation below 0.5 (unresolved), the edge departures ([frame, state, kept, carried by the space, the state
-    that took most of it]), the
+    continuation below the floor (unresolved), the edge departures ([frame, state, kept, carried by the space, the
+    state that took most of it]), the
     smallest |St_cc|, and the frames at which the reordering changed the labels (perms: the per-frame label
     permutations of apply_state_reordering_general)."""
     conts, edges, unresolved = [], [], []
@@ -3490,7 +3496,8 @@ def _continuity_record(St_list, start_time, reordering, alpha, min_overlap, perm
             "state_reordering_min_overlap": float(min_overlap),
             "unresolved_frames": unresolved, "edge_departures": edges,
             "min_continuity": float(min(c.min() for c in conts)) if conts else 1.0, "reordered_frames": reordered,
-            "note": "unresolved_frames: the frames in which a labeled state continued with less than 0.5 inside the "
+            "note": "unresolved_frames: the frames in which a labeled state continued with less than the floor "
+                    "(1/sqrt(2)) inside the "
                     "space and was let through - in the energy order the trivial crossings left to the propagation, "
                     "with a reordering the frames a lowered threshold accepted - edge_departures: [frame, state, kept, "
                     "carried by the space, the state that took most of it] of the states that left the active space "
@@ -3524,8 +3531,8 @@ def _follow_orbitals(params, start_time, finish_time):
     identity at start_time - and the record of the window: the frames at which the labels changed, the count of
     frames off the energy order, the smallest continuity, the orbitals that left the window (edge_departures:
     [frame, label, kept, carried by the window, the window position that took most of it] - the window carries less
-    than 0.5 of the orbital) and the
-    unresolved crossings ([frame, label]: an orbital continuing with less than 0.5 while the window carries it).
+    than the floor of the orbital) and the
+    unresolved crossings ([frame, label]: an orbital continuing with less than the floor while the window carries it).
     Nothing is refused here: the SD states built from the followed orbitals are checked as labeled
     (state_reordering_min_overlap), _selection_record reads the record against the active space."""
     res_dir, n = params['path_to_npz_files'], params['data_dim'] // 2
@@ -3551,7 +3558,7 @@ def _follow_orbitals(params, start_time, finish_time):
         d = St[perm, new]
         inside = np.sqrt(np.sum(St[perm] ** 2, axis=1))
         min_continuity = min(min_continuity, float(d.min()))
-        edge_idx, _, unresolved_idx = _classify_continuations(d, inside, 0.5)
+        edge_idx, _, unresolved_idx = _classify_continuations(d, inside, CONTINUITY_FLOOR)
         for r in edge_idx:
             edges.append([k + 1, int(r), round(float(d[r]), 4), round(float(inside[r]), 4),
                           _partner(St[perm[r]], new[r])])
@@ -3599,7 +3606,8 @@ def _selection_record(params, perms, window, active_space):
                     "active space exchanged its position with one outside it - tracked_orbitals: the window "
                     "positions (0-based in the stored window, alpha then beta) of the active-space orbitals in the "
                     "frames they stand off their energy positions - unresolved_frames: an orbital continuing with "
-                    "less than 0.5 while the window carries it (active_space_unresolved_frames: one of the active "
+                    "less than the floor (1/sqrt(2)) while the window carries it "
+                    "(active_space_unresolved_frames: one of the active "
                     "space) - edge_departures: [frame, orbital, kept, carried by the window, the position that took "
                     "most of it] of the orbitals that "
                     "left the window through its edge - nothing is refused here, the SD states built from the "
@@ -3769,9 +3777,9 @@ def run_step3_pod(params):
     determinants is H_hole = tr(h_act) 1 - h_act, h_act the POD Hamiltonian over the basis states, and their time
     overlap is det(St_act) times the cofactor matrix of St_act, St_act the time overlaps of the basis states -
     equal to St_act itself to first order in the frame spacing. The signs of the printed block states are followed
-    along the trajectory by the sign of <s(k)|s(k+1)> - a basis state whose |<s(k)|s(k+1)>| falls below 0.5 does not
-    continue itself (two block states of one fragment swap between the frames) and the run is refused, as in the SD
-    route.
+    along the trajectory by the sign of <s(k)|s(k+1)> - a basis state whose |<s(k)|s(k+1)>| falls below the floor
+    1/sqrt(2) does not continue itself (two block states of one fragment swap between the frames) and the run is
+    refused, as in the SD route.
 
     Written into path_to_save_sd_Hvibs - the file set of run_step3_sd_nacs_libint, so that the step-4 runner and the
     plots read it unchanged, the 'sd' states here being the ADIABATIC hole states, the eigenstates of H_hole of every
@@ -3819,7 +3827,7 @@ def run_step3_pod(params):
                 exp(-(alpha dE)^2) [default: 0]
             * **params['do_diabatic_state_reordering']** (int): the reordering of the block states between the
                 frames, with the vocabulary of do_state_reordering. 0 [default]: none - every block state of the
-                basis must continue itself (|<s(k)|s(k+1)>| >= 0.5), a swap of two block states is refused, the
+                basis must continue itself (|<s(k)|s(k+1)>| >= 1/sqrt(2)), a swap of two block states is refused, the
                 ranks are the energy order of every frame. 1: Sato (get_reordering), 2: Munkres-Kuhn
                 (libra_py.hungarian), 22: the same assignment by scipy's linear_sum_assignment - ALL block states of
                 a block are reordered against the block's states of the next frame and every basis state follows
@@ -3842,9 +3850,10 @@ def run_step3_pod(params):
                 the report list them (unresolved_frames, min_continuity).
             * **params['state_reordering_min_overlap']** (float): the same threshold for the adiabatic states as
                 labeled by do_state_reordering 1 or 2 - refused below it after the reordering, 0 switches the check
-                off - recorded under "adiabatic" in the report (the frames let through below 0.5, min_continuity,
+                off - recorded under "adiabatic" in the report (the frames let through below the floor, min_continuity,
                 reordered_frames - the frames at which the labels changed - and frames_off_energy_order) [default:
-                0.5]. In the energy order (0) nothing is refused.
+                1/sqrt(2) = 0.707, more than half of a state's weight on its own continuation]. In the energy order
+                (0) nothing is refused.
             * **params['active_space_selection']** (string): 'energy' alone - the POD basis holds no Kohn-Sham
                 orbitals to follow, its block states are followed by do_diabatic_state_reordering.
             * **params['nac_algo']** (int): 0 alone - the route writes the HST couplings (St^T - St) / 2 dt.
@@ -3864,8 +3873,10 @@ def run_step3_pod(params):
                       'diabatization_scheme': 'pod_cp2k', 'apply_phase_correction': True,
                       'apply_orthonormalization': 'lowdin_cached', 'do_state_reordering': 0,
                       'state_reordering_alpha': 0.0, 'do_diabatic_state_reordering': 0,
-                      'diabatic_state_reordering_alpha': 0.0, 'diabatic_state_reordering_min_overlap': math.sqrt(0.5),
-                      'state_reordering_min_overlap': 0.5, 'active_space_selection': 'energy', 'nac_algo': 0}
+                      'diabatic_state_reordering_alpha': 0.0,
+                      'diabatic_state_reordering_min_overlap': CONTINUITY_FLOOR,
+                      'state_reordering_min_overlap': CONTINUITY_FLOOR, 'active_space_selection': 'energy',
+                      'nac_algo': 0}
     _refuse_former_names(params)
     # the keys of the SD route's Kohn-Sham basis have no reading here - num_occ_states in place of
     # num_occ_states_per_block ran the whole occupied space without a word
@@ -4024,7 +4035,7 @@ def run_step3_pod(params):
                              F"{inside[c]:.3f} of the state) - two block states swap between the frames and the labels "
                              F"would mean other states from there on: narrow num_occ_states_per_block, or follow the "
                              F"states with do_diabatic_state_reordering 2")
-        # every state let through below 0.5 that the basis still carries is an unresolved continuation
+        # every state let through below the floor that the basis still carries is an unresolved continuation
         if len(unresolved_idx):
             unresolved.append(frames[i + 1])
         if nxt != cur:
@@ -4127,7 +4138,7 @@ def run_step3_pod(params):
                                             "states of the frames off that order)" if dia_reordering else
                                             " and every state continues itself between the frames") + " - an "
                                             "internal mixing below the threshold is refused, unresolved_frames lists "
-                                            "the frames a threshold below 0.5 let through with less than 0.5, "
+                                            "the frames a lower threshold let through with less than the floor, "
                                             "edge_departures the states that left the basis of their block ([frame, "
                                             "state, kept, carried by the basis, the block state taken])"})
     report = {"frames": [start_time, finish_time], "n_states": n, "blocks": nblk, "block_states": nmo,
@@ -4153,8 +4164,9 @@ def run_step3_pod(params):
     print(F"run_step3_pod: {n} hole states of {nblk} blocks ({per_block} of {occupied} occupied) over "
           F"{len(frames)} frames - continuity min {report['min_continuity']:.4f}, |St_hole - St_block| max "
           F"{report['max_hole_minus_block_overlap']:.2e}, |St^T St - 1| max {report['max_nonunitarity']:.2e}, "
-          F"{len(reordered)} reordered frames of the adiabatic states ({len(adi_unresolved)} let through below 0.5), "
-          F"{len(swaps)} swap frames of the block states ({len(unresolved)} let through below 0.5, {len(edges)} edge "
+          F"{len(reordered)} reordered frames of the adiabatic states ({len(adi_unresolved)} let through below the "
+          F"floor), {len(swaps)} swap frames of the block states ({len(unresolved)} let through below the floor, "
+          F"{len(edges)} edge "
           F"departures), block gaps {block_gap} eV")
     return report
 
@@ -4234,8 +4246,8 @@ def run_step3_sd_nacs_libint(params):
                 last against the rest of the span), else the manifold is refused as not localized
             * **params['do_diabatic_state_reordering']** (int): the reordering of the diabatic states of one
                 fragment between the frames through O = W(k)^T St(k) W(k+1), with the vocabulary of
-                do_state_reordering. 0 [default]: none - every state must continue itself (|O_cc| >= 0.5), a frame
-                pair in which two states of a fragment swap is refused, their ranks are the energy order of every
+                do_state_reordering. 0 [default]: none - every state must continue itself (|O_cc| >= 1/sqrt(2)), a
+                frame pair in which two states of a fragment swap is refused, their ranks are the energy order of every
                 frame. 1: Sato (get_reordering), 2: Munkres-Kuhn (libra_py.hungarian), 22: the same assignment by
                 scipy's linear_sum_assignment - within every fragment (and manifold, and fragment pair of the joint
                 states) the states of frame k+1 are assigned to those of frame k, so a state keeps the identity it
@@ -4263,9 +4275,10 @@ def run_step3_sd_nacs_libint(params):
             * **params['state_reordering_min_overlap']** (float): the same threshold for the SD (and CI) states as
                 labeled by do_state_reordering 1 or 2: an internal mixing below it after the reordering refuses the
                 run (the frame spacing does not resolve the crossing, 0 switches the check off), an edge departure
-                is recorded [default: 0.5]. In the energy order (do_state_reordering 0) nothing is refused - a
-                crossing of adiabatic states is the convention there and is left to the propagation.
-                sd_route_report.json records unresolved_frames (internal continuations below 0.5 let through),
+                is recorded [default: 1/sqrt(2) = 0.707, more than half of a state's weight on its own continuation].
+                In the energy order (do_state_reordering 0) nothing is refused - a crossing of adiabatic states is the
+                convention there and is left to the propagation.
+                sd_route_report.json records unresolved_frames (internal continuations below the floor let through),
                 edge_departures, min_continuity and reordered_frames.
             * **params['active_space_selection']** (string): how the orbitals of the active space are picked at every
                 frame. 'energy' [default]: the energy positions of the frame (an orbital that crosses the edge of the
@@ -4280,7 +4293,7 @@ def run_step3_sd_nacs_libint(params):
                 records under "active_space" the reordered frames of the window, the frames at which the active space
                 crossed its edge (active_space_edge_frames), the window positions of the active orbitals in every
                 frame off their energy positions (tracked_orbitals, 0-based in the stored window, alpha then beta),
-                min_continuity, unresolved_frames (an orbital continuing with less than 0.5 inside the window,
+                min_continuity, unresolved_frames (an orbital continuing with less than the floor inside the window,
                 active_space_unresolved_frames those of the active space) and edge_departures (an orbital that left
                 the window). With is_many_body the TD-DFT configurations of every frame are renamed from the orbital
                 positions the log files print to the labels before the union basis and the T matrices are built, so
@@ -4348,7 +4361,8 @@ def run_step3_sd_nacs_libint(params):
                       'localized_carrier': 'none', 'sd_charge': 0, 'diabatization_scheme': 'mulliken',
                       'occupancy_tolerance': 0.25,
                       'do_diabatic_state_reordering': 0, 'diabatic_state_reordering_alpha': 0.0,
-                      'diabatic_state_reordering_min_overlap': math.sqrt(0.5), 'state_reordering_min_overlap': 0.5,
+                      'diabatic_state_reordering_min_overlap': CONTINUITY_FLOOR,
+                      'state_reordering_min_overlap': CONTINUITY_FLOOR,
                       'active_space_selection': 'energy', 'active_space_selection_algo': 2,
                       'active_space_selection_alpha': 0.0
                       }
@@ -4742,7 +4756,7 @@ def run_step3_sd_nacs_libint(params):
                                      extra=_tracking_record(dia_reordering, dia_alpha, dia_min_overlap, perms_dia,
                                                             swaps_dia, unresolved_dia, cont_dia, edges_dia, start_time))
         print(F"diabatic SD states: {len(swaps_dia)} swap frames, {len(unresolved_dia)} frames let through with a "
-              F"continuation below 0.5, {len(edges_dia)} edge departures, continuity min {cont_dia:.4f}")
+              F"continuation below the floor, {len(edges_dia)} edge departures, continuity min {cont_dia:.4f}")
     if params['do_state_reordering'] in (1, 2, 22):
         t2 = time.time()
         # For state reordering we need a list of CMATRIX for both St and energy
@@ -4775,7 +4789,7 @@ def run_step3_sd_nacs_libint(params):
                                              params['state_reordering_alpha'], sd_min_overlap,
                                              perms if params['do_state_reordering'] in (1, 2, 22) else None)}
     print(F"SD states: {len(route_report['sd']['reordered_frames'])} reordered frames, "
-          F"{len(route_report['sd']['unresolved_frames'])} frames let through with a continuation below 0.5, "
+          F"{len(route_report['sd']['unresolved_frames'])} frames let through with a continuation below the floor, "
           F"{len(route_report['sd']['edge_departures'])} edge departures (a state left the active space), continuity "
           F"min {route_report['sd']['min_continuity']:.4f}")
 
