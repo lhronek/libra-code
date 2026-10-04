@@ -1218,6 +1218,17 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                            "hvib_adi", "hvib_dia", "St", "basis_transform", "projector"
                 ]
 
+            * **dyn_params["nfiles"]** ( int ): the number of Hamiltonian files a file-fed model holds, -1 for a model
+                that computes its Hamiltonian. The endpoint of step i reads file icond + i + 1 and the interval start
+                icond + i, so a run ends inside the window (nsteps <= nfiles - icond - 1) unless periodic_dynamics
+                reuses it - one file reused periodically is a constant Hamiltonian [ default: -1 ]
+
+            * **dyn_params["icond"]** ( int ): the file index the trajectory starts from [ default: 0 ]
+
+            * **dyn_params["periodic_dynamics"]** ( int ): 1 = the loaded window is reused periodically (the file
+                index wraps at nfiles, the seam carries a discontinuous Hamiltonian), 0 = a run past the window is
+                refused [ default: 0 ]
+
         ham (nHamiltonian): object controlling Hamiltonian-related calculations
 
         compute_model ( PyObject ): the pointer to the Python function that performs the Hamiltonian calculations
@@ -1256,7 +1267,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                            "do_nac_phase_correction": 0,
                            "state_tracking_algo": -1, "MK_alpha": 0.0, "MK_verbosity": 0,
                            "convergence": 0, "max_number_attempts": 100, "min_probability_reordering": 0.0,
-                           "is_nbra": 0, "icond": 0, "nfiles": -1, "thermally_corrected_nbra": 0,
+                           "is_nbra": 0, "icond": 0, "nfiles": -1, "periodic_dynamics": 0, "thermally_corrected_nbra": 0,
                            "hop_force_refresh": 0, "total_energy": 0.01,
                            "tcnbra_nu_therm": 0.001, "tcnbra_nhc_size": 1, "tcnbra_do_nac_scaling": 1
                            })
@@ -1421,6 +1432,15 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
     is_nbra = _sync_nbra_flag(dyn_params)
     icond = dyn_params["icond"]    # Setting the initial geoemtry in the dynamics
     nfiles = dyn_params["nfiles"]  # The number of loaded Ham files
+    periodic_dynamics = dyn_params["periodic_dynamics"]
+    if periodic_dynamics not in (0, 1):
+        raise ValueError(F"periodic_dynamics = {periodic_dynamics} has no branch (0 = the loaded window is read once, "
+                         F"1 = reused periodically)")
+    # the endpoint of step i reads file icond + i + 1 - the last one lies inside the loaded window
+    if nfiles > 0 and not periodic_dynamics and icond + nsteps + 1 > nfiles:
+        raise ValueError(F"the run reads file index {icond + nsteps} of the {nfiles} loaded files (the endpoint of step i "
+                         F"is file icond + i + 1) - nsteps <= nfiles - icond - 1 = {nfiles - icond - 1}, or "
+                         F"periodic_dynamics 1")
     tsh_method = dyn_params["tsh_method"]
     thermally_corrected_nbra = dyn_params["thermally_corrected_nbra"]
     total_energy = dyn_params["total_energy"]
@@ -1567,7 +1587,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
             # interval being propagated, <t_i|t_i+1>, whose left-edge file index is
             # the interval START - passed explicitly as timestep_st
             index_st = i + icond
-            if nfiles > 0:
+            if nfiles > 0 and periodic_dynamics:
                 index = index % nfiles
                 index_st = index_st % nfiles
             model_params.update({"timestep": index, "timestep_st": index_st})
