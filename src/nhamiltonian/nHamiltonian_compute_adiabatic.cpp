@@ -350,14 +350,12 @@ void nHamiltonian::compute_adiabatic_derivatives() {
 
           //        *dtilda = (*basis_transform) * (*dc1_dia[n]).H() *
           //        (*basis_transform).H() * (*ham_adi);
-          // the adiabatic energies multiply from the LEFT: tmp_kl = (U^H dH U)_kl
-          // - E_k (U^H D U)_kl - E_l (U^H D^H U)_kl is the derivative of the
-          // generalized eigenproblem H U = S U E for a moving basis with
-          // dS = D + D^H. Its diagonal is the Hellmann-Feynman force, its
-          // off-diagonals give <phi_k|d phi_l> = (U^H S dU)_kl + (U^H D U)_kl.
-          // E multiplies from the left: with E on the right the anti-Hermitian part
-          // of D enters the couplings with the opposite sign (a rigidly rotating
-          // orthonormal basis acquires an adiabatic NAC), the forces either way
+          // the derivative of the generalized eigenproblem H U = S U E for a moving
+          // basis with dS = D + D^H: tmp_kl = (U^H dH U)_kl - E_k (U^H D U)_kl
+          // - E_l (U^H D^H U)_kl, the energies multiplying from the left - the
+          // diagonal is the Hellmann-Feynman force, the off-diagonals give
+          // <phi_k|d phi_l> = (U^H S dU)_kl + (U^H D U)_kl, and a rigidly rotating
+          // orthonormal basis keeps a zero adiabatic NAC
           *dtilda = (*ham_adi) * (*basis_transform).H() * (*dc1_dia[n]) *
                     (*basis_transform);
           *dtilda = (*dtilda + (*dtilda).H());
