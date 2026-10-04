@@ -49,6 +49,13 @@ static void check_model_handover(dyn_control_params &prms, nHamiltonian &ham) {
       missing = "ham_dia"; reader = "ham_update_method = 1"; cure = "hand it over";
     } else if (prms.ham_update_method == 2 && !ch->ham_adi_present) {
       missing = "ham_adi"; reader = "ham_update_method = 2"; cure = "hand it over";
+    } else if (prms.force_method != 0 && prms.ham_update_method == 2 && !ch->d1ham_adi_present) {
+      missing = "d1ham_adi"; reader = "force_method other than 0 (the forces of an adiabatic-native model)";
+      cure = "hand it over or use force_method = 0";
+    } else if (prms.force_method != 0 && prms.ham_update_method == 1 && !ch->d1ham_dia_present) {
+      missing = "d1ham_dia";
+      reader = "force_method other than 0 (the forces of a diabatic model, the adiabatic ones follow from them)";
+      cure = "hand it over or use force_method = 0";
     } else if (prms.time_overlap_method == 0 && reads_st && !ch->time_overlap_adi_present) {
       missing = "time_overlap_adi";
       reader = "time_overlap_method = 0 with a reader of the time overlap (nac_update_method 2, the state "
