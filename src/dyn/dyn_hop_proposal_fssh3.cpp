@@ -209,8 +209,10 @@ vector<double> hopping_probabilities_fssh3(dyn_control_params& prms, CMATRIX& de
     // For the fluxes approach, the staying probability is defined based on the 
     // total outflow probability and the hopping probabilities are proportional to 
     // fluxes  
-    if(j==i){  g[j] = 1.0 - P_out; }
-    else{      g[j] = fabs(g[j]/nrm)*P_out;   }
+    // nrm = 0 - no positive flux into any other state (a density that does not move): nothing leaves,
+    // the active state keeps the whole probability (0/0 is no probability)
+    if(j==i){  g[j] = (nrm > 0.0) ? 1.0 - P_out : 1.0; }
+    else{      g[j] = (nrm > 0.0) ? fabs(g[j]/nrm)*P_out : 0.0;   }
   }// for all states
   return g;
 
@@ -638,15 +640,15 @@ vector<double> hopping_probabilities_fssh3_dev(dyn_control_params& prms, CMATRIX
     if(approach_option==0){  
       // For the populations approach, we already have probabilities
       // but let's normalize still
-      g[j] = fabs(g[j]/nrm);  
+      g[j] = (nrm > 0.0) ? fabs(g[j]/nrm) : 0.0;     // nrm = 0: no flux, no probability
     }
     else if(approach_option==1 || approach_option==2 || approach_option==-1){
       // For the fluxes approach, the staying probability is defined based on the 
       // total outflow probability and the hopping probabilities are proportional to 
       // fluxes
   
-      if(j==i){  g[j] = 1.0 - P_out; }
-      else{      g[j] = fabs(g[j]/nrm)*P_out;   }
+      if(j==i){  g[j] = (nrm > 0.0) ? 1.0 - P_out : 1.0; }
+      else{      g[j] = (nrm > 0.0) ? fabs(g[j]/nrm)*P_out : 0.0;   }
       
     }
   }// for all states
