@@ -688,9 +688,10 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
             * **dyn_params["fssh3_size_option"]** ( int ): The size of the vectorized density matrix in equations
                 to determine hopping probabilites/fluxes
 
-                - 0: N elements - only populations; the matrices are overdetermined
+                - 0: N elements - only populations; the matrices are overdetermined [ default - the live proposal ]
                 - 1: N^2 elements - first N elements are populations, then Re and Im parts of upper-triangular coherences
-                         that is rho_{0,1}, rho_{0,2}, ... rho_{0,N-1}, rho_{1,2}, ... rho_{1,N-1}, ... rho_{N-2,N-1}  [ default ]
+                         that is rho_{0,1}, rho_{0,2}, ... rho_{0,N-1}, rho_{1,2}, ... rho_{1,N-1}, ... rho_{N-2,N-1}
+                         (the uncalled hopping_probabilities_fssh3_dev alone - refused with tsh_method 8)
 
 
             * **dyn_params["fssh3_approach_option"]** ( int ): The approach to determine the hopping probabilities
@@ -700,8 +701,9 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - 2: the kinetic approach with the banded initial guess of the rate matrix in run_opt
 
 
-            * **dyn_params["fssh3_decomp_option"]** ( int ): The matrix decomposition method for solving the least-squares problem.
-                In the present implementation, is not used
+            * **dyn_params["fssh3_decomp_option"]** ( int ): The matrix decomposition method for solving the least-squares problem,
+                read by the uncalled hopping_probabilities_fssh3_dev alone - the live proposal fits the rate matrix by
+                run_opt's gradient descent and has no decomposition step, so the value is inert under tsh_method 8
 
                 - 0: bdcSvd
                 - 1: fullPivLu
@@ -1291,7 +1293,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
     default_params.update({"fssh2_revision": 0})
 
     # ================= FSSH3 specific ====================
-    default_params.update({"fssh3_size_option": 1, "fssh3_approach_option": 0, "fssh3_decomp_option": 3,
+    default_params.update({"fssh3_size_option": 0, "fssh3_approach_option": 0, "fssh3_decomp_option": 3,
                            "fssh3_dt": 0.001, "fssh3_max_steps": 1000, "fssh3_err_tol": 1e-7
                            })
 

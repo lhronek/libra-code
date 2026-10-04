@@ -319,8 +319,10 @@ class DynControlParams:
     #: The size of the vectorized density matrix in equations to determine hopping probabilites/fluxes
     #: 0: N elements - only populations; the matrices are overdetermined
     #: 1: N^2 elements - first N elements are populations, then Re and Im parts of upper-triangular coherences
-    #:    that is rho_{0,1}, rho_{0,2}, ... rho_{0,N-1}, rho_{1,2}, ... rho_{1,N-1}, ... rho_{N-2,N-1}  [ default ]
-    fssh3_size_option: int = 1
+    #:    that is rho_{0,1}, rho_{0,2}, ... rho_{0,N-1}, rho_{1,2}, ... rho_{1,N-1}, ... rho_{N-2,N-1}
+    #:    (the uncalled hopping_probabilities_fssh3_dev alone - refused with tsh_method 8)
+    #: 0 is the live proposal's default
+    fssh3_size_option: int = 0
 
     #: FSSH3 approach
     #: The approach to determine the hopping probabilities:
@@ -329,8 +331,8 @@ class DynControlParams:
     fssh3_approach_option: int = 0
 
     #: FSSH3 matrix decomposition method
-    #: The matrix decomposition method for solving the least-squares problem.
-    #: In the present implementation, is not used.
+    #: The matrix decomposition method for solving the least-squares problem, read by the uncalled
+    #: hopping_probabilities_fssh3_dev alone - the live proposal has no decomposition step, inert under tsh_method 8.
     #: 0: bdcSvd
     #: 1: fullPivLu
     #: 2: fullPivHouseholderQr

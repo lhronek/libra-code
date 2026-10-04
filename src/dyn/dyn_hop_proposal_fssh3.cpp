@@ -151,14 +151,15 @@ vector<double> hopping_probabilities_fssh3(dyn_control_params& prms, CMATRIX& de
 
   //====== Testing options =========
 
-  int size_option = 0; // not used here, = prms.fssh3_size_option; // 0 - N elements, only populations; 1 - N^2 elements - also coherences
+  // the live proposal propagates the populations alone (fssh3_size_option 0 - sanity_check refuses 1 with tsh_method 8)
+  //int size_option = 0; // not used here, = prms.fssh3_size_option; // 0 - N elements, only populations; 1 - N^2 elements - also coherences
   int approach_option = prms.fssh3_approach_option; 
   // 0 - master equation (J contains hopping probabilities); 
   // 1 - kinetic approach (J contains fluxes), initialize J to be all zeroes
   // 2 - kinetic approach (J contains fluxes), initialize J to J_{i,i+1} = 1.0 and J_{i-1,i} = -1.0, and 0.0 otherwise
 
 
-  int decomp_option = 0; // not used here, = prms.fssh3_decomp_option; // in this version, it selects the 
+  int constraint_option = 0; // run_opt's constraint set (its opt argument) - no decomposition step here, fssh3_decomp_option is the development twin's
 
   //=========================== Step 1: definition of vectorized densities ==================================
 
@@ -179,7 +180,7 @@ vector<double> hopping_probabilities_fssh3(dyn_control_params& prms, CMATRIX& de
   dPdt = (1.0/dt)*(P_new - P_old);
    
   // Least squares solution - rate constants matrix
-  J = run_opt(P_old, P_new, prms.fssh3_dt, prms.fssh3_max_steps, prms.fssh3_err_tol, decomp_option, errors, dt, approach_option);
+  J = run_opt(P_old, P_new, prms.fssh3_dt, prms.fssh3_max_steps, prms.fssh3_err_tol, constraint_option, errors, dt, approach_option);
 
   //=========================== Step 3: probabilities ==========================================
   // Now convert them the fluxes that go from node j to all other nodes to probabilities:

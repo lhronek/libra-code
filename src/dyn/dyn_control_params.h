@@ -510,9 +510,10 @@ class dyn_control_params{
 
     Options:
 
-      - 0: N elements - only populations; the matrices are overdetermined
+      - 0: N elements - only populations; the matrices are overdetermined [ default - the live proposal ]
       - 1: N^2 elements - first N elements are populations, then Re and Im parts of upper-triangular coherences
-                         that is rho_{0,1}, rho_{0,2}, ... rho_{0,N-1}, rho_{1,2}, ... rho_{1,N-1}, ... rho_{N-2,N-1}  [ default ]
+                         that is rho_{0,1}, rho_{0,2}, ... rho_{0,N-1}, rho_{1,2}, ... rho_{1,N-1}, ... rho_{N-2,N-1}
+                         (the uncalled hopping_probabilities_fssh3_dev alone - sanity_check refuses it with tsh_method 8)
   */
   int fssh3_size_option;
 
@@ -529,8 +530,9 @@ class dyn_control_params{
   int fssh3_approach_option;
 
   /** 
-    The matrix decomposition method for solving the least-squares problem.
-    In the present implementation, is not used.
+    The matrix decomposition method for solving the least-squares problem - read by the uncalled
+    hopping_probabilities_fssh3_dev alone: the live proposal fits the rate matrix by run_opt's gradient
+    descent and has no decomposition step, so the value is inert under tsh_method 8.
 
     Options:
       - 0: bdcSvd

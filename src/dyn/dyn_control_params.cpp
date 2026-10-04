@@ -91,7 +91,7 @@ dyn_control_params::dyn_control_params(){
   fssh2_revision = 0;
 
   ///================= FSSH3 specific ====================
-  fssh3_size_option = 1;
+  fssh3_size_option = 0;
   fssh3_approach_option = 0;
   fssh3_decomp_option = 3;
   fssh3_dt = 0.001;
@@ -686,6 +686,15 @@ void dyn_control_params::sanity_check(){
     std::cout<<"Error in dyn_control_params::sanity_check: hop_force_refresh needs the state-specific forces "
         <<"(force_method = 1) of adiabatic hopping states (rep_sh = 1) on per-trajectory child Hamiltonians "
         <<"(isNBRA = 0)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
+  /// the live FSSH3 proposal propagates the populations alone - the N^2 coherence set of fssh3_size_option 1 is
+  /// implemented in the uncalled hopping_probabilities_fssh3_dev alone
+  if(tsh_method==8 && fssh3_size_option!=0){
+    std::cout<<"Error in dyn_control_params::sanity_check: fssh3_size_option = "<<fssh3_size_option
+        <<" (the N^2 coherence set) is implemented in the uncalled hopping_probabilities_fssh3_dev alone -"
+        <<" the live FSSH3 proposal (tsh_method 8) propagates the populations alone, use 0\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
