@@ -58,6 +58,11 @@ class dyn_control_params{
      - 1: adiabatic representation, wfc [ default ]
      - 2: diabatic representation, density matrix (e.g. Liouville's picture)
      - 3: adiabatic representation, density matrix (e.g. Liouville's picture)
+          2 and 3 propagate the density matrix alone - the amplitudes keep their t0 values, so
+          sanity_check refuses the options that read them (force_method 2 / 3, tsh_method 5,
+          decoherence_algo other than -1 / 9, decoherence_times_type 2 / 4 / 5), the python layer
+          refuses an explicit Cadi / Cdia / q_mm / p_mm in properties_to_save and drops them from
+          the default list
      - 4: MMST adiabatic representation, wfc - reserved, not implemented (no
           electronic propagation exists for it - rejected by sanity_check)
   */

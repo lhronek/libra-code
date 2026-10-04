@@ -345,6 +345,10 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - 1: adiabatic representation, wfc [ default ]
                 - 2: diabatic representation, density matrix (e.g. Liouville's picture)
                 - 3: adiabatic representation, density matrix (e.g. Liouville's picture)
+                     2 and 3 propagate the density matrix alone - the amplitudes keep their t0 values, so
+                     sanity_check refuses the options that read them (force_method 2 / 3, tsh_method 5,
+                     decoherence_algo other than -1 / 9, decoherence_times_type 2 / 4 / 5), an explicit
+                     Cadi / Cdia / q_mm / p_mm in properties_to_save is refused and the default list drops them
                 - 4: MMST adiabatic representation, wfc - reserved, not implemented (rejected by
                      sanity_check - use rep_tdse 1 with force_method 2 and sqc_gamma)
 
@@ -1413,6 +1417,20 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
         need = (dyn_params["rep_tdse"] in (0, 2)) or (dyn_params["rep_sh"] == 0) \
             or bool(dia_props.intersection(dyn_params["properties_to_save"]))
         dyn_params["compute_dm_dia"] = 1 if need else 0
+
+    # the density-matrix representations propagate the density matrix alone - the amplitudes and the mapping
+    # variables keep their t0 values: an explicit request for them is refused, the default list drops them
+    if dyn_params["rep_tdse"] in (2, 3):
+        frozen_props = ("Cadi", "Cdia", "q_mm", "p_mm")
+        named = [k for k in dyn_params["properties_to_save"] if k in frozen_props]
+        if named and "properties_to_save" in _dyn_params:
+            raise ValueError(F"properties_to_save names {named}: the amplitudes are not propagated under rep_tdse = "
+                             F"{dyn_params['rep_tdse']} (the density matrix is) - save D_adi / D_dia or the se_pop_* "
+                             F"populations instead")
+        if named:
+            print(F"rep_tdse = {dyn_params['rep_tdse']}: {named} dropped from the default properties_to_save - the "
+                  F"amplitudes are not propagated in the density-matrix representations")
+            dyn_params["properties_to_save"] = [k for k in dyn_params["properties_to_save"] if k not in frozen_props]
 
     prefix = dyn_params["prefix"]
     prefix2 = dyn_params["prefix2"]

@@ -328,6 +328,40 @@ void dyn_control_params::sanity_check(){
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
+  /// the density-matrix representations propagate the density matrix alone - the amplitudes keep their t0
+  /// values (update_amplitudes has nothing to convert there), so every option that reads or rewrites them is
+  /// refused: the Ehrenfest and QTSH forces, DISH, the amplitude-acting decoherence corrections and the
+  /// amplitude-based decoherence rates
+  if(rep_tdse==2 || rep_tdse==3){
+    if(force_method==2 || force_method==3){
+      std::cout<<"Error in dyn_control_params::sanity_check: force_method = "<<force_method<<" (2 Ehrenfest, 3 QTSH)"
+          <<" computes the forces and energies from the amplitudes, which rep_tdse = "<<rep_tdse<<" (a density-matrix"
+          <<" representation) never updates after t0 - use force_method 0 or 1, or an amplitude representation"
+          <<" (rep_tdse 0 or 1)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if(tsh_method==5){
+      std::cout<<"Error in dyn_control_params::sanity_check: tsh_method = 5 (DISH) proposes its hops and collapses"
+          <<" from the amplitudes, which rep_tdse = "<<rep_tdse<<" (a density-matrix representation) never updates"
+          <<" after t0 - use another tsh_method, or rep_tdse 1\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if(!(decoherence_algo==-1 || decoherence_algo==9)){
+      std::cout<<"Error in dyn_control_params::sanity_check: decoherence_algo = "<<decoherence_algo<<" acts on the"
+          <<" amplitudes (0 SDM, 1 ID-A, 2 A-FSSH, 3 BCSH, 4 MFSD, 5 SHXF, 6 MQCXF, 7 DISH rev2023, 8 ID-dia), which"
+          <<" rep_tdse = "<<rep_tdse<<" (a density-matrix representation) never updates after t0 - the density-matrix"
+          <<" representations admit decoherence_algo -1 and 9 (the coherence factors)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if(decoherence_times_type==2 || decoherence_times_type==4 || decoherence_times_type==5){
+      std::cout<<"Error in dyn_control_params::sanity_check: decoherence_times_type = "<<decoherence_times_type
+          <<" computes the decoherence rates from the amplitudes (2 and 4 Schwartz, 5 Gu-Franco), which rep_tdse = "
+          <<rep_tdse<<" (a density-matrix representation) never updates after t0 - use -1, 0, 1 (EDC) or 3 (Schwartz"
+          <<" from the Hamiltonian)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+  }
+
   /// the stochastic reorderings need a random generator, which the
   /// projector update (update_proj_adi -> compute_projector) does not
   /// receive - there they would keep the identity permutation, i.e. run as
