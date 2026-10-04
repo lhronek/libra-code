@@ -348,7 +348,7 @@ void dyn_control_params::sanity_check(){
     }
     if(!(decoherence_algo==-1 || decoherence_algo==9)){
       std::cout<<"Error in dyn_control_params::sanity_check: decoherence_algo = "<<decoherence_algo<<" acts on the"
-          <<" amplitudes (0 SDM, 1 ID-A, 2 A-FSSH, 3 BCSH, 4 MFSD, 5 SHXF, 6 MQCXF, 7 DISH rev2023, 8 ID-dia), which"
+          <<" amplitudes (0 SDM, 1 ID-A, 3 BCSH, 4 MFSD, 5 SHXF, 6 MQCXF, 7 DISH rev2023, 8 ID-dia), which"
           <<" rep_tdse = "<<rep_tdse<<" (a density-matrix representation) never updates after t0 - the density-matrix"
           <<" representations admit decoherence_algo -1 and 9 (the coherence factors)\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
@@ -416,7 +416,7 @@ void dyn_control_params::sanity_check(){
     {"use_qtsh", use_qtsh, {0, 1}},
     {"qtsh_force_option", qtsh_force_option, {0, 1, 2}},
     {"use_kcrpmd", use_kcrpmd, {0, 1}},
-    {"decoherence_algo", (int)decoherence_algo, {-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9}},
+    {"decoherence_algo", (int)decoherence_algo, {-1, 0, 1, 3, 4, 5, 6, 7, 8, 9}},
     {"dish_decoherence_event_option", dish_decoherence_event_option, {0, 1}},
     {"decoherence_times_type", decoherence_times_type, {-1, 0, 1, 2, 3, 4, 5}},
     {"dephasing_informed", dephasing_informed, {0, 1}},

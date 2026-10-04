@@ -756,7 +756,8 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - [-1]: no decoherence [ default ]
                 - 0: SDM and alike
                 - 1: instantaneous decoherence options (ID-S, ID-A, ID-C)
-                - 2: AFSSH
+                - 2: AFSSH - refused: its application apply_afssh is commented out upstream (2022-11-07)
+                     and nothing else dispatches on 2
                 - 3: BCSH of Linjun Wang
                 - 4: MF-SD of Bedard-Hearn, Larsen, Schwartz
                 - 5: SHXF of Min
@@ -1537,9 +1538,11 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
             therm[traj].set_Nf_t(len(dyn_params["thermostat_dofs"]))
             therm[traj].init_nhc()
 
-    if decoherence_algo == 2:
-        dyn_var.allocate_afssh()
-    elif decoherence_algo == 3:  # BCSH
+    # decoherence_algo 2 (A-FSSH) is refused by sanity_check - its application is commented out upstream, the
+    # moments allocated here were never integrated
+    #if decoherence_algo == 2:
+    #    dyn_var.allocate_afssh()
+    if decoherence_algo == 3:  # BCSH
         dyn_var.allocate_bcsh()
     elif decoherence_algo == 5:  # SHXF
         dyn_var.allocate_shxf()

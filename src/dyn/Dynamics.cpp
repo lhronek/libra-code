@@ -2764,10 +2764,12 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   } else if (prms.decoherence_algo ==
              1) { /* ID-A. Nothing to do here, this is done in the surface
                      hopping section */
-  } else if (prms.decoherence_algo ==
-             2) { /* A-FSSH. Nothing to do here, this is done in the surface
-                     hopping section */
   }
+  // decoherence_algo 2 (A-FSSH) is refused by sanity_check - its application is commented out upstream
+  //else if (prms.decoherence_algo ==
+  //           2) { /* A-FSSH. Nothing to do here, this is done in the surface
+  //                   hopping section */
+  //}
   // BCSH
   else if (prms.decoherence_algo == 3) {
     if (prms.rep_tdse == 1) {
@@ -2908,7 +2910,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   // -1: no decoherence - 8 (diabatic IDA) acts after the hops
   else if (prms.decoherence_algo == -1 || prms.decoherence_algo == 8) { ; }
   else {
-    std::cout<<"Error in compute_dynamics(): decoherence_algo = "<<prms.decoherence_algo<<" has no branch here (implemented: -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)\n";
+    std::cout<<"Error in compute_dynamics(): decoherence_algo = "<<prms.decoherence_algo<<" has no branch here (implemented: -1, 0, 1, 3, 4, 5, 6, 7, 8, 9)\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
@@ -2988,10 +2990,12 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
                   "1\n";
           std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
-      } else if (prms.decoherence_algo == 2) {
-        /// Temporarily commented AVA 11/7/2022
-        /// apply_afssh(dyn_var, Coeff, act_states, invM, ham, dyn_params, rnd);
-      } // AFSSH
+      }
+      // decoherence_algo 2 (A-FSSH) is refused by sanity_check - its application is commented out upstream
+      //else if (prms.decoherence_algo == 2) {
+      //  /// Temporarily commented AVA 11/7/2022
+      //  /// apply_afssh(dyn_var, Coeff, act_states, invM, ham, dyn_params, rnd);
+      //} // AFSSH
       else if (prms.decoherence_algo == 3) {
         ;
         ;
@@ -3034,7 +3038,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       // -1: no decoherence - 0 (MSDM / EDC) acts during the propagation
       else if (prms.decoherence_algo == -1 || prms.decoherence_algo == 0) { ; }
       else {
-        std::cout<<"Error in compute_dynamics(): decoherence_algo = "<<prms.decoherence_algo<<" has no branch here (implemented: -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)\n";
+        std::cout<<"Error in compute_dynamics(): decoherence_algo = "<<prms.decoherence_algo<<" has no branch here (implemented: -1, 0, 1, 3, 4, 5, 6, 7, 8, 9)\n";
         std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
 

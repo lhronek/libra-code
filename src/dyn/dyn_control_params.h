@@ -652,7 +652,8 @@ class dyn_control_params{
       - [-1]: no decoherence [ default ]
       - 0: SDM and alike
       - 1: instantaneous decoherence options (ID-S, ID-A, ID-C)
-      - 2: AFSSH
+      - 2: AFSSH - refused: its application apply_afssh is commented out upstream (2022-11-07) and
+           nothing else dispatches on 2
       - 3: BCSH of Linjun Wang
       - 4: MF-SD of Bedard-Hearn, Larsen, Schwartz
       - 5: SHXF of Min
