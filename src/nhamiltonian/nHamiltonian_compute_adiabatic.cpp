@@ -885,6 +885,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
     }
 
     has_attr = (int)hasattr(obj, "dc1_adi");
+    dc1_adi_present = has_attr;
     if (has_attr) {
 
       check_cmatrix_list(obj, "dc1_adi", nadi, nadi, nnucl);

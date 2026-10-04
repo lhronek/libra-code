@@ -153,6 +153,7 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
     hvib_adi_present = 0;
     time_overlap_adi_present = 0;
     d1ham_adi_present = 0;
+    dc1_adi_present = 0;
     has_attr = (int)hasattr(obj,"ham_dia");        
     ham_dia_present = has_attr;
     if(has_attr){  

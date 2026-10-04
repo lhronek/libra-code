@@ -226,6 +226,7 @@ void nHamiltonian::init_mem_status(int ndia_, int nadi_, int nnucl_) {
   time_overlap_adi_present = 0;
   d1ham_adi_present = 0;
   d1ham_dia_present = 0;
+  dc1_adi_present = 0;
   ovlp_dia_supplied = 0;
   lowdin_cache_state = -1;
   lowdin_cache_eig = 0;
@@ -539,6 +540,7 @@ void nHamiltonian::copy_level_content(nHamiltonian *src) {
   time_overlap_adi_present = src->time_overlap_adi_present;
   d1ham_adi_present = src->d1ham_adi_present;
   d1ham_dia_present = src->d1ham_dia_present;
+  dc1_adi_present = src->dc1_adi_present;
   ovlp_dia_supplied = src->ovlp_dia_supplied;
   // the Lowdin frame memo is not copied - the copy refills it from its own ovlp_dia on first use
   lowdin_cache_state = -1;

@@ -71,6 +71,13 @@ static void check_model_handover(dyn_control_params &prms, nHamiltonian &ham) {
       missing = "nac_adi";
       reader = "nac_update_method = 0 (hvib_update_method 1 builds hvib_adi = ham_adi - i nac_adi)";
       cure = "hand it over or use nac_update_method = 2 (the coupling derived from time_overlap_adi)";
+    } else if (adi_tdse && prms.nac_update_method == 1 && prms.ham_update_method == 2 && !ch->dc1_adi_present) {
+      // a diabatic model's dc1_dia may stay zero (strictly diabatic) - its adiabatic couplings follow from
+      // d1ham_dia through the derivative tier, an adiabatic-native model has no other source
+      missing = "dc1_adi";
+      reader = "nac_update_method = 1 (the coupling of an adiabatic-native model from its derivative couplings and "
+               "the momenta)";
+      cure = "hand it over or use nac_update_method = 2 (the coupling derived from time_overlap_adi)";
     } else if (!adi_tdse && prms.hvib_update_method == 0 && prms.ham_transform_method != 3 &&
                prms.ham_transform_method != 4 && !ch->hvib_dia_present) {
       // transforms 3 and 4 build hvib_dia from the rotated ham_dia, and nac_dia stays zero under

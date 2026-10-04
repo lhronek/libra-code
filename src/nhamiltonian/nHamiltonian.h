@@ -195,6 +195,7 @@ public:
   int time_overlap_adi_present;
   int d1ham_adi_present;
   int d1ham_dia_present;
+  int dc1_adi_present;
   ///< whether the model object ever supplied ovlp_dia - a child never given a metric holds the
   ///< identity of its allocation, which the dynamical variables need not scan
   int ovlp_dia_supplied;
