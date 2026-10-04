@@ -63,7 +63,7 @@ class dyn_control_params{
           (decoherence_times_type 2 / 4 / 5) take their density-matrix forms tr(A rho) there, the
           collapse-type corrections (decoherence_algo 0 / 1 / 3 / 4 / 7 / 8) and DISH (tsh_method 5)
           act on the propagated adiabatic density under 3 and are refused under 2 (its adiabatic
-          density is derived),
+          density is derived - as rep_tdse 0 has DISH refused for its derived adiabatic amplitudes),
           SHXF / MQCXF (5 / 6) are refused under 2 and 3, the python layer
           refuses an explicit Cadi / Cdia / q_mm / p_mm in properties_to_save and drops them from
           the default list

@@ -355,6 +355,15 @@ void dyn_control_params::sanity_check(){
         <<" t0 - no density-matrix form exists, use rep_tdse 1\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
+  /// rep_tdse 0 derives its adiabatic amplitudes from the propagated diabatic ones at the end of every step, so a
+  /// collapse of them is lost - DISH and DISH rev2023 collapse them without a representation gate of their own (the
+  /// other corrections refuse rep_tdse 0 at run time)
+  if(rep_tdse==0 && (tsh_method==5 || decoherence_algo==7)){
+    std::cout<<"Error in dyn_control_params::sanity_check: "<<((tsh_method==5) ? "tsh_method = 5 (DISH)" : "decoherence_algo = 7 (DISH rev2023)")
+        <<" collapses the adiabatic amplitudes, which rep_tdse = 0 recomputes from the propagated diabatic ones at the"
+        <<" end of every step - the collapses would be lost - use rep_tdse 1 (or 3 on the density matrix)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
   /// the stochastic reorderings need a random generator, which the
   /// projector update (update_proj_adi -> compute_projector) does not
