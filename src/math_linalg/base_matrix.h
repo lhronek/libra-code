@@ -125,6 +125,22 @@ public:
   }
 
   ///========== Getters and setters ====================
+  ///< the index refusal of the element accessors - outside their inlined bodies
+  __attribute__((noinline)) static void index_error(const char *fn, const char *which, int i, int n, int n_rows,
+                                                      int n_cols) {
+    std::cout << "Error in base_matrix::" << fn << "(): the " << which << " index " << i << " is outside 0.." << n - 1
+              << " of a " << n_rows << " x " << n_cols << " matrix\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  void check_row(const char *fn, int i) const {
+    if ((unsigned)i >= (unsigned)n_rows) { index_error(fn, "row", i, n_rows, n_rows, n_cols); }
+  }
+  void check_col(const char *fn, int j) const {
+    if ((unsigned)j >= (unsigned)n_cols) { index_error(fn, "column", j, n_cols, n_rows, n_cols); }
+  }
+  void check_flat(const char *fn, int i) const {
+    if ((unsigned)i >= (unsigned)n_elts) { index_error(fn, "flat", i, n_elts, n_rows, n_cols); }
+  }
   void set(int i, T1 val) {
     /** Sets the indx's emelent of the M array to the input value
     if the index i is set to -1, it sets all matrix elements
@@ -136,6 +152,7 @@ public:
         M[j] = val;
       }
     } else {
+      check_flat("set", i);
       M[i] = val;
     }
   }
@@ -162,27 +179,38 @@ public:
         M[k] = val;
       }
     } else if (i == -1 && j != -1) {
+      check_col("set", j);
       //      cout<<"...Case 1\n";
       for (int k = 0; k < n_rows; k++) {
         //        cout<<k<<"  "<<M[k*n_cols + j]<<endl;
         M[k * n_cols + j] = val;
       }
     } else if (i != -1 && j == -1) {
+      check_row("set", i);
       //      cout<<"...Case 2\n";
       for (int k = 0; k < n_cols; k++) {
         //        cout<<k<<"  "<<M[i*n_cols + k]<<endl;
         M[i * n_cols + k] = val;
       }
     } else {
+      check_row("set", i);
+      check_col("set", j);
       M[i * n_cols + j] = val;
     }
   }
 
   ///< Returns the matrix element with the index "indx"
-  T1 get(int i) const { return M[i]; }
+  T1 get(int i) const {
+    check_flat("get", i);
+    return M[i];
+  }
 
   ///< Returns the matrix element accessed by its row and coloumn indices
-  T1 get(int i, int j) const { return M[i * n_cols + j]; }
+  T1 get(int i, int j) const {
+    check_row("get", i);
+    check_col("get", j);
+    return M[i * n_cols + j];
+  }
 
   base_matrix<T1> vec() {
     /** Matrix vectorization: The vector formed by concatenating all the columns
@@ -328,18 +356,22 @@ public:
     }
 
     if (row == -1 && col != -1) {
+      check_col("add", col);
       for (int i = 0; i < n_rows; i++) {
         M[i * n_cols + col] += (T1)x;
       }
     }
 
     if (row != -1 && col == -1) {
+      check_row("add", row);
       for (int i = 0; i < n_cols; i++) {
         M[row * n_cols + i] += (T1)x;
       }
     }
 
     if (row != -1 && col != -1) {
+      check_row("add", row);
+      check_col("add", col);
       M[row * n_cols + col] += (T1)x;
     }
   }
@@ -356,18 +388,22 @@ public:
     }
 
     if (row == -1 && col != -1) {
+      check_col("scale", col);
       for (int i = 0; i < n_rows; i++) {
         M[i * n_cols + col] *= (T1)x;
       }
     }
 
     if (row != -1 && col == -1) {
+      check_row("scale", row);
       for (int i = 0; i < n_cols; i++) {
         M[row * n_cols + i] *= (T1)x;
       }
     }
 
     if (row != -1 && col != -1) {
+      check_row("scale", row);
+      check_col("scale", col);
       M[row * n_cols + col] *= (T1)x;
     }
   }
@@ -586,6 +622,8 @@ public:
   */
 
   void swap_cols(int I, int J) { ///< Swaps two columns
+    check_col("swap_cols", I);
+    check_col("swap_cols", J);
 
     if (I >= n_cols) {
       cout << "Error in base_matrix<T>::swap_cols\n";
@@ -608,6 +646,8 @@ public:
   }
 
   void swap_rows(int I, int J) { ///< Swaps two rows
+    check_row("swap_rows", I);
+    check_row("swap_rows", J);
 
     if (I >= n_rows) {
       cout << "Error in base_matrix<T>::swap_rows\n";
