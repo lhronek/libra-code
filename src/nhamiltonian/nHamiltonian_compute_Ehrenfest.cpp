@@ -307,6 +307,85 @@ vector<CMATRIX> nHamiltonian::Ehrenfest_forces_tens_dia(CMATRIX& ampl_dia, vecto
 
 
 
+
+complex<double> nHamiltonian::Ehrenfest_energy_dia_dm(CMATRIX& dm_dia){
+/**
+  The density-matrix form of Ehrenfest_energy_dia: E = tr(H rho) / tr(S rho) for the plain-coefficient density
+  rho = C_dia C_dia^H (the storage of dyn_variables::dm_dia) - equal to C^H H C / C^H S C for a pure state. The
+  density-matrix representations (rep_tdse 2 / 3) propagate rho alone, their amplitudes keep the t0 values
+*/
+  if(ovlp_dia_mem_status==0){ cout<<"Error in Ehrenfest_energy_dia_dm(): the overlap matrix in the diabatic basis is not allocated \
+  but it is needed for the calculations\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  if(ham_dia_mem_status==0){ cout<<"Error in Ehrenfest_energy_dia_dm(): the diabatic Hamiltonian matrix is not allocated \
+  but it is needed for the calculations\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
+
+  complex<double> norm = ((*ovlp_dia) * dm_dia).tr();
+  return ((*ham_dia) * dm_dia).tr() / norm;
+}
+
+complex<double> nHamiltonian::Ehrenfest_energy_dia_dm(CMATRIX& dm_dia, vector<int>& id_){
+/**
+  See the description of the Ehrenfest_energy_dia_dm(CMATRIX& dm_dia) function
+*/
+  if(id_.size()==1){
+    if(id_[0]==id){   return Ehrenfest_energy_dia_dm(dm_dia);    }
+    else{ cout<<"ERROR in Ehrenfest_energy_dia_dm: No Hamiltonian matching the requested id\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  }
+  else{
+    if (id_[1] < 0 || id_[1] >= (int)children.size()) {
+      cout << "Error in nHamiltonian::Ehrenfest_energy_dia_dm(): the child index " << id_[1]
+           << " is beyond the " << children.size() << " children of this level - a shared child "
+              "(isNBRA) serves trajectory 0's index alone\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    vector<int> next(id_.begin()+1,id_.end());
+    return children[id_[1]]->Ehrenfest_energy_dia_dm(dm_dia, next);
+  }
+}
+
+complex<double> nHamiltonian::Ehrenfest_energy_adi_dm(CMATRIX& dm_adi, CMATRIX& transform){
+/**
+  The density-matrix form of Ehrenfest_energy_adi: E = tr(T^H H T rho) / tr(rho) for rho = C_adi C_adi^H, with
+  T the identity as the amplitude form takes it
+*/
+  if(ham_adi_mem_status==0){ cout<<"Error in Ehrenfest_energy_adi_dm(): the adiabatic Hamiltonian matrix is not allocated \
+  but it is needed for the calculations\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
+
+  CMATRIX T(transform); T.identity();
+  complex<double> norm = dm_adi.tr();
+  return (T.H() * (*ham_adi) * T * dm_adi).tr() / norm;
+}
+
+complex<double> nHamiltonian::Ehrenfest_energy_adi_dm(CMATRIX& dm_adi){
+  CMATRIX T(nadi, nadi); T.identity();
+  return Ehrenfest_energy_adi_dm(dm_adi, T);
+}
+
+complex<double> nHamiltonian::Ehrenfest_energy_adi_dm(CMATRIX& dm_adi, vector<int>& id_, CMATRIX& transform){
+/**
+  See the description of the Ehrenfest_energy_adi_dm(CMATRIX& dm_adi) function
+*/
+  if(id_.size()==1){
+    if(id_[0]==id){   return Ehrenfest_energy_adi_dm(dm_adi, transform);    }
+    else{ cout<<"ERROR in Ehrenfest_energy_adi_dm: No Hamiltonian matching the requested id\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  }
+  else{
+    if (id_[1] < 0 || id_[1] >= (int)children.size()) {
+      cout << "Error in nHamiltonian::Ehrenfest_energy_adi_dm(): the child index " << id_[1]
+           << " is beyond the " << children.size() << " children of this level - a shared child "
+              "(isNBRA) serves trajectory 0's index alone\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    vector<int> next(id_.begin()+1,id_.end());
+    return children[id_[1]]->Ehrenfest_energy_adi_dm(dm_adi, next, transform);
+  }
+}
+
+complex<double> nHamiltonian::Ehrenfest_energy_adi_dm(CMATRIX& dm_adi, vector<int>& id_){
+  CMATRIX T(nadi, nadi); T.identity();
+  return Ehrenfest_energy_adi_dm(dm_adi, id_, T);
+}
+
 }// namespace libnhamiltonian
 }// liblibra
 

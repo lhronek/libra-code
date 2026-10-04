@@ -240,8 +240,33 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
 
   else if(prms.force_method==2){  // Ehrenfest forces
 
+    // the density-matrix representations (rep_tdse 2 / 3) propagate rho alone and their amplitudes keep the t0
+    // values - the Ehrenfest energy is tr(H rho) / tr(S rho) there (the amplitude form for a pure state)
+    int dm_rep = (prms.rep_tdse==2 || prms.rep_tdse==3);
+    if(dm_rep && prms.rep_force==0){
+      for(itraj=0; itraj<ntraj; itraj++){
+        id[1] = child_of(ham, itraj);
+        CMATRIX& rho = *dyn_vars.dm_dia[itraj];
+        res[itraj] = ham.Ehrenfest_energy_dia_dm(rho, id).real();
+        if(prms.ehrenfest_normalized==0){
+          double nrm = (ham.get_ovlp_dia(id) * rho).tr().real();
+          res[itraj] = res[itraj] * nrm - prms.sqc_gamma * ham.get_ham_dia(id).tr().real();
+        }
+      }
+    }
+    else if(dm_rep && prms.rep_force==1){
+      for(itraj=0; itraj<ntraj; itraj++){
+        id[1] = child_of(ham, itraj);
+        CMATRIX& rho = *dyn_vars.dm_adi[itraj];
+        res[itraj] = ham.Ehrenfest_energy_adi_dm(rho, id, *(dyn_vars.proj_adi[itraj])).real();
+        if(prms.ehrenfest_normalized==0){
+          double nrm = rho.tr().real();
+          res[itraj] = res[itraj] * nrm - prms.sqc_gamma * ham.get_ham_adi(id).tr().real();
+        }
+      }
+    }
     // Diabatic 
-    if(prms.rep_force==0){ 
+    else if(prms.rep_force==0){ 
       CMATRIX coeff(ndia, 1);
       for(itraj=0; itraj<ntraj; itraj++){
         id[1] = child_of(ham, itraj);
@@ -279,8 +304,21 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
     
     vector<int> effective_states = driving_states(prms, dyn_vars);
     
+    // the density-matrix representations (rep_tdse 2 / 3): the coherence energy from rho (the amplitude form for a
+    // pure state) - the adiabatic branch below adds no coherence term and serves them as it is
+    int dm_rep = (prms.rep_tdse==2 || prms.rep_tdse==3);
+    if(dm_rep && prms.rep_force==0){
+      MATRIX p_traj(dyn_vars.ndof, 1);
+      for(itraj=0; itraj<ntraj; itraj++){
+        id[1] = child_of(ham, itraj);
+        int ist = effective_states[itraj];
+        res[itraj] = ham.child(id[1])->get_ham_dia_lowdin().get(ist, ist).real();
+        p_traj = dyn_vars.p->col(itraj);
+        res[itraj] += ham.QTSH_energy_dia_dm(*dyn_vars.dm_dia[itraj], p_traj, *dyn_vars.iM, id).real();
+      }
+    }
     // Diabatic 
-    if(prms.rep_force==0){ 
+    else if(prms.rep_force==0){ 
       CMATRIX coeff(ndia, 1);
       MATRIX p_traj(dyn_vars.ndof, 1);
       for(itraj=0; itraj<ntraj; itraj++){
@@ -420,8 +458,18 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
   }// TSH && adiabatic
 
   else if(prms.force_method==2){  // Ehrenfest forces
+    // the density-matrix representations (rep_tdse 2 / 3) propagate rho alone and their amplitudes keep the t0
+    // values - the Ehrenfest forces are -tr(dH rho) / tr(S rho) there (the amplitude form for a pure state)
+    int dm_rep = (prms.rep_tdse==2 || prms.rep_tdse==3);
+    if(dm_rep && prms.rep_force==0){
+      *dyn_vars.f = ham.Ehrenfest_forces_dia_dm(dyn_vars.dm_dia, 1, 0, prms.sqc_gamma, prms.ehrenfest_normalized).real();
+    }
+    else if(dm_rep && prms.rep_force==1){
+      int option = prms.ehrenfest_force_option;
+      *dyn_vars.f = ham.Ehrenfest_forces_adi_dm(dyn_vars.dm_adi, 1, option, prms.sqc_gamma, prms.ehrenfest_normalized).real();
+    }
     // Diabatic 
-    if(prms.rep_force==0){  
+    else if(prms.rep_force==0){  
      // sqc_gamma adds the Meyer-Miller ZPE term (see the adiabatic branch)
      *dyn_vars.f = ham.Ehrenfest_forces_dia(*dyn_vars.ampl_dia, 1, 0, prms.sqc_gamma, prms.ehrenfest_normalized).real(); 
  
@@ -469,7 +517,16 @@ void update_forces(dyn_control_params& prms, dyn_variables& dyn_vars, nHamiltoni
     }
 
     // Off-diagonal Hellmann-Feynman force calculations
-    if(prms.rep_force==0){  
+    // the density-matrix representations (rep_tdse 2 / 3) take it from rho (the amplitude form for a pure state)
+    int dm_rep = (prms.rep_tdse==2 || prms.rep_tdse==3);
+    if(dm_rep && prms.rep_force==0){
+      *dyn_vars.qtsh_f_nc = ham.QTSH_forces_dia_dm(dyn_vars.dm_dia, 1, 0).real();
+    }
+    else if(dm_rep && prms.rep_force==1){
+      int option = prms.qtsh_force_option;
+      *dyn_vars.qtsh_f_nc = ham.QTSH_forces_adi_dm(dyn_vars.dm_adi, 1, option).real();
+    }
+    else if(prms.rep_force==0){  
       *dyn_vars.qtsh_f_nc = ham.QTSH_forces_dia(*dyn_vars.ampl_dia, 1).real();
     }
     else if(prms.rep_force==1){

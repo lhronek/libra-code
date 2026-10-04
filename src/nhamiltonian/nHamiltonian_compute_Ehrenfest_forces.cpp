@@ -577,5 +577,165 @@ requested id\n"; std::cout << std::flush; throw std::runtime_error("libra C++ er
 }
 */
 
+
+CMATRIX nHamiltonian::Ehrenfest_forces_dia_unit_dm(CMATRIX &dm_dia, int option, double gamma, int normalized) {
+  /**
+    The density-matrix form of Ehrenfest_forces_dia_unit: every C^H A C of the amplitude form is tr(A rho) for the
+    plain-coefficient density rho = C_dia C_dia^H of one trajectory (the storage of dyn_variables::dm_dia), the norm
+    C^H S C is tr(S rho) - equal to the amplitude form for a pure state. The density-matrix representations
+    (rep_tdse 2 / 3) propagate rho alone, their amplitudes keep the t0 values
+  */
+  if (!(option == 0 || option == 1)) {
+    cout << "Error in Ehrenfest_forces_dia_unit_dm(): option = " << option
+         << " is not allowed (0 - all terms, 1 - no derivative-coupling terms)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  if (ovlp_dia_mem_status == 0) {
+    cout << "Error in Ehrenfest_forces_dia_unit_dm(): the overlap matrix in the diabatic basis is not allocated \
+  but it is needed for the calculations\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  if (ham_dia_mem_status == 0) {
+    cout << "Error in Ehrenfest_forces_dia_unit_dm(): the diabatic Hamiltonian matrix is not allocated \
+  but it is needed for the calculations\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  CMATRIX res(nnucl, 1);
+  CMATRIX dtilda(ndia, ndia);
+  CMATRIX invS(ndia, ndia);
+  FullPivLU_inverse(*ovlp_dia, invS);
+  complex<double> norm = ((*ovlp_dia) * dm_dia).tr();
+  for (int n = 0; n < nnucl; n++) {
+    if (d1ham_dia_mem_status[n] == 0) {
+      cout << "Error in Ehrenfest_forces_dia_unit_dm(): the derivatives of the Hamiltonian matrix in the \
+      diabatic basis w.r.t. the nuclear DOF " << n << " is not allocated but is needed for the calculations \n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if (dc1_dia_mem_status[n] == 0) {
+      cout << "Error in Ehrenfest_forces_dia_unit_dm(): the derivatives couplings matrix in the diabatic \
+      basis w.r.t. the nuclear DOF " << n << " is not allocated but is needed for the calculations \n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if (option == 0) {
+      dtilda = ((*dc1_dia[n]).H() * invS * (*ham_dia) + (*ham_dia) * invS * (*dc1_dia[n]));
+      res.M[n] = -((*d1ham_dia[n] - dtilda) * dm_dia).tr();
+    } else if (option == 1) {
+      res.M[n] = -((*d1ham_dia[n]) * dm_dia).tr();
+    }
+    // the Meyer-Miller ZPE term of Ehrenfest_forces_dia_unit - amplitude-free
+    if (gamma != 0.0) {
+      complex<double> zpe = (invS * (*d1ham_dia[n])).tr();
+      if (option == 0) {
+        zpe -= 2.0 * (invS * (*dc1_dia[n]) * invS * (*ham_dia)).tr().real();
+      }
+      res.M[n] += gamma * zpe;
+    }
+  } // for n
+  // normalized 0 = the un-normalized Meyer-Miller mapping force, tr(rho) = 1 + N gamma for SQC-sampled densities
+  if (normalized) { res /= norm; }
+  return res;
+}
+
+CMATRIX nHamiltonian::Ehrenfest_forces_dia_dm(vector<CMATRIX *> &dm_dia, int lvl, int option, double gamma,
+                                              int normalized) {
+  /**
+    The density-matrix form of Ehrenfest_forces_dia: one ndia x ndia density per trajectory (dyn_variables::dm_dia),
+    lvl 0 - this Hamiltonian serves every trajectory, lvl 1 - children[i] serves trajectory i
+    Returns MATRIX(ndof, ntraj) - the Ehrenfest forces in the diabatic representation
+  */
+  int ntraj = dm_dia.size();
+  if (lvl == 1 && children.size() != static_cast<std::size_t>(ntraj)) {
+    cout << "ERROR in CMATRIX nHamiltonian::Ehrenfest_forces_dia_dm(): the number of densities (" << ntraj
+         << ") should be equal to the number of children Hamiltonians (" << children.size() << ")\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  CMATRIX frc_tmp(nnucl, 1);
+  CMATRIX F(nnucl, ntraj);
+  for (int i = 0; i < ntraj; i++) {
+    if (lvl == 0) { frc_tmp = Ehrenfest_forces_dia_unit_dm(*dm_dia[i], option, gamma, normalized); }
+    if (lvl == 1) { frc_tmp = children[i]->Ehrenfest_forces_dia_unit_dm(*dm_dia[i], option, gamma, normalized); }
+    for (int n = 0; n < nnucl; n++) { F.set(n, i, frc_tmp.get(n, 0)); }
+  }
+  return F;
+}
+
+CMATRIX nHamiltonian::Ehrenfest_forces_adi_unit_dm(CMATRIX &dm_adi, int option, CMATRIX &transform, double gamma,
+                                                   int normalized) {
+  /**
+    The density-matrix form of Ehrenfest_forces_adi_unit: every C^H A C of the amplitude form is tr(A rho) for
+    rho = C_adi C_adi^H of one trajectory (dyn_variables::dm_adi), the norm C^H C is tr(rho), T the identity as
+    the amplitude form takes it - equal to the amplitude form for a pure state
+  */
+  if (!(option == 0 || option == 1)) {
+    cout << "Error in Ehrenfest_forces_adi_unit_dm(): option = " << option
+         << " is not allowed (0 - all terms, 1 - no derivative-coupling terms)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  if (ham_adi_mem_status == 0) {
+    cout << "Error in Ehrenfest_forces_adi_unit_dm(): the adiabatic Hamiltonian matrix is not allocated \
+  but it is needed for the calculations\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  complex<double> norm = dm_adi.tr();
+  CMATRIX res(nnucl, 1);
+  CMATRIX tmp(nadi, nadi);
+  CMATRIX T(transform);
+  T.identity();
+  for (int n = 0; n < nnucl; n++) {
+    if (d1ham_adi_mem_status[n] == 0) {
+      cout << "Error in Ehrenfest_forces_adi_unit_dm(): the derivatives of the Hamiltonian matrix in the \
+    adiabatic basis w.r.t. the nuclear DOF " << n << " is not allocated but is needed for the calculations \n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if (dc1_adi_mem_status[n] == 0) {
+      cout << "Error in Ehrenfest_forces_adi_unit_dm(): the derivatives couplings matrix in the adiabatic \
+    basis w.r.t. the nuclear DOF " << n << " is not allocated but is needed for the calculations \n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if (option == 0) { // all terms, the derivative couplings included
+      tmp = (T.H() * (*dc1_adi[n]) * T).H() * (T.H() * (*ham_adi) * T);
+      tmp = tmp + tmp.H();
+      res.M[n] = -((T.H() * (*d1ham_adi[n]) * T - tmp) * dm_adi).tr();
+    } else if (option == 1) { // no derivative-coupling terms - the local-diabatization-consistent variant
+      res.M[n] = -(T.H() * (*d1ham_adi[n]) * T * dm_adi).tr();
+    }
+  } // for n
+  // the Meyer-Miller ZPE term of Ehrenfest_forces_adi_unit - amplitude-free
+  for (int n = 0; n < nnucl; n++) {
+    for (int i = 0; i < nadi; i++) {
+      res.M[n] -= gamma * (-d1ham_adi[n]->get(i, i));
+    }
+  }
+  // normalized 0 = the un-normalized Meyer-Miller mapping force
+  if (normalized) { res /= norm; }
+  return res;
+}
+
+CMATRIX nHamiltonian::Ehrenfest_forces_adi_dm(vector<CMATRIX *> &dm_adi, int lvl, int option, double gamma,
+                                              int normalized) {
+  /**
+    The density-matrix form of Ehrenfest_forces_adi with the uniform gamma and identity transforms: one nadi x nadi
+    density per trajectory (dyn_variables::dm_adi), lvl 0 - this Hamiltonian serves every trajectory, lvl 1 -
+    children[i] serves trajectory i
+    Returns MATRIX(ndof, ntraj) - the Ehrenfest forces in the adiabatic representation
+  */
+  int ntraj = dm_adi.size();
+  if (lvl == 1 && children.size() != static_cast<std::size_t>(ntraj)) {
+    cout << "ERROR in CMATRIX nHamiltonian::Ehrenfest_forces_adi_dm(): the number of densities (" << ntraj
+         << ") should be equal to the number of children Hamiltonians (" << children.size() << ")\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  CMATRIX I(nadi, nadi);
+  I.load_identity();
+  CMATRIX frc_tmp(nnucl, 1);
+  CMATRIX F(nnucl, ntraj);
+  for (int i = 0; i < ntraj; i++) {
+    if (lvl == 0) { frc_tmp = Ehrenfest_forces_adi_unit_dm(*dm_adi[i], option, I, gamma, normalized); }
+    if (lvl == 1) { frc_tmp = children[i]->Ehrenfest_forces_adi_unit_dm(*dm_adi[i], option, I, gamma, normalized); }
+    for (int n = 0; n < nnucl; n++) { F.set(n, i, frc_tmp.get(n, 0)); }
+  }
+  return F;
+}
+
 } // namespace libnhamiltonian
 } // namespace liblibra

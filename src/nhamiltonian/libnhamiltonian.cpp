@@ -271,6 +271,18 @@ void export_nhamiltonian_objects(){
   = &nHamiltonian::Ehrenfest_energy_dia;
   complex<double> (nHamiltonian::*expt_Ehrenfest_energy_dia_v2)(CMATRIX& ampl_dia, vector<int>& id_)
   = &nHamiltonian::Ehrenfest_energy_dia;
+  complex<double> (nHamiltonian::*expt_Ehrenfest_energy_adi_dm_v1)(CMATRIX& dm_adi)
+  = &nHamiltonian::Ehrenfest_energy_adi_dm;
+  complex<double> (nHamiltonian::*expt_Ehrenfest_energy_adi_dm_v2)(CMATRIX& dm_adi, vector<int>& id_)
+  = &nHamiltonian::Ehrenfest_energy_adi_dm;
+  complex<double> (nHamiltonian::*expt_Ehrenfest_energy_dia_dm_v1)(CMATRIX& dm_dia)
+  = &nHamiltonian::Ehrenfest_energy_dia_dm;
+  complex<double> (nHamiltonian::*expt_Ehrenfest_energy_dia_dm_v2)(CMATRIX& dm_dia, vector<int>& id_)
+  = &nHamiltonian::Ehrenfest_energy_dia_dm;
+  CMATRIX (nHamiltonian::*expt_Ehrenfest_forces_adi_unit_dm_v1)(CMATRIX& dm_adi, int option, CMATRIX& transform, double gamma, int normalized)
+  = &nHamiltonian::Ehrenfest_forces_adi_unit_dm;
+  CMATRIX (nHamiltonian::*expt_Ehrenfest_forces_dia_unit_dm_v1)(CMATRIX& dm_dia, int option, double gamma, int normalized)
+  = &nHamiltonian::Ehrenfest_forces_dia_unit_dm;
 
 
   //CMATRIX (nHamiltonian::*expt_Ehrenfest_forces_adi_v1)(CMATRIX& ampl_adi, int lvl, int option, CMATRIX& transform)
@@ -318,6 +330,14 @@ void export_nhamiltonian_objects(){
   = &nHamiltonian::QTSH_energy_dia;
   complex<double> (nHamiltonian::*expt_QTSH_energy_dia_v4)(CMATRIX& ampl_dia, MATRIX& p, const MATRIX& invM, vector<int>& id_)
   = &nHamiltonian::QTSH_energy_dia;
+  complex<double> (nHamiltonian::*expt_QTSH_energy_dia_dm_v1)(CMATRIX& dm_dia)
+  = &nHamiltonian::QTSH_energy_dia_dm;
+  complex<double> (nHamiltonian::*expt_QTSH_energy_dia_dm_v3)(CMATRIX& dm_dia, MATRIX& p, const MATRIX& invM)
+  = &nHamiltonian::QTSH_energy_dia_dm;
+  CMATRIX (nHamiltonian::*expt_QTSH_forces_adi_unit_dm_v1)(CMATRIX& dm_adi, int option, CMATRIX& transform)
+  = &nHamiltonian::QTSH_forces_adi_unit_dm;
+  CMATRIX (nHamiltonian::*expt_QTSH_forces_dia_unit_dm_v1)(CMATRIX& dm_dia, int option)
+  = &nHamiltonian::QTSH_forces_dia_unit_dm;
   
   //CMATRIX (nHamiltonian::*expt_QTSH_forces_adi_v1)(CMATRIX& ampl_adi, int lvl, int option, CMATRIX& transform)
   //= &nHamiltonian::QTSH_forces_adi;
@@ -596,6 +616,12 @@ void export_nhamiltonian_objects(){
       .def("Ehrenfest_energy_adi", expt_Ehrenfest_energy_adi_v2)
       .def("Ehrenfest_energy_dia", expt_Ehrenfest_energy_dia_v1)
       .def("Ehrenfest_energy_dia", expt_Ehrenfest_energy_dia_v2)
+      .def("Ehrenfest_energy_adi_dm", expt_Ehrenfest_energy_adi_dm_v1)
+      .def("Ehrenfest_energy_adi_dm", expt_Ehrenfest_energy_adi_dm_v2)
+      .def("Ehrenfest_energy_dia_dm", expt_Ehrenfest_energy_dia_dm_v1)
+      .def("Ehrenfest_energy_dia_dm", expt_Ehrenfest_energy_dia_dm_v2)
+      .def("Ehrenfest_forces_adi_unit_dm", expt_Ehrenfest_forces_adi_unit_dm_v1)
+      .def("Ehrenfest_forces_dia_unit_dm", expt_Ehrenfest_forces_dia_unit_dm_v1)
 
       .def("Ehrenfest_forces_tens_adi", expt_Ehrenfest_forces_tens_adi_v1)
       .def("Ehrenfest_forces_tens_adi", expt_Ehrenfest_forces_tens_adi_v2)
@@ -619,6 +645,10 @@ void export_nhamiltonian_objects(){
       .def("QTSH_energy_dia", expt_QTSH_energy_dia_v2)
       .def("QTSH_energy_dia", expt_QTSH_energy_dia_v3)
       .def("QTSH_energy_dia", expt_QTSH_energy_dia_v4)
+      .def("QTSH_energy_dia_dm", expt_QTSH_energy_dia_dm_v1)
+      .def("QTSH_energy_dia_dm", expt_QTSH_energy_dia_dm_v3)
+      .def("QTSH_forces_adi_unit_dm", expt_QTSH_forces_adi_unit_dm_v1)
+      .def("QTSH_forces_dia_unit_dm", expt_QTSH_forces_dia_unit_dm_v1)
       
       .def("QTSH_forces_adi", expt_QTSH_forces_adi_v1)
       .def("QTSH_forces_adi", expt_QTSH_forces_adi_v2)

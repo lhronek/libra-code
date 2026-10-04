@@ -682,6 +682,30 @@ public:
   CMATRIX QTSH_forces_adi(CMATRIX& ampl_adi, int lvl);              ///< QTSH forces in adiabatic basis
 
 
+///< The density-matrix forms of the Ehrenfest and QTSH energies and forces - the density-matrix representations
+///< (rep_tdse 2 / 3) propagate the density matrix alone, their amplitudes keep the t0 values. Every amplitude
+///< expression C^H A C / C^H S C becomes tr(A rho) / tr(S rho) for the plain-coefficient density rho = C C^H, so
+///< the two forms agree for a pure state. In nHamiltonian_compute_Ehrenfest.cpp, _Ehrenfest_forces.cpp, _QTSH.cpp
+///< and _QTSH_forces.cpp
+  complex<double> Ehrenfest_energy_dia_dm(CMATRIX& dm_dia);
+  complex<double> Ehrenfest_energy_dia_dm(CMATRIX& dm_dia, vector<int>& id_);
+  complex<double> Ehrenfest_energy_adi_dm(CMATRIX& dm_adi, CMATRIX& transform);
+  complex<double> Ehrenfest_energy_adi_dm(CMATRIX& dm_adi);
+  complex<double> Ehrenfest_energy_adi_dm(CMATRIX& dm_adi, vector<int>& id_, CMATRIX& transform);
+  complex<double> Ehrenfest_energy_adi_dm(CMATRIX& dm_adi, vector<int>& id_);
+  CMATRIX Ehrenfest_forces_dia_unit_dm(CMATRIX& dm_dia, int option, double gamma, int normalized);
+  CMATRIX Ehrenfest_forces_dia_dm(vector<CMATRIX*>& dm_dia, int lvl, int option, double gamma, int normalized);
+  CMATRIX Ehrenfest_forces_adi_unit_dm(CMATRIX& dm_adi, int option, CMATRIX& transform, double gamma, int normalized);
+  CMATRIX Ehrenfest_forces_adi_dm(vector<CMATRIX*>& dm_adi, int lvl, int option, double gamma, int normalized);
+  complex<double> QTSH_energy_dia_dm(CMATRIX& dm_dia);
+  complex<double> QTSH_energy_dia_dm(CMATRIX& dm_dia, MATRIX& p, const MATRIX& invM);
+  complex<double> QTSH_energy_dia_dm(CMATRIX& dm_dia, MATRIX& p, const MATRIX& invM, vector<int>& id_);
+  CMATRIX QTSH_forces_dia_unit_dm(CMATRIX& dm_dia, int option);
+  CMATRIX QTSH_forces_dia_dm(vector<CMATRIX*>& dm_dia, int lvl, int option);
+  CMATRIX QTSH_forces_adi_unit_dm(CMATRIX& dm_adi, int option, CMATRIX& transform);
+  CMATRIX QTSH_forces_adi_dm(vector<CMATRIX*>& dm_adi, int lvl, int option);
+
+
 ///< In nHamiltonian_compute_KCRPMD.cpp
   vector<MATRIX> generate_m_matrices(double beta);
   double kcrpmd_effective_potential(vector<double>& y_aux_var, const MATRIX& q, const MATRIX& invM, 

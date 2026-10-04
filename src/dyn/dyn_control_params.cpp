@@ -330,16 +330,9 @@ void dyn_control_params::sanity_check(){
 
   /// the density-matrix representations propagate the density matrix alone - the amplitudes keep their t0
   /// values (update_amplitudes has nothing to convert there), so every option that reads or rewrites them is
-  /// refused: the Ehrenfest and QTSH forces, DISH, the amplitude-acting decoherence corrections and the
-  /// amplitude-based decoherence rates
+  /// refused: DISH, the amplitude-acting decoherence corrections and the amplitude-based decoherence rates
+  /// (the Ehrenfest and QTSH forces and energies, force_method 2 / 3, take their density-matrix forms there)
   if(rep_tdse==2 || rep_tdse==3){
-    if(force_method==2 || force_method==3){
-      std::cout<<"Error in dyn_control_params::sanity_check: force_method = "<<force_method<<" (2 Ehrenfest, 3 QTSH)"
-          <<" computes the forces and energies from the amplitudes, which rep_tdse = "<<rep_tdse<<" (a density-matrix"
-          <<" representation) never updates after t0 - use force_method 0 or 1, or an amplitude representation"
-          <<" (rep_tdse 0 or 1)\n";
-      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-    }
     if(tsh_method==5){
       std::cout<<"Error in dyn_control_params::sanity_check: tsh_method = 5 (DISH) proposes its hops and collapses"
           <<" from the amplitudes, which rep_tdse = "<<rep_tdse<<" (a density-matrix representation) never updates"

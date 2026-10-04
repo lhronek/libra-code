@@ -345,8 +345,9 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - 1: adiabatic representation, wfc [ default ]
                 - 2: diabatic representation, density matrix (e.g. Liouville's picture)
                 - 3: adiabatic representation, density matrix (e.g. Liouville's picture)
-                     2 and 3 propagate the density matrix alone - the amplitudes keep their t0 values, so
-                     sanity_check refuses the options that read them (force_method 2 / 3, tsh_method 5,
+                     2 and 3 propagate the density matrix alone - the amplitudes keep their t0 values: the
+                     Ehrenfest and QTSH forces and energies (force_method 2 / 3) take their density-matrix
+                     forms tr(A rho) there, sanity_check refuses the other readers (tsh_method 5,
                      decoherence_algo other than -1 / 9, decoherence_times_type 2 / 4 / 5), an explicit
                      Cadi / Cdia / q_mm / p_mm in properties_to_save is refused and the default list drops them
                 - 4: MMST adiabatic representation, wfc - reserved, not implemented (rejected by
@@ -429,8 +430,8 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
 
                 - 0: don't compute forces at all - e.g. we do not really need them
                 - 1: state-specific  as in the TSH or adiabatic (including adiabatic excited states) [ default ]
-                - 2: Ehrenfest
-                - 3: QTSH force
+                - 2: Ehrenfest - under rep_tdse 2 / 3 from the density matrix, -tr(dH rho) / tr(S rho)
+                - 3: QTSH force - under rep_tdse 2 / 3 from the density matrix as well
                 - 4: KC-RPMD force
 
                 With isNBRA == 1 and ntraj > 1 option 0 runs, and option 1 is
@@ -1415,8 +1416,10 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
         # populations read the OPPOSITE representation's density matrix
         dia_props = {"D_dia", "se_pop_dia", "coherence_dia",
                      "mash_pop_dia", "sqc_pop_dia", "sh_pop_adi_TR"}
+        # the diabatic Ehrenfest / QTSH forces of the density-matrix representations read dm_dia too
         need = (dyn_params["rep_tdse"] in (0, 2)) or (dyn_params["rep_sh"] == 0) \
-            or bool(dia_props.intersection(dyn_params["properties_to_save"]))
+            or bool(dia_props.intersection(dyn_params["properties_to_save"])) \
+            or (dyn_params["force_method"] in (2, 3) and dyn_params["rep_force"] == 0)
         dyn_params["compute_dm_dia"] = 1 if need else 0
 
     # the density-matrix representations propagate the density matrix alone - the amplitudes and the mapping

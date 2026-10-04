@@ -169,6 +169,60 @@ complex<double> nHamiltonian::QTSH_energy_adi(CMATRIX& ampl_adi, vector<int>& id
   return QTSH_energy_adi(ampl_adi, id_, I);
 }
 
+
+complex<double> nHamiltonian::QTSH_energy_dia_dm(CMATRIX& dm_dia){
+/**
+  The density-matrix form of QTSH_energy_dia: tr((V - i nac_dia) rho) / tr(S rho) with V the off-diagonal part of
+  the diabatic Hamiltonian and rho = C_dia C_dia^H (dyn_variables::dm_dia) - equal to the amplitude form for a pure
+  state
+*/
+  if(ovlp_dia_mem_status==0){ cout<<"Error in QTSH_energy_dia_dm(): the overlap matrix in the diabatic basis is not allocated \
+  but it is needed for the calculations\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  if(ham_dia_mem_status==0){ cout<<"Error in QTSH_energy_dia_dm(): the diabatic Hamiltonian matrix is not allocated \
+  but it is needed for the calculations\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
+
+  CMATRIX V(*ham_dia);
+  for(int i=0; i<ndia; i++){ V.set(i, i, complex<double>(0.0, 0.0)); }
+  complex<double> norm = ((*ovlp_dia) * dm_dia).tr();
+  return (( V + complex<double>(0.0, -1.0) * (*nac_dia) ) * dm_dia).tr() / norm;
+}
+
+complex<double> nHamiltonian::QTSH_energy_dia_dm(CMATRIX& dm_dia, MATRIX& p, const MATRIX& invM){
+/**
+  The density-matrix form of QTSH_energy_dia(ampl_dia, p, invM): the coherence energy in the Lowdin frame of the
+  diabats, tr(offdiag(Hvib_L) rho_L) / tr(rho_L) over the Lowdin density rho_L = Y rho Y^H (the amplitude form's
+  d = Y ampl_dia gives d d^H = Y rho Y^H). At S = I the frames coincide and this is QTSH_energy_dia_dm(dm_dia)
+*/
+  CMATRIX X(ndia, ndia);
+  CMATRIX Y(ndia, ndia);
+  if(lowdin_dia(X, Y) == 0){ return QTSH_energy_dia_dm(dm_dia); }
+  CMATRIX rho_l(Y * dm_dia * Y.H());
+  CMATRIX V(get_hvib_dia_lowdin(p, invM));
+  for(int i=0; i<ndia; i++){ V.set(i, i, complex<double>(0.0, 0.0)); }
+  complex<double> norm = rho_l.tr();
+  return (V * rho_l).tr() / norm;
+}
+
+complex<double> nHamiltonian::QTSH_energy_dia_dm(CMATRIX& dm_dia, MATRIX& p, const MATRIX& invM, vector<int>& id_){
+/**
+  See the description of the QTSH_energy_dia_dm(CMATRIX& dm_dia, MATRIX& p, const MATRIX& invM) function
+*/
+  if(id_.size()==1){
+    if(id_[0]==id){   return QTSH_energy_dia_dm(dm_dia, p, invM);    }
+    else{ cout<<"ERROR in QTSH_energy_dia_dm: No Hamiltonian matching the requested id\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
+  }
+  else{
+    if (id_[1] < 0 || id_[1] >= (int)children.size()) {
+      cout << "Error in nHamiltonian::QTSH_energy_dia_dm(): the child index " << id_[1]
+           << " is beyond the " << children.size() << " children of this level - a shared child "
+              "(isNBRA) serves trajectory 0's index alone\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    vector<int> next(id_.begin()+1,id_.end());
+    return children[id_[1]]->QTSH_energy_dia_dm(dm_dia, p, invM, next);
+  }
+}
+
 }// namespace libnhamiltonian
 }// liblibra
 

@@ -58,8 +58,9 @@ class dyn_control_params{
      - 1: adiabatic representation, wfc [ default ]
      - 2: diabatic representation, density matrix (e.g. Liouville's picture)
      - 3: adiabatic representation, density matrix (e.g. Liouville's picture)
-          2 and 3 propagate the density matrix alone - the amplitudes keep their t0 values, so
-          sanity_check refuses the options that read them (force_method 2 / 3, tsh_method 5,
+          2 and 3 propagate the density matrix alone - the amplitudes keep their t0 values: the
+          Ehrenfest and QTSH forces and energies (force_method 2 / 3) take their density-matrix
+          forms tr(A rho) there, sanity_check refuses the other readers (tsh_method 5,
           decoherence_algo other than -1 / 9, decoherence_times_type 2 / 4 / 5), the python layer
           refuses an explicit Cadi / Cdia / q_mm / p_mm in properties_to_save and drops them from
           the default list
@@ -160,8 +161,8 @@ class dyn_control_params{
     Options:
       - 0: don't compute forces at all - e.g. we do not really need them
       - 1: state-specific  as in the TSH or adiabatic (including adiabatic excited states) [ default ]
-      - 2: Ehrenfest and MMST (SQC)
-      - 3: QTSH force
+      - 2: Ehrenfest and MMST (SQC) - under rep_tdse 2 / 3 from the density matrix, -tr(dH rho) / tr(S rho)
+      - 3: QTSH force - under rep_tdse 2 / 3 from the density matrix as well
       - 4: KC-RPMD force
 
     With isNBRA == 1 and ntraj > 1 option 0 runs, and option 1 is

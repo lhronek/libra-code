@@ -508,5 +508,172 @@ id\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see 
 }
 */
 
+
+CMATRIX nHamiltonian::QTSH_forces_dia_unit_dm(CMATRIX &dm_dia, int option) {
+  /**
+    The density-matrix form of QTSH_forces_dia_unit: every C^H A C of the amplitude form is tr(A rho) for the
+    plain-coefficient density rho = C_dia C_dia^H of one trajectory (dyn_variables::dm_dia), the Lowdin amplitudes
+    d = Y C give the Lowdin density Y rho Y^H - equal to the amplitude form for a pure state
+  */
+  if (!(option == 0 || option == 1)) {
+    cout << "Error in QTSH_forces_dia_unit_dm(): option = " << option
+         << " is not allowed (0 - first-order off-diagonal force, 1 - with the second-order term)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  if (ovlp_dia_mem_status == 0) {
+    cout << "Error in QTSH_forces_dia_unit_dm(): the overlap matrix in the diabatic basis is not allocated \
+  but it is needed for the calculations\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  if (ham_dia_mem_status == 0) {
+    cout << "Error in QTSH_forces_dia_unit_dm(): the diabatic Hamiltonian matrix is not allocated \
+  but it is needed for the calculations\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  CMATRIX res(nnucl, 1);
+  CMATRIX X(ndia, ndia);
+  CMATRIX Y(ndia, ndia);
+  if (lowdin_dia(X, Y)) {
+    // the Lowdin frame of the diabats (QTSH_forces_dia_unit): -tr(offdiag(dH_L) rho_L) / tr(rho_L) on
+    // rho_L = Y rho Y^H, dH_L the total derivative of X ham_dia X along the DOF for option 0 and X d1ham_dia X
+    // for option 1
+    CMATRIX rho_l(Y * dm_dia * Y.H());
+    complex<double> norm_l = rho_l.tr();
+    for (int n = 0; n < nnucl; n++) {
+      if (d1ham_dia_mem_status[n] == 0) {
+        cout << "Error in QTSH_forces_dia_unit_dm(): the derivatives of the Hamiltonian matrix in the \
+      diabatic basis w.r.t. the nuclear DOF " << n << " is not allocated but is needed for the calculations \n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
+      CMATRIX dH((option == 0) ? get_d1ham_dia_lowdin(n) : X * (*d1ham_dia[n]) * X);
+      for (int i = 0; i < ndia; i++) { dH.set(i, i, complex<double>(0.0, 0.0)); }
+      res.M[n] = -(dH * rho_l).tr();
+    }
+    res /= norm_l;
+    return res;
+  }
+  CMATRIX dtilda(ndia, ndia);
+  CMATRIX invS(ndia, ndia);
+  FullPivLU_inverse(*ovlp_dia, invS);
+  complex<double> norm = ((*ovlp_dia) * dm_dia).tr();
+  CMATRIX temp_diag(ndia, ndia);
+  for (int n = 0; n < nnucl; n++) {
+    if (d1ham_dia_mem_status[n] == 0) {
+      cout << "Error in QTSH_forces_dia_unit_dm(): the derivatives of the Hamiltonian matrix in the \
+      diabatic basis w.r.t. the nuclear DOF " << n << " is not allocated but is needed for the calculations \n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if (dc1_dia_mem_status[n] == 0) {
+      cout << "Error in QTSH_forces_dia_unit_dm(): the derivatives couplings matrix in the diabatic \
+      basis w.r.t. the nuclear DOF " << n << " is not allocated but is needed for the calculations \n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if (option == 0) {
+      dtilda = ((*dc1_dia[n]).H() * invS * (*ham_dia) + (*ham_dia) * invS * (*dc1_dia[n]));
+      for (int i = 0; i < ndia; i++) { temp_diag.set(i, i, (*d1ham_dia[n] - dtilda).get(i, i)); }
+      res.M[n] = -((*d1ham_dia[n] - dtilda - temp_diag) * dm_dia).tr();
+    } else if (option == 1) {
+      for (int i = 0; i < ndia; i++) { temp_diag.set(i, i, d1ham_dia[n]->get(i, i)); }
+      res.M[n] = -((*d1ham_dia[n] - temp_diag) * dm_dia).tr();
+    }
+  } // for n
+  res /= norm;
+  return res;
+}
+
+CMATRIX nHamiltonian::QTSH_forces_dia_dm(vector<CMATRIX *> &dm_dia, int lvl, int option) {
+  /**
+    The density-matrix form of QTSH_forces_dia: one ndia x ndia density per trajectory (dyn_variables::dm_dia),
+    lvl 0 - this Hamiltonian serves every trajectory, lvl 1 - children[i] serves trajectory i
+    Returns MATRIX(ndof, ntraj) - the QTSH off-diagonal Hellmann-Feynman forces in the diabatic representation
+  */
+  int ntraj = dm_dia.size();
+  if (lvl == 1 && children.size() != static_cast<std::size_t>(ntraj)) {
+    cout << "ERROR in CMATRIX nHamiltonian::QTSH_forces_dia_dm(): the number of densities (" << ntraj
+         << ") should be equal to the number of children Hamiltonians (" << children.size() << ")\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  CMATRIX frc_tmp(nnucl, 1);
+  CMATRIX F(nnucl, ntraj);
+  for (int i = 0; i < ntraj; i++) {
+    if (lvl == 0) { frc_tmp = QTSH_forces_dia_unit_dm(*dm_dia[i], option); }
+    if (lvl == 1) { frc_tmp = children[i]->QTSH_forces_dia_unit_dm(*dm_dia[i], option); }
+    for (int n = 0; n < nnucl; n++) { F.set(n, i, frc_tmp.get(n, 0)); }
+  }
+  return F;
+}
+
+CMATRIX nHamiltonian::QTSH_forces_adi_unit_dm(CMATRIX &dm_adi, int option, CMATRIX &transform) {
+  /**
+    The density-matrix form of QTSH_forces_adi_unit: every C^H A C of the amplitude form is tr(A rho) for
+    rho = C_adi C_adi^H of one trajectory (dyn_variables::dm_adi), T the identity as the amplitude form takes it -
+    equal to the amplitude form for a pure state
+  */
+  if (!(option == 0 || option == 1 || option == 2)) {
+    cout << "Error in QTSH_forces_adi_unit_dm(): option = " << option
+         << " is not allowed (0 - first-order off-diagonal force, 1 - with the second-order term, 2 - no derivative-coupling force)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  if (ham_adi_mem_status == 0) {
+    cout << "Error in QTSH_forces_adi_unit_dm(): the adiabatic Hamiltonian matrix is not allocated \
+  but it is needed for the calculations\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  complex<double> norm = dm_adi.tr();
+  CMATRIX res(nnucl, 1);
+  CMATRIX tmp(nadi, nadi);
+  CMATRIX T(transform);
+  T.identity();
+  for (int n = 0; n < nnucl; n++) {
+    if (d1ham_adi_mem_status[n] == 0) {
+      cout << "Error in QTSH_forces_adi_unit_dm(): the derivatives of the Hamiltonian matrix in the \
+    adiabatic basis w.r.t. the nuclear DOF " << n << " is not allocated but is needed for the calculations \n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if (dc1_adi_mem_status[n] == 0) {
+      cout << "Error in QTSH_forces_adi_unit_dm(): the derivatives couplings matrix in the adiabatic \
+    basis w.r.t. the nuclear DOF " << n << " is not allocated but is needed for the calculations \n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if (option == 0) { // the first-order off-diagonal force
+      tmp = (T.H() * (*dc1_adi[n]) * T).H() * (T.H() * (*ham_adi) * T);
+      tmp = tmp + tmp.H();
+      res.M[n] = (tmp * dm_adi).tr();
+    } else if (option == 1) { // with the second-order term
+      tmp = (T.H() * (*dc1_adi[n]) * T).H() * (T.H() * (*hvib_adi) * T);
+      tmp = tmp + tmp.H();
+      res.M[n] = (tmp * dm_adi).tr();
+    } else if (option == 2) { // no derivative-coupling force - the local-diabatization-consistent variant
+      res.M[n] = 0.0;
+    }
+  } // for n
+  res /= norm;
+  return res;
+}
+
+CMATRIX nHamiltonian::QTSH_forces_adi_dm(vector<CMATRIX *> &dm_adi, int lvl, int option) {
+  /**
+    The density-matrix form of QTSH_forces_adi with identity transforms: one nadi x nadi density per trajectory
+    (dyn_variables::dm_adi), lvl 0 - this Hamiltonian serves every trajectory, lvl 1 - children[i] serves trajectory i
+    Returns MATRIX(ndof, ntraj) - the QTSH forces in the adiabatic representation
+  */
+  int ntraj = dm_adi.size();
+  if (lvl == 1 && children.size() != static_cast<std::size_t>(ntraj)) {
+    cout << "ERROR in CMATRIX nHamiltonian::QTSH_forces_adi_dm(): the number of densities (" << ntraj
+         << ") should be equal to the number of children Hamiltonians (" << children.size() << ")\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  CMATRIX I(nadi, nadi);
+  I.load_identity();
+  CMATRIX frc_tmp(nnucl, 1);
+  CMATRIX F(nnucl, ntraj);
+  for (int i = 0; i < ntraj; i++) {
+    if (lvl == 0) { frc_tmp = QTSH_forces_adi_unit_dm(*dm_adi[i], option, I); }
+    if (lvl == 1) { frc_tmp = children[i]->QTSH_forces_adi_unit_dm(*dm_adi[i], option, I); }
+    for (int n = 0; n < nnucl; n++) { F.set(n, i, frc_tmp.get(n, 0)); }
+  }
+  return F;
+}
+
 } // namespace libnhamiltonian
 } // namespace liblibra

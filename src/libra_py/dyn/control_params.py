@@ -49,9 +49,10 @@ class DynControlParams:
     #: 1 adiabatic wfc [default]
     #: 2 diabatic density matrix
     #: 3 adiabatic density matrix
-    #:   2 and 3 propagate the density matrix alone - the amplitudes keep their t0 values, so the C++ sanity_check
-    #:   refuses the options that read them (force_method 2 / 3, tsh_method 5, decoherence_algo other than -1 / 9,
-    #:   decoherence_times_type 2 / 4 / 5), an explicit Cadi / Cdia / q_mm / p_mm in properties_to_save is refused
+    #:   2 and 3 propagate the density matrix alone - the amplitudes keep their t0 values: the Ehrenfest and QTSH
+    #:   forces and energies (force_method 2 / 3) take their density-matrix forms tr(A rho) there, the C++ sanity_check
+    #:   refuses the other readers (tsh_method 5, decoherence_algo other than -1 / 9, decoherence_times_type 2 / 4 / 5),
+    #:   an explicit Cadi / Cdia / q_mm / p_mm in properties_to_save is refused
     #:   and the default list drops them
     #: 4 MMST adiabatic wfc - reserved, not implemented (rejected by the C++ sanity_check)
     rep_tdse: int = 1
