@@ -184,6 +184,15 @@ public:
   int hvib_dia_supplied;
   int nac_adi_supplied;
   int nac_dia_supplied;
+  ///< whether the model object carried the attribute at the last ingestion, zeros included - the
+  ///< consume-side contract reads presence (an option that reads a model-supplied quantity refuses
+  ///< a model that hands over none of it), the overwrite guards above read data
+  int ham_dia_present;
+  int ham_adi_present;
+  int nac_adi_present;
+  int hvib_adi_present;
+  int hvib_dia_present;
+  int time_overlap_adi_present;
   ///< whether the model object ever supplied ovlp_dia - a child never given a metric holds the
   ///< identity of its allocation, which the dynamical variables need not scan
   int ovlp_dia_supplied;

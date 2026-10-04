@@ -29,6 +29,56 @@ namespace libdyn {
 
 namespace bp = boost::python;
 
+// the consume side of the model-attribute contract: an option that reads a model-supplied
+// quantity refuses a model that hands over none of it - the engine's slot would otherwise keep
+// its zeros or the previous step's values and the run would look healthy
+static void check_model_handover(dyn_control_params &prms, nHamiltonian &ham) {
+  int ntraj = ham.children.size();
+  // the time overlap is read by the HST/NPI couplings, the state tracking, the phase correction
+  // and the local-diabatization frame
+  int reads_st = (prms.nac_update_method == 2 || prms.ham_transform_method == 4 ||
+                  prms.state_tracking_algo != 0 || prms.do_phase_correction == 1);
+  // the adiabatic propagation reads hvib_adi, the diabatic one hvib_dia
+  int adi_tdse = (prms.rep_tdse == 1 || prms.rep_tdse == 3);
+  for (int traj = 0; traj < ntraj; traj++) {
+    nHamiltonian *ch = ham.children[traj];
+    const char *missing = nullptr;
+    const char *reader = nullptr;
+    const char *cure = nullptr;
+    if (prms.ham_update_method == 1 && !ch->ham_dia_present) {
+      missing = "ham_dia"; reader = "ham_update_method = 1"; cure = "hand it over";
+    } else if (prms.ham_update_method == 2 && !ch->ham_adi_present) {
+      missing = "ham_adi"; reader = "ham_update_method = 2"; cure = "hand it over";
+    } else if (prms.time_overlap_method == 0 && reads_st && !ch->time_overlap_adi_present) {
+      missing = "time_overlap_adi";
+      reader = "time_overlap_method = 0 with a reader of the time overlap (nac_update_method 2, the state "
+               "tracking, the phase correction or ham_transform_method 4)";
+      cure = "hand it over or use time_overlap_method = 1 (St from the basis transforms)";
+    } else if (prms.tsh_method == 3 || prms.tsh_method == 4) {
+      ; // the Landau-Zener and Zhu-Nakamura hops read the gap, not the coupling
+    } else if (adi_tdse && prms.hvib_update_method == 0 && !ch->hvib_adi_present) {
+      missing = "hvib_adi"; reader = "hvib_update_method = 0 (the adiabatic propagation)";
+      cure = "hand it over or use hvib_update_method = 1 (ham_adi - i nac_adi)";
+    } else if (adi_tdse && prms.hvib_update_method == 1 && prms.nac_update_method == 0 &&
+               !ch->nac_adi_present) {
+      missing = "nac_adi";
+      reader = "nac_update_method = 0 (hvib_update_method 1 builds hvib_adi = ham_adi - i nac_adi)";
+      cure = "hand it over or use nac_update_method = 2 (the coupling derived from time_overlap_adi)";
+    } else if (!adi_tdse && prms.hvib_update_method == 0 && prms.ham_transform_method != 3 &&
+               prms.ham_transform_method != 4 && !ch->hvib_dia_present) {
+      // transforms 3 and 4 build hvib_dia from the rotated ham_dia, and nac_dia stays zero under
+      // nac_update_method 0 by the strictly diabatic contract
+      missing = "hvib_dia"; reader = "hvib_update_method = 0 (the diabatic propagation)";
+      cure = "hand it over or use hvib_update_method = 1";
+    }
+    if (missing != nullptr) {
+      cout << "Error in update_Hamiltonian_variables(): " << reader << " reads the model's obj." << missing
+           << ", but the model hands over none - " << cure << "\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+  }
+}
+
 void update_Hamiltonian_variables(dyn_control_params &prms,
                                   dyn_variables &dyn_var, nHamiltonian &ham,
                                   nHamiltonian &ham_prev, bp::object py_funct,
@@ -218,6 +268,7 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
       std::cout<<"Error in update_Hamiltonian_variables(): ham_update_method = "<<prms.ham_update_method<<" has no branch here (implemented: 0, 1, 2)\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
+    check_model_handover(prms, ham);
     //    exit(0);
     // Do the additional transformation between any reps, if needed
     if (prms.ham_transform_method == 0) {

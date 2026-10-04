@@ -147,7 +147,13 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
 //exit(0);
     // Extract all the computed properties
     int has_attr=0;
+    // the diabatic ingestion carries none of the adiabatic attributes
+    ham_adi_present = 0;
+    nac_adi_present = 0;
+    hvib_adi_present = 0;
+    time_overlap_adi_present = 0;
     has_attr = (int)hasattr(obj,"ham_dia");        
+    ham_dia_present = has_attr;
     if(has_attr){  
 
       check_cmatrix(obj, "ham_dia", ndia, ndia);
@@ -180,6 +186,7 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
     }
 
     has_attr = (int)hasattr(obj,"hvib_dia");        
+    hvib_dia_present = has_attr;
     hvib_dia_supplied = 0;
     if(has_attr){    
 

@@ -726,6 +726,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
     // Extract all the computed properties
     int has_attr = 0;
     has_attr = (int)hasattr(obj, "ham_adi");
+    ham_adi_present = has_attr;
     if (has_attr) {
 
       check_cmatrix(obj, "ham_adi", nadi, nadi);
@@ -745,6 +746,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
     }
 
     has_attr = (int)hasattr(obj, "nac_adi");
+    nac_adi_present = has_attr;
     nac_adi_supplied = 0;
     if (has_attr) {
 
@@ -764,6 +766,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
     }
 
     has_attr = (int)hasattr(obj, "hvib_adi");
+    hvib_adi_present = has_attr;
     hvib_adi_supplied = 0;
     if (has_attr) {
 
@@ -783,6 +786,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
     }
 
     has_attr = (int)hasattr(obj, "hvib_dia");
+    hvib_dia_present = has_attr;
     hvib_dia_supplied = 0;
     if (has_attr) {
 
@@ -820,6 +824,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
 
     ham_dia_supplied = 0;
     has_attr = (int)hasattr(obj, "ham_dia");
+    ham_dia_present = has_attr;
     if (has_attr) {
 
       // the diabatic-representation hop proposals (LZ with rep_lz 0/1, ZN)
@@ -860,6 +865,7 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
     }
 
     has_attr = (int)hasattr(obj, "time_overlap_adi");
+    time_overlap_adi_present = has_attr;
     time_overlap_adi_supplied = 0;
     if (has_attr) {
 
