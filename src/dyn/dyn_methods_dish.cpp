@@ -480,6 +480,118 @@ void dish_project_out_collapse(vector<int>& old_states, vector<int>& proposed_st
 }
 
 
+
+vector<int> dish_dm(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates,
+                    dyn_control_params& prms, Random& rnd){
+/**
+  The density form of dish: rep_tdse 3 propagates the adiabatic density alone, so the coherence intervals, the
+  collapse probabilities, the collapses and the projections act on dyn_var.dm_adi - the same random draws, hop
+  proposals and acceptance as the amplitude form
+*/
+    vector<CMATRIX*>& dm = dyn_var.dm_adi;
+    vector<int> act_states = dyn_var.act_states;
+    MATRIX& coherence_time = *dyn_var.coherence_time;
+    coherence_time.add(-1, -1, prms.dt);
+    int traj;
+    int nst = dyn_var.nadi;
+    int ntraj = dyn_var.ntraj;
+    vector<int> old_states(ntraj,-1);
+    vector<int> new_states(ntraj,-1);
+    vector<int> proposed_states(ntraj,-1);
+    vector<int> which_trajectories(1,-1);
+    vector<int> final_states(act_states);
+    MATRIX coherence_interval(nst, ntraj);
+    coherence_interval = coherence_intervals_dm(dm, decoherence_rates);
+    vector<int> decohered_states( decoherence_event(coherence_time, coherence_interval, prms.dish_decoherence_event_option, rnd) );
+    for(traj=0; traj < ntraj; traj++){
+      int istate = decohered_states[traj];
+      if(istate>-1){
+        coherence_time.set(istate, traj, 0.0);
+        double prob = dm[traj]->get(istate, istate).real();
+        double ksi = rnd.uniform(0.0, 1.0);
+        if(istate == act_states[traj]){
+            if(ksi<=prob){
+              collapse_dm(*dm[traj], act_states[traj]);
+            }
+            else{
+              vector<int> possible_outcomes;
+              possible_outcomes  = where_can_we_hop(traj, dyn_var, ham, prms, rnd);
+              int num_allowed = possible_outcomes.size();
+              if(num_allowed > 0){
+                MATRIX hop_probabilities(1, num_allowed);
+                double norm = 0.0;
+                for(int j=0;j<num_allowed;j++){
+                    int jstate = possible_outcomes[j];
+                    double pj = dm[traj]->get(jstate, jstate).real();
+                    norm += pj;
+                    hop_probabilities.set(0, j, pj );
+                }
+                hop_probabilities *= 1.0/norm;
+                double ksi2 = rnd.uniform(0.0, 1.0);
+                int selected_state_index = hop(0, hop_probabilities, ksi2);
+                final_states[traj] = possible_outcomes[selected_state_index];
+                project_out_dm(*dm[traj], istate);
+              }
+            }
+        }
+        else{
+            if(ksi<=prob){
+              proposed_states[traj] = istate;
+              which_trajectories[0] = traj;
+              old_states = act_states;
+              new_states = accept_hops(dyn_var, ham, proposed_states, old_states, prms, rnd, which_trajectories);
+              if(new_states[traj] == proposed_states[traj]){
+                collapse_dm(*dm[traj], new_states[traj]);
+                final_states[traj] = new_states[traj];
+                coherence_time.set(final_states[traj], traj, 0.0);
+              }
+            }
+            else{
+              project_out_dm(*dm[traj], istate);
+            }
+        }
+      }
+    }
+    return final_states;
+}
+
+void dish_rev2023_dm(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates,
+                     dyn_control_params& prms, Random& rnd){
+/**
+  The density form of dish_rev2023 on dyn_var.dm_adi (rep_tdse 3)
+*/
+  vector<CMATRIX*>& dm = dyn_var.dm_adi;
+  MATRIX& coherence_time = *dyn_var.coherence_time;
+  int traj;
+  int nst = dyn_var.nadi;
+  int ntraj = dyn_var.ntraj;
+  coherence_time.add(-1, -1, prms.dt);
+  MATRIX coherence_interval(nst, ntraj);
+  if(prms.decoherence_times_type==2 || prms.decoherence_times_type==4){
+    for(traj=0; traj < ntraj; traj++){
+      for(int i=0; i<nst; i++){
+        double tt = 1e+10;
+        if( fabs(decoherence_rates[traj].get(i,i))>0.0){ tt = 1.0/decoherence_rates[traj].get(i,i); }
+        coherence_interval.set(i, traj, tt );
+      }
+    }
+  }
+  else {
+    coherence_interval = coherence_intervals_dm(dm, decoherence_rates);
+  }
+  vector<int> decohered_states( decoherence_event(coherence_time, coherence_interval, prms.dish_decoherence_event_option, rnd) );
+  for(traj=0; traj < ntraj; traj++){
+    int istate = decohered_states[traj];
+    if(istate>-1){
+      coherence_time.set(istate, traj, 0.0);
+      double prob = dm[traj]->get(istate, istate).real();
+      double ksi = rnd.uniform(0.0, 1.0);
+      if(ksi<=prob){  collapse_dm(*dm[traj], istate);  }
+      else{   project_out_dm(*dm[traj], istate);    }
+    }
+  }
+}
+
 }// namespace libdyn
 }// liblibra
 

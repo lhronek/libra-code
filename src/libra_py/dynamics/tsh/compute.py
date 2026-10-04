@@ -347,9 +347,11 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - 3: adiabatic representation, density matrix (e.g. Liouville's picture)
                      2 and 3 propagate the density matrix alone - the amplitudes keep their t0 values: the
                      Ehrenfest and QTSH forces and energies (force_method 2 / 3) and the decoherence rates
-                     (decoherence_times_type 2 / 4 / 5) take their density-matrix forms tr(A rho) there,
-                     sanity_check refuses the other readers (tsh_method 5, decoherence_algo other than
-                     -1 / 9), an explicit
+                     (decoherence_times_type 2 / 4 / 5) take their density-matrix forms tr(A rho) there, the
+                     collapse-type corrections (decoherence_algo 0 / 1 / 3 / 4 / 7 / 8) and DISH (tsh_method 5)
+                     act on the propagated adiabatic density under 3 and are refused under 2 (its adiabatic
+                     density is derived),
+                     SHXF / MQCXF (5 / 6) are refused under 2 and 3, an explicit
                      Cadi / Cdia / q_mm / p_mm in properties_to_save is refused and the default list drops them
                 - 4: MMST adiabatic representation, wfc - reserved, not implemented (rejected by
                      sanity_check - use rep_tdse 1 with force_method 2 and sqc_gamma)

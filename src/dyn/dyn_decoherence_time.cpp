@@ -649,5 +649,39 @@ vector<MATRIX> Gu_Franco_dm(dyn_control_params &prms, vector<CMATRIX> &dm_adi) {
   return Gu_Franco_dm(prms, ptrs);
 }
 
+
+MATRIX coherence_intervals_dm(CMATRIX &rho, MATRIX &rates) {
+  /** The density form of coherence_intervals(Coeff, rates): the populations rho_jj in place of |c_j|^2
+      (the amplitude form builds the density itself) */
+  int nstates = rho.n_rows;
+  MATRIX tau_m(nstates, 1);
+  for (int i = 0; i < nstates; i++) {
+    double summ = 0.0;
+    for (int j = 0; j < nstates; j++) {
+      if (j != i) { summ += rho.get(j, j).real() * rates.get(i, j); }
+    }
+    if (summ > 0.0) { tau_m.set(i, 0, 1.0 / summ); }
+    else { tau_m.set(i, 0, 1.0e+25); }
+  }
+  return tau_m;
+}
+
+MATRIX coherence_intervals_dm(vector<CMATRIX *> &dm, vector<MATRIX> &rates) {
+  /** The density form of the multi-trajectory coherence_intervals: MATRIX(nstates, ntraj) */
+  int ntraj = dm.size();
+  if (static_cast<std::size_t>(ntraj) != rates.size()) {
+    cout << "ERROR in coherence_intervals_dm: the ntraj dimensions do not agree for the densities (" << ntraj
+         << ") and rates (" << rates.size() << ")\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  int nstates = (ntraj > 0) ? dm[0]->n_rows : 0;
+  MATRIX res(nstates, ntraj);
+  for (int traj = 0; traj < ntraj; traj++) {
+    MATRIX tau_m(coherence_intervals_dm(*dm[traj], rates[traj]));
+    for (int i = 0; i < nstates; i++) { res.set(i, traj, tau_m.get(i, 0)); }
+  }
+  return res;
+}
+
 } // namespace libdyn
 } // namespace liblibra

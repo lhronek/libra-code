@@ -49,6 +49,18 @@ CMATRIX sdm(CMATRIX& Coeff, double dt, vector<int>& act_st, vector<MATRIX>& deco
 void project_out(CMATRIX& Coeff, int traj, int i);
 void collapse(CMATRIX& Coeff, int traj, int i, int collapse_option);
 void collapse_dm(CMATRIX* dm, int i);
+// the density-matrix forms of the collapse-type corrections - rep_tdse 3 acts on dyn_variables::dm_adi
+void collapse_dm(CMATRIX& rho, int i);
+void project_out_dm(CMATRIX& rho, int i);
+void sdm_dm(CMATRIX& rho, double dt, int act_st, MATRIX& decoh_rates, double tol);
+void sdm_dm(vector<CMATRIX*>& dm, double dt, vector<int>& act_st, vector<MATRIX>& decoh_rates, double tol, int isNBRA);
+void instantaneous_decoherence_dm(vector<CMATRIX*>& dm, vector<int>& accepted_states, vector<int>& proposed_states,
+   vector<int>& initial_states, int instantaneous_decoherence_variant, int collapse_option);
+void instantaneous_decoherence_dia_dm(vector<CMATRIX*>& dm, nHamiltonian& ham, vector<int>& accepted_states,
+   vector<int>& proposed_states, vector<int>& initial_states, int instantaneous_decoherence_variant, int collapse_option);
+void bcsh_dm(vector<CMATRIX*>& dm, double dt, vector<int>& act_states, MATRIX& reversal_events);
+void mfsd_dm(MATRIX& p, vector<CMATRIX*>& dm, MATRIX& invM, double dt, vector<int>& act_st, vector<MATRIX>& decoherence_rates,
+   nHamiltonian& ham, Random& rnd, int isNBRA);
 
 void instantaneous_decoherence(CMATRIX& Coeff, 
    vector<int>& accepted_states, vector<int>& proposed_states, vector<int>& initial_states,
@@ -105,6 +117,8 @@ void dephasing_informed_correction(vector<MATRIX>& decoh_rates, vector<CMATRIX>&
 
 MATRIX coherence_intervals(CMATRIX& Coeff, MATRIX& rates);
 MATRIX coherence_intervals(CMATRIX& Coeff, vector<MATRIX>& rates);
+MATRIX coherence_intervals_dm(CMATRIX& rho, MATRIX& rates);
+MATRIX coherence_intervals_dm(vector<CMATRIX*>& dm, vector<MATRIX>& rates);
 
 vector<MATRIX> schwartz_1(dyn_control_params& prms, CMATRIX& amplitudes, nHamiltonian& ham, MATRIX& inv_alp);
 vector<MATRIX> schwartz_1(dyn_control_params& prms, CMATRIX& amplitudes, MATRIX& p, nHamiltonian& ham, MATRIX& inv_alp);
@@ -136,6 +150,9 @@ vector<int> dish(dyn_variables& dyn_var, nHamiltonian& ham,
 void dish_rev2023(dyn_variables& dyn_var, nHamiltonian& ham,
                   vector<MATRIX>& decoherence_rates,
                   dyn_control_params& prms,Random& rnd);
+// the density forms on dyn_var.dm_adi (rep_tdse 3)
+vector<int> dish_dm(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates, dyn_control_params& prms, Random& rnd);
+void dish_rev2023_dm(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates, dyn_control_params& prms, Random& rnd);
 
 /*
 int ida(CMATRIX& Coeff, int old_st, int new_st, double E_old, double E_new, double T, double ksi);

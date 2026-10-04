@@ -329,24 +329,31 @@ void dyn_control_params::sanity_check(){
   }
 
   /// the density-matrix representations propagate the density matrix alone - the amplitudes keep their t0
-  /// values (update_amplitudes has nothing to convert there), so every option that reads or rewrites them is
-  /// refused: DISH and the amplitude-acting decoherence corrections (the Ehrenfest and QTSH forces and energies,
-  /// force_method 2 / 3, and the decoherence rates, decoherence_times_type 2 / 4 / 5, take their density-matrix
-  /// forms there)
-  if(rep_tdse==2 || rep_tdse==3){
-    if(tsh_method==5){
-      std::cout<<"Error in dyn_control_params::sanity_check: tsh_method = 5 (DISH) proposes its hops and collapses"
-          <<" from the amplitudes, which rep_tdse = "<<rep_tdse<<" (a density-matrix representation) never updates"
-          <<" after t0 - use another tsh_method, or rep_tdse 1\n";
-      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-    }
-    if(!(decoherence_algo==-1 || decoherence_algo==9)){
-      std::cout<<"Error in dyn_control_params::sanity_check: decoherence_algo = "<<decoherence_algo<<" acts on the"
-          <<" amplitudes (0 SDM, 1 ID-A, 3 BCSH, 4 MFSD, 5 SHXF, 6 MQCXF, 7 DISH rev2023, 8 ID-dia), which"
-          <<" rep_tdse = "<<rep_tdse<<" (a density-matrix representation) never updates after t0 - the density-matrix"
-          <<" representations admit decoherence_algo -1 and 9 (the coherence factors)\n";
-      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-    }
+  /// values (update_amplitudes has nothing to convert there): the Ehrenfest and QTSH forces and energies
+  /// (force_method 2 / 3), the decoherence rates (decoherence_times_type 2 / 4 / 5), the collapse-type corrections
+  /// (decoherence_algo 0 / 1 / 3 / 4 / 7 / 8) and DISH (tsh_method 5) take their density-matrix forms there. The
+  /// corrections and DISH act on the ADIABATIC density, the propagated variable of rep_tdse 3 alone - rep_tdse 2
+  /// derives it from the propagated diabatic one every step (as rep_tdse 0 derives its adiabatic amplitudes), so a
+  /// collapse of it would be lost there. SHXF / MQCXF are written on the amplitudes (auxiliary trajectories and
+  /// phases) and have no density-matrix form
+  if(rep_tdse==2 && tsh_method==5){
+    std::cout<<"Error in dyn_control_params::sanity_check: tsh_method = 5 (DISH) collapses the adiabatic density,"
+        <<" which rep_tdse = 2 derives from the propagated diabatic one every step - the collapses would be lost -"
+        <<" use rep_tdse 3 (the adiabatic density matrix) or 1\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  if(rep_tdse==2 && !(decoherence_algo==-1 || decoherence_algo==9)){
+    std::cout<<"Error in dyn_control_params::sanity_check: decoherence_algo = "<<decoherence_algo<<" acts on the"
+        <<" adiabatic density, which rep_tdse = 2 derives from the propagated diabatic one every step - the diabatic"
+        <<" density-matrix representation admits decoherence_algo -1 and 9 (the coherence factors), the corrections"
+        <<" run under rep_tdse 3 (the adiabatic density matrix) or 1\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  if(rep_tdse==3 && (decoherence_algo==5 || decoherence_algo==6)){
+    std::cout<<"Error in dyn_control_params::sanity_check: decoherence_algo = "<<decoherence_algo<<" (5 SHXF, 6 MQCXF)"
+        <<" is written on the amplitudes (auxiliary trajectories and phases), which rep_tdse = 3 never updates after"
+        <<" t0 - no density-matrix form exists, use rep_tdse 1\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   /// the stochastic reorderings need a random generator, which the

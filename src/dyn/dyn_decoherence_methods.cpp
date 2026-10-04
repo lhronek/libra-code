@@ -1916,5 +1916,258 @@ void propagate_half_xf(dyn_variables &dyn_var, nHamiltonian &Ham,
   *dyn_var.ampl_adi = Coeff;
 }
 
+
+//=============== The density-matrix forms of the collapse-type corrections ===============
+// rep_tdse 3 propagates the adiabatic density matrix alone - its amplitudes keep the t0 values - so the
+// corrections that collapse, project or scale the amplitudes act there on rho = C C^H through these forms,
+// each the amplitude form's map written on the density (the same quantity for a pure state)
+
+void collapse_dm(CMATRIX &rho, int i) {
+  /** The reference form of collapse_dm(CMATRIX*, int): rho -> |i><i| - the density of the collapsed amplitude
+      vector for either collapse_option of collapse() (the phase it keeps or resets is not in the density) */
+  collapse_dm(&rho, i);
+}
+
+void project_out_dm(CMATRIX &rho, int i) {
+  /** The density form of project_out: rho -> (1 - P_i) rho (1 - P_i) / (1 - rho_ii), the zero matrix when the
+      state carries the whole population (the amplitude form yields the zero vector there) */
+  double pi = rho.get(i, i).real();
+  double nrm = 1.0 - pi;
+  if (nrm <= 0.0) { nrm = 0.0; }
+  if (nrm > 0.0) { nrm = 1.0 / nrm; }
+  rho *= nrm;
+  rho.scale(i, -1, 0.0);
+  rho.scale(-1, i, 0.0);
+}
+
+void sdm_dm(CMATRIX &rho, double dt, int act_st, MATRIX &decoh_rates, double tol) {
+  /** The density form of sdm(Coeff, dt, act_st, decoh_rates, tol): the amplitude scalings c_i -> f_i c_i become
+      rho_ij -> f_i f_j rho_ij, with f_i = exp(-dt / tau_i) for the inactive states and f_a = sqrt(p_aa_new / p_aa_old)
+      for the active one - the same checks and messages as the amplitude form */
+  int N = rho.n_rows;
+  double p_aa_old = rho.get(act_st, act_st).real();
+  if (p_aa_old > 1.0 + tol) {
+    cout << "=== Place 1 =====\n";
+    cout << "WARNING in sdm_dm(CMATRIX& rho, double dt, int act_st, MATRIX& decoh_rates):\n";
+    cout << "The population of the active state is larger than 1: p_aa_old = " << p_aa_old << endl;
+    cout << "rho = \n";
+    rho.show_matrix();
+    cout << "act_st = " << act_st << endl;
+    cout << "decoh_rates = \n";
+    decoh_rates.show_matrix();
+    cout << "initial total pop = " << rho.tr().real();
+    rho *= (1.0 / p_aa_old);
+    p_aa_old = 1.0;
+  }
+  if (p_aa_old > 0.0) {
+    vector<double> f(N, 1.0);
+    double inact_st_pop = 0.0;
+    for (int i = 0; i < N; i++) {
+      if (i != act_st) {
+        double itau = decoh_rates.get(i, act_st);
+        f[i] = exp(-dt * itau);
+        inact_st_pop += rho.get(i, i).real() * f[i] * f[i];
+      }
+    }
+    if (inact_st_pop > 1.0) {
+      cout << "=== Place 2 =====\n";
+      cout << "Error in sdm_dm(CMATRIX& rho, double dt, int act_st, MATRIX& decoh_rates):\n";
+      cout << "Total population of inactive states after rescaling is larger than 1: inact_st_pop = " << inact_st_pop << endl;
+      cout << "rho = \n";
+      rho.show_matrix();
+      cout << "act_st = " << act_st << endl;
+      cout << "decoh_rates = \n";
+      decoh_rates.show_matrix();
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    double p_aa_new = 1.0 - inact_st_pop;
+    if (p_aa_new < 0.0) {
+      cout << "=== Place 3 =====\n";
+      cout << "Error in sdm_dm(CMATRIX& rho, double dt, int act_st, MATRIX& decoh_rates):\n";
+      cout << "new population of the active state " << p_aa_new << " is negative...\n";
+      cout << "inact_st_pop = " << inact_st_pop << endl;
+      cout << "p_aa_old = " << p_aa_old << endl;
+      cout << "rho = \n";
+      rho.show_matrix();
+      cout << "act_st = " << act_st << endl;
+      cout << "decoh_rates = \n";
+      decoh_rates.show_matrix();
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    f[act_st] = sqrt(p_aa_new / p_aa_old);
+    for (int i = 0; i < N; i++) {
+      for (int j = 0; j < N; j++) {
+        rho.set(i, j, rho.get(i, j) * (f[i] * f[j]));
+      }
+    }
+  } // if p_aa_old > 0.0
+  double new_norm = rho.tr().real();
+  if (fabs(new_norm - 1.0) > 0.1) {
+    cout << "=== Place 4 =====\n";
+    cout << "Error in sdm_dm(CMATRIX& rho, double dt, int act_st, MATRIX& decoh_rates):\n";
+    cout << "p_aa_old = " << p_aa_old << endl;
+    cout << "rho = \n";
+    rho.show_matrix();
+    cout << "act_st = " << act_st << endl;
+    cout << "decoh_rates = \n";
+    decoh_rates.show_matrix();
+    cout << "new total pop = " << new_norm;
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+}
+
+void sdm_dm(vector<CMATRIX *> &dm, double dt, vector<int> &act_st, vector<MATRIX> &decoh_rates, double tol,
+            int isNBRA) {
+  /** The density form of the multi-trajectory sdm: every trajectory's density in place (isNBRA 1 reads the
+      rates of trajectory 0 for all, as the amplitude form) */
+  int ntraj = dm.size();
+  for (int traj = 0; traj < ntraj; traj++) {
+    int indx = (isNBRA == 1) ? 0 : traj;
+    sdm_dm(*dm[traj], dt, act_st[traj], decoh_rates[indx], tol);
+  }
+}
+
+static void check_id_sizes(const char *fn, int ntraj, vector<int> &accepted_states, vector<int> &proposed_states,
+                           vector<int> &initial_states, int collapse_option) {
+  if (accepted_states.size() != static_cast<std::size_t>(ntraj) || proposed_states.size() != static_cast<std::size_t>(ntraj) ||
+      initial_states.size() != static_cast<std::size_t>(ntraj)) {
+    cout << "ERROR in " << fn << ": the sizes of the state lists (" << accepted_states.size() << ", "
+         << proposed_states.size() << ", " << initial_states.size() << ") and the number of densities (" << ntraj
+         << ") are inconsistent\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  if (!(collapse_option == 0 || collapse_option == 1)) {
+    std::cout << "Error in " << fn << ": collapse_option = " << collapse_option << " has no branch here (implemented: 0, 1)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+}
+
+void instantaneous_decoherence_dm(vector<CMATRIX *> &dm, vector<int> &accepted_states, vector<int> &proposed_states,
+                                  vector<int> &initial_states, int instantaneous_decoherence_variant, int collapse_option) {
+  /** The density form of instantaneous_decoherence: the same variants (0 ID-S, 1 ID-A, 2 ID-C, 3 IDN, 4 ID-F) with
+      collapse_dm and project_out_dm on each trajectory's density */
+  int ntraj = dm.size();
+  check_id_sizes("instantaneous_decoherence_dm", ntraj, accepted_states, proposed_states, initial_states, collapse_option);
+  if (instantaneous_decoherence_variant == 0) {
+    for (int traj = 0; traj < ntraj; traj++) {
+      if (accepted_states[traj] != initial_states[traj]) { collapse_dm(*dm[traj], accepted_states[traj]); }
+    }
+  } else if (instantaneous_decoherence_variant == 1) {
+    for (int traj = 0; traj < ntraj; traj++) {
+      if (proposed_states[traj] != initial_states[traj]) {
+        if (accepted_states[traj] == proposed_states[traj]) { collapse_dm(*dm[traj], accepted_states[traj]); }
+        else { collapse_dm(*dm[traj], initial_states[traj]); }
+      }
+    }
+  } else if (instantaneous_decoherence_variant == 2) {
+    for (int traj = 0; traj < ntraj; traj++) { collapse_dm(*dm[traj], accepted_states[traj]); }
+  } else if (instantaneous_decoherence_variant == 3) {
+    for (int traj = 0; traj < ntraj; traj++) {
+      if (proposed_states[traj] != initial_states[traj]) {
+        if (accepted_states[traj] == proposed_states[traj]) { collapse_dm(*dm[traj], accepted_states[traj]); }
+        else { project_out_dm(*dm[traj], proposed_states[traj]); }
+      }
+    }
+  } else if (instantaneous_decoherence_variant == 4) {
+    for (int traj = 0; traj < ntraj; traj++) {
+      if (proposed_states[traj] != initial_states[traj]) {
+        if (accepted_states[traj] != proposed_states[traj]) { project_out_dm(*dm[traj], proposed_states[traj]); }
+      }
+    }
+  } else {
+    std::cout << "Error in instantaneous_decoherence_dm(): instantaneous_decoherence_variant = " << instantaneous_decoherence_variant
+              << " has no branch here (implemented: 0, 1, 2, 3, 4)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+}
+
+void instantaneous_decoherence_dia_dm(vector<CMATRIX *> &dm, nHamiltonian &ham, vector<int> &accepted_states,
+                                      vector<int> &proposed_states, vector<int> &initial_states,
+                                      int instantaneous_decoherence_variant, int collapse_option) {
+  /** The density form of instantaneous_decoherence_dia - like its amplitude form it collapses the adiabatic
+      density exactly as instantaneous_decoherence does for the variants 0 / 1 / 2 and reads nothing from ham */
+  int ntraj = dm.size();
+  check_id_sizes("instantaneous_decoherence_dia_dm", ntraj, accepted_states, proposed_states, initial_states, collapse_option);
+  if (instantaneous_decoherence_variant == 0 || instantaneous_decoherence_variant == 1 || instantaneous_decoherence_variant == 2) {
+    instantaneous_decoherence_dm(dm, accepted_states, proposed_states, initial_states, instantaneous_decoherence_variant, collapse_option);
+  } else {
+    std::cout << "Error in instantaneous_decoherence_dia_dm(): instantaneous_decoherence_variant = " << instantaneous_decoherence_variant
+              << " has no branch here (implemented: 0, 1, 2)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+}
+
+void bcsh_dm(vector<CMATRIX *> &dm, double dt, vector<int> &act_states, MATRIX &reversal_events) {
+  /** The density form of bcsh: a reversing active state collapses the density onto itself, otherwise every
+      reversing inactive state is projected out */
+  int ntraj = dm.size();
+  for (int itraj = 0; itraj < ntraj; itraj++) {
+    int nadi = dm[itraj]->n_rows;
+    int a = act_states[itraj];
+    if (reversal_events.get(a, itraj) > 0) {
+      collapse_dm(*dm[itraj], a);
+    } else {
+      for (int i = 0; i < nadi; i++) {
+        if (i != a && reversal_events.get(i, itraj) > 0) { project_out_dm(*dm[itraj], i); }
+      }
+    }
+  }
+}
+
+void mfsd_dm(MATRIX &p, vector<CMATRIX *> &dm, MATRIX &invM, double dt, vector<int> &act_states,
+             vector<MATRIX> &decoherence_rates, nHamiltonian &ham, Random &rnd, int isNBRA) {
+  /** The density form of mfsd: the collapse probabilities from rho_ii, the energies before and after the
+      collapse from Ehrenfest_energy_adi_dm, the same random draws, momentum rescaling and active-state update */
+  int idof;
+  int ntraj = dm.size();
+  int ndof = ham.nnucl;
+  for (int itraj = 0; itraj < ntraj; itraj++) {
+    CMATRIX &rho = *dm[itraj];
+    int nadi = rho.n_rows;
+    double ksi = rnd.uniform(0.0, 1.0);
+    vector<int> proposed_states;
+    vector<double> hopping_prob;
+    double summ_prob = 0.0;
+    for (int i = 0; i < nadi; i++) {
+      double P_i = rho.get(i, i).real() * decoherence_rates[(isNBRA == 1) ? 0 : itraj].get(i, i) * dt;
+      if (ksi < P_i) {
+        proposed_states.push_back(i);
+        hopping_prob.push_back(P_i);
+        summ_prob += P_i;
+      }
+    }
+    if (summ_prob > 0.0) {
+      for (auto i = 0u; i < proposed_states.size(); i++) { hopping_prob[i] /= summ_prob; }
+      int indx_i = hop(hopping_prob, rnd.uniform(0.0, 1.0));
+      int decohered_state = proposed_states[indx_i];
+      vector<int> _id(2, 0);
+      _id[1] = itraj;
+      double E_old = ham.Ehrenfest_energy_adi_dm(rho, _id).real();
+      CMATRIX rho_tmp(rho);
+      collapse_dm(rho_tmp, decohered_state);
+      double E_new = ham.Ehrenfest_energy_adi_dm(rho_tmp, _id).real();
+      MATRIX nac_eff(ndof, 1);
+      MATRIX p_i(ndof, 1);
+      for (int i = 0; i < nadi; i++) {
+        double P_i = rho.get(i, i).real();
+        for (idof = 0; idof < ndof; idof++) {
+          if (i != decohered_state) {
+            nac_eff.add(idof, 0, P_i * ham.get_dc1_adi(idof, _id).get(i, decohered_state).real());
+          }
+        }
+      }
+      p_i = p.col(itraj);
+      double nac_mag = (nac_eff.T() * nac_eff).get(0, 0);
+      if (can_rescale_along_vector(E_old, E_new, p_i, invM, nac_eff) && nac_mag > 0.0) {
+        int do_reverse = 0;
+        rescale_along_vector(E_old, E_new, p_i, invM, nac_eff, do_reverse);
+        for (idof = 0; idof < ndof; idof++) { p.set(idof, itraj, p_i.get(idof, 0)); }
+        collapse_dm(rho, decohered_state);
+        act_states[itraj] = decohered_state;
+      }
+    }
+  }
+}
+
 } // namespace libdyn
 } // namespace liblibra

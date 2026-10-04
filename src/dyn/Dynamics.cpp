@@ -2771,8 +2771,11 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       *dyn_var.ampl_adi =
           sdm(*dyn_var.ampl_adi, prms.dt, dyn_var.act_states, decoherence_rates,
               prms.sdm_norm_tolerance, prms.isNBRA);
+    } else if (prms.rep_tdse == 3) {
+      // the adiabatic density is the propagated variable there
+      sdm_dm(dyn_var.dm_adi, prms.dt, dyn_var.act_states, decoherence_rates, prms.sdm_norm_tolerance, prms.isNBRA);
     } else {
-      cout << "ERROR: SDM/mSDM requires rep_tdse = 1\n";
+      cout << "ERROR: SDM/mSDM requires rep_tdse = 1 or 3\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else if (prms.decoherence_algo ==
@@ -2790,8 +2793,11 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       wp_reversal_events(dyn_var, ham, prms.dt);
       *dyn_var.ampl_adi = bcsh(*dyn_var.ampl_adi, prms.dt, dyn_var.act_states,
                                *dyn_var.reversal_events);
+    } else if (prms.rep_tdse == 3) {
+      wp_reversal_events(dyn_var, ham, prms.dt);
+      bcsh_dm(dyn_var.dm_adi, prms.dt, dyn_var.act_states, *dyn_var.reversal_events);
     } else {
-      cout << "ERROR: BCSH requires rep_tdse = 1\n";
+      cout << "ERROR: BCSH requires rep_tdse = 1 or 3\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
@@ -2809,8 +2815,13 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       // Recompute NAC, Hvib, etc. in response to change of p
       update_Hamiltonian_variables(prms, dyn_var, ham, ham_aux, py_funct,
                                    params, 1);
+    } else if (prms.rep_tdse == 3) {
+      p = *dyn_var.p;
+      mfsd_dm(p, dyn_var.dm_adi, *dyn_var.iM, prms.dt, dyn_var.act_states, decoherence_rates, ham, rnd, prms.isNBRA);
+      *dyn_var.p = p;
+      update_Hamiltonian_variables(prms, dyn_var, ham, ham_aux, py_funct, params, 1);
     } else {
-      cout << "ERROR: MFSD requires rep_tdse = 1\n";
+      cout << "ERROR: MFSD requires rep_tdse = 1 or 3\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
@@ -2835,7 +2846,9 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
 
   // DISH, rev2023
   else if (prms.decoherence_algo == 7) {
-    dish_rev2023(dyn_var, ham, decoherence_rates, prms, rnd);
+    // rep_tdse 3 propagates the adiabatic density - the collapses act on it
+    if (prms.rep_tdse == 3) { dish_rev2023_dm(dyn_var, ham, decoherence_rates, prms, rnd); }
+    else { dish_rev2023(dyn_var, ham, decoherence_rates, prms, rnd); }
   }
 
 
@@ -2999,9 +3012,12 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
           instantaneous_decoherence(
               *dyn_var.ampl_adi, act_states, prop_states, old_states,
               prms.instantaneous_decoherence_variant, prms.collapse_option);
+        } else if (prms.rep_tdse == 3) {
+          instantaneous_decoherence_dm(dyn_var.dm_adi, act_states, prop_states, old_states,
+                                       prms.instantaneous_decoherence_variant, prms.collapse_option);
         } else {
           cout << "ERROR: Instantaneous Decoherence requires rep_tdse = "
-                  "1\n";
+                  "1 or 3\n";
           std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
       }
@@ -3039,9 +3055,12 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
           instantaneous_decoherence_dia(
               *dyn_var.ampl_adi, ham, act_states, prop_states, old_states,
               prms.instantaneous_decoherence_variant, prms.collapse_option);
+        } else if (prms.rep_tdse == 3) {
+          instantaneous_decoherence_dia_dm(dyn_var.dm_adi, ham, act_states, prop_states, old_states,
+                                           prms.instantaneous_decoherence_variant, prms.collapse_option);
         } else {
           cout << "ERROR: Instantaneous Decoherence requires rep_tdse = "
-                  "1\n";
+                  "1 or 3\n";
           std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
       } // algo == 8
@@ -3067,7 +3086,9 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
                 "= -1\n";
         std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
-      act_states = dish(dyn_var, ham, decoherence_rates, prms, rnd);
+      // rep_tdse 3 propagates the adiabatic density - DISH collapses and projects it
+      if (prms.rep_tdse == 3) { act_states = dish_dm(dyn_var, ham, decoherence_rates, prms, rnd); }
+      else { act_states = dish(dyn_var, ham, decoherence_rates, prms, rnd); }
       // the proposals DISH refused stay inside dish - no frustrated hop reaches the rescaling
       prop_states = act_states;
     } // DISH

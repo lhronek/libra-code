@@ -444,6 +444,12 @@ void export_dyn_decoherence_objects(){
 
   void (*expt_collapse_v1)(CMATRIX& Coeff, int traj, int i, int collapse_option) = &collapse;
   def("collapse", expt_collapse_v1);
+  void (*expt_collapse_dm_v1)(CMATRIX& rho, int i) = &collapse_dm;
+  def("collapse_dm", expt_collapse_dm_v1);
+  void (*expt_project_out_dm_v1)(CMATRIX& rho, int i) = &project_out_dm;
+  def("project_out_dm", expt_project_out_dm_v1);
+  void (*expt_sdm_dm_v1)(CMATRIX& rho, double dt, int act_st, MATRIX& decoh_rates, double tol) = &sdm_dm;
+  def("sdm_dm", expt_sdm_dm_v1);
 
   void (*expt_instantaneous_decoherence_v1)(CMATRIX& Coeff, 
   vector<int>& accepted_states, vector<int>& proposed_states, vector<int>& initial_states,
@@ -538,6 +544,8 @@ void export_dyn_decoherence_objects(){
 
   MATRIX (*expt_coherence_intervals_v2)(CMATRIX& Coeff, vector<MATRIX>& rates) = &coherence_intervals;
   def("coherence_intervals", expt_coherence_intervals_v2);
+  MATRIX (*expt_coherence_intervals_dm_v1)(CMATRIX& rho, MATRIX& rates) = &coherence_intervals_dm;
+  def("coherence_intervals_dm", expt_coherence_intervals_dm_v1);
 
 
   vector<MATRIX> (*expt_schwartz_1_v1)
