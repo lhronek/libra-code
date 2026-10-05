@@ -235,7 +235,7 @@ def load(dyn_general):
     dyn_general.update({"decoherence_times_type":5 })
 
     #================ Decoherence time parameters ===================    
-    # For "decoherence_times_type":5
+    # For "decoherence_times_type":1
     dyn_general.update( { "decoherence_C_param": 1.0, "decoherence_eps_param":0.1 } )
    
     # For "decoherence_times_type":2 and "decoherence_times_type":3, "decoherence_times_type":4
@@ -249,9 +249,8 @@ def load(dyn_general):
     B = MATRIX(1,1); B.set(0,0, 1.0)
     dyn_general.update( { "schwartz_interaction_width":B } )
 
-    #Reorganization energy of the bath, Ha  - for "decoherence_times_type":5
-    #default: 0.0 Ha
-    dyn_general.update( { "reorg_eergy":0.0 } )
+    #Reorganization energy of the bath, Ha - the lambda of the Gu-Franco rates ("decoherence_times_type":5), set by
+    #the caller together with Temperature - there is no physical default and 0.0 is refused
 
     #A flag to apply the dephasing-informed approach of Sifain et al 
     #to correct dephasing times: 
