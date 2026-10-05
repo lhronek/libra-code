@@ -989,8 +989,14 @@ static vector<MATRIX> compute_decoherence_rates(dyn_control_params &prms, dyn_va
   if (prms.decoherence_times_type == -1) {
     for (int traj = 0; traj < ntraj1; traj++) { rates[traj] = 0.0; }
   }
-  /// Just use the plain times given from the input, usually the mSDM formalism
+  /// Just use the plain times given from the input, usually the mSDM formalism - in the shape of the basis
   else if (prms.decoherence_times_type == 0) {
+    if (prms.decoherence_rates->n_rows != nst || prms.decoherence_rates->n_cols != nst) {
+      std::cout << "Error in compute_decoherence_rates(): decoherence_rates is " << prms.decoherence_rates->n_rows << " x "
+                << prms.decoherence_rates->n_cols << " - the " << ((rep == 1) ? "adiabatic" : "diabatic")
+                << " rates (decoherence_times_type 0) need " << nst << " x " << nst << "\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
     for (int traj = 0; traj < ntraj1; traj++) { rates[traj] = *prms.decoherence_rates; }
   }
   /// Compute the dephasing rates according the original energy-based formalism
