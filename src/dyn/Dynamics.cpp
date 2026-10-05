@@ -2510,16 +2510,28 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   // updates the basis re-projection matrices
   for (i = 0; i < num_el; i++) {
     if (prms.decoherence_algo == 5 or prms.decoherence_algo == 6) {
-      update_ham_xf(dyn_var);
-      propagate_half_xf(dyn_var, ham, prms);
+      // rep_tdse 3 propagates the adiabatic density - the XF half step acts on it
+      if (prms.rep_tdse == 3) {
+        update_ham_xf_dm(dyn_var);
+        propagate_half_xf_dm(dyn_var, ham, prms);
+      } else {
+        update_ham_xf(dyn_var);
+        propagate_half_xf(dyn_var, ham, prms);
+      }
     }
 
     propagate_electronic(dyn_var, ham, ham_aux, prms, i);
 
     if (prms.decoherence_algo == 5 or prms.decoherence_algo == 6) {
       rotate_nab_phase(dyn_var, ham, prms);
-      update_ham_xf(dyn_var);
-      propagate_half_xf(dyn_var, ham, prms);
+      // rep_tdse 3 propagates the adiabatic density - the XF half step acts on it
+      if (prms.rep_tdse == 3) {
+        update_ham_xf_dm(dyn_var);
+        propagate_half_xf_dm(dyn_var, ham, prms);
+      } else {
+        update_ham_xf(dyn_var);
+        propagate_half_xf(dyn_var, ham, prms);
+      }
     }
   }
 
@@ -2600,7 +2612,8 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   //
 
   if (prms.decoherence_algo == 6 and prms.use_xf_force == 1) {
-    update_forces_xf(dyn_var, ham, ham_aux);
+    if (prms.rep_tdse == 3) { update_forces_xf_dm(dyn_var, ham, ham_aux); }
+    else { update_forces_xf(dyn_var, ham, ham_aux); }
   }
 
   //  // NVT dynamics
@@ -2829,8 +2842,10 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   else if (prms.decoherence_algo == 5) {
     if (prms.rep_tdse == 1) {
       shxf(dyn_var, ham, ham_aux, prms);
+    } else if (prms.rep_tdse == 3) {
+      shxf_dm(dyn_var, ham, ham_aux, prms);
     } else {
-      cout << "ERROR: SHXF requires rep_tdse = 1\n";
+      cout << "ERROR: SHXF requires rep_tdse = 1 or 3\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
@@ -2838,8 +2853,10 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   else if (prms.decoherence_algo == 6) {
     if (prms.rep_tdse == 1) {
       mqcxf(dyn_var, ham, ham_aux, prms);
+    } else if (prms.rep_tdse == 3) {
+      mqcxf_dm(dyn_var, ham, ham_aux, prms);
     } else {
-      cout << "ERROR: MQCXF requires rep_tdse = 1\n";
+      cout << "ERROR: MQCXF requires rep_tdse = 1 or 3\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }

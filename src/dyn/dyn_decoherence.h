@@ -61,6 +61,14 @@ void instantaneous_decoherence_dia_dm(vector<CMATRIX*>& dm, nHamiltonian& ham, v
 void bcsh_dm(vector<CMATRIX*>& dm, double dt, vector<int>& act_states, MATRIX& reversal_events);
 void mfsd_dm(MATRIX& p, vector<CMATRIX*>& dm, MATRIX& invM, double dt, vector<int>& act_st, vector<MATRIX>& decoherence_rates,
    nHamiltonian& ham, Random& rnd, int isNBRA);
+// the density-matrix forms of SHXF and MQCXF (rep_tdse 3)
+void xf_destroy_AT_dm(dyn_variables& dyn_var, double threshold);
+void xf_destroy_AT_dm(dyn_variables& dyn_var, nHamiltonian& ham, double threshold);
+void shxf_dm(dyn_variables& dyn_var, nHamiltonian& ham, nHamiltonian& ham_prev, dyn_control_params& prms);
+void mqcxf_dm(dyn_variables& dyn_var, nHamiltonian& ham, nHamiltonian& ham_prev, dyn_control_params& prms);
+void update_ham_xf_dm(dyn_variables& dyn_var);
+void update_forces_xf_dm(dyn_variables& dyn_var, nHamiltonian& ham, nHamiltonian& ham_prev);
+void propagate_half_xf_dm(dyn_variables& dyn_var, nHamiltonian& Ham, dyn_control_params& prms);
 
 void instantaneous_decoherence(CMATRIX& Coeff, 
    vector<int>& accepted_states, vector<int>& proposed_states, vector<int>& initial_states,

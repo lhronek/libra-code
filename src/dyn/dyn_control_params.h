@@ -61,10 +61,10 @@ class dyn_control_params{
           2 and 3 propagate the density matrix alone - the amplitudes keep their t0 values: the
           Ehrenfest and QTSH forces and energies (force_method 2 / 3) and the decoherence rates
           (decoherence_times_type 2 / 4 / 5) take their density-matrix forms tr(A rho) there, the
-          collapse-type corrections (decoherence_algo 0 / 1 / 3 / 4 / 7 / 8) and DISH (tsh_method 5)
-          act on the propagated adiabatic density under 3 and are refused under 2 (its adiabatic
-          density is derived - as rep_tdse 0 has DISH refused for its derived adiabatic amplitudes),
-          SHXF / MQCXF (5 / 6) are refused under 2 and 3, the python layer
+          collapse-type corrections (decoherence_algo 0 / 1 / 3 / 4 / 7 / 8), SHXF / MQCXF (5 / 6) and
+          DISH (tsh_method 5) act on the propagated adiabatic density under 3 and are refused under 2
+          (its adiabatic density is derived - as rep_tdse 0 has DISH refused for its derived adiabatic
+          amplitudes), the python layer
           refuses an explicit Cadi / Cdia / q_mm / p_mm in properties_to_save and drops them from
           the default list
      - 4: MMST adiabatic representation, wfc - reserved, not implemented (no
