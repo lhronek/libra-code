@@ -448,6 +448,8 @@ class DynControlParams:
     #:    mean-field force comes from the density matrix)
     #:  3 Schwartz - pair-wise-based decoherence, (Schwartz 2), using inv_alpha
     #:  4 Schwartz - mean-field Force-based decoherence (Schwartz 1), but using interaction width (under rep_tdse
+    #:    both Schwartz-1 forms (2 and 4) compare the state forces with the mean-field force without the derivative-coupling
+    #:    term for the bare-energy integrators (0-2, 9-12, 19) and with it otherwise, as ehrenfest_force_option 1 / 0
     #:    2 / 3 from the density matrix as well)
     #:  5 Gu-Franco (|rho_ij| sqrt(4 lambda kB T) - under rep_tdse 2 / 3 read from the density matrix)
     decoherence_times_type: int = -1

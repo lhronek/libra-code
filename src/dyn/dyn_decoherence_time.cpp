@@ -296,6 +296,18 @@ static int rates_basis_count(nHamiltonian &ham, int rep, const char *fn) {
   std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
 }
 
+static int schwartz_force_option(dyn_control_params &prms) {
+  /**
+    The option of the mean-field force the Schwartz-1 rates compare the state forces with: without the derivative-coupling
+    term for the bare-energy integrators (0-2, 9-12 and 19 - the rotation projector family), with it otherwise - the
+    convention of ehrenfest_force_option 1 / 0, one rule for the inv_alpha and the interaction-width forms and their
+    density twins
+  */
+  int e = prms.electronic_integrator;
+  if (e == 0 || e == 1 || e == 2 || e == 9 || e == 10 || e == 11 || e == 12 || e == 19) { return 1; }
+  return 0;
+}
+
 vector<MATRIX> schwartz_1(dyn_control_params &prms, CMATRIX &amplitudes,
                           nHamiltonian &ham, MATRIX &inv_alp, int rep) {
   /**
@@ -326,13 +338,7 @@ vector<MATRIX> schwartz_1(dyn_control_params &prms, CMATRIX &amplitudes,
   /// F_mf = ham.Ehrenfest_forces_adi(amplitudes, 1).real();
   /// //aux_get_forces(prms_mf, amplitudes, projectors, act_states, ham);
 
-  int option = 0; // default value for NAC-based integrators
-  if (prms.electronic_integrator == 0 || prms.electronic_integrator == 1 ||
-      prms.electronic_integrator == 2 || prms.electronic_integrator == 9 ||
-      prms.electronic_integrator == 10 || prms.electronic_integrator == 11 ||
-      prms.electronic_integrator == 12 || prms.electronic_integrator == 19) {
-    option = 1;
-  }
+  int option = schwartz_force_option(prms);
 
   F_mf = (rep == 1) ? ham.Ehrenfest_forces_adi(amplitudes, 1, option).real()
                     : ham.Ehrenfest_forces_dia(amplitudes, 1, option).real();
@@ -396,15 +402,7 @@ vector<MATRIX> schwartz_1(dyn_control_params &prms, CMATRIX &amplitudes,
   /// F_mf = ham.Ehrenfest_forces_adi(amplitudes, 1).real();
   /// //aux_get_forces(prms_mf, amplitudes, projectors, act_states, ham);
 
-  int option = 0; // default value for NAC-based integrators
-  if (prms.electronic_integrator == 0 || prms.electronic_integrator == 1 ||
-      prms.electronic_integrator == 2 || prms.electronic_integrator == 9 ||
-      prms.electronic_integrator == 10 || prms.electronic_integrator == 11 ||
-      prms.electronic_integrator == 12 || prms.electronic_integrator == 19) {
-    option = 1;
-  }
-
-  option = 0;
+  int option = schwartz_force_option(prms);
   F_mf = (rep == 1) ? ham.Ehrenfest_forces_adi(amplitudes, 1, option).real()
                     : ham.Ehrenfest_forces_dia(amplitudes, 1, option).real();
 
@@ -570,13 +568,7 @@ vector<MATRIX> schwartz_1_dm(dyn_control_params &prms, vector<CMATRIX *> &dm, nH
   MATRIX F_mf(ndof, ntraj);
   MATRIX F_st(ndof, ntraj);
   vector<MATRIX> res(ntraj, MATRIX(nstates, nstates));
-  int option = 0; // default value for NAC-based integrators
-  if (prms.electronic_integrator == 0 || prms.electronic_integrator == 1 ||
-      prms.electronic_integrator == 2 || prms.electronic_integrator == 9 ||
-      prms.electronic_integrator == 10 || prms.electronic_integrator == 11 ||
-      prms.electronic_integrator == 12 || prms.electronic_integrator == 19) {
-    option = 1;
-  }
+  int option = schwartz_force_option(prms);
   F_mf = (rep == 1) ? ham.Ehrenfest_forces_adi_dm(dm, 1, option, 0.0, 1).real()
                     : ham.Ehrenfest_forces_dia_dm(dm, 1, option, 0.0, 1).real();
   for (int i = 0; i < nstates; i++) {
@@ -598,7 +590,7 @@ vector<MATRIX> schwartz_1_dm(dyn_control_params &prms, vector<CMATRIX *> &dm, MA
                              MATRIX &w, int rep) {
   /**
     The density-matrix form of schwartz_1(prms, amplitudes, p, ham, w) - the interaction-width variant, the
-    mean-field force from the per-trajectory densities (option 0 as the amplitude form takes it)
+    mean-field force from the per-trajectory densities with the option of the integrator family
     dm - ntraj densities CMATRIX(nstates, nstates), p - MATRIX(ndof, ntraj), w - MATRIX(ndof, 1)
   */
   int ndof = ham.nnucl;
@@ -608,7 +600,7 @@ vector<MATRIX> schwartz_1_dm(dyn_control_params &prms, vector<CMATRIX *> &dm, MA
   MATRIX F_mf(ndof, ntraj);
   MATRIX F_st(ndof, ntraj);
   vector<MATRIX> res(ntraj, MATRIX(nstates, nstates));
-  int option = 0;
+  int option = schwartz_force_option(prms);
   F_mf = (rep == 1) ? ham.Ehrenfest_forces_adi_dm(dm, 1, option, 0.0, 1).real()
                     : ham.Ehrenfest_forces_dia_dm(dm, 1, option, 0.0, 1).real();
   for (int i = 0; i < nstates; i++) {

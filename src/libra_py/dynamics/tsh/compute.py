@@ -806,7 +806,9 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                      (under rep_tdse 2 / 3 the mean-field force comes from the density matrix)
                 - 3: Schwartz - pair-wise-based decoherences 
                 - 4: Schwartz - mean-field Force-based decoherence with `schwartz_interaction_width`
-                     (under rep_tdse 2 / 3 from the density matrix as well)
+                     (under rep_tdse 2 / 3 from the density matrix as well) - both Schwartz-1 forms (2 and 4) compare
+                     the state forces with the mean-field force without the derivative-coupling term for the
+                     bare-energy integrators (0-2, 9-12, 19) and with it otherwise, as ehrenfest_force_option 1 / 0
                 - 5: Gu-Franco (|rho_ij| sqrt(4 lambda kB T) - under rep_tdse 2 / 3 read from the density matrix)
 
                 With isNBRA == 1 and ntraj > 1 options 2 and 4 are rejected -

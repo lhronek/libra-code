@@ -716,6 +716,9 @@ class dyn_control_params{
       - 3: Schwartz - pair-wise-based decoherence, (Schwartz 2), using inv_alpha
       - 4: Schwartz - mean-field Force-based decoherence (Schwartz 1), but using interaction width (under
            rep_tdse 2 / 3 from the density matrix as well)
+           - both Schwartz-1 forms (2 and 4) compare the state forces with the mean-field force without the
+           derivative-coupling term for the bare-energy integrators (0-2, 9-12, 19) and with it otherwise, the
+           convention of ehrenfest_force_option 1 / 0
       - 5: Gu-Franco (|rho_ij| sqrt(4 lambda kB T) - under rep_tdse 2 / 3 read from the density matrix)
 
     With isNBRA == 1 and ntraj > 1 options 2 and 4 are rejected -
