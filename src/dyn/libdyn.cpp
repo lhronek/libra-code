@@ -360,6 +360,7 @@ void export_dyn_variables_objects(){
 
 
       .def("update_amplitudes", expt_update_amplitudes_v1)
+      .def("adopt_adiabatic", &dyn_variables::adopt_adiabatic)
       .def("update_amplitudes", expt_update_amplitudes_v2)
       .def("update_amplitudes", expt_update_amplitudes_v3)
       .def("update_amplitudes", expt_update_amplitudes_v4)

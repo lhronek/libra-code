@@ -257,6 +257,39 @@ void dyn_variables::update_amplitudes(dyn_control_params& dyn_params){
 }
 
 
+void dyn_variables::adopt_adiabatic(dyn_control_params& dyn_params){
+/**
+  The write-through of a correction made on the adiabatic variable (a collapse, a projection, an SDM scaling, an
+  XF half step): under rep_tdse 0 the propagated diabatic amplitudes take the corrected adiabatic ones
+  (C_dia = U C_adi, the rep_tdse 1 direction of update_amplitudes), under rep_tdse 2 the propagated diabatic density
+  takes the corrected adiabatic one (rho_dia = U rho_adi U^H, the rep_tdse 3 direction of update_density_matrix) -
+  called right after the correction, before the end-of-step recompute of the adiabatic variable from the propagated
+  one would discard it. Under rep_tdse 1 and 3 the adiabatic variable is the propagated one and nothing is done
+*/
+  int rep = dyn_params.rep_tdse;
+  if(rep==1 || rep==3){ return; }
+  if(rep==0){
+    CMATRIX cd(ndia, 1);
+    CMATRIX ca(nadi, 1);
+    for(int traj=0; traj<ntraj; traj++){
+      CMATRIX& U = (*basis_transform[traj]);
+      ca = ampl_adi->col(traj);
+      cd.product(U, ca);
+      for(int i=0;i<ndia;i++){ ampl_dia->set(i, traj, cd.get(i,0) ); }
+    }
+  }
+  else if(rep==2){
+    for(int traj=0; traj<ntraj; traj++){
+      CMATRIX& U = (*basis_transform[traj]);
+      dm_dia[traj]->product(U, *dm_adi[traj], adjoint(U));
+    }
+  }
+  else{
+    std::cout<<"Error in dyn_variables::adopt_adiabatic(): rep_tdse = "<<rep<<" has no branch here (implemented: 0, 1, 2, 3)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+}
+
 void dyn_variables::update_density_matrix(dyn_control_params& dyn_params){
 /**
     """

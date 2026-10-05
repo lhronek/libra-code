@@ -804,6 +804,7 @@ class dyn_variables{
 
   void update_mm_variables();  ///< q_mm/p_mm from ampl_adi (ampl_adi = (q_mm + i p_mm)/sqrt2)
   void update_amplitudes(dyn_control_params& dyn_params);
+  void adopt_adiabatic(dyn_control_params& dyn_params);   ///< the write-through of a corrected adiabatic variable into the propagated diabatic one (rep_tdse 0 / 2)
   void update_amplitudes(dyn_control_params& dyn_params, nHamiltonian& ham);
   void update_amplitudes(bp::dict dyn_params, nHamiltonian& ham);
   void update_amplitudes(dyn_control_params& dyn_params, bp::object compute_model, bp::dict model_params);

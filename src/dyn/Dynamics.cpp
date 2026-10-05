@@ -2510,7 +2510,9 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   // updates the basis re-projection matrices
   for (i = 0; i < num_el; i++) {
     if (prms.decoherence_algo == 5 or prms.decoherence_algo == 6) {
-      // rep_tdse 3 propagates the adiabatic density - the XF half step acts on it
+      // the XF half step acts on the propagated adiabatic variable - the density under rep_tdse 3, the amplitudes
+      // under 1 (the diabatic representations are refused by sanity_check: interleaved with the propagation, the
+      // half step would see the old state in the new basis there)
       if (prms.rep_tdse == 3) {
         update_ham_xf_dm(dyn_var);
         propagate_half_xf_dm(dyn_var, ham, prms);
@@ -2524,7 +2526,9 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
 
     if (prms.decoherence_algo == 5 or prms.decoherence_algo == 6) {
       rotate_nab_phase(dyn_var, ham, prms);
-      // rep_tdse 3 propagates the adiabatic density - the XF half step acts on it
+      // the XF half step acts on the propagated adiabatic variable - the density under rep_tdse 3, the amplitudes
+      // under 1 (the diabatic representations are refused by sanity_check: interleaved with the propagation, the
+      // half step would see the old state in the new basis there)
       if (prms.rep_tdse == 3) {
         update_ham_xf_dm(dyn_var);
         propagate_half_xf_dm(dyn_var, ham, prms);
@@ -2780,15 +2784,18 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
 
   // SDM and alike methods - only in the adiabatic rep
   if (prms.decoherence_algo == 0) {
-    if (prms.rep_tdse == 1) {
+    if (prms.rep_tdse == 0 || prms.rep_tdse == 1) {
       *dyn_var.ampl_adi =
           sdm(*dyn_var.ampl_adi, prms.dt, dyn_var.act_states, decoherence_rates,
               prms.sdm_norm_tolerance, prms.isNBRA);
-    } else if (prms.rep_tdse == 3) {
-      // the adiabatic density is the propagated variable there
+      // rep_tdse 0 derives its adiabatic amplitudes - the corrected ones are written through into the propagated diabatic ones
+      if (prms.rep_tdse == 0) { dyn_var.adopt_adiabatic(prms); }
+    } else if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
       sdm_dm(dyn_var.dm_adi, prms.dt, dyn_var.act_states, decoherence_rates, prms.sdm_norm_tolerance, prms.isNBRA);
+      // rep_tdse 2 derives its adiabatic density - the corrected one is written through into the propagated diabatic one
+      if (prms.rep_tdse == 2) { dyn_var.adopt_adiabatic(prms); }
     } else {
-      cout << "ERROR: SDM/mSDM requires rep_tdse = 1 or 3\n";
+      std::cout<<"Error in compute_dynamics(): rep_tdse = "<<prms.rep_tdse<<" has no branch here (implemented: 0, 1, 2, 3)\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   } else if (prms.decoherence_algo ==
@@ -2802,39 +2809,47 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   //}
   // BCSH
   else if (prms.decoherence_algo == 3) {
-    if (prms.rep_tdse == 1) {
+    if (prms.rep_tdse == 0 || prms.rep_tdse == 1) {
       wp_reversal_events(dyn_var, ham, prms.dt);
       *dyn_var.ampl_adi = bcsh(*dyn_var.ampl_adi, prms.dt, dyn_var.act_states,
                                *dyn_var.reversal_events);
-    } else if (prms.rep_tdse == 3) {
+      // rep_tdse 0 derives its adiabatic amplitudes - the corrected ones are written through into the propagated diabatic ones
+      if (prms.rep_tdse == 0) { dyn_var.adopt_adiabatic(prms); }
+    } else if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
       wp_reversal_events(dyn_var, ham, prms.dt);
       bcsh_dm(dyn_var.dm_adi, prms.dt, dyn_var.act_states, *dyn_var.reversal_events);
+      // rep_tdse 2 derives its adiabatic density - the corrected one is written through into the propagated diabatic one
+      if (prms.rep_tdse == 2) { dyn_var.adopt_adiabatic(prms); }
     } else {
-      cout << "ERROR: BCSH requires rep_tdse = 1 or 3\n";
+      std::cout<<"Error in compute_dynamics(): rep_tdse = "<<prms.rep_tdse<<" has no branch here (implemented: 0, 1, 2, 3)\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
   // MFSD
   else if (prms.decoherence_algo == 4) {
-    if (prms.rep_tdse == 1) {
+    if (prms.rep_tdse == 0 || prms.rep_tdse == 1) {
       p = *dyn_var.p;
       // cout<<"p before mfsd\n"; dyn_var.p->show_matrix();
       *dyn_var.ampl_adi =
           mfsd(p, *dyn_var.ampl_adi, *dyn_var.iM, prms.dt, dyn_var.act_states,
                decoherence_rates, ham, rnd, prms.isNBRA);
       *dyn_var.p = p;
+      // rep_tdse 0 derives its adiabatic amplitudes - the corrected ones are written through into the propagated diabatic ones
+      if (prms.rep_tdse == 0) { dyn_var.adopt_adiabatic(prms); }
       // cout<<"p after mfsd\n"; dyn_var.p->show_matrix();
 
       // Recompute NAC, Hvib, etc. in response to change of p
       update_Hamiltonian_variables(prms, dyn_var, ham, ham_aux, py_funct,
                                    params, 1);
-    } else if (prms.rep_tdse == 3) {
+    } else if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
       p = *dyn_var.p;
       mfsd_dm(p, dyn_var.dm_adi, *dyn_var.iM, prms.dt, dyn_var.act_states, decoherence_rates, ham, rnd, prms.isNBRA);
       *dyn_var.p = p;
+      // rep_tdse 2 derives its adiabatic density - the corrected one is written through into the propagated diabatic one
+      if (prms.rep_tdse == 2) { dyn_var.adopt_adiabatic(prms); }
       update_Hamiltonian_variables(prms, dyn_var, ham, ham_aux, py_funct, params, 1);
     } else {
-      cout << "ERROR: MFSD requires rep_tdse = 1 or 3\n";
+      std::cout<<"Error in compute_dynamics(): rep_tdse = "<<prms.rep_tdse<<" has no branch here (implemented: 0, 1, 2, 3)\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
@@ -2845,7 +2860,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
     } else if (prms.rep_tdse == 3) {
       shxf_dm(dyn_var, ham, ham_aux, prms);
     } else {
-      cout << "ERROR: SHXF requires rep_tdse = 1 or 3\n";
+      std::cout<<"Error in compute_dynamics(): rep_tdse = "<<prms.rep_tdse<<" has no branch here (implemented: 1, 3 - the XF half step is interleaved with the adiabatic propagation, sanity_check refuses 0 and 2)\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
@@ -2856,16 +2871,22 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
     } else if (prms.rep_tdse == 3) {
       mqcxf_dm(dyn_var, ham, ham_aux, prms);
     } else {
-      cout << "ERROR: MQCXF requires rep_tdse = 1 or 3\n";
+      std::cout<<"Error in compute_dynamics(): rep_tdse = "<<prms.rep_tdse<<" has no branch here (implemented: 1, 3 - the XF half step is interleaved with the adiabatic propagation, sanity_check refuses 0 and 2)\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
 
   // DISH, rev2023
   else if (prms.decoherence_algo == 7) {
-    // rep_tdse 3 propagates the adiabatic density - the collapses act on it
-    if (prms.rep_tdse == 3) { dish_rev2023_dm(dyn_var, ham, decoherence_rates, prms, rnd); }
-    else { dish_rev2023(dyn_var, ham, decoherence_rates, prms, rnd); }
+    // the density representations act on the adiabatic density, the amplitude ones on the adiabatic amplitudes -
+    // the diabatic ones (0, 2) write the correction through into their propagated variable
+    if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
+      dish_rev2023_dm(dyn_var, ham, decoherence_rates, prms, rnd);
+      if (prms.rep_tdse == 2) { dyn_var.adopt_adiabatic(prms); }
+    } else {
+      dish_rev2023(dyn_var, ham, decoherence_rates, prms, rnd);
+      if (prms.rep_tdse == 0) { dyn_var.adopt_adiabatic(prms); }
+    }
   }
 
 
@@ -3025,16 +3046,17 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
 
       // Instantaneous decoherence
       if (prms.decoherence_algo == 1) {
-        if (prms.rep_tdse == 1) {
+        if (prms.rep_tdse == 0 || prms.rep_tdse == 1) {
           instantaneous_decoherence(
               *dyn_var.ampl_adi, act_states, prop_states, old_states,
               prms.instantaneous_decoherence_variant, prms.collapse_option);
-        } else if (prms.rep_tdse == 3) {
+          if (prms.rep_tdse == 0) { dyn_var.adopt_adiabatic(prms); }
+        } else if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
           instantaneous_decoherence_dm(dyn_var.dm_adi, act_states, prop_states, old_states,
                                        prms.instantaneous_decoherence_variant, prms.collapse_option);
+          if (prms.rep_tdse == 2) { dyn_var.adopt_adiabatic(prms); }
         } else {
-          cout << "ERROR: Instantaneous Decoherence requires rep_tdse = "
-                  "1 or 3\n";
+        std::cout<<"Error in compute_dynamics(): rep_tdse = "<<prms.rep_tdse<<" has no branch here (implemented: 0, 1, 2, 3)\n";
           std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
       }
@@ -3068,16 +3090,17 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       // Experimental: instantaneous decoherence in diabatic basis | TODO: check
       // the compatibility with rep_sh==0
       else if (prms.decoherence_algo == 8) {
-        if (prms.rep_tdse == 1) {
+        if (prms.rep_tdse == 0 || prms.rep_tdse == 1) {
           instantaneous_decoherence_dia(
               *dyn_var.ampl_adi, ham, act_states, prop_states, old_states,
               prms.instantaneous_decoherence_variant, prms.collapse_option);
-        } else if (prms.rep_tdse == 3) {
+          if (prms.rep_tdse == 0) { dyn_var.adopt_adiabatic(prms); }
+        } else if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
           instantaneous_decoherence_dia_dm(dyn_var.dm_adi, ham, act_states, prop_states, old_states,
                                            prms.instantaneous_decoherence_variant, prms.collapse_option);
+          if (prms.rep_tdse == 2) { dyn_var.adopt_adiabatic(prms); }
         } else {
-          cout << "ERROR: Instantaneous Decoherence requires rep_tdse = "
-                  "1 or 3\n";
+        std::cout<<"Error in compute_dynamics(): rep_tdse = "<<prms.rep_tdse<<" has no branch here (implemented: 0, 1, 2, 3)\n";
           std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
       } // algo == 8
@@ -3103,9 +3126,15 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
                 "= -1\n";
         std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
-      // rep_tdse 3 propagates the adiabatic density - DISH collapses and projects it
-      if (prms.rep_tdse == 3) { act_states = dish_dm(dyn_var, ham, decoherence_rates, prms, rnd); }
-      else { act_states = dish(dyn_var, ham, decoherence_rates, prms, rnd); }
+      // the density representations collapse and project the adiabatic density, the amplitude ones the adiabatic
+      // amplitudes - the diabatic ones (0, 2) write the result through into their propagated variable
+      if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
+        act_states = dish_dm(dyn_var, ham, decoherence_rates, prms, rnd);
+        if (prms.rep_tdse == 2) { dyn_var.adopt_adiabatic(prms); }
+      } else {
+        act_states = dish(dyn_var, ham, decoherence_rates, prms, rnd);
+        if (prms.rep_tdse == 0) { dyn_var.adopt_adiabatic(prms); }
+      }
       // the proposals DISH refused stay inside dish - no frustrated hop reaches the rescaling
       prop_states = act_states;
     } // DISH

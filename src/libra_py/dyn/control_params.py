@@ -51,9 +51,11 @@ class DynControlParams:
     #: 3 adiabatic density matrix
     #:   2 and 3 propagate the density matrix alone - the amplitudes keep their t0 values: the Ehrenfest and QTSH
     #:   forces and energies (force_method 2 / 3) and the decoherence rates (decoherence_times_type 2 / 4 / 5) take their
-    #:   density-matrix forms tr(A rho) there, the collapse-type corrections (decoherence_algo 0 / 1 / 3 / 4 / 7 / 8),
-    #:   SHXF / MQCXF (5 / 6) and DISH (tsh_method 5) act on the propagated adiabatic density under 3 and are refused
-    #:   under 2 (its adiabatic density is derived - as rep_tdse 0 has DISH refused for its derived adiabatic amplitudes),
+    #:   density-matrix forms tr(A rho) there, the collapse-type corrections (decoherence_algo 0 / 1 / 3 / 4 / 7 / 8) and
+    #:   DISH (tsh_method 5) act on the adiabatic variable in every representation - the propagated one under 1 and 3, and
+    #:   under 0 and 2 the corrected adiabatic amplitudes or density are written through into the propagated diabatic ones
+    #:   (adopt_adiabatic) before the end-of-step recompute - SHXF / MQCXF (5 / 6) run under 1 and 3 alone (their half step
+    #:   is interleaved with the propagation) -
     #:   an explicit Cadi / Cdia / q_mm / p_mm in properties_to_save is refused
     #:   and the default list drops them
     #: 4 MMST adiabatic wfc - reserved, not implemented (rejected by the C++ sanity_check)
