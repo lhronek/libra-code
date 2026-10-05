@@ -257,6 +257,23 @@ void dyn_variables::update_amplitudes(dyn_control_params& dyn_params){
 }
 
 
+static void check_shape(const char* fn, CMATRIX& x, int nr, int nc){
+  if(x.n_rows != nr || x.n_cols != nc){
+    std::cout<<"Error in dyn_variables::"<<fn<<"(): the matrix is "<<x.n_rows<<" x "<<x.n_cols<<", "<<nr<<" x "<<nc<<" expected\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+}
+static void check_traj(const char* fn, int i, int ntraj){
+  if(i < 0 || i >= ntraj){
+    std::cout<<"Error in dyn_variables::"<<fn<<"(): trajectory "<<i<<" of "<<ntraj<<"\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+}
+void dyn_variables::set_ampl_adi(CMATRIX& x){ check_shape("set_ampl_adi", x, nadi, ntraj); *ampl_adi = x; }
+void dyn_variables::set_ampl_dia(CMATRIX& x){ check_shape("set_ampl_dia", x, ndia, ntraj); *ampl_dia = x; }
+void dyn_variables::set_dm_adi(int i, CMATRIX& x){ check_traj("set_dm_adi", i, ntraj); check_shape("set_dm_adi", x, nadi, nadi); *dm_adi[i] = x; }
+void dyn_variables::set_dm_dia(int i, CMATRIX& x){ check_traj("set_dm_dia", i, ntraj); check_shape("set_dm_dia", x, ndia, ndia); *dm_dia[i] = x; }
+
 void dyn_variables::adopt_adiabatic(dyn_control_params& dyn_params){
 /**
   The write-through of a correction made on the adiabatic variable (a collapse, a projection, an SDM scaling, an

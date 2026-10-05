@@ -738,6 +738,10 @@ class dyn_variables{
 
   CMATRIX get_ampl_adi(){ return *ampl_adi; }
   CMATRIX get_ampl_dia(){ return *ampl_dia; }
+  void set_ampl_adi(CMATRIX& x);   ///< the adiabatic amplitudes, nadi x ntraj - a wrong shape is refused
+  void set_ampl_dia(CMATRIX& x);   ///< the diabatic amplitudes, ndia x ntraj
+  void set_dm_adi(int i, CMATRIX& x);   ///< trajectory i's adiabatic density, nadi x nadi
+  void set_dm_dia(int i, CMATRIX& x);   ///< trajectory i's diabatic density, ndia x ndia
   MATRIX get_q_mm(){ return *q_mm; }
   MATRIX get_p_mm(){ return *p_mm; }
   CMATRIX get_proj_adi(int i){ return *proj_adi[i]; } 

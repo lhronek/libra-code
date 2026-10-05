@@ -407,6 +407,7 @@ void export_nhamiltonian_objects(){
       .def("set_levels", &nHamiltonian::set_levels)
       .def("add_child", &nHamiltonian::add_child)
       .def("add_new_children", &nHamiltonian::add_new_children)
+      .def("child", &nHamiltonian::child, return_internal_reference<>())
       .def("get_full_id", &nHamiltonian::get_full_id)
 
       .def("copy_content", expt_copy_content_v1)
