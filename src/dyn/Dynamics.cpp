@@ -2317,8 +2317,8 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   }
 
   // Defining matrices based on ntraj1
-  vector<CMATRIX> Eadi(ntraj1, CMATRIX(nst, nst));
-  vector<MATRIX> decoherence_rates(ntraj1, MATRIX(nst, nst));
+  vector<CMATRIX> Eadi(ntraj1, CMATRIX(nadi, nadi));          // the adiabatic energies and rates, whatever rep_tdse propagates
+  vector<MATRIX> decoherence_rates(ntraj1, MATRIX(nadi, nadi));
   vector<double> Ekin(ntraj1, 0.0);
   MATRIX gamma(ndof, ntraj);
   MATRIX p_traj(ndof, 1);
