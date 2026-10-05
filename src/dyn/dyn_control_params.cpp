@@ -460,6 +460,20 @@ void dyn_control_params::sanity_check(){
     }
   }
 
+  /// the instantaneous decoherence reads the hops of one basis: decoherence_algo 1 the adiabatic ones (rep_sh 1),
+  /// decoherence_algo 8 the diabatic ones (rep_sh 0, acting on the diabatic variable in the Lowdin frame of the
+  /// diabats) - the cross pairings would act on lists the hopping never updates
+  if(decoherence_algo==1 && rep_sh==0){
+    std::cout<<"Error in dyn_control_params::sanity_check: decoherence_algo = 1 (the instantaneous decoherence in the"
+        <<" adiabatic basis) reads the adiabatic hops, and under rep_sh = 0 the hops are diabatic - use decoherence_algo 8,"
+        <<" its diabatic twin\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  if(decoherence_algo==8 && rep_sh==1){
+    std::cout<<"Error in dyn_control_params::sanity_check: decoherence_algo = 8 (the instantaneous decoherence in the"
+        <<" diabatic basis) reads the diabatic hops, and under rep_sh = 1 the hops are adiabatic - use decoherence_algo 1\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
   /// the time-overlap NAC route builds the couplings with nac_algo 0 (HST)
   /// or 1 (NPI) - with nac_algo -1 it computes nothing and stores zero
