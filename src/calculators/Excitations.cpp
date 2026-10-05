@@ -287,7 +287,7 @@ void compute_excitations(Control_Parameters& prms,Model_Parameters& modprms,Nucl
   delete muy;
   delete muz;
 
-  el_tmp->~Electronic();
+  delete el_tmp;
 
 //  exit(0);
 
