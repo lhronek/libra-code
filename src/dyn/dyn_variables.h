@@ -387,6 +387,7 @@ class dyn_variables{
     For Method: DISH
   */
   MATRIX* coherence_time;
+  MATRIX* coherence_time_dia;   ///< MATRIX(ndia, ntraj) - the coherence counters of the diabatic states, the diabatic DISH (rep_sh 0)
 
 
   ///================= For FSSH2 ===================

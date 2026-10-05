@@ -61,10 +61,11 @@ class dyn_control_params{
           2 and 3 propagate the density matrix alone - the amplitudes keep their t0 values: the
           Ehrenfest and QTSH forces and energies (force_method 2 / 3) and the decoherence rates
           (decoherence_times_type 2 / 4 / 5) take their density-matrix forms tr(A rho) there, the
-          collapse-type corrections (decoherence_algo 0 / 1 / 3 / 4 / 7 / 8) and DISH (tsh_method 5)
-          act on the adiabatic variable in every representation - the propagated one under 1 and 3,
-          and under 0 and 2 the corrected adiabatic amplitudes or density are written through into
-          the propagated diabatic ones (adopt_adiabatic) before the end-of-step recompute - SHXF /
+          collapse-type corrections and DISH act on the variable of their basis in every representation
+          (the adiabatic one for decoherence_algo 0 / 1 / 3 / 4 / 7 and DISH under rep_sh 1, the diabatic
+          one for decoherence_algo 8 and DISH under rep_sh 0) - the propagated one when the representation
+          matches, otherwise the corrected variable is written through into the propagated one
+          (adopt_adiabatic / adopt_diabatic) before the end-of-step recompute - SHXF /
           MQCXF (5 / 6) run under 1 and 3 alone (their half step is interleaved with the propagation),
           the python layer
           refuses an explicit Cadi / Cdia / q_mm / p_mm in properties_to_save and drops them from
@@ -413,7 +414,7 @@ class dyn_control_params{
       - 2: Markov-State Surface Hopping (MSSH)
       - 3: Landau-Zener (LZ) options
       - 4: Zhu-Nakamura (ZN) options
-      - 5: DISH
+      - 5: DISH (in the hopping basis of rep_sh - the adiabatic states under 1, the Lowdin diabatic states under 0)
       - 6: MASH
       - 7: FSSH2
       - 8: FSSH3

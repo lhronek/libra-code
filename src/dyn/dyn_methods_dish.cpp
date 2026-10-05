@@ -95,16 +95,18 @@ vector<int> decoherence_event(MATRIX& coherence_time, MATRIX& coherence_interval
   return decoherence_event(coherence_time, coherence_interval, 0, rnd);
 
 }
-vector<int> dish(dyn_variables& dyn_var, nHamiltonian& ham, 
-                 vector<MATRIX>& decoherence_rates,  dyn_control_params& prms,Random& rnd){
+static vector<int> dish_core(dyn_variables& dyn_var, nHamiltonian& ham, CMATRIX& Coeff, vector<int>& act_states,
+                             MATRIX& coherence_time, vector<MATRIX>& decoherence_rates, dyn_control_params& prms, Random& rnd){
+/**
+  The DISH step on the variable of one hopping basis: Coeff (nst x ntraj) the amplitudes, act_states the active states and
+  coherence_time (nst x ntraj) the coherence counters of that basis, decoherence_rates its rates - dish() hands the adiabatic
+  ones, dish_dia() the Lowdin diabatic ones. where_can_we_hop and accept_hops read the basis from prms.rep_sh
+*/
 
 
     MATRIX& q = *dyn_var.q;
     MATRIX& p = *dyn_var.p;
-    CMATRIX& Coeff = *dyn_var.ampl_adi;
     MATRIX& invM = *dyn_var.iM;
-    vector<int> act_states = dyn_var.act_states;
-    MATRIX& coherence_time = *dyn_var.coherence_time;
 
     /// Advance coherence times
     coherence_time.add(-1, -1, prms.dt);
@@ -290,6 +292,27 @@ vector<int> dish(dyn_variables& dyn_var, nHamiltonian& ham,
 }
 
 
+
+vector<int> dish(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates, dyn_control_params& prms, Random& rnd){
+/** DISH in the adiabatic basis (rep_sh 1): the amplitudes ampl_adi, the lists act_states, the counters coherence_time */
+  return dish_core(dyn_var, ham, *dyn_var.ampl_adi, dyn_var.act_states, *dyn_var.coherence_time, decoherence_rates, prms, rnd);
+}
+
+vector<int> dish_dia(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates, dyn_control_params& prms, Random& rnd){
+/**
+  DISH in the diabatic basis (rep_sh 0): the same step on the Lowdin diabatic amplitudes d = Y c of each trajectory (the frame
+  the diabatic hop machinery hops in, c itself for an identity metric), the diabatic lists act_states_dia, the counters
+  coherence_time_dia and the rates of the diabatic basis - the trajectories an event touched are written back through X,
+  the others keep their amplitudes bit for bit. Returns the new diabatic active states
+*/
+  vector<CMATRIX> X;
+  vector<int> lowdin;
+  CMATRIX d(lowdin_ampl(*dyn_var.ampl_dia, ham, X, lowdin));
+  CMATRIX before(d);
+  vector<int> res(dish_core(dyn_var, ham, d, dyn_var.act_states_dia, *dyn_var.coherence_time_dia, decoherence_rates, prms, rnd));
+  lowdin_ampl_back(*dyn_var.ampl_dia, d, before, X, lowdin);
+  return res;
+}
 
 void dish_rev2023(dyn_variables& dyn_var, nHamiltonian& ham, 
                   vector<MATRIX>& decoherence_rates,
@@ -481,19 +504,17 @@ void dish_project_out_collapse(vector<int>& old_states, vector<int>& proposed_st
 
 
 
-vector<int> dish_dm(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates,
-                    dyn_control_params& prms, Random& rnd){
+static vector<int> dish_dm_core(dyn_variables& dyn_var, nHamiltonian& ham, vector<CMATRIX*>& dm, vector<int>& act_states,
+                                MATRIX& coherence_time, vector<MATRIX>& decoherence_rates, dyn_control_params& prms, Random& rnd){
 /**
-  The density form of dish: rep_tdse 3 propagates the adiabatic density alone, so the coherence intervals, the
-  collapse probabilities, the collapses and the projections act on dyn_var.dm_adi - the same random draws, hop
-  proposals and acceptance as the amplitude form
+  The density form of dish_core: the density-matrix representations propagate the density alone, so the coherence
+  intervals, the collapse probabilities, the collapses and the projections act on the per-trajectory densities dm of the
+  hopping basis (dish_dm hands dm_adi, dish_dia_dm the Lowdin diabatic ones) - the same random draws, hop proposals and
+  acceptance as the amplitude form
 */
-    vector<CMATRIX*>& dm = dyn_var.dm_adi;
-    vector<int> act_states = dyn_var.act_states;
-    MATRIX& coherence_time = *dyn_var.coherence_time;
     coherence_time.add(-1, -1, prms.dt);
     int traj;
-    int nst = dyn_var.nadi;
+    int nst = (dm.size() > 0) ? dm[0]->n_rows : 0;
     int ntraj = dyn_var.ntraj;
     vector<int> old_states(ntraj,-1);
     vector<int> new_states(ntraj,-1);
@@ -553,6 +574,24 @@ vector<int> dish_dm(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& d
       }
     }
     return final_states;
+}
+
+vector<int> dish_dm(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates, dyn_control_params& prms, Random& rnd){
+/** The density form of DISH in the adiabatic basis (rep_sh 1) on dyn_var.dm_adi */
+  return dish_dm_core(dyn_var, ham, dyn_var.dm_adi, dyn_var.act_states, *dyn_var.coherence_time, decoherence_rates, prms, rnd);
+}
+
+vector<int> dish_dia_dm(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates, dyn_control_params& prms, Random& rnd){
+/** The density form of dish_dia on dyn_var.dm_dia: the Lowdin densities rho_L = Y rho Y^H, the touched ones written back through X */
+  vector<CMATRIX> X;
+  vector<int> lowdin;
+  vector<CMATRIX> rho(lowdin_dm(dyn_var.dm_dia, ham, X, lowdin));
+  vector<CMATRIX> before(rho);
+  vector<CMATRIX*> ptrs(rho.size());
+  for(std::size_t traj = 0; traj < rho.size(); traj++){ ptrs[traj] = &rho[traj]; }
+  vector<int> res(dish_dm_core(dyn_var, ham, ptrs, dyn_var.act_states_dia, *dyn_var.coherence_time_dia, decoherence_rates, prms, rnd));
+  lowdin_dm_back(dyn_var.dm_dia, rho, before, X, lowdin);
+  return res;
 }
 
 void dish_rev2023_dm(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates,

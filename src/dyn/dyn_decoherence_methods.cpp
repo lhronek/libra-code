@@ -512,6 +512,87 @@ static void check_id_dia_sizes(const char *fn, int ntraj, vector<int> &accepted_
   }
 }
 
+nHamiltonian *lowdin_child(nHamiltonian &ham, int traj) {
+  /** The trajectory's child Hamiltonian - the shared one under isNBRA (one child), the Hamiltonian itself when it has no children */
+  int nchildren = ham.children.size();
+  return (nchildren > 0) ? ham.children[(traj < nchildren) ? traj : 0] : &ham;
+}
+
+CMATRIX lowdin_ampl(CMATRIX &Coeff, nHamiltonian &ham, vector<CMATRIX> &X, vector<int> &lowdin) {
+  /**
+    The diabatic amplitudes Coeff (ndia x ntraj) in the Lowdin frame of each trajectory's diabats, d = Y c with Y = S^1/2 of the
+    child's ovlp_dia - c itself for an identity metric (lowdin[traj] = 0). X[traj] = S^-1/2 is kept for lowdin_ampl_back
+  */
+  int ndia = Coeff.n_rows;
+  int ntraj = Coeff.n_cols;
+  CMATRIX d(Coeff);
+  CMATRIX Y(ndia, ndia);
+  CMATRIX col(ndia, 1);
+  X.assign(ntraj, CMATRIX(ndia, ndia));
+  lowdin.assign(ntraj, 0);
+  for (int traj = 0; traj < ntraj; traj++) {
+    lowdin[traj] = lowdin_child(ham, traj)->lowdin_dia(X[traj], Y);
+    if (lowdin[traj]) {
+      col = Y * Coeff.col(traj);
+      for (int i = 0; i < ndia; i++) { d.set(i, traj, col.get(i, 0)); }
+    }
+  }
+  return d;
+}
+
+void lowdin_ampl_back(CMATRIX &Coeff, CMATRIX &d, CMATRIX &before, vector<CMATRIX> &X, vector<int> &lowdin) {
+  /**
+    The trajectories whose Lowdin amplitudes d changed against before are written back into Coeff, c = X d - the untouched
+    ones keep their amplitudes bit for bit (X Y c differs from c by roundoff)
+  */
+  int ndia = Coeff.n_rows;
+  int ntraj = Coeff.n_cols;
+  CMATRIX col(ndia, 1);
+  for (int traj = 0; traj < ntraj; traj++) {
+    int changed = 0;
+    for (int i = 0; i < ndia; i++) { if (d.get(i, traj) != before.get(i, traj)) { changed = 1; } }
+    if (!changed) { continue; }
+    col = d.col(traj);
+    if (lowdin[traj]) { col = X[traj] * col; }
+    for (int i = 0; i < ndia; i++) { Coeff.set(i, traj, col.get(i, 0)); }
+  }
+}
+
+vector<CMATRIX> lowdin_dm(vector<CMATRIX *> &dm, nHamiltonian &ham, vector<CMATRIX> &X, vector<int> &lowdin) {
+  /** The per-trajectory diabatic densities in the Lowdin frame, rho_L = Y rho Y^H - rho itself for an identity metric */
+  int ntraj = dm.size();
+  vector<CMATRIX> rho;
+  rho.reserve(ntraj);
+  X.clear();
+  X.reserve(ntraj);
+  lowdin.assign(ntraj, 0);
+  for (int traj = 0; traj < ntraj; traj++) {
+    int n = dm[traj]->n_rows;
+    CMATRIX Xt(n, n);
+    CMATRIX Y(n, n);
+    lowdin[traj] = lowdin_child(ham, traj)->lowdin_dia(Xt, Y);
+    X.push_back(Xt);
+    if (lowdin[traj]) { rho.push_back(Y * (*dm[traj]) * Y.H()); }
+    else { rho.push_back(*dm[traj]); }
+  }
+  return rho;
+}
+
+void lowdin_dm_back(vector<CMATRIX *> &dm, vector<CMATRIX> &rho, vector<CMATRIX> &before, vector<CMATRIX> &X, vector<int> &lowdin) {
+  /** The trajectories whose Lowdin density changed against before are written back, rho = X rho_L X^H - the others untouched */
+  int ntraj = dm.size();
+  for (int traj = 0; traj < ntraj; traj++) {
+    int n = rho[traj].n_rows;
+    int changed = 0;
+    for (int i = 0; i < n; i++) {
+      for (int j = 0; j < n; j++) { if (rho[traj].get(i, j) != before[traj].get(i, j)) { changed = 1; } }
+    }
+    if (!changed) { continue; }
+    if (lowdin[traj]) { *dm[traj] = X[traj] * rho[traj] * X[traj].H(); }
+    else { *dm[traj] = rho[traj]; }
+  }
+}
+
 void instantaneous_decoherence_dia(CMATRIX &Coeff, nHamiltonian &ham, vector<int> &accepted_states,
                                    vector<int> &proposed_states, vector<int> &initial_states,
                                    int instantaneous_decoherence_variant, int collapse_option) {
@@ -527,7 +608,6 @@ void instantaneous_decoherence_dia(CMATRIX &Coeff, nHamiltonian &ham, vector<int
   int ntraj = Coeff.n_cols;
   int ndia = Coeff.n_rows;
   check_id_dia_sizes("instantaneous_decoherence_dia", ntraj, accepted_states, proposed_states, initial_states, collapse_option);
-  int nchildren = ham.children.size();
   CMATRIX X(ndia, ndia);
   CMATRIX Y(ndia, ndia);
   CMATRIX col(ndia, 1);
@@ -535,8 +615,7 @@ void instantaneous_decoherence_dia(CMATRIX &Coeff, nHamiltonian &ham, vector<int
     int kind, state;
     id_event(instantaneous_decoherence_variant, accepted_states[traj], proposed_states[traj], initial_states[traj], kind, state);
     if (kind == 0) { continue; }
-    // the trajectory's child Hamiltonian, the shared one under isNBRA, the Hamiltonian itself when it has no children
-    nHamiltonian *child = (nchildren > 0) ? ham.children[(traj < nchildren) ? traj : 0] : &ham;
+    nHamiltonian *child = lowdin_child(ham, traj);
     int lowdin = child->lowdin_dia(X, Y);
     col = Coeff.col(traj);
     if (lowdin) { col = Y * col; }
@@ -2050,7 +2129,6 @@ void instantaneous_decoherence_dia_dm(vector<CMATRIX *> &dm, nHamiltonian &ham, 
       the collapses and projections on the Lowdin density rho_L = Y rho Y^H, back through X */
   int ntraj = dm.size();
   check_id_dia_sizes("instantaneous_decoherence_dia_dm", ntraj, accepted_states, proposed_states, initial_states, collapse_option);
-  int nchildren = ham.children.size();
   for (int traj = 0; traj < ntraj; traj++) {
     int kind, state;
     id_event(instantaneous_decoherence_variant, accepted_states[traj], proposed_states[traj], initial_states[traj], kind, state);
@@ -2059,7 +2137,7 @@ void instantaneous_decoherence_dia_dm(vector<CMATRIX *> &dm, nHamiltonian &ham, 
     int ndia = rho.n_rows;
     CMATRIX X(ndia, ndia);
     CMATRIX Y(ndia, ndia);
-    nHamiltonian *child = (nchildren > 0) ? ham.children[(traj < nchildren) ? traj : 0] : &ham;
+    nHamiltonian *child = lowdin_child(ham, traj);
     int lowdin = child->lowdin_dia(X, Y);
     if (lowdin) { rho = Y * rho * Y.H(); }
     if (kind == 1) { collapse_dm(rho, state); }

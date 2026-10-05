@@ -212,6 +212,7 @@ void dyn_variables::allocate_dish(){
   if(dish_vars_status==0){
 
     coherence_time = new MATRIX(nadi, ntraj);
+    coherence_time_dia = new MATRIX(ndia, ntraj);
     dish_vars_status = 1;
 
   }
@@ -500,6 +501,7 @@ dyn_variables::dyn_variables(const dyn_variables& x){
 
     // Copy content
     *coherence_time = *x.coherence_time;
+    *coherence_time_dia = *x.coherence_time_dia;
 
   }// if DISH vars
 
@@ -709,6 +711,7 @@ dyn_variables::~dyn_variables(){
 
   if(dish_vars_status==1){
     delete coherence_time;
+    delete coherence_time_dia;
 
     dish_vars_status = 0;
   }

@@ -983,10 +983,16 @@ vector<int> where_can_we_hop(int traj, dyn_variables& dyn_var, nHamiltonian& ham
 //  MATRIX& p = *dyn_var.p;
 //  MATRIX& invM = *dyn_var.iM;
 //  CMATRIX& Coeff = *dyn_var.ampl_adi;
-    vector<int> act_states = dyn_var.act_states;
-
+    // the hopping basis of rep_sh - the adiabatic lists and count under 1, the diabatic ones under 0 (accept_hops reads the same basis)
+    vector<int> act_states;
+    int nstates;
+    if(prms.rep_sh == 1){ act_states = dyn_var.act_states; nstates = dyn_var.nadi; }
+    else if(prms.rep_sh == 0){ act_states = dyn_var.act_states_dia; nstates = dyn_var.ndia; }
+    else{
+      std::cout<<"Error in where_can_we_hop(): rep_sh = "<<prms.rep_sh<<" has no branch here (implemented: 0, 1)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
     int ntraj = act_states.size();
-    int nstates = dyn_var.nadi; // Coeff.n_rows;
 
     vector<int> proposed_states(ntraj, -1);
     vector<int> new_states(ntraj, -1);

@@ -967,6 +967,77 @@ int need_active_states_diff_rep(dyn_control_params &prms) {
   return res;
 }
 
+static vector<MATRIX> compute_decoherence_rates(dyn_control_params &prms, dyn_variables &dyn_var, nHamiltonian &ham, int rep,
+                                                int ntraj1) {
+  /**
+    The decoherence rates of the step in one basis - rep 1 the adiabatic rates (SDM, MFSD, DISH rev2023 and the adiabatic DISH
+    read them), rep 0 the rates of the diabatic DISH (tsh_method 5 under rep_sh 0). decoherence_times_type selects the formula,
+    the basis supplies its energies (ham_adi, the Lowdin diabatic ham_dia), forces, amplitudes and densities (the density-matrix
+    representations hand the propagated densities, their amplitudes keep the t0 values) - the diabatic populations and
+    coherences of Gu-Franco are read in the Lowdin frame of the diabats. ntraj1 is 1 under isNBRA
+  */
+  if (!(rep == 0 || rep == 1)) {
+    std::cout << "Error in compute_decoherence_rates(): rep = " << rep << " has no branch here (implemented: 0, 1)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  int nst = (rep == 1) ? dyn_var.nadi : dyn_var.ndia;
+  int dm_rep = (prms.rep_tdse == 2 || prms.rep_tdse == 3) ? 1 : 0;
+  vector<MATRIX> rates(ntraj1, MATRIX(nst, nst));
+  vector<CMATRIX> X;
+  vector<int> lowdin;
+  /// Effectively turn off decoherence effects
+  if (prms.decoherence_times_type == -1) {
+    for (int traj = 0; traj < ntraj1; traj++) { rates[traj] = 0.0; }
+  }
+  /// Just use the plain times given from the input, usually the mSDM formalism
+  else if (prms.decoherence_times_type == 0) {
+    for (int traj = 0; traj < ntraj1; traj++) { rates[traj] = *prms.decoherence_rates; }
+  }
+  /// Compute the dephasing rates according the original energy-based formalism
+  else if (prms.decoherence_times_type == 1) {
+    vector<CMATRIX> E((rep == 1) ? get_Eadi(ham) : get_Edia(ham));
+    vector<double> Ekin(dyn_var.compute_kinetic_energies());
+    rates = edc_rates(E, Ekin, prms.decoherence_C_param, prms.decoherence_eps_param, prms.isNBRA);
+  }
+  else if (prms.decoherence_times_type == 2) {
+    if (dm_rep) {
+      rates = schwartz_1_dm(prms, (rep == 1) ? dyn_var.dm_adi : dyn_var.dm_dia, ham, *prms.schwartz_decoherence_inv_alpha, rep);
+    } else {
+      rates = schwartz_1(prms, (rep == 1) ? *dyn_var.ampl_adi : *dyn_var.ampl_dia, ham, *prms.schwartz_decoherence_inv_alpha, rep);
+    }
+  }
+  else if (prms.decoherence_times_type == 3) {
+    rates = schwartz_2(prms, ham, *prms.schwartz_decoherence_inv_alpha, rep);
+  }
+  else if (prms.decoherence_times_type == 4) {
+    if (dm_rep) {
+      rates = schwartz_1_dm(prms, (rep == 1) ? dyn_var.dm_adi : dyn_var.dm_dia, *dyn_var.p, ham, *prms.schwartz_interaction_width, rep);
+    } else {
+      rates = schwartz_1(prms, (rep == 1) ? *dyn_var.ampl_adi : *dyn_var.ampl_dia, *dyn_var.p, ham, *prms.schwartz_interaction_width, rep);
+    }
+  }
+  else if (prms.decoherence_times_type == 5) {
+    if (dm_rep) {
+      if (rep == 1) { rates = Gu_Franco_dm(prms, dyn_var.dm_adi); }
+      else { vector<CMATRIX> rho(lowdin_dm(dyn_var.dm_dia, ham, X, lowdin)); rates = Gu_Franco_dm(prms, rho); }
+    } else {
+      if (rep == 1) { rates = Gu_Franco(prms, *dyn_var.ampl_adi); }
+      else { CMATRIX d(lowdin_ampl(*dyn_var.ampl_dia, ham, X, lowdin)); rates = Gu_Franco(prms, d); }
+    }
+  }
+  else {
+    std::cout<<"Error in compute_decoherence_rates(): decoherence_times_type = "<<prms.decoherence_times_type<<" has no branch here (implemented: -1, 0, 1, 2, 3, 4, 5)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  ///== Optionally, apply the dephasing-informed correction - ave_gaps holds the gaps of the same basis ==
+  if (prms.dephasing_informed == 1) {
+    vector<CMATRIX> E((rep == 1) ? get_Eadi(ham) : get_Edia(ham));
+    MATRIX ave_gaps(*prms.ave_gaps);
+    dephasing_informed_correction(rates, E, ave_gaps, prms.isNBRA);
+  }
+  return rates;
+}
+
 static void propagate_amplitudes_adi_exp(int method, double dt, CMATRIX &C,
                                           CMATRIX &T_new, nHamiltonian *ham,
                                           nHamiltonian *ham_prev, int is_ssy,
@@ -2317,9 +2388,8 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   }
 
   // Defining matrices based on ntraj1
-  vector<CMATRIX> Eadi(ntraj1, CMATRIX(nadi, nadi));          // the adiabatic energies and rates, whatever rep_tdse propagates
-  vector<MATRIX> decoherence_rates(ntraj1, MATRIX(nadi, nadi));
-  vector<double> Ekin(ntraj1, 0.0);
+  vector<MATRIX> decoherence_rates;       // the adiabatic rates of the step, nadi x nadi per trajectory - computed below
+  vector<MATRIX> decoherence_rates_dia;   // the diabatic ones, for the diabatic DISH alone
   MATRIX gamma(ndof, ntraj);
   MATRIX p_traj(ndof, 1);
   vector<int> t1(ndof, 0);
@@ -2715,69 +2785,11 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   //exit(0);
 
   //================= Update decoherence rates & times ================
-  /// Effectively turn off decoherence effects
-  if (prms.decoherence_times_type == -1) {
-    for (traj = 0; traj < ntraj1; traj++) {
-      decoherence_rates[traj] = 0.0;
-    }
-  }
-  /// Just use the plain times given from the input, usually the mSDM formalism
-  else if (prms.decoherence_times_type == 0) {
-    for (traj = 0; traj < ntraj1; traj++) {
-      decoherence_rates[traj] = *prms.decoherence_rates;
-    }
-  }
-  /// Compute the dephasing rates according the original energy-based formalism
-  else if (prms.decoherence_times_type == 1) {
-    Eadi = get_Eadi(ham);
-    Ekin = dyn_var.compute_kinetic_energies();
-    decoherence_rates = edc_rates(Eadi, Ekin, prms.decoherence_C_param,
-                                  prms.decoherence_eps_param, prms.isNBRA);
-  }
-
-  else if (prms.decoherence_times_type == 2) {
-    // the density-matrix representations (rep_tdse 2 / 3) hand the propagated densities - their amplitudes
-    // keep the t0 values
-    if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
-      decoherence_rates = schwartz_1_dm(prms, dyn_var.dm_adi, ham, *prms.schwartz_decoherence_inv_alpha);
-    } else {
-      decoherence_rates = schwartz_1(prms, *dyn_var.ampl_adi, ham,
-                                     *prms.schwartz_decoherence_inv_alpha);
-    }
-  }
-
-  else if (prms.decoherence_times_type == 3) {
-    decoherence_rates =
-        schwartz_2(prms, ham, *prms.schwartz_decoherence_inv_alpha);
-  }
-
-  else if (prms.decoherence_times_type == 4) {
-    if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
-      decoherence_rates = schwartz_1_dm(prms, dyn_var.dm_adi, *dyn_var.p, ham, *prms.schwartz_interaction_width);
-    } else {
-      decoherence_rates = schwartz_1(prms, *dyn_var.ampl_adi, *dyn_var.p, ham,
-                                     *prms.schwartz_interaction_width);
-    }
-  }
-
-  else if (prms.decoherence_times_type == 5) {
-    if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
-      decoherence_rates = Gu_Franco_dm(prms, dyn_var.dm_adi);
-    } else {
-      decoherence_rates = Gu_Franco(prms, *dyn_var.ampl_adi);
-    }
-  }
-  else {
-    std::cout<<"Error in compute_dynamics(): decoherence_times_type = "<<prms.decoherence_times_type<<" has no branch here (implemented: -1, 0, 1, 2, 3, 4, 5)\n";
-    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-  }
-
-  ///== Optionally, apply the dephasing-informed correction ==
-  if (prms.dephasing_informed == 1) {
-    Eadi = get_Eadi(ham);
-    MATRIX ave_gaps(*prms.ave_gaps);
-    dephasing_informed_correction(decoherence_rates, Eadi, ave_gaps,
-                                  prms.isNBRA);
+  // the adiabatic rates feed SDM, MFSD, DISH rev2023 and the adiabatic DISH - the diabatic DISH (tsh_method 5 under rep_sh 0)
+  // takes the rates of the diabatic basis
+  decoherence_rates = compute_decoherence_rates(prms, dyn_var, ham, 1, ntraj1);
+  if (prms.tsh_method == 5 && prms.rep_sh == 0) {
+    decoherence_rates_dia = compute_decoherence_rates(prms, dyn_var, ham, 0, ntraj1);
   }
 
   //============ Apply pre-TSH decoherence corrections ==================
@@ -3128,17 +3140,33 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
                 "= -1\n";
         std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
-      // the density representations collapse and project the adiabatic density, the amplitude ones the adiabatic
-      // amplitudes - the diabatic ones (0, 2) write the result through into their propagated variable
-      if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
-        act_states = dish_dm(dyn_var, ham, decoherence_rates, prms, rnd);
-        if (prms.rep_tdse == 2) { dyn_var.adopt_adiabatic(prms); }
+      // DISH hops in the basis of rep_sh. Under rep_sh 1 the density representations collapse and project the adiabatic
+      // density, the amplitude ones the adiabatic amplitudes - the diabatic ones (0, 2) write the result through into their
+      // propagated variable. Under rep_sh 0 the diabatic DISH acts on the Lowdin diabatic variable with the diabatic lists,
+      // counters and rates - ampl_dia (derived under 1, written through into ampl_adi) or dm_dia (derived under 3)
+      if (prms.rep_sh == 1) {
+        if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
+          act_states = dish_dm(dyn_var, ham, decoherence_rates, prms, rnd);
+          if (prms.rep_tdse == 2) { dyn_var.adopt_adiabatic(prms); }
+        } else {
+          act_states = dish(dyn_var, ham, decoherence_rates, prms, rnd);
+          if (prms.rep_tdse == 0) { dyn_var.adopt_adiabatic(prms); }
+        }
+        // the proposals DISH refused stay inside dish - no frustrated hop reaches the rescaling
+        prop_states = act_states;
+      } else if (prms.rep_sh == 0) {
+        if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
+          act_states_dia = dish_dia_dm(dyn_var, ham, decoherence_rates_dia, prms, rnd);
+          if (prms.rep_tdse == 3) { dyn_var.adopt_diabatic(prms); }
+        } else {
+          act_states_dia = dish_dia(dyn_var, ham, decoherence_rates_dia, prms, rnd);
+          if (prms.rep_tdse == 1) { dyn_var.adopt_diabatic(prms); }
+        }
+        prop_states = act_states_dia;
       } else {
-        act_states = dish(dyn_var, ham, decoherence_rates, prms, rnd);
-        if (prms.rep_tdse == 0) { dyn_var.adopt_adiabatic(prms); }
+        std::cout<<"Error in compute_dynamics(): rep_sh = "<<prms.rep_sh<<" has no branch here (implemented: 0, 1)\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
-      // the proposals DISH refused stay inside dish - no frustrated hop reaches the rescaling
-      prop_states = act_states;
     } // DISH
 
     //====================== Momenta adjustment after successful/frustrated hops

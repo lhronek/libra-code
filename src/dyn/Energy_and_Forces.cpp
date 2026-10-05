@@ -606,6 +606,18 @@ vector<CMATRIX> get_Eadi(nHamiltonian& ham){
 
 }
 
+vector<CMATRIX> get_Edia(nHamiltonian& ham){
+/** The diabatic twin of get_Eadi: the Lowdin-frame diabatic Hamiltonian X ham_dia X of every child (ham_dia itself for an
+    identity metric) - the energies the diabatic hopping (hop_acceptance_algo 11) and the diabatic DISH rates read */
+  int nst = ham.ndia;
+  int ntraj = ham.children.size();
+  vector<CMATRIX> Edia(ntraj, CMATRIX(nst, nst));
+  for(int traj=0; traj<ntraj; traj++){
+    Edia[traj] = ham.children[traj]->get_ham_dia_lowdin();
+  }
+  return Edia;
+}
+
 vector<CMATRIX> get_Eadi(nHamiltonian* ham){
 
   int nst = ham->nadi;

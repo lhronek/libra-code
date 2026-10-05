@@ -77,6 +77,12 @@ void instantaneous_decoherence(CMATRIX& Coeff,
 void instantaneous_decoherence_dia(CMATRIX& Coeff, nHamiltonian& ham,
    vector<int>& accepted_states, vector<int>& proposed_states, vector<int>& initial_states,
    int instantaneous_decoherence_variant, int collapse_option);
+// the Lowdin frame of the diabats per trajectory - the diabatic corrections and the diabatic DISH act in it
+nHamiltonian* lowdin_child(nHamiltonian& ham, int traj);
+CMATRIX lowdin_ampl(CMATRIX& Coeff, nHamiltonian& ham, vector<CMATRIX>& X, vector<int>& lowdin);
+void lowdin_ampl_back(CMATRIX& Coeff, CMATRIX& d, CMATRIX& before, vector<CMATRIX>& X, vector<int>& lowdin);
+vector<CMATRIX> lowdin_dm(vector<CMATRIX*>& dm, nHamiltonian& ham, vector<CMATRIX>& X, vector<int>& lowdin);
+void lowdin_dm_back(vector<CMATRIX*>& dm, vector<CMATRIX>& rho, vector<CMATRIX>& before, vector<CMATRIX>& X, vector<int>& lowdin);
 
 CMATRIX afssh_dzdt(CMATRIX& dz, CMATRIX& Hvib, CMATRIX& F, CMATRIX& C, double mass, int act_state);
 void integrate_afssh_moments(CMATRIX& dR, CMATRIX& dP, CMATRIX& Hvib, CMATRIX& F, CMATRIX& C, double mass, int act_state, double dt, int nsteps);
@@ -128,6 +134,10 @@ MATRIX coherence_intervals(CMATRIX& Coeff, vector<MATRIX>& rates);
 MATRIX coherence_intervals_dm(CMATRIX& rho, MATRIX& rates);
 MATRIX coherence_intervals_dm(vector<CMATRIX*>& dm, vector<MATRIX>& rates);
 
+// rep selects the basis of the forces and the state count: 1 adiabatic (the forms without rep), 0 diabatic (the diabatic DISH)
+vector<MATRIX> schwartz_1(dyn_control_params& prms, CMATRIX& amplitudes, nHamiltonian& ham, MATRIX& inv_alp, int rep);
+vector<MATRIX> schwartz_1(dyn_control_params& prms, CMATRIX& amplitudes, MATRIX& p, nHamiltonian& ham, MATRIX& w, int rep);
+vector<MATRIX> schwartz_2(dyn_control_params& prms, nHamiltonian& ham, MATRIX& inv_alp, int rep);
 vector<MATRIX> schwartz_1(dyn_control_params& prms, CMATRIX& amplitudes, nHamiltonian& ham, MATRIX& inv_alp);
 vector<MATRIX> schwartz_1(dyn_control_params& prms, CMATRIX& amplitudes, MATRIX& p, nHamiltonian& ham, MATRIX& inv_alp);
 vector<MATRIX> schwartz_2(dyn_control_params& prms, nHamiltonian& ham, MATRIX& inv_alp);
@@ -136,9 +146,13 @@ vector<MATRIX> schwartz_2(dyn_control_params& prms, nHamiltonian& ham, MATRIX& i
 vector<MATRIX> Gu_Franco(dyn_control_params& prms, CMATRIX& amplitudes);
 // the density-matrix forms of the amplitude-based rates - the density-matrix representations (rep_tdse 2 / 3)
 // hand their per-trajectory densities (dyn_variables::dm_adi), the CMATRIXList forms serve python
+vector<MATRIX> schwartz_1_dm(dyn_control_params& prms, vector<CMATRIX*>& dm, nHamiltonian& ham, MATRIX& inv_alp, int rep);
+vector<MATRIX> schwartz_1_dm(dyn_control_params& prms, vector<CMATRIX*>& dm, MATRIX& p, nHamiltonian& ham, MATRIX& w, int rep);
 vector<MATRIX> schwartz_1_dm(dyn_control_params& prms, vector<CMATRIX*>& dm_adi, nHamiltonian& ham, MATRIX& inv_alp);
 vector<MATRIX> schwartz_1_dm(dyn_control_params& prms, vector<CMATRIX*>& dm_adi, MATRIX& p, nHamiltonian& ham, MATRIX& w);
 vector<MATRIX> Gu_Franco_dm(dyn_control_params& prms, vector<CMATRIX*>& dm_adi);
+vector<MATRIX> schwartz_1_dm(dyn_control_params& prms, vector<CMATRIX>& dm, nHamiltonian& ham, MATRIX& inv_alp, int rep);
+vector<MATRIX> schwartz_1_dm(dyn_control_params& prms, vector<CMATRIX>& dm, MATRIX& p, nHamiltonian& ham, MATRIX& w, int rep);
 vector<MATRIX> schwartz_1_dm(dyn_control_params& prms, vector<CMATRIX>& dm_adi, nHamiltonian& ham, MATRIX& inv_alp);
 vector<MATRIX> schwartz_1_dm(dyn_control_params& prms, vector<CMATRIX>& dm_adi, MATRIX& p, nHamiltonian& ham, MATRIX& w);
 vector<MATRIX> Gu_Franco_dm(dyn_control_params& prms, vector<CMATRIX>& dm_adi);
@@ -160,6 +174,9 @@ void dish_rev2023(dyn_variables& dyn_var, nHamiltonian& ham,
                   dyn_control_params& prms,Random& rnd);
 // the density forms on dyn_var.dm_adi (rep_tdse 3)
 vector<int> dish_dm(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates, dyn_control_params& prms, Random& rnd);
+// DISH in the diabatic basis (rep_sh 0) on the Lowdin diabatic amplitudes ampl_dia / densities dm_dia with the diabatic rates
+vector<int> dish_dia(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates, dyn_control_params& prms, Random& rnd);
+vector<int> dish_dia_dm(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates, dyn_control_params& prms, Random& rnd);
 void dish_rev2023_dm(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates, dyn_control_params& prms, Random& rnd);
 
 /*

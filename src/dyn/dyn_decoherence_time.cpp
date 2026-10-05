@@ -288,8 +288,16 @@ MATRIX coherence_intervals(CMATRIX &Coeff, vector<MATRIX> &rates) {
   return res;
 }
 
+static int rates_basis_count(nHamiltonian &ham, int rep, const char *fn) {
+  /** The state count of the basis the rates are computed in: rep 1 the adiabatic one, rep 0 the diabatic one */
+  if (rep == 1) { return ham.nadi; }
+  if (rep == 0) { return ham.ndia; }
+  std::cout << "Error in " << fn << "(): rep = " << rep << " has no branch here (implemented: 0, 1)\n";
+  std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+}
+
 vector<MATRIX> schwartz_1(dyn_control_params &prms, CMATRIX &amplitudes,
-                          nHamiltonian &ham, MATRIX &inv_alp) {
+                          nHamiltonian &ham, MATRIX &inv_alp, int rep) {
   /**
     Compute decoherence rates 1/tau_i for all states and all trajectories
     according to Schwartz prescription
@@ -304,7 +312,7 @@ vector<MATRIX> schwartz_1(dyn_control_params &prms, CMATRIX &amplitudes,
   */
 
   int ndof = ham.nnucl;
-  int nstates = ham.nadi;
+  int nstates = rates_basis_count(ham, rep, "schwartz_1");
   int ntraj = ham.children.size();
 
   MATRIX F_mf(ndof, ntraj);
@@ -326,13 +334,13 @@ vector<MATRIX> schwartz_1(dyn_control_params &prms, CMATRIX &amplitudes,
     option = 1;
   }
 
-  F_mf = ham.Ehrenfest_forces_adi(amplitudes, 1, option).real();
+  F_mf = (rep == 1) ? ham.Ehrenfest_forces_adi(amplitudes, 1, option).real()
+                    : ham.Ehrenfest_forces_dia(amplitudes, 1, option).real();
 
   for (int i = 0; i < nstates; i++) {
     vector<int> act_states(ntraj, i);
 
-    F_st = ham.forces_adi(act_states)
-               .real(); // aux_get_forces(prms_mf, amplitudes, projectors,
+    F_st = ((rep == 1) ? ham.forces_adi(act_states) : ham.forces_dia(act_states)).real(); // aux_get_forces(prms_mf, amplitudes, projectors,
                         // act_states, ham);
 
     for (int itraj = 0; itraj < ntraj; itraj++) {
@@ -356,7 +364,7 @@ vector<MATRIX> schwartz_1(dyn_control_params &prms, CMATRIX &amplitudes,
 }
 
 vector<MATRIX> schwartz_1(dyn_control_params &prms, CMATRIX &amplitudes,
-                          MATRIX &p, nHamiltonian &ham, MATRIX &w) {
+                          MATRIX &p, nHamiltonian &ham, MATRIX &w, int rep) {
   /**
     Compute decoherence rates 1/tau_i for all states and all trajectories
     according to Schwartz prescription
@@ -372,7 +380,7 @@ vector<MATRIX> schwartz_1(dyn_control_params &prms, CMATRIX &amplitudes,
   */
 
   int ndof = ham.nnucl;
-  int nstates = ham.nadi;
+  int nstates = rates_basis_count(ham, rep, "schwartz_1");
   int ntraj = ham.children.size();
 
   double w2;
@@ -397,13 +405,13 @@ vector<MATRIX> schwartz_1(dyn_control_params &prms, CMATRIX &amplitudes,
   }
 
   option = 0;
-  F_mf = ham.Ehrenfest_forces_adi(amplitudes, 1, option).real();
+  F_mf = (rep == 1) ? ham.Ehrenfest_forces_adi(amplitudes, 1, option).real()
+                    : ham.Ehrenfest_forces_dia(amplitudes, 1, option).real();
 
   for (int i = 0; i < nstates; i++) {
     vector<int> act_states(ntraj, i);
 
-    F_st = ham.forces_adi(act_states)
-               .real(); // aux_get_forces(prms_mf, amplitudes, projectors,
+    F_st = ((rep == 1) ? ham.forces_adi(act_states) : ham.forces_dia(act_states)).real(); // aux_get_forces(prms_mf, amplitudes, projectors,
                         // act_states, ham);
 
     for (int itraj = 0; itraj < ntraj; itraj++) {
@@ -428,7 +436,7 @@ vector<MATRIX> schwartz_1(dyn_control_params &prms, CMATRIX &amplitudes,
 }
 
 vector<MATRIX> schwartz_2(dyn_control_params &prms, nHamiltonian &ham,
-                          MATRIX &inv_alp) {
+                          MATRIX &inv_alp, int rep) {
   /**
     Compute decoherence rates 1/tau_ij for all pairs of states and all
     trajectories according to Schwartz state-pair prescription
@@ -442,7 +450,7 @@ vector<MATRIX> schwartz_2(dyn_control_params &prms, nHamiltonian &ham,
   */
 
   int ndof = ham.nnucl;
-  int nstates = ham.nadi;
+  int nstates = rates_basis_count(ham, rep, "schwartz_2");
   int ntraj = ham.children.size();
 
   //  dyn_control_params prms_st(prms);  prms_st.force_method = 1;
@@ -454,8 +462,7 @@ vector<MATRIX> schwartz_2(dyn_control_params &prms, nHamiltonian &ham,
 
   for (int i = 0; i < nstates; i++) {
     vector<int> act_states_i(ntraj, i);
-    F[i] = ham.forces_adi(act_states_i)
-               .real(); //  aux_get_forces(prms_st, amplitudes, projectors,
+    F[i] = ((rep == 1) ? ham.forces_adi(act_states_i) : ham.forces_dia(act_states_i)).real(); //  aux_get_forces(prms_st, amplitudes, projectors,
                         //  act_states_i, ham);
 
   } // for i
@@ -482,6 +489,18 @@ vector<MATRIX> schwartz_2(dyn_control_params &prms, nHamiltonian &ham,
   } // for i
 
   return res;
+}
+
+vector<MATRIX> schwartz_1(dyn_control_params &prms, CMATRIX &amplitudes, nHamiltonian &ham, MATRIX &inv_alp) {
+  return schwartz_1(prms, amplitudes, ham, inv_alp, 1);
+}
+
+vector<MATRIX> schwartz_1(dyn_control_params &prms, CMATRIX &amplitudes, MATRIX &p, nHamiltonian &ham, MATRIX &w) {
+  return schwartz_1(prms, amplitudes, p, ham, w, 1);
+}
+
+vector<MATRIX> schwartz_2(dyn_control_params &prms, nHamiltonian &ham, MATRIX &inv_alp) {
+  return schwartz_2(prms, ham, inv_alp, 1);
 }
 
 vector<MATRIX> Gu_Franco(dyn_control_params &prms, CMATRIX &amplitudes) {
@@ -537,16 +556,16 @@ vector<MATRIX> Gu_Franco(dyn_control_params &prms, CMATRIX &amplitudes) {
 }
 
 
-vector<MATRIX> schwartz_1_dm(dyn_control_params &prms, vector<CMATRIX *> &dm_adi, nHamiltonian &ham, MATRIX &inv_alp) {
+vector<MATRIX> schwartz_1_dm(dyn_control_params &prms, vector<CMATRIX *> &dm, nHamiltonian &ham, MATRIX &inv_alp, int rep) {
   /**
     The density-matrix form of schwartz_1(prms, amplitudes, ham, inv_alp): the mean-field force comes from the
     per-trajectory densities (Ehrenfest_forces_adi_dm, the same force for a pure state) - the density-matrix
     representations (rep_tdse 2 / 3) propagate rho alone, their amplitudes keep the t0 values
-    dm_adi - ntraj densities CMATRIX(nstates, nstates), inv_alp - MATRIX(ndof, 1)
+    dm - ntraj densities CMATRIX(nstates, nstates), inv_alp - MATRIX(ndof, 1)
     Return: ntraj MATRIX(nstates, nstates) - the diagonal holds 1/tau_i
   */
   int ndof = ham.nnucl;
-  int nstates = ham.nadi;
+  int nstates = rates_basis_count(ham, rep, "schwartz_1_dm");
   int ntraj = ham.children.size();
   MATRIX F_mf(ndof, ntraj);
   MATRIX F_st(ndof, ntraj);
@@ -558,10 +577,11 @@ vector<MATRIX> schwartz_1_dm(dyn_control_params &prms, vector<CMATRIX *> &dm_adi
       prms.electronic_integrator == 12 || prms.electronic_integrator == 19) {
     option = 1;
   }
-  F_mf = ham.Ehrenfest_forces_adi_dm(dm_adi, 1, option, 0.0, 1).real();
+  F_mf = (rep == 1) ? ham.Ehrenfest_forces_adi_dm(dm, 1, option, 0.0, 1).real()
+                    : ham.Ehrenfest_forces_dia_dm(dm, 1, option, 0.0, 1).real();
   for (int i = 0; i < nstates; i++) {
     vector<int> act_states(ntraj, i);
-    F_st = ham.forces_adi(act_states).real();
+    F_st = ((rep == 1) ? ham.forces_adi(act_states) : ham.forces_dia(act_states)).real();
     for (int itraj = 0; itraj < ntraj; itraj++) {
       double tau_inv2 = 0.0;
       for (int idof = 0; idof < ndof; idof++) {
@@ -574,25 +594,26 @@ vector<MATRIX> schwartz_1_dm(dyn_control_params &prms, vector<CMATRIX *> &dm_adi
   return res;
 }
 
-vector<MATRIX> schwartz_1_dm(dyn_control_params &prms, vector<CMATRIX *> &dm_adi, MATRIX &p, nHamiltonian &ham,
-                             MATRIX &w) {
+vector<MATRIX> schwartz_1_dm(dyn_control_params &prms, vector<CMATRIX *> &dm, MATRIX &p, nHamiltonian &ham,
+                             MATRIX &w, int rep) {
   /**
     The density-matrix form of schwartz_1(prms, amplitudes, p, ham, w) - the interaction-width variant, the
     mean-field force from the per-trajectory densities (option 0 as the amplitude form takes it)
-    dm_adi - ntraj densities CMATRIX(nstates, nstates), p - MATRIX(ndof, ntraj), w - MATRIX(ndof, 1)
+    dm - ntraj densities CMATRIX(nstates, nstates), p - MATRIX(ndof, ntraj), w - MATRIX(ndof, 1)
   */
   int ndof = ham.nnucl;
-  int nstates = ham.nadi;
+  int nstates = rates_basis_count(ham, rep, "schwartz_1_dm");
   int ntraj = ham.children.size();
   double w2;
   MATRIX F_mf(ndof, ntraj);
   MATRIX F_st(ndof, ntraj);
   vector<MATRIX> res(ntraj, MATRIX(nstates, nstates));
   int option = 0;
-  F_mf = ham.Ehrenfest_forces_adi_dm(dm_adi, 1, option, 0.0, 1).real();
+  F_mf = (rep == 1) ? ham.Ehrenfest_forces_adi_dm(dm, 1, option, 0.0, 1).real()
+                    : ham.Ehrenfest_forces_dia_dm(dm, 1, option, 0.0, 1).real();
   for (int i = 0; i < nstates; i++) {
     vector<int> act_states(ntraj, i);
-    F_st = ham.forces_adi(act_states).real();
+    F_st = ((rep == 1) ? ham.forces_adi(act_states) : ham.forces_dia(act_states)).real();
     for (int itraj = 0; itraj < ntraj; itraj++) {
       double tau_inv2 = 0.0;
       for (int idof = 0; idof < ndof; idof++) {
@@ -604,6 +625,14 @@ vector<MATRIX> schwartz_1_dm(dyn_control_params &prms, vector<CMATRIX *> &dm_adi
     } // for itraj
   } // for i
   return res;
+}
+
+vector<MATRIX> schwartz_1_dm(dyn_control_params &prms, vector<CMATRIX *> &dm_adi, nHamiltonian &ham, MATRIX &inv_alp) {
+  return schwartz_1_dm(prms, dm_adi, ham, inv_alp, 1);
+}
+
+vector<MATRIX> schwartz_1_dm(dyn_control_params &prms, vector<CMATRIX *> &dm_adi, MATRIX &p, nHamiltonian &ham, MATRIX &w) {
+  return schwartz_1_dm(prms, dm_adi, p, ham, w, 1);
 }
 
 vector<MATRIX> Gu_Franco_dm(dyn_control_params &prms, vector<CMATRIX *> &dm_adi) {
@@ -636,13 +665,23 @@ static vector<CMATRIX *> dm_pointers(vector<CMATRIX> &dms) {
   for (std::size_t i = 0; i < dms.size(); i++) { ptrs[i] = &dms[i]; }
   return ptrs;
 }
+vector<MATRIX> schwartz_1_dm(dyn_control_params &prms, vector<CMATRIX> &dm, nHamiltonian &ham, MATRIX &inv_alp, int rep) {
+  vector<CMATRIX *> ptrs(dm_pointers(dm));
+  return schwartz_1_dm(prms, ptrs, ham, inv_alp, rep);
+}
+
 vector<MATRIX> schwartz_1_dm(dyn_control_params &prms, vector<CMATRIX> &dm_adi, nHamiltonian &ham, MATRIX &inv_alp) {
   vector<CMATRIX *> ptrs(dm_pointers(dm_adi));
-  return schwartz_1_dm(prms, ptrs, ham, inv_alp);
+  return schwartz_1_dm(prms, ptrs, ham, inv_alp, 1);
 }
+vector<MATRIX> schwartz_1_dm(dyn_control_params &prms, vector<CMATRIX> &dm, MATRIX &p, nHamiltonian &ham, MATRIX &w, int rep) {
+  vector<CMATRIX *> ptrs(dm_pointers(dm));
+  return schwartz_1_dm(prms, ptrs, p, ham, w, rep);
+}
+
 vector<MATRIX> schwartz_1_dm(dyn_control_params &prms, vector<CMATRIX> &dm_adi, MATRIX &p, nHamiltonian &ham, MATRIX &w) {
   vector<CMATRIX *> ptrs(dm_pointers(dm_adi));
-  return schwartz_1_dm(prms, ptrs, p, ham, w);
+  return schwartz_1_dm(prms, ptrs, p, ham, w, 1);
 }
 vector<MATRIX> Gu_Franco_dm(dyn_control_params &prms, vector<CMATRIX> &dm_adi) {
   vector<CMATRIX *> ptrs(dm_pointers(dm_adi));

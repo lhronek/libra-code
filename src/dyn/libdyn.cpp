@@ -557,22 +557,38 @@ void export_dyn_decoherence_objects(){
   vector<MATRIX> (*expt_schwartz_1_v1)
   (dyn_control_params& prms, CMATRIX& amplitudes, nHamiltonian& ham, MATRIX& inv_alp) = &schwartz_1;
   def("schwartz_1", expt_schwartz_1_v1);
+
+  vector<MATRIX> (*expt_schwartz_1_v1r)
+  (dyn_control_params& prms, CMATRIX& amplitudes, nHamiltonian& ham, MATRIX& inv_alp, int rep) = &schwartz_1;
+  def("schwartz_1", expt_schwartz_1_v1r);
   
   vector<MATRIX> (*expt_schwartz_1_v2)
   (dyn_control_params& prms, CMATRIX& amplitudes, MATRIX& p, nHamiltonian& ham, MATRIX& w) = &schwartz_1;
   def("schwartz_1", expt_schwartz_1_v2);
 
+  vector<MATRIX> (*expt_schwartz_1_v2r)
+  (dyn_control_params& prms, CMATRIX& amplitudes, MATRIX& p, nHamiltonian& ham, MATRIX& w, int rep) = &schwartz_1;
+  def("schwartz_1", expt_schwartz_1_v2r);
+
   vector<MATRIX> (*expt_schwartz_2_v1)
   (dyn_control_params& prms, nHamiltonian& ham, MATRIX& inv_alp) = &schwartz_2;
   def("schwartz_2", expt_schwartz_2_v1);
+
+  vector<MATRIX> (*expt_schwartz_2_v1r)
+  (dyn_control_params& prms, nHamiltonian& ham, MATRIX& inv_alp, int rep) = &schwartz_2;
+  def("schwartz_2", expt_schwartz_2_v1r);
 
 
   vector<MATRIX> (*expt_Gu_Franco_v1)(dyn_control_params& prms, CMATRIX& amplitudes) = &Gu_Franco;
   def("Gu_Franco", expt_Gu_Franco_v1);
   vector<MATRIX> (*expt_schwartz_1_dm_v1)(dyn_control_params& prms, vector<CMATRIX>& dm_adi, nHamiltonian& ham, MATRIX& inv_alp) = &schwartz_1_dm;
   def("schwartz_1_dm", expt_schwartz_1_dm_v1);
+  vector<MATRIX> (*expt_schwartz_1_dm_v1r)(dyn_control_params& prms, vector<CMATRIX>& dm, nHamiltonian& ham, MATRIX& inv_alp, int rep) = &schwartz_1_dm;
+  def("schwartz_1_dm", expt_schwartz_1_dm_v1r);
   vector<MATRIX> (*expt_schwartz_1_dm_v2)(dyn_control_params& prms, vector<CMATRIX>& dm_adi, MATRIX& p, nHamiltonian& ham, MATRIX& w) = &schwartz_1_dm;
   def("schwartz_1_dm", expt_schwartz_1_dm_v2);
+  vector<MATRIX> (*expt_schwartz_1_dm_v2r)(dyn_control_params& prms, vector<CMATRIX>& dm, MATRIX& p, nHamiltonian& ham, MATRIX& w, int rep) = &schwartz_1_dm;
+  def("schwartz_1_dm", expt_schwartz_1_dm_v2r);
   vector<MATRIX> (*expt_Gu_Franco_dm_v1)(dyn_control_params& prms, vector<CMATRIX>& dm_adi) = &Gu_Franco_dm;
   def("Gu_Franco_dm", expt_Gu_Franco_dm_v1);
 
@@ -589,6 +605,11 @@ void export_dyn_decoherence_objects(){
   (dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates, 
    dyn_control_params& prms,Random& rnd) = &dish;
   def("dish", expt_dish_v1);
+
+  vector<int> (*expt_dish_dia_v1)
+  (dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates,
+   dyn_control_params& prms,Random& rnd) = &dish_dia;
+  def("dish_dia", expt_dish_dia_v1);
 
   void (*expt_dish_rev2023_v1)(dyn_variables& dyn_var, nHamiltonian& ham,
                   vector<MATRIX>& decoherence_rates,
@@ -1056,6 +1077,9 @@ void export_Energy_Forces_objects(){
 
   vector<CMATRIX> (*expt_get_Eadi_v1)(nHamiltonian& ham) = &get_Eadi;
   def("get_Eadi", expt_get_Eadi_v1);
+
+  vector<CMATRIX> (*expt_get_Edia_v1)(nHamiltonian& ham) = &get_Edia;
+  def("get_Edia", expt_get_Edia_v1);
 
 
 }
