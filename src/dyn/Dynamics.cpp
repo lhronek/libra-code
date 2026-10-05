@@ -2844,7 +2844,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
     if (prms.rep_tdse == 0 || prms.rep_tdse == 1) {
       wp_reversal_events(dyn_var, ham, prms.dt);
       *dyn_var.ampl_adi = bcsh(*dyn_var.ampl_adi, prms.dt, dyn_var.act_states,
-                               *dyn_var.reversal_events);
+                               *dyn_var.reversal_events, prms.collapse_option);
       // rep_tdse 0 derives its adiabatic amplitudes - the corrected ones are written through into the propagated diabatic ones
       if (prms.rep_tdse == 0) { dyn_var.adopt_adiabatic(prms); }
     } else if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
@@ -2860,7 +2860,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   else if (prms.decoherence_algo == 3 && prms.rep_sh == 0) {
     wp_reversal_events_dia(dyn_var, ham, prms.dt);
     if (prms.rep_tdse == 0 || prms.rep_tdse == 1) {
-      bcsh_dia(*dyn_var.ampl_dia, ham, prms.dt, dyn_var.act_states_dia, *dyn_var.reversal_events_dia);
+      bcsh_dia(*dyn_var.ampl_dia, ham, prms.dt, dyn_var.act_states_dia, *dyn_var.reversal_events_dia, prms.collapse_option);
       if (prms.rep_tdse == 1) { dyn_var.adopt_diabatic(prms); }
     } else if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
       bcsh_dia_dm(dyn_var.dm_dia, ham, prms.dt, dyn_var.act_states_dia, *dyn_var.reversal_events_dia);
@@ -2877,7 +2877,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       // cout<<"p before mfsd\n"; dyn_var.p->show_matrix();
       *dyn_var.ampl_adi =
           mfsd(p, *dyn_var.ampl_adi, *dyn_var.iM, prms.dt, dyn_var.act_states,
-               decoherence_rates, ham, rnd, prms.isNBRA);
+               decoherence_rates, ham, rnd, prms.isNBRA, prms.collapse_option);
       *dyn_var.p = p;
       // rep_tdse 0 derives its adiabatic amplitudes - the corrected ones are written through into the propagated diabatic ones
       if (prms.rep_tdse == 0) { dyn_var.adopt_adiabatic(prms); }
@@ -2901,7 +2901,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   else if (prms.decoherence_algo == 4 && prms.rep_sh == 0) {
     p = *dyn_var.p;
     if (prms.rep_tdse == 0 || prms.rep_tdse == 1) {
-      mfsd_dia(p, *dyn_var.ampl_dia, *dyn_var.iM, prms.dt, dyn_var.act_states_dia, decoherence_rates_dia, ham, rnd, prms.isNBRA);
+      mfsd_dia(p, *dyn_var.ampl_dia, *dyn_var.iM, prms.dt, dyn_var.act_states_dia, decoherence_rates_dia, ham, rnd, prms.isNBRA, prms.collapse_option);
       *dyn_var.p = p;
       if (prms.rep_tdse == 1) { dyn_var.adopt_diabatic(prms); }
     } else if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {

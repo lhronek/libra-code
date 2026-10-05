@@ -111,7 +111,7 @@ static vector<int> dish_core(dyn_variables& dyn_var, nHamiltonian& ham, CMATRIX&
     /// Advance coherence times
     coherence_time.add(-1, -1, prms.dt);
 
-    int collapse_option = 0;
+    int collapse_option = prms.collapse_option;   // the phase choice of the collapse, as every decoherence scheme takes it
 
     int i,j, traj;
     int nst = Coeff.n_rows; 
@@ -321,7 +321,7 @@ static void dish_rev2023_core(CMATRIX& Coeff, MATRIX& coherence_time, vector<MAT
 */
 
 
-  int collapse_option = 0;
+  int collapse_option = prms.collapse_option;   // the phase choice of the collapse, as every decoherence scheme takes it
 
   int i,j, traj;
   int nst = Coeff.n_rows;

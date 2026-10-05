@@ -88,10 +88,10 @@ void lowdin_dm_back(vector<CMATRIX*>& dm, vector<CMATRIX>& rho, vector<CMATRIX>&
 void sdm_dia(CMATRIX& Coeff, nHamiltonian& ham, double dt, vector<int>& act_st, vector<MATRIX>& decoh_rates, double tol, int isNBRA);
 void sdm_dia_dm(vector<CMATRIX*>& dm, nHamiltonian& ham, double dt, vector<int>& act_st, vector<MATRIX>& decoh_rates, double tol, int isNBRA);
 void wp_reversal_events_dia(dyn_variables& dyn_var, nHamiltonian& ham, double dt);
-void bcsh_dia(CMATRIX& Coeff, nHamiltonian& ham, double dt, vector<int>& act_states, MATRIX& reversal_events);
+void bcsh_dia(CMATRIX& Coeff, nHamiltonian& ham, double dt, vector<int>& act_states, MATRIX& reversal_events, int collapse_option);
 void bcsh_dia_dm(vector<CMATRIX*>& dm, nHamiltonian& ham, double dt, vector<int>& act_states, MATRIX& reversal_events);
 void mfsd_dia(MATRIX& p, CMATRIX& Coeff, MATRIX& invM, double dt, vector<int>& act_states, vector<MATRIX>& decoherence_rates,
-   nHamiltonian& ham, Random& rnd, int isNBRA);
+   nHamiltonian& ham, Random& rnd, int isNBRA, int collapse_option);
 void mfsd_dia_dm(MATRIX& p, vector<CMATRIX*>& dm, MATRIX& invM, double dt, vector<int>& act_states, vector<MATRIX>& decoherence_rates,
    nHamiltonian& ham, Random& rnd, int isNBRA);
 
@@ -103,10 +103,13 @@ void integrate_afssh_moments(CMATRIX& dR, CMATRIX& dP, CMATRIX& Hvib, CMATRIX& F
 //MATRIX wp_reversal_events(MATRIX& p, MATRIX& invM, vector<int>& act_states, 
 //                          nHamiltonian& ham, vector<CMATRIX>& projectors, double dt);
 void wp_reversal_events(dyn_variables& dyn_var, nHamiltonian& ham, double dt);
+// collapse_option is the phase choice of the collapse (0 keeps it, 1 resets the amplitude to 1) - the forms without it keep the phase
+CMATRIX bcsh(CMATRIX& Coeff, double dt, vector<int>& act_states, MATRIX& reversal_events, int collapse_option);
 CMATRIX bcsh(CMATRIX& Coeff, double dt, vector<int>& act_states, MATRIX& reversal_events);
 
 
 // For MF-SD of Schwartz
+CMATRIX mfsd(MATRIX& p, CMATRIX& Coeff, MATRIX& invM, double dt, vector<int>& act_st, vector<MATRIX>& decoherence_rates, nHamiltonian& ham, Random& rnd, int isNBRA, int collapse_option);
 CMATRIX mfsd(MATRIX& p, CMATRIX& Coeff, MATRIX& invM, double dt, vector<int>& act_st, vector<MATRIX>& decoherence_rates, nHamiltonian& ham, Random& rnd, int isNBRA);
 CMATRIX mfsd(MATRIX& p, CMATRIX& Coeff, MATRIX& invM, double dt, vector<int>& act_st, vector<MATRIX>& decoherence_rates, nHamiltonian& ham, Random& rnd);
 

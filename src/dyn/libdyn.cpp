@@ -481,8 +481,11 @@ void export_dyn_decoherence_objects(){
   CMATRIX (*expt_bcsh_v1)
   (CMATRIX& Coeff, double dt, vector<int>& act_states, MATRIX& reversal_events) = &bcsh;
   def("bcsh", expt_bcsh_v1);
+  CMATRIX (*expt_bcsh_v2)
+  (CMATRIX& Coeff, double dt, vector<int>& act_states, MATRIX& reversal_events, int collapse_option) = &bcsh;
+  def("bcsh", expt_bcsh_v2);
 
-  void (*expt_bcsh_dia_v1)(CMATRIX& Coeff, nHamiltonian& ham, double dt, vector<int>& act_states, MATRIX& reversal_events) = &bcsh_dia;
+  void (*expt_bcsh_dia_v1)(CMATRIX& Coeff, nHamiltonian& ham, double dt, vector<int>& act_states, MATRIX& reversal_events, int collapse_option) = &bcsh_dia;
   def("bcsh_dia", expt_bcsh_dia_v1);
 
 
@@ -495,9 +498,13 @@ void export_dyn_decoherence_objects(){
   (MATRIX& p, CMATRIX& Coeff, MATRIX& invM, double dt, vector<int>& act_states, vector<MATRIX>& decoherence_rates, 
    nHamiltonian& ham, Random& rnd) = &mfsd;
   def("mfsd", expt_mfsd_v2);
+  CMATRIX (*expt_mfsd_v3)
+  (MATRIX& p, CMATRIX& Coeff, MATRIX& invM, double dt, vector<int>& act_states, vector<MATRIX>& decoherence_rates,
+   nHamiltonian& ham, Random& rnd, int isNBRA, int collapse_option) = &mfsd;
+  def("mfsd", expt_mfsd_v3);
 
   void (*expt_mfsd_dia_v1)(MATRIX& p, CMATRIX& Coeff, MATRIX& invM, double dt, vector<int>& act_states, vector<MATRIX>& decoherence_rates,
-                           nHamiltonian& ham, Random& rnd, int isNBRA) = &mfsd_dia;
+                           nHamiltonian& ham, Random& rnd, int isNBRA, int collapse_option) = &mfsd_dia;
   def("mfsd_dia", expt_mfsd_dia_v1);
   
   void (*expt_xf_hop_reset)

@@ -290,10 +290,10 @@ def _print_simulation_params(dyn_params, nadi, ntraj, init_params=None, model_pa
                 lines.append(row(F"{key}:", _params_json_default(p[key])))
         if deco == 0 and "sdm_norm_tolerance" in p:
             lines.append(row("sdm_norm_tolerance:", p["sdm_norm_tolerance"]))
-        if deco == 1:
-            for key in ("instantaneous_decoherence_variant", "collapse_option"):
-                if key in p:
-                    lines.append(row(F"{key}:", p[key]))
+        if deco in (1, 8) and "instantaneous_decoherence_variant" in p:
+            lines.append(row("instantaneous_decoherence_variant:", p["instantaneous_decoherence_variant"]))
+        if deco in (1, 3, 4, 5, 6, 7, 8) and "collapse_option" in p:      # every amplitude collapse takes it
+            lines.append(row("collapse_option:", p["collapse_option"]))
         if deco in (5, 6):
             for key in ("coherence_threshold", "e_mask", "use_xf_force",
                         "project_out_aux", "tp_algo", "use_td_width"):
@@ -852,7 +852,10 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                                 but we don't do anything if the hop is successful
 
 
-            * **dyn_params["collapse_option"]** ( int ): How to collapse wavefunction amplitudes in the decoherence schemes:
+            * **dyn_params["collapse_option"]** ( int ): How to collapse wavefunction amplitudes in the decoherence schemes -
+                every amplitude collapse takes it (the instantaneous decoherence, DISH, DISH rev2023, BCSH, MF-SD, SHXF / MQCXF
+                and the diabatic twins), the density forms carry no phase; a collapse leaves a global phase per trajectory, so
+                the option moves the saved amplitudes' phase and no observable:
 
                 - 0: by rescaling the magnitude of the amplitude vector elements, but preserving "phase" [ default ]
                 - 1: by resetting the amplitudes to 1.0+0.0j. This option changes phase

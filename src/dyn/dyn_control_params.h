@@ -777,7 +777,10 @@ class dyn_control_params{
 
 
   /**
-    How to collapse wavefunction amplitudes in the decoherence schemes:
+    How to collapse wavefunction amplitudes in the decoherence schemes - every amplitude collapse takes it (the
+    instantaneous decoherence, DISH, DISH rev2023, BCSH, MF-SD, SHXF / MQCXF and the diabatic twins); the density
+    forms carry no phase. A collapse leaves a global phase per trajectory, so the option moves the saved amplitudes'
+    phase and no observable:
       - 0: by rescaling the magnitude of the amplitude vector elements, but preserving "phase" [ default ]
       - 1: by resetting the amplitudes to 1.0+0.0j. This option changes phase 
 

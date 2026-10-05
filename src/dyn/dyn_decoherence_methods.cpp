@@ -850,7 +850,7 @@ void wp_reversal_events(dyn_variables &dyn_var, nHamiltonian &ham, double dt) {
 }
 
 CMATRIX bcsh(CMATRIX &Coeff, double dt, vector<int> &act_states,
-             MATRIX &reversal_events) {
+             MATRIX &reversal_events, int collapse_option) {
   /**
   \brief Branching corrected surface hopping decoherence algorithm
 
@@ -887,7 +887,7 @@ CMATRIX bcsh(CMATRIX &Coeff, double dt, vector<int> &act_states,
 
     // If it reverses, we collapse wfc on that state
     if (reversal_events.get(a, itraj) > 0) {
-      collapse(C, itraj, a, 0);
+      collapse(C, itraj, a, collapse_option);
     }
 
     else { // Otherwise, let's project out the all the nonactive states that
@@ -908,9 +908,14 @@ CMATRIX bcsh(CMATRIX &Coeff, double dt, vector<int> &act_states,
   return C;
 }
 
+CMATRIX bcsh(CMATRIX &Coeff, double dt, vector<int> &act_states, MATRIX &reversal_events) {
+  /** The phase-keeping form (collapse_option 0) */
+  return bcsh(Coeff, dt, act_states, reversal_events, 0);
+}
+
 CMATRIX mfsd(MATRIX &p, CMATRIX &Coeff, MATRIX &invM, double dt,
              vector<int> &act_states, vector<MATRIX> &decoherence_rates,
-             nHamiltonian &ham, Random &rnd, int isNBRA) {
+             nHamiltonian &ham, Random &rnd, int isNBRA, int collapse_option) {
   /**
   \brief Mean field with stochastic decoherence
 
@@ -1000,7 +1005,7 @@ CMATRIX mfsd(MATRIX &p, CMATRIX &Coeff, MATRIX &invM, double dt,
       _id[1] = itraj;
       double E_old = ham.Ehrenfest_energy_adi(coeff, _id).real();
 
-      collapse(coeff_tmp, 0, decohered_state, 0);
+      collapse(coeff_tmp, 0, decohered_state, collapse_option);
       double E_new = ham.Ehrenfest_energy_adi(coeff_tmp, _id).real();
       // double E_new = ham.get_ham_adi(_id).get(decohered_state,
       // decohered_state).real();
@@ -1053,7 +1058,7 @@ CMATRIX mfsd(MATRIX &p, CMATRIX &Coeff, MATRIX &invM, double dt,
         // p.show_matrix();
 
         // And collapse the coherent superposition on the decohered state
-        collapse(C, itraj, decohered_state, 0);
+        collapse(C, itraj, decohered_state, collapse_option);
 
         // cout<<"Ampl (after) = \n"; C.show_matrix();
         act_states[itraj] = decohered_state;
@@ -1064,6 +1069,13 @@ CMATRIX mfsd(MATRIX &p, CMATRIX &Coeff, MATRIX &invM, double dt,
   } // for itraj
 
   return C;
+}
+
+CMATRIX mfsd(MATRIX &p, CMATRIX &Coeff, MATRIX &invM, double dt,
+             vector<int> &act_states, vector<MATRIX> &decoherence_rates,
+             nHamiltonian &ham, Random &rnd, int isNBRA) {
+  /** The phase-keeping form (collapse_option 0) */
+  return mfsd(p, Coeff, invM, dt, act_states, decoherence_rates, ham, rnd, isNBRA, 0);
 }
 
 CMATRIX mfsd(MATRIX &p, CMATRIX &Coeff, MATRIX &invM, double dt,
@@ -1103,7 +1115,7 @@ void xf_init_AT(dyn_variables &dyn_var, int traj, int ist) {
   }
 }
 
-void xf_destroy_AT(dyn_variables &dyn_var, double threshold) {
+void xf_destroy_AT(dyn_variables &dyn_var, double threshold, int collapse_option) {
   /**
   \brief When the electronic state recovers to an adiabatic state, destroy
   auxiliary trajectories
@@ -1128,7 +1140,7 @@ void xf_destroy_AT(dyn_variables &dyn_var, double threshold) {
       if (is_mixed[i] == 1) {
         if (a_ii > upper_lim) {
           is_recovered = 1;
-          collapse(*dyn_var.ampl_adi, traj, i, 0);
+          collapse(*dyn_var.ampl_adi, traj, i, collapse_option);
           break;
         }
       }
@@ -1140,7 +1152,7 @@ void xf_destroy_AT(dyn_variables &dyn_var, double threshold) {
   } // traj
 }
 
-void xf_destroy_AT(dyn_variables &dyn_var, nHamiltonian &ham,
+void xf_destroy_AT(dyn_variables &dyn_var, nHamiltonian &ham, int collapse_option,
                    double threshold) {
   /**
   \brief When the electronic state recovers to an adiabatic state, destroy
@@ -1173,7 +1185,7 @@ void xf_destroy_AT(dyn_variables &dyn_var, nHamiltonian &ham,
           coeff = dyn_var.ampl_adi->col(traj);
           double Epot_old = ham.Ehrenfest_energy_adi(coeff, _id).real();
 
-          collapse(*dyn_var.ampl_adi, traj, i, 0);
+          collapse(*dyn_var.ampl_adi, traj, i, collapse_option);
 
           // After the collapse
           coeff = dyn_var.ampl_adi->col(traj);
@@ -1275,7 +1287,7 @@ void shxf(dyn_variables &dyn_var, nHamiltonian &ham, nHamiltonian &ham_prev,
   int nadi = dyn_var.nadi;
   int ndof = dyn_var.ndof;
 
-  xf_destroy_AT(dyn_var, prms.coherence_threshold);
+  xf_destroy_AT(dyn_var, prms.coherence_threshold, prms.collapse_option);
 
   xf_create_AT(dyn_var, prms.coherence_threshold);
 
@@ -1408,7 +1420,7 @@ void shxf(dyn_variables &dyn_var, nHamiltonian &ham, nHamiltonian &ham_prev,
 
     if (is_tp == 1) {
       if (prms.tp_algo == 1) {
-        collapse(*dyn_var.ampl_adi, traj, a, 0);
+        collapse(*dyn_var.ampl_adi, traj, a, prms.collapse_option);
         xf_init_AT(dyn_var, traj, -1);
         cout << "Collapse to the active state " << a
              << " at a classical turning point on traj " << traj << endl;
@@ -1492,7 +1504,7 @@ void mqcxf(dyn_variables &dyn_var, nHamiltonian &ham, nHamiltonian &ham_prev,
   int nadi = dyn_var.nadi;
   int ndof = dyn_var.ndof;
 
-  xf_destroy_AT(dyn_var, ham, prms.coherence_threshold);
+  xf_destroy_AT(dyn_var, ham, prms.collapse_option, prms.coherence_threshold);
 
   xf_create_AT(dyn_var, prms.coherence_threshold);
 
@@ -1635,7 +1647,7 @@ void mqcxf(dyn_variables &dyn_var, nHamiltonian &ham, nHamiltonian &ham_prev,
         double Epot_old = Epot;
 
         int a = dyn_var.act_states[traj];
-        collapse(*dyn_var.ampl_adi, traj, a, 0);
+        collapse(*dyn_var.ampl_adi, traj, a, prms.collapse_option);
 
         // After the collapse
         coeff = dyn_var.ampl_adi->col(traj);
@@ -2305,7 +2317,7 @@ void wp_reversal_events_dia(dyn_variables &dyn_var, nHamiltonian &ham, double dt
   }
 }
 
-void bcsh_dia(CMATRIX &Coeff, nHamiltonian &ham, double dt, vector<int> &act_states, MATRIX &reversal_events) {
+void bcsh_dia(CMATRIX &Coeff, nHamiltonian &ham, double dt, vector<int> &act_states, MATRIX &reversal_events, int collapse_option) {
   /**
     BCSH in the diabatic basis: bcsh's collapses and projections on the Lowdin diabatic amplitudes with the diabatic lists and
     the diabatic reflection flags (wp_reversal_events_dia), written back through X
@@ -2314,7 +2326,7 @@ void bcsh_dia(CMATRIX &Coeff, nHamiltonian &ham, double dt, vector<int> &act_sta
   vector<int> lowdin;
   CMATRIX d(lowdin_ampl(Coeff, ham, X, lowdin));
   CMATRIX before(d);
-  d = bcsh(d, dt, act_states, reversal_events);
+  d = bcsh(d, dt, act_states, reversal_events, collapse_option);
   lowdin_ampl_back(Coeff, d, before, X, lowdin);
 }
 
@@ -2330,7 +2342,7 @@ void bcsh_dia_dm(vector<CMATRIX *> &dm, nHamiltonian &ham, double dt, vector<int
 }
 
 void mfsd_dia(MATRIX &p, CMATRIX &Coeff, MATRIX &invM, double dt, vector<int> &act_states, vector<MATRIX> &decoherence_rates,
-              nHamiltonian &ham, Random &rnd, int isNBRA) {
+              nHamiltonian &ham, Random &rnd, int isNBRA, int collapse_option) {
   /**
     MF-SD in the diabatic basis: the collapse probabilities from the Lowdin diabatic populations and the diagonal of the diabatic
     rates, the collapse on the Lowdin amplitudes, the energy before and after from Ehrenfest_energy_dia on the plain amplitudes,
@@ -2372,7 +2384,7 @@ void mfsd_dia(MATRIX &p, CMATRIX &Coeff, MATRIX &invM, double dt, vector<int> &a
       ccol = Coeff.col(itraj);
       double E_old = ham.Ehrenfest_energy_dia(ccol, _id).real();
       dcol = d.col(itraj);
-      collapse(dcol, 0, decohered_state, 0);
+      collapse(dcol, 0, decohered_state, collapse_option);
       ccol = lowdin[itraj] ? X[itraj] * dcol : dcol;
       double E_new = ham.Ehrenfest_energy_dia(ccol, _id).real();
       p_i = p.col(itraj);
@@ -2382,7 +2394,7 @@ void mfsd_dia(MATRIX &p, CMATRIX &Coeff, MATRIX &invM, double dt, vector<int> &a
         int do_reverse = 0;
         rescale_along_vector(E_old, E_new, p_i, invM, dir, do_reverse);
         for (int idof = 0; idof < ndof; idof++) { p.set(idof, itraj, p_i.get(idof, 0)); }
-        collapse(d, itraj, decohered_state, 0);
+        collapse(d, itraj, decohered_state, collapse_option);
         act_states[itraj] = decohered_state;
       }
     }
