@@ -460,6 +460,15 @@ void dyn_control_params::sanity_check(){
     }
   }
 
+  /// the Gu-Franco rates (decoherence_times_type 5) carry the prefactor sqrt(4 lambda kB T) - with reorg_energy or
+  /// Temperature at zero every rate is zero and the correction is silently off, below zero the rates are NaN
+  if(decoherence_times_type==5 && (reorg_energy<=0.0 || Temperature<=0.0)){
+    std::cout<<"Error in dyn_control_params::sanity_check: decoherence_times_type = 5 (the Gu-Franco rates) with reorg_energy = "
+        <<reorg_energy<<" Ha and Temperature = "<<Temperature<<" K - the prefactor sqrt(4 lambda kB T) is zero or NaN, both must"
+        <<" be positive (reorg_energy has no physical default - set the reorganization energy of the bath)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
   /// the instantaneous decoherence reads the hops of one basis: decoherence_algo 1 the adiabatic ones (rep_sh 1),
   /// decoherence_algo 8 the diabatic ones (rep_sh 0, acting on the diabatic variable in the Lowdin frame of the
   /// diabats) - the cross pairings would act on lists the hopping never updates

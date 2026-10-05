@@ -452,6 +452,7 @@ class DynControlParams:
     #:    term for the bare-energy integrators (0-2, 9-12, 19) and with it otherwise, as ehrenfest_force_option 1 / 0
     #:    2 / 3 from the density matrix as well)
     #:  5 Gu-Franco (|rho_ij| sqrt(4 lambda kB T) - under rep_tdse 2 / 3 read from the density matrix)
+    #:    needs reorg_energy > 0 (lambda, no physical default) and Temperature > 0 (T), refused otherwise
     decoherence_times_type: int = -1
 
     #: Schwartz 1/alpha parameters (ndof, 1)
@@ -747,7 +748,8 @@ class DynControlParams:
     #: Properties to save (Python list of strings)
     properties_to_save: List[str] = field(default_factory=list)
 
-    #: Bath reorganization energy (Ha) [default: 0.0 Ha]
+    #: Bath reorganization energy (Ha) - the lambda of the Gu-Franco rates (decoherence_times_type 5), which refuse a
+    #: non-positive value, no physical default [default: 0.0 Ha]
     reorg_energy: float = 0.0
 
     # ==========================================================================

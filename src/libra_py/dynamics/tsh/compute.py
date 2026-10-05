@@ -810,6 +810,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                      the state forces with the mean-field force without the derivative-coupling term for the
                      bare-energy integrators (0-2, 9-12, 19) and with it otherwise, as ehrenfest_force_option 1 / 0
                 - 5: Gu-Franco (|rho_ij| sqrt(4 lambda kB T) - under rep_tdse 2 / 3 read from the density matrix)
+                     needs reorg_energy > 0 (lambda, no physical default) and Temperature > 0 (T), refused otherwise
 
                 With isNBRA == 1 and ntraj > 1 options 2 and 4 are rejected -
                 Schwartz 1 builds per-trajectory mean-field forces on the single
@@ -824,7 +825,9 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 of NAC in computing decoherence rates [ default: NULL ]
 
 
-            * **dyn_params["reorg_energy"]** ( double ): reorganization energy of the bath [ units: Ha; default: 0.0 Ha ]
+            * **dyn_params["reorg_energy"]** ( double ): reorganization energy of the bath - the lambda of the Gu-Franco
+                rates (decoherence_times_type 5), which refuse a non-positive value, no physical default
+                [ units: Ha, default: 0.0 Ha ]
 
 
             * **dyn_params["decoherence_C_param"]** ( double ): An empirical parameter used in the EDC method [ default: 1.0 Ha]
