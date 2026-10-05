@@ -307,6 +307,43 @@ void dyn_variables::adopt_adiabatic(dyn_control_params& dyn_params){
   }
 }
 
+void dyn_variables::adopt_diabatic(dyn_control_params& dyn_params){
+/**
+  The write-through of a correction made on the diabatic variable (the diabatic instantaneous decoherence): under
+  rep_tdse 1 the propagated adiabatic amplitudes take the corrected diabatic ones (C_adi = U^H S C_dia, the rep_tdse 0
+  direction of update_amplitudes), under rep_tdse 3 the propagated adiabatic density takes the corrected diabatic one
+  (rho_adi = (S U)^H rho_dia (S U), the rep_tdse 2 direction of update_density_matrix) - the mirror of adopt_adiabatic.
+  Under rep_tdse 0 and 2 the diabatic variable is the propagated one and nothing is done
+*/
+  int rep = dyn_params.rep_tdse;
+  if(rep==0 || rep==2){ return; }
+  if(rep==1){
+    CMATRIX cd(ndia, 1);
+    CMATRIX ca(nadi, 1);
+    for(int traj=0; traj<ntraj; traj++){
+      CMATRIX& U = (*basis_transform[traj]);
+      cd = ampl_dia->col(traj);
+      if(ovlp_dia_is_identity[traj]){ ca.product(adjoint(U), cd); }
+      else{ ca.product(adjoint(U), (*ovlp_dia[traj]) * cd); }
+      for(int i=0;i<nadi;i++){ ampl_adi->set(i, traj, ca.get(i,0) ); }
+    }
+  }
+  else if(rep==3){
+    for(int traj=0; traj<ntraj; traj++){
+      CMATRIX& U = (*basis_transform[traj]);
+      if(ovlp_dia_is_identity[traj]){ dm_adi[traj]->product(adjoint(U), *dm_dia[traj], U); }
+      else{
+        CMATRIX su((*ovlp_dia[traj]) * U);
+        dm_adi[traj]->product(adjoint(su), *dm_dia[traj], su);
+      }
+    }
+  }
+  else{
+    std::cout<<"Error in dyn_variables::adopt_diabatic(): rep_tdse = "<<rep<<" has no branch here (implemented: 0, 1, 2, 3)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+}
+
 void dyn_variables::update_density_matrix(dyn_control_params& dyn_params){
 /**
     """

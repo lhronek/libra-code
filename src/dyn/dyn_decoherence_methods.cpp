@@ -475,113 +475,75 @@ void instantaneous_decoherence(CMATRIX &Coeff, vector<int> &accepted_states,
   }
 }
 
-void instantaneous_decoherence_dia(CMATRIX &Coeff, nHamiltonian &ham,
-                                   vector<int> &accepted_states,
-                                   vector<int> &proposed_states,
-                                   vector<int> &initial_states,
-                                   int instantaneous_decoherence_variant,
-                                   int collapse_option) {
+// the event of the instantaneous decoherence for one trajectory: kind 0 - nothing, 1 - collapse onto state, 2 - project
+// state out - the variants of instantaneous_decoherence (0 ID-S, 1 ID-A, 2 ID-C, 3 IDN, 4 ID-F) on any state lists
+static void id_event(int variant, int accepted, int proposed, int initial, int &kind, int &state) {
+  kind = 0; state = -1;
+  if (variant == 0) {
+    if (accepted != initial) { kind = 1; state = accepted; }
+  } else if (variant == 1) {
+    if (proposed != initial) { kind = 1; state = (accepted == proposed) ? accepted : initial; }
+  } else if (variant == 2) {
+    kind = 1; state = accepted;
+  } else if (variant == 3) {
+    if (proposed != initial) {
+      if (accepted == proposed) { kind = 1; state = accepted; } else { kind = 2; state = proposed; }
+    }
+  } else if (variant == 4) {
+    if (proposed != initial && accepted != proposed) { kind = 2; state = proposed; }
+  } else {
+    std::cout << "Error in id_event(): instantaneous_decoherence_variant = " << variant << " has no branch here (implemented: 0, 1, 2, 3, 4)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+}
 
+static void check_id_dia_sizes(const char *fn, int ntraj, vector<int> &accepted_states, vector<int> &proposed_states,
+                               vector<int> &initial_states, int collapse_option) {
+  if (accepted_states.size() != static_cast<std::size_t>(ntraj) || proposed_states.size() != static_cast<std::size_t>(ntraj) ||
+      initial_states.size() != static_cast<std::size_t>(ntraj)) {
+    cout << "ERROR in " << fn << ": the sizes of the diabatic state lists (" << accepted_states.size() << ", "
+         << proposed_states.size() << ", " << initial_states.size() << ") and the number of trajectories (" << ntraj
+         << ") are inconsistent\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  if (!(collapse_option == 0 || collapse_option == 1)) {
+    std::cout << "Error in " << fn << ": collapse_option = " << collapse_option << " has no branch here (implemented: 0, 1)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+}
+
+void instantaneous_decoherence_dia(CMATRIX &Coeff, nHamiltonian &ham, vector<int> &accepted_states,
+                                   vector<int> &proposed_states, vector<int> &initial_states,
+                                   int instantaneous_decoherence_variant, int collapse_option) {
   /**
-    This is an experimental ID function which does all the same as the normal
-    one does, but in the diabatic basis:
-
-    Args:
-      Coeff - the adiabatic amplitudes
-      ham - nHamiltonian object
-
-    Two options of the algorithm are available:
-    ID-S: wavefunction amplitudes are collapsed only during the successful hops
-    (onto the new state) ID-A: wavefunction amplitudes are collapsed at every
-    attempted hop to the new state, if successful to the old state, if now
-
-    There collapsing options are controlled by the parameter
-    instantaneous_decoherence_variant
-
-     0 - ID-S
-     1 - ID-A
-     2 - ID-C - consistent ID - an experimental algo
-
-     In the "consistent" version, we lift the condition that the
-    accepted/proposed states must be different from the starting state - this
-    option addresses a philosophical question - what if we say that no hops is
-    equivalent to the hop onto the current state? why should the "hopping" into
-    the original state by treated differently from the "actual hopping" to
-    another state? So, in this version we collapse onto the accpeted states, no
-    matter if they are the result of a successfull or frustrated hop.
-
-    The mechanism of the collapse event itself is controlled by the
-    collapse_option parameter
+    The instantaneous decoherence in the DIABATIC basis - the twin of instantaneous_decoherence for the diabatic hopping
+    (rep_sh 0): Coeff holds the DIABATIC amplitudes (ndia x ntraj), the state lists are the diabatic ones (the accepted
+    act_states_dia, the proposals, the initial act_states_dia), and the collapses and projections act on the Lowdin
+    state of the trajectory's child Hamiltonian - d = Y C with Y = S^1/2 and X = S^-1/2 of ovlp_dia, the frame the
+    diabatic hop machinery hops in, the plain diabatic state for an identity metric (lowdin_dia returns 0). The
+    variants are those of the adiabatic form (0 ID-S, 1 ID-A, 2 ID-C, 3 IDN, 4 ID-F), the collapse keeps or resets
+    the phase by collapse_option as collapse() does
   */
-  int traj;
   int ntraj = Coeff.n_cols;
-
-  if (accepted_states.size() != static_cast<std::size_t>(ntraj)) {
-    cout << "ERROR in ids: the sizes of the input variables Coeff and "
-            "accepted_states are inconsistent\n";
-    cout << "Coeff.num_of_cols = = " << ntraj << "\n";
-    cout << "accepted_states.size() = " << accepted_states.size() << "\n";
-    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-  }
-  if (proposed_states.size() != static_cast<std::size_t>(ntraj)) {
-    cout << "ERROR in ids: the sizes of the input variables Coeff and "
-            "proposed_states are inconsistent\n";
-    cout << "Coeff.num_of_cols = = " << ntraj << "\n";
-    cout << "proposed_states.size() = " << proposed_states.size() << "\n";
-    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-  }
-  if (initial_states.size() != static_cast<std::size_t>(ntraj)) {
-    cout << "ERROR in ids: the sizes of the input variables Coeff and "
-            "initial_states are inconsistent\n";
-    cout << "Coeff.num_of_cols = = " << ntraj << "\n";
-    cout << "initial_states.size() = " << initial_states.size() << "\n";
-    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-  }
-
-  // ID-S
-  if (instantaneous_decoherence_variant == 0) {
-
-    for (traj = 0; traj < ntraj; traj++) {
-
-      if (accepted_states[traj] != initial_states[traj]) {
-        collapse(Coeff, traj, accepted_states[traj], collapse_option);
-      }
-    } // traj
-
-  } // ID-S
-
-  // ID-A
-  else if (instantaneous_decoherence_variant == 1) {
-
-    for (traj = 0; traj < ntraj; traj++) {
-
-      if (proposed_states[traj] != initial_states[traj]) {
-        // Only apply ID-A, if the proposed states are different from the
-        // original ones
-
-        if (accepted_states[traj] == proposed_states[traj]) {
-          // Proposed hop is successful - collapse onto newly accepted state
-          collapse(Coeff, traj, accepted_states[traj], collapse_option);
-        } else {
-          // Proposed hop is not successful - collapse onto the original state
-          collapse(Coeff, traj, initial_states[traj], collapse_option);
-        }
-      }
-    } // traj
-
-  } // ID-A
-
-  // ID-C
-  else if (instantaneous_decoherence_variant == 2) {
-
-    for (traj = 0; traj < ntraj; traj++) {
-      collapse(Coeff, traj, accepted_states[traj], collapse_option);
-    } // traj
-
-  } // ID-C
-  else {
-    std::cout<<"Error in instantaneous_decoherence_dia(): instantaneous_decoherence_variant = "<<instantaneous_decoherence_variant<<" has no branch here (implemented: 0, 1, 2 in the diabatic variant)\n";
-    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  int ndia = Coeff.n_rows;
+  check_id_dia_sizes("instantaneous_decoherence_dia", ntraj, accepted_states, proposed_states, initial_states, collapse_option);
+  int nchildren = ham.children.size();
+  CMATRIX X(ndia, ndia);
+  CMATRIX Y(ndia, ndia);
+  CMATRIX col(ndia, 1);
+  for (int traj = 0; traj < ntraj; traj++) {
+    int kind, state;
+    id_event(instantaneous_decoherence_variant, accepted_states[traj], proposed_states[traj], initial_states[traj], kind, state);
+    if (kind == 0) { continue; }
+    // the trajectory's child Hamiltonian, the shared one under isNBRA, the Hamiltonian itself when it has no children
+    nHamiltonian *child = (nchildren > 0) ? ham.children[(traj < nchildren) ? traj : 0] : &ham;
+    int lowdin = child->lowdin_dia(X, Y);
+    col = Coeff.col(traj);
+    if (lowdin) { col = Y * col; }
+    if (kind == 1) { collapse(col, 0, state, collapse_option); }
+    else { project_out(col, 0, state); }
+    if (lowdin) { col = X * col; }
+    for (int i = 0; i < ndia; i++) { Coeff.set(i, traj, col.get(i, 0)); }
   }
 }
 
@@ -2084,16 +2046,25 @@ void instantaneous_decoherence_dm(vector<CMATRIX *> &dm, vector<int> &accepted_s
 void instantaneous_decoherence_dia_dm(vector<CMATRIX *> &dm, nHamiltonian &ham, vector<int> &accepted_states,
                                       vector<int> &proposed_states, vector<int> &initial_states,
                                       int instantaneous_decoherence_variant, int collapse_option) {
-  /** The density form of instantaneous_decoherence_dia - like its amplitude form it collapses the adiabatic
-      density exactly as instantaneous_decoherence does for the variants 0 / 1 / 2 and reads nothing from ham */
+  /** The density form of instantaneous_decoherence_dia: the per-trajectory DIABATIC densities (dyn_variables::dm_dia),
+      the collapses and projections on the Lowdin density rho_L = Y rho Y^H, back through X */
   int ntraj = dm.size();
-  check_id_sizes("instantaneous_decoherence_dia_dm", ntraj, accepted_states, proposed_states, initial_states, collapse_option);
-  if (instantaneous_decoherence_variant == 0 || instantaneous_decoherence_variant == 1 || instantaneous_decoherence_variant == 2) {
-    instantaneous_decoherence_dm(dm, accepted_states, proposed_states, initial_states, instantaneous_decoherence_variant, collapse_option);
-  } else {
-    std::cout << "Error in instantaneous_decoherence_dia_dm(): instantaneous_decoherence_variant = " << instantaneous_decoherence_variant
-              << " has no branch here (implemented: 0, 1, 2)\n";
-    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  check_id_dia_sizes("instantaneous_decoherence_dia_dm", ntraj, accepted_states, proposed_states, initial_states, collapse_option);
+  int nchildren = ham.children.size();
+  for (int traj = 0; traj < ntraj; traj++) {
+    int kind, state;
+    id_event(instantaneous_decoherence_variant, accepted_states[traj], proposed_states[traj], initial_states[traj], kind, state);
+    if (kind == 0) { continue; }
+    CMATRIX &rho = *dm[traj];
+    int ndia = rho.n_rows;
+    CMATRIX X(ndia, ndia);
+    CMATRIX Y(ndia, ndia);
+    nHamiltonian *child = (nchildren > 0) ? ham.children[(traj < nchildren) ? traj : 0] : &ham;
+    int lowdin = child->lowdin_dia(X, Y);
+    if (lowdin) { rho = Y * rho * Y.H(); }
+    if (kind == 1) { collapse_dm(rho, state); }
+    else { project_out_dm(rho, state); }
+    if (lowdin) { rho = X * rho * X.H(); }
   }
 }
 

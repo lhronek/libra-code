@@ -665,7 +665,10 @@ class dyn_control_params{
       - 5: SHXF of Min
       - 6: MQCXF
       - 7: DISH, rev2023
-      - 8: diabatic IDA, experimental
+      - 8: the instantaneous decoherence in the diabatic basis - for the diabatic hopping (rep_sh 0): the
+           variants of 1 on the diabatic state lists, the collapses and projections on the Lowdin diabatic state
+           (the plain diabatic state for an identity metric), written through into the propagated adiabatic
+           variable under rep_tdse 1 / 3 - 1 is its adiabatic twin for rep_sh 1 (sanity_check pairs them)
       - 9: SCOTSH = state coherence transfer TSH (experimental)
 
   */

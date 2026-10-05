@@ -460,17 +460,6 @@ void dyn_control_params::sanity_check(){
     }
   }
 
-  /// the diabatic instantaneous decoherence (decoherence_algo 8 ->
-  /// instantaneous_decoherence_dia) implements the variants 0, 1 and 2
-  /// alone - 3 and 4 exist in the adiabatic chain (decoherence_algo 1) and
-  /// would throw at the first accepted hop
-  if(decoherence_algo==8 && instantaneous_decoherence_variant>2){
-    std::cout<<"Error in dyn_control_params::sanity_check: instantaneous_decoherence_variant = "
-        <<instantaneous_decoherence_variant<<" with decoherence_algo = 8 (the diabatic instantaneous"
-        <<" decoherence) - that chain implements the variants 0, 1 and 2 alone, 3 and 4 belong to the"
-        <<" adiabatic chain (decoherence_algo 1)\n";
-    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-  }
 
   /// the time-overlap NAC route builds the couplings with nac_algo 0 (HST)
   /// or 1 (NPI) - with nac_algo -1 it computes nothing and stores zero

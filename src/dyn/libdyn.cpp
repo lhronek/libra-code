@@ -361,6 +361,7 @@ void export_dyn_variables_objects(){
 
       .def("update_amplitudes", expt_update_amplitudes_v1)
       .def("adopt_adiabatic", &dyn_variables::adopt_adiabatic)
+      .def("adopt_diabatic", &dyn_variables::adopt_diabatic)
       .def("set_ampl_adi", &dyn_variables::set_ampl_adi)
       .def("set_ampl_dia", &dyn_variables::set_ampl_dia)
       .def("set_dm_adi", &dyn_variables::set_dm_adi)

@@ -3087,18 +3087,20 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
         ;
       } // DISH rev 2023, nothing to do here
 
-      // Experimental: instantaneous decoherence in diabatic basis | TODO: check
-      // the compatibility with rep_sh==0
+      // the instantaneous decoherence in the diabatic basis - for the diabatic hopping (rep_sh 0, sanity_check
+      // pairs them): the diabatic lists (the accepted act_states_dia, the proposals, the initial act_states_dia)
+      // and the diabatic variable - the amplitude representations act on ampl_dia (derived under rep_tdse 1, the
+      // correction written through into the propagated ampl_adi), the density ones on dm_dia (derived under 3)
       else if (prms.decoherence_algo == 8) {
         if (prms.rep_tdse == 0 || prms.rep_tdse == 1) {
           instantaneous_decoherence_dia(
-              *dyn_var.ampl_adi, ham, act_states, prop_states, old_states,
+              *dyn_var.ampl_dia, ham, act_states_dia, prop_states, old_states_dia,
               prms.instantaneous_decoherence_variant, prms.collapse_option);
-          if (prms.rep_tdse == 0) { dyn_var.adopt_adiabatic(prms); }
+          if (prms.rep_tdse == 1) { dyn_var.adopt_diabatic(prms); }
         } else if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
-          instantaneous_decoherence_dia_dm(dyn_var.dm_adi, ham, act_states, prop_states, old_states,
+          instantaneous_decoherence_dia_dm(dyn_var.dm_dia, ham, act_states_dia, prop_states, old_states_dia,
                                            prms.instantaneous_decoherence_variant, prms.collapse_option);
-          if (prms.rep_tdse == 2) { dyn_var.adopt_adiabatic(prms); }
+          if (prms.rep_tdse == 3) { dyn_var.adopt_diabatic(prms); }
         } else {
         std::cout<<"Error in compute_dynamics(): rep_tdse = "<<prms.rep_tdse<<" has no branch here (implemented: 0, 1, 2, 3)\n";
           std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
