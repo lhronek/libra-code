@@ -81,10 +81,11 @@ CMATRIX nHamiltonian::Ehrenfest_forces_dia_unit(CMATRIX &ampl_dia, int option, d
   }
 
   CMATRIX res(nnucl, 1);
+  // the diabatic work matrices - the metric inverse and the coupling term - take the diabatic size (ndia x ndia)
   CMATRIX *dtilda;
-  dtilda = new CMATRIX(nadi, nadi);
+  dtilda = new CMATRIX(ndia, ndia);
   CMATRIX *invS;
-  invS = new CMATRIX(nadi, nadi);
+  invS = new CMATRIX(ndia, ndia);
 
   FullPivLU_inverse(*ovlp_dia, *invS);
 

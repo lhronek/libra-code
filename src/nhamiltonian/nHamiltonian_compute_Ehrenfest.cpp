@@ -250,8 +250,9 @@ vector<CMATRIX> nHamiltonian::Ehrenfest_forces_tens_dia(CMATRIX& ampl_dia){
 //  not allocated, but they are needed for the calculations\n"; exit(0); }
 
 
-  CMATRIX* dtilda; dtilda = new CMATRIX(nadi,nadi);
-  CMATRIX* invS; invS = new CMATRIX(nadi, nadi); 
+  // the diabatic work matrices take the diabatic size (the metric is ndia x ndia)
+  CMATRIX* dtilda; dtilda = new CMATRIX(ndia,ndia);
+  CMATRIX* invS; invS = new CMATRIX(ndia, ndia); 
 
   FullPivLU_inverse(*ovlp_dia, *invS);
   complex<double> norm = (ampl_dia.H() * (*ovlp_dia) * ampl_dia).M[0]; 
