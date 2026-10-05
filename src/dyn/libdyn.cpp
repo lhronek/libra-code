@@ -461,9 +461,9 @@ void export_dyn_decoherence_objects(){
   int instantaneous_decoherence_variant, int collapse_option) = &instantaneous_decoherence;
   def("instantaneous_decoherence", expt_instantaneous_decoherence_v1);
 
-  void (*expt_instantaneous_decoherence_dia_v1)(CMATRIX& Coeff,
+  void (*expt_instantaneous_decoherence_dia_v1)(CMATRIX& Coeff, nHamiltonian& ham,
   vector<int>& accepted_states, vector<int>& proposed_states, vector<int>& initial_states,
-  int instantaneous_decoherence_variant, int collapse_option) = &instantaneous_decoherence;
+  int instantaneous_decoherence_variant, int collapse_option) = &instantaneous_decoherence_dia;
   def("instantaneous_decoherence_dia", expt_instantaneous_decoherence_dia_v1);
 
 
