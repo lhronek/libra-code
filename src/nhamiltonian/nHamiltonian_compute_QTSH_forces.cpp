@@ -248,8 +248,7 @@ id\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see 
 }
 */
 
-CMATRIX nHamiltonian::QTSH_forces_adi_unit(CMATRIX &ampl_adi, int option,
-                                           CMATRIX &transform) {
+CMATRIX nHamiltonian::QTSH_forces_adi_unit(CMATRIX &ampl_adi, int option) {
   /**
     \param[in] ampl_adi: MATRIX(nadi, 1) diabatic amplitudes for one trajectory
 
@@ -287,8 +286,7 @@ CMATRIX nHamiltonian::QTSH_forces_adi_unit(CMATRIX &ampl_adi, int option,
   CMATRIX tmp(nadi, nadi);
 
   //  CMATRIX& T = transform;
-  CMATRIX T(transform);
-  T.identity();
+  // the amplitudes arrive in the basis of ham_adi - the step's projector moved them in the propagation, no transform here
 
   for (int n = 0; n < nnucl; n++) {
 
@@ -325,7 +323,7 @@ CMATRIX nHamiltonian::QTSH_forces_adi_unit(CMATRIX &ampl_adi, int option,
     if (option ==
         0) { // Original formulation with NACs - for non-LD integrators
 
-      tmp = (T.H() * (*dc1_adi[n]) * T).H() * (T.H() * (*ham_adi) * T);
+      tmp = (*dc1_adi[n]).H() * (*ham_adi);
       tmp = tmp + tmp.H();
 
       res.M[n] = (ampl_adi.H() * tmp * ampl_adi).M[0];
@@ -341,7 +339,7 @@ CMATRIX nHamiltonian::QTSH_forces_adi_unit(CMATRIX &ampl_adi, int option,
       // }
     } else if (option == 1) { // Including the 2nd order force
 
-      tmp = (T.H() * (*dc1_adi[n]) * T).H() * (T.H() * (*hvib_adi) * T);
+      tmp = (*dc1_adi[n]).H() * (*hvib_adi);
       tmp = tmp + tmp.H();
 
       res.M[n] = (ampl_adi.H() * tmp * ampl_adi).M[0];
@@ -358,20 +356,12 @@ CMATRIX nHamiltonian::QTSH_forces_adi_unit(CMATRIX &ampl_adi, int option,
   return res;
 }
 
-CMATRIX nHamiltonian::QTSH_forces_adi_unit(CMATRIX &ampl_adi, int option) {
-  CMATRIX I(nadi, nadi);
-  I.identity();
-  return QTSH_forces_adi_unit(ampl_adi, option, I);
-}
 
 CMATRIX nHamiltonian::QTSH_forces_adi_unit(CMATRIX &ampl_adi) {
-  CMATRIX I(nadi, nadi);
-  I.identity();
-  return QTSH_forces_adi_unit(ampl_adi, 0, I);
+  return QTSH_forces_adi_unit(ampl_adi, 0);
 }
 
-CMATRIX nHamiltonian::QTSH_forces_adi(CMATRIX &ampl_adi, int lvl, int option,
-                                      vector<CMATRIX *> &transforms) {
+CMATRIX nHamiltonian::QTSH_forces_adi(CMATRIX &ampl_adi, int lvl, int option) {
   /**
     \brief Computes the QTSH forces in the adiabatic basis
 
@@ -439,8 +429,7 @@ CMATRIX nHamiltonian::QTSH_forces_adi(CMATRIX &ampl_adi, int lvl, int option,
       frc_tmp = QTSH_forces_adi_unit(ampl_tmp, option);
     }
     if (lvl == 1) {
-      frc_tmp =
-          children[i]->QTSH_forces_adi_unit(ampl_tmp, option, *transforms[i]);
+      frc_tmp = children[i]->QTSH_forces_adi_unit(ampl_tmp, option);
     }
 
     push_submatrix(F, frc_tmp, stenc_frc, stenc_col);
@@ -450,45 +439,9 @@ CMATRIX nHamiltonian::QTSH_forces_adi(CMATRIX &ampl_adi, int lvl, int option,
   return F;
 }
 
-CMATRIX nHamiltonian::QTSH_forces_adi(CMATRIX &ampl_adi, int lvl, int option) {
-  int ntraj = ampl_adi.n_cols;
-  vector<CMATRIX *> I(ntraj);
-
-  for (int itraj = 0; itraj < ntraj; itraj++) {
-    I[itraj] = new CMATRIX(nadi, nadi);
-    I[itraj]->load_identity();
-  }
-
-  CMATRIX F(nnucl, ampl_adi.n_cols);
-
-  F = QTSH_forces_adi(ampl_adi, lvl, option, I);
-
-  for (int itraj = 0; itraj < ntraj; itraj++) {
-    delete I[itraj];
-  }
-  I.clear();
-
-  return F;
-}
 
 CMATRIX nHamiltonian::QTSH_forces_adi(CMATRIX &ampl_adi, int lvl) {
-  int ntraj = ampl_adi.n_cols;
-  vector<CMATRIX *> I(ntraj);
-
-  for (int itraj = 0; itraj < ntraj; itraj++) {
-    I[itraj] = new CMATRIX(nadi, nadi);
-    I[itraj]->load_identity();
-  }
-
-  CMATRIX F(nnucl, ampl_adi.n_cols);
-
-  F = QTSH_forces_adi(ampl_adi, lvl, 0, I);
-
-  for (int itraj = 0; itraj < ntraj; itraj++) {
-    delete I[itraj];
-  }
-  I.clear();
-  return F;
+  return QTSH_forces_adi(ampl_adi, lvl, 0);
 }
 
 /*
@@ -603,7 +556,7 @@ CMATRIX nHamiltonian::QTSH_forces_dia_dm(vector<CMATRIX *> &dm_dia, int lvl, int
   return F;
 }
 
-CMATRIX nHamiltonian::QTSH_forces_adi_unit_dm(CMATRIX &dm_adi, int option, CMATRIX &transform) {
+CMATRIX nHamiltonian::QTSH_forces_adi_unit_dm(CMATRIX &dm_adi, int option) {
   /**
     The density-matrix form of QTSH_forces_adi_unit: every C^H A C of the amplitude form is tr(A rho) for
     rho = C_adi C_adi^H of one trajectory (dyn_variables::dm_adi), T the identity as the amplitude form takes it -
@@ -622,8 +575,7 @@ CMATRIX nHamiltonian::QTSH_forces_adi_unit_dm(CMATRIX &dm_adi, int option, CMATR
   complex<double> norm = dm_adi.tr();
   CMATRIX res(nnucl, 1);
   CMATRIX tmp(nadi, nadi);
-  CMATRIX T(transform);
-  T.identity();
+  // the amplitudes arrive in the basis of ham_adi - the step's projector moved them in the propagation, no transform here
   for (int n = 0; n < nnucl; n++) {
     if (d1ham_adi_mem_status[n] == 0) {
       cout << "Error in QTSH_forces_adi_unit_dm(): the derivatives of the Hamiltonian matrix in the \
@@ -636,11 +588,11 @@ CMATRIX nHamiltonian::QTSH_forces_adi_unit_dm(CMATRIX &dm_adi, int option, CMATR
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     if (option == 0) { // the first-order off-diagonal force
-      tmp = (T.H() * (*dc1_adi[n]) * T).H() * (T.H() * (*ham_adi) * T);
+      tmp = (*dc1_adi[n]).H() * (*ham_adi);
       tmp = tmp + tmp.H();
       res.M[n] = (tmp * dm_adi).tr();
     } else if (option == 1) { // with the second-order term
-      tmp = (T.H() * (*dc1_adi[n]) * T).H() * (T.H() * (*hvib_adi) * T);
+      tmp = (*dc1_adi[n]).H() * (*hvib_adi);
       tmp = tmp + tmp.H();
       res.M[n] = (tmp * dm_adi).tr();
     } else if (option == 2) { // no derivative-coupling force - the local-diabatization-consistent variant
@@ -653,7 +605,7 @@ CMATRIX nHamiltonian::QTSH_forces_adi_unit_dm(CMATRIX &dm_adi, int option, CMATR
 
 CMATRIX nHamiltonian::QTSH_forces_adi_dm(vector<CMATRIX *> &dm_adi, int lvl, int option) {
   /**
-    The density-matrix form of QTSH_forces_adi with identity transforms: one nadi x nadi density per trajectory
+    The density-matrix form of QTSH_forces_adi - one nadi x nadi density per trajectory
     (dyn_variables::dm_adi), lvl 0 - this Hamiltonian serves every trajectory, lvl 1 - children[i] serves trajectory i
     Returns MATRIX(ndof, ntraj) - the QTSH forces in the adiabatic representation
   */
@@ -663,13 +615,11 @@ CMATRIX nHamiltonian::QTSH_forces_adi_dm(vector<CMATRIX *> &dm_adi, int lvl, int
          << ") should be equal to the number of children Hamiltonians (" << children.size() << ")\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
-  CMATRIX I(nadi, nadi);
-  I.load_identity();
   CMATRIX frc_tmp(nnucl, 1);
   CMATRIX F(nnucl, ntraj);
   for (int i = 0; i < ntraj; i++) {
-    if (lvl == 0) { frc_tmp = QTSH_forces_adi_unit_dm(*dm_adi[i], option, I); }
-    if (lvl == 1) { frc_tmp = children[i]->QTSH_forces_adi_unit_dm(*dm_adi[i], option, I); }
+    if (lvl == 0) { frc_tmp = QTSH_forces_adi_unit_dm(*dm_adi[i], option); }
+    if (lvl == 1) { frc_tmp = children[i]->QTSH_forces_adi_unit_dm(*dm_adi[i], option); }
     for (int n = 0; n < nnucl; n++) { F.set(n, i, frc_tmp.get(n, 0)); }
   }
   return F;

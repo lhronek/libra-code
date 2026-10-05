@@ -258,7 +258,7 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
       for(itraj=0; itraj<ntraj; itraj++){
         id[1] = child_of(ham, itraj);
         CMATRIX& rho = *dyn_vars.dm_adi[itraj];
-        res[itraj] = ham.Ehrenfest_energy_adi_dm(rho, id, *(dyn_vars.proj_adi[itraj])).real();
+        res[itraj] = ham.Ehrenfest_energy_adi_dm(rho, id).real();
         if(prms.ehrenfest_normalized==0){
           double nrm = rho.tr().real();
           res[itraj] = res[itraj] * nrm - prms.sqc_gamma * ham.get_ham_adi(id).tr().real();
@@ -286,7 +286,7 @@ vector<double> potential_energies(dyn_control_params& prms, dyn_variables& dyn_v
       for(itraj=0; itraj<ntraj; itraj++){
         id[1] = child_of(ham, itraj);
         coeff = dyn_vars.ampl_adi->col(itraj);
-        res[itraj] = ham.Ehrenfest_energy_adi(coeff, id, *(dyn_vars.proj_adi[itraj]) ).real();
+        res[itraj] = ham.Ehrenfest_energy_adi(coeff, id).real();
         if(prms.ehrenfest_normalized==0){
           double nrm = (coeff.H() * coeff).get(0,0).real();
           res[itraj] = res[itraj] * nrm - prms.sqc_gamma * ham.get_ham_adi(id).tr().real();

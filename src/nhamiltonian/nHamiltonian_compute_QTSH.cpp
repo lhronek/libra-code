@@ -123,7 +123,7 @@ complex<double> nHamiltonian::QTSH_energy_dia(CMATRIX& ampl_dia, MATRIX& p, cons
 
 
 
-complex<double> nHamiltonian::QTSH_energy_adi(CMATRIX& ampl_adi, CMATRIX& transform){
+complex<double> nHamiltonian::QTSH_energy_adi(CMATRIX& ampl_adi){
 /**
   Compute the coherence energy of QTSH in the adiabatic representation.
   The coherence energy in QTSH has the form of the off-diagonal terms of the Ehrenfest energy.
@@ -135,22 +135,17 @@ complex<double> nHamiltonian::QTSH_energy_adi(CMATRIX& ampl_adi, CMATRIX& transf
 //  if(ampl_adi_mem_status==0){ cout<<"Error in QTSH_energy_adi(): the amplitudes of the adiabatic states are\
 //  not allocated, but they are needed for the calculations\n"; exit(0); }
 
-//  CMATRIX& T = transform;
-  CMATRIX T(transform); T.identity();
+  // the amplitudes arrive in the basis of ham_adi - the step's projector moved them in the propagation, no transform here
   
   complex<double> norm = (ampl_adi.H() * ampl_adi).M[0]; 
   
-  return (ampl_adi.H() * ( T.H() * complex<double>(0.0, -1.0)* (*nac_adi) * T) * ampl_adi).M[0] / norm;
+  return (ampl_adi.H() * ( complex<double>(0.0, -1.0)* (*nac_adi) ) * ampl_adi).M[0] / norm;
 
 }
 
-complex<double> nHamiltonian::QTSH_energy_adi(CMATRIX& ampl_adi){
-  CMATRIX I(nadi, nadi); I.identity();
-  return QTSH_energy_adi(ampl_adi, I);
-}
 
 
-complex<double> nHamiltonian::QTSH_energy_adi(CMATRIX& ampl_adi, vector<int>& id_, CMATRIX& transform){
+complex<double> nHamiltonian::QTSH_energy_adi(CMATRIX& ampl_adi, vector<int>& id_){
 /**
   See the description of the QTSH_energy_adi(CMATRIX& ampl_adi) function
 */
@@ -160,14 +155,10 @@ complex<double> nHamiltonian::QTSH_energy_adi(CMATRIX& ampl_adi, vector<int>& id
   }
   else{
     vector<int> next(id_.begin()+1,id_.end());
-    return children[id_[1]]->QTSH_energy_adi(ampl_adi, next, transform);
+    return children[id_[1]]->QTSH_energy_adi(ampl_adi, next);
   }
 }
 
-complex<double> nHamiltonian::QTSH_energy_adi(CMATRIX& ampl_adi, vector<int>& id_){
-  CMATRIX I(nadi, nadi); I.identity();
-  return QTSH_energy_adi(ampl_adi, id_, I);
-}
 
 
 complex<double> nHamiltonian::QTSH_energy_dia_dm(CMATRIX& dm_dia){

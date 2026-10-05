@@ -632,20 +632,18 @@ public:
 
 
   ///< In nHamiltonian_compute_Ehrenfest.cpp and nHamiltonian_compute_Ehrenfest_forces.cpp
-  complex<double> Ehrenfest_energy_adi(CMATRIX& ampl_adi, CMATRIX& transform);
+  ///< The adiabatic Ehrenfest and QTSH energies and forces take the amplitudes (densities) in the basis of the current
+  ///< ham_adi: the step's projector moves them in the propagation (update_active_states) and no transform is applied here -
+  ///< the former transform argument was the identity since upstream 85ff75d0 and is gone
   complex<double> Ehrenfest_energy_adi(CMATRIX& ampl_adi);
-  complex<double> Ehrenfest_energy_adi(CMATRIX& ampl_adi, vector<int>& id_, CMATRIX& transform);
   complex<double> Ehrenfest_energy_adi(CMATRIX& ampl_adi, vector<int>& id_);
-  CMATRIX Ehrenfest_forces_adi_unit(CMATRIX& ampl_adi, int option, CMATRIX& transform, double gamma, int normalized);  ///< Ehrenfest forces in adiabatic basis, normalized 0 = un-normalized Meyer-Miller form
-  CMATRIX Ehrenfest_forces_adi_unit(CMATRIX& ampl_adi, int option, CMATRIX& transform, double gamma);  ///< Ehrenfest forces in adiabatic basis
-  CMATRIX Ehrenfest_forces_adi_unit(CMATRIX& ampl_adi, int option, CMATRIX& transform);      ///< Ehrenfest forces in adiabatic basis
+  CMATRIX Ehrenfest_forces_adi_unit(CMATRIX& ampl_adi, int option, double gamma, int normalized);  ///< Ehrenfest forces in adiabatic basis, normalized 0 = un-normalized Meyer-Miller form
+  CMATRIX Ehrenfest_forces_adi_unit(CMATRIX& ampl_adi, int option, double gamma);  ///< Ehrenfest forces in adiabatic basis
   CMATRIX Ehrenfest_forces_adi_unit(CMATRIX& ampl_adi, int option);      ///< Ehrenfest forces in adiabatic basis
   CMATRIX Ehrenfest_forces_adi_unit(CMATRIX& ampl_adi);                  ///< Ehrenfest forces in adiabatic basis
-  CMATRIX Ehrenfest_forces_adi(CMATRIX& ampl_adi, int lvl, int option, vector<CMATRIX*>& transforms, vector<double>& gammas, int normalized);  ///< Ehrenfest forces in adiabatic basis, normalization switch
-  CMATRIX Ehrenfest_forces_adi(CMATRIX& ampl_adi, int lvl, int option, vector<CMATRIX*>& transforms, vector<double>& gammas);  ///< Ehrenfest forces in adiabatic basis
-  CMATRIX Ehrenfest_forces_adi(CMATRIX& ampl_adi, int lvl, int option, vector<CMATRIX*>& transforms);  ///< Ehrenfest forces in adiabatic basis
-  CMATRIX Ehrenfest_forces_adi(CMATRIX& ampl_adi, int lvl, int option, double gamma, int normalized);  ///< Ehrenfest forces in adiabatic basis, uniform gamma, identity transforms, normalization switch
-  CMATRIX Ehrenfest_forces_adi(CMATRIX& ampl_adi, int lvl, int option, double gamma);  ///< Ehrenfest forces in adiabatic basis, uniform Meyer-Miller gamma, identity transforms
+  CMATRIX Ehrenfest_forces_adi(CMATRIX& ampl_adi, int lvl, int option, vector<double>& gammas, int normalized);  ///< Ehrenfest forces in adiabatic basis, per-trajectory gammas, normalization switch
+  CMATRIX Ehrenfest_forces_adi(CMATRIX& ampl_adi, int lvl, int option, double gamma, int normalized);  ///< Ehrenfest forces in adiabatic basis, uniform gamma, normalization switch
+  CMATRIX Ehrenfest_forces_adi(CMATRIX& ampl_adi, int lvl, int option, double gamma);  ///< Ehrenfest forces in adiabatic basis, uniform Meyer-Miller gamma
   CMATRIX Ehrenfest_forces_adi(CMATRIX& ampl_adi, int lvl, int option);  ///< Ehrenfest forces in adiabatic basis
   CMATRIX Ehrenfest_forces_adi(CMATRIX& ampl_adi, int lvl);              ///< Ehrenfest forces in adiabatic basis
 
@@ -672,14 +670,10 @@ public:
 
 
   ///< In nHamiltonian_compute_QTSH.cpp and nHamiltonian_compute_QTSH_forces.cpp
-  complex<double> QTSH_energy_adi(CMATRIX& ampl_adi, CMATRIX& transform);
   complex<double> QTSH_energy_adi(CMATRIX& ampl_adi);
-  complex<double> QTSH_energy_adi(CMATRIX& ampl_adi, vector<int>& id_, CMATRIX& transform);
   complex<double> QTSH_energy_adi(CMATRIX& ampl_adi, vector<int>& id_);
-  CMATRIX QTSH_forces_adi_unit(CMATRIX& ampl_adi, int option, CMATRIX& transform);      ///< QTSH forces in adiabatic basis
   CMATRIX QTSH_forces_adi_unit(CMATRIX& ampl_adi, int option);      ///< QTSH forces in adiabatic basis
   CMATRIX QTSH_forces_adi_unit(CMATRIX& ampl_adi);                  ///< QTSH forces in adiabatic basis
-  CMATRIX QTSH_forces_adi(CMATRIX& ampl_adi, int lvl, int option, vector<CMATRIX*>& transforms);  ///< QTSH forces in adiabatic basis
   CMATRIX QTSH_forces_adi(CMATRIX& ampl_adi, int lvl, int option);  ///< QTSH forces in adiabatic basis
   CMATRIX QTSH_forces_adi(CMATRIX& ampl_adi, int lvl);              ///< QTSH forces in adiabatic basis
 
@@ -691,20 +685,18 @@ public:
 ///< and _QTSH_forces.cpp
   complex<double> Ehrenfest_energy_dia_dm(CMATRIX& dm_dia);
   complex<double> Ehrenfest_energy_dia_dm(CMATRIX& dm_dia, vector<int>& id_);
-  complex<double> Ehrenfest_energy_adi_dm(CMATRIX& dm_adi, CMATRIX& transform);
   complex<double> Ehrenfest_energy_adi_dm(CMATRIX& dm_adi);
-  complex<double> Ehrenfest_energy_adi_dm(CMATRIX& dm_adi, vector<int>& id_, CMATRIX& transform);
   complex<double> Ehrenfest_energy_adi_dm(CMATRIX& dm_adi, vector<int>& id_);
   CMATRIX Ehrenfest_forces_dia_unit_dm(CMATRIX& dm_dia, int option, double gamma, int normalized);
   CMATRIX Ehrenfest_forces_dia_dm(vector<CMATRIX*>& dm_dia, int lvl, int option, double gamma, int normalized);
-  CMATRIX Ehrenfest_forces_adi_unit_dm(CMATRIX& dm_adi, int option, CMATRIX& transform, double gamma, int normalized);
+  CMATRIX Ehrenfest_forces_adi_unit_dm(CMATRIX& dm_adi, int option, double gamma, int normalized);
   CMATRIX Ehrenfest_forces_adi_dm(vector<CMATRIX*>& dm_adi, int lvl, int option, double gamma, int normalized);
   complex<double> QTSH_energy_dia_dm(CMATRIX& dm_dia);
   complex<double> QTSH_energy_dia_dm(CMATRIX& dm_dia, MATRIX& p, const MATRIX& invM);
   complex<double> QTSH_energy_dia_dm(CMATRIX& dm_dia, MATRIX& p, const MATRIX& invM, vector<int>& id_);
   CMATRIX QTSH_forces_dia_unit_dm(CMATRIX& dm_dia, int option);
   CMATRIX QTSH_forces_dia_dm(vector<CMATRIX*>& dm_dia, int lvl, int option);
-  CMATRIX QTSH_forces_adi_unit_dm(CMATRIX& dm_adi, int option, CMATRIX& transform);
+  CMATRIX QTSH_forces_adi_unit_dm(CMATRIX& dm_adi, int option);
   CMATRIX QTSH_forces_adi_dm(vector<CMATRIX*>& dm_adi, int lvl, int option);
 
 

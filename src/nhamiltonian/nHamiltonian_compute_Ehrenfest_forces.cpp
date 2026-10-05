@@ -263,7 +263,6 @@ requested id\n"; std::cout << std::flush; throw std::runtime_error("libra C++ er
 */
 
 CMATRIX nHamiltonian::Ehrenfest_forces_adi_unit(CMATRIX &ampl_adi, int option,
-                                                CMATRIX &transform,
                                                 double gamma, int normalized) {
   /**
     \param[in] ampl_adi: MATRIX(nadi, 1) diabatic amplitudes for one trajectory
@@ -319,9 +318,7 @@ CMATRIX nHamiltonian::Ehrenfest_forces_adi_unit(CMATRIX &ampl_adi, int option,
   CMATRIX res(nnucl, 1);
   CMATRIX tmp(nadi, nadi);
 
-  //  CMATRIX& T = transform;
-  CMATRIX T(transform);
-  T.identity();
+  // the amplitudes arrive in the basis of ham_adi - the step's projector moved them in the propagation, no transform here
 
   for (int n = 0; n < nnucl; n++) {
 
@@ -352,13 +349,13 @@ CMATRIX nHamiltonian::Ehrenfest_forces_adi_unit(CMATRIX &ampl_adi, int option,
       //      tmp = (T.H() * (*dc1_adi[n]) ).H() *  (T.H() * (*ham_adi) * T);
       // AVA - testing new approach  11/9/2023 - thanks to Daeho; let's keep
       // this version it works better and is more theoretically sound
-      tmp = (T.H() * (*dc1_adi[n]) * T).H() * (T.H() * (*ham_adi) * T);
+      tmp = (*dc1_adi[n]).H() * (*ham_adi);
       tmp = tmp + tmp.H();
       res.M[n] =
-          -(ampl_adi.H() * (T.H() * (*d1ham_adi[n]) * T - tmp) * ampl_adi).M[0];
+          -(ampl_adi.H() * ((*d1ham_adi[n]) - tmp) * ampl_adi).M[0];
     } else if (option == 1) { // Options that disregard the NACs - appropriate
                               // for the LD integrators
-      res.M[n] = -(ampl_adi.H() * T.H() * (*d1ham_adi[n]) * T * ampl_adi).M[0];
+      res.M[n] = -(ampl_adi.H() * (*d1ham_adi[n]) * ampl_adi).M[0];
     }
 
   } // for n
@@ -377,32 +374,21 @@ CMATRIX nHamiltonian::Ehrenfest_forces_adi_unit(CMATRIX &ampl_adi, int option,
   return res;
 }
 
-CMATRIX nHamiltonian::Ehrenfest_forces_adi_unit(CMATRIX &ampl_adi, int option,
-                                                CMATRIX &transform,
-                                                double gamma) {
-  return Ehrenfest_forces_adi_unit(ampl_adi, option, transform, gamma, 1);
+CMATRIX nHamiltonian::Ehrenfest_forces_adi_unit(CMATRIX &ampl_adi, int option, double gamma) {
+  return Ehrenfest_forces_adi_unit(ampl_adi, option, gamma, 1);
 }
 
-CMATRIX nHamiltonian::Ehrenfest_forces_adi_unit(CMATRIX &ampl_adi, int option,
-                                                CMATRIX &transform) {
-  return Ehrenfest_forces_adi_unit(ampl_adi, option, transform, 0.0, 1);
-}
 
 CMATRIX nHamiltonian::Ehrenfest_forces_adi_unit(CMATRIX &ampl_adi, int option) {
-  CMATRIX I(nadi, nadi);
-  I.identity();
-  return Ehrenfest_forces_adi_unit(ampl_adi, option, I, 0.0, 1);
+  return Ehrenfest_forces_adi_unit(ampl_adi, option, 0.0, 1);
 }
 
 CMATRIX nHamiltonian::Ehrenfest_forces_adi_unit(CMATRIX &ampl_adi) {
-  CMATRIX I(nadi, nadi);
-  I.identity();
-  return Ehrenfest_forces_adi_unit(ampl_adi, 0, I, 0.0, 1);
+  return Ehrenfest_forces_adi_unit(ampl_adi, 0, 0.0, 1);
 }
 
 CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl,
                                            int option,
-                                           vector<CMATRIX *> &transforms,
                                            vector<double> &gammas, int normalized) {
   /**
     \brief Computes the Ehrenfest forces in the adiabatic basis
@@ -471,12 +457,10 @@ CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl,
     pop_submatrix(ampl_adi, ampl_tmp, stenc_ampl, stenc_col);
 
     if (lvl == 0) {
-      frc_tmp = Ehrenfest_forces_adi_unit(ampl_tmp, option, *transforms[0],
-                                          gammas[0], normalized); // gammas[i]);
+      frc_tmp = Ehrenfest_forces_adi_unit(ampl_tmp, option, gammas[0], normalized); // gammas[i]);
     }
     if (lvl == 1) {
-      frc_tmp = children[i]->Ehrenfest_forces_adi_unit(
-          ampl_tmp, option, *transforms[i], gammas[i], normalized);
+      frc_tmp = children[i]->Ehrenfest_forces_adi_unit(ampl_tmp, option, gammas[i], normalized);
     }
 
     push_submatrix(F, frc_tmp, stenc_frc, stenc_col);
@@ -486,48 +470,18 @@ CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl,
   return F;
 }
 
-CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl,
-                                           int option,
-                                           vector<CMATRIX *> &transforms,
-                                           vector<double> &gammas) {
-  return Ehrenfest_forces_adi(ampl_adi, lvl, option, transforms, gammas, 1);
-}
 
-CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl,
-                                           int option,
-                                           vector<CMATRIX *> &transforms) {
-  int ntraj = ampl_adi.n_cols;
-  vector<double> gammas(ntraj, 0.0);
-
-  return Ehrenfest_forces_adi(ampl_adi, lvl, option, transforms, gammas, 1);
-}
 
 CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl,
                                            int option, double gamma, int normalized) {
   /**
     The uniform-gamma form: one Meyer-Miller ZPE parameter for every
-    trajectory (the sqc_gamma control key) and identity transforms - the
-    amplitudes are already in the current adiabatic basis
+    trajectory (the sqc_gamma control key) - the amplitudes arrive in the
+    current adiabatic basis (the step's projector moved them in the propagation)
   */
   int ntraj = ampl_adi.n_cols;
-  vector<CMATRIX *> I(ntraj);
   vector<double> gammas(ntraj, gamma);
-
-  for (int itraj = 0; itraj < ntraj; itraj++) {
-    I[itraj] = new CMATRIX(nadi, nadi);
-    I[itraj]->load_identity();
-  }
-
-  CMATRIX F(nnucl, ampl_adi.n_cols);
-
-  F = Ehrenfest_forces_adi(ampl_adi, lvl, option, I, gammas, normalized);
-
-  for (int itraj = 0; itraj < ntraj; itraj++) {
-    delete I[itraj];
-  }
-  I.clear();
-
-  return F;
+  return Ehrenfest_forces_adi(ampl_adi, lvl, option, gammas, normalized);
 }
 
 CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl,
@@ -542,23 +496,8 @@ CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl,
 
 CMATRIX nHamiltonian::Ehrenfest_forces_adi(CMATRIX &ampl_adi, int lvl) {
   int ntraj = ampl_adi.n_cols;
-  vector<CMATRIX *> I(ntraj);
   vector<double> gammas(ntraj, 0.0);
-
-  for (int itraj = 0; itraj < ntraj; itraj++) {
-    I[itraj] = new CMATRIX(nadi, nadi);
-    I[itraj]->load_identity();
-  }
-
-  CMATRIX F(nnucl, ampl_adi.n_cols);
-
-  F = Ehrenfest_forces_adi(ampl_adi, lvl, 0, I, gammas);
-
-  for (int itraj = 0; itraj < ntraj; itraj++) {
-    delete I[itraj];
-  }
-  I.clear();
-  return F;
+  return Ehrenfest_forces_adi(ampl_adi, lvl, 0, gammas, 1);
 }
 
 /*
@@ -660,12 +599,11 @@ CMATRIX nHamiltonian::Ehrenfest_forces_dia_dm(vector<CMATRIX *> &dm_dia, int lvl
   return F;
 }
 
-CMATRIX nHamiltonian::Ehrenfest_forces_adi_unit_dm(CMATRIX &dm_adi, int option, CMATRIX &transform, double gamma,
-                                                   int normalized) {
+CMATRIX nHamiltonian::Ehrenfest_forces_adi_unit_dm(CMATRIX &dm_adi, int option, double gamma, int normalized) {
   /**
     The density-matrix form of Ehrenfest_forces_adi_unit: every C^H A C of the amplitude form is tr(A rho) for
-    rho = C_adi C_adi^H of one trajectory (dyn_variables::dm_adi), the norm C^H C is tr(rho), T the identity as
-    the amplitude form takes it - equal to the amplitude form for a pure state
+    rho = C_adi C_adi^H of one trajectory (dyn_variables::dm_adi) in the basis of ham_adi, the norm C^H C is tr(rho)
+    - equal to the amplitude form for a pure state
   */
   if (!(option == 0 || option == 1)) {
     cout << "Error in Ehrenfest_forces_adi_unit_dm(): option = " << option
@@ -680,8 +618,7 @@ CMATRIX nHamiltonian::Ehrenfest_forces_adi_unit_dm(CMATRIX &dm_adi, int option, 
   complex<double> norm = dm_adi.tr();
   CMATRIX res(nnucl, 1);
   CMATRIX tmp(nadi, nadi);
-  CMATRIX T(transform);
-  T.identity();
+  // the amplitudes arrive in the basis of ham_adi - the step's projector moved them in the propagation, no transform here
   for (int n = 0; n < nnucl; n++) {
     if (d1ham_adi_mem_status[n] == 0) {
       cout << "Error in Ehrenfest_forces_adi_unit_dm(): the derivatives of the Hamiltonian matrix in the \
@@ -694,11 +631,11 @@ CMATRIX nHamiltonian::Ehrenfest_forces_adi_unit_dm(CMATRIX &dm_adi, int option, 
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
     if (option == 0) { // all terms, the derivative couplings included
-      tmp = (T.H() * (*dc1_adi[n]) * T).H() * (T.H() * (*ham_adi) * T);
+      tmp = (*dc1_adi[n]).H() * (*ham_adi);
       tmp = tmp + tmp.H();
-      res.M[n] = -((T.H() * (*d1ham_adi[n]) * T - tmp) * dm_adi).tr();
+      res.M[n] = -(((*d1ham_adi[n]) - tmp) * dm_adi).tr();
     } else if (option == 1) { // no derivative-coupling terms - the local-diabatization-consistent variant
-      res.M[n] = -(T.H() * (*d1ham_adi[n]) * T * dm_adi).tr();
+      res.M[n] = -((*d1ham_adi[n]) * dm_adi).tr();
     }
   } // for n
   // the Meyer-Miller ZPE term of Ehrenfest_forces_adi_unit - amplitude-free
@@ -715,7 +652,7 @@ CMATRIX nHamiltonian::Ehrenfest_forces_adi_unit_dm(CMATRIX &dm_adi, int option, 
 CMATRIX nHamiltonian::Ehrenfest_forces_adi_dm(vector<CMATRIX *> &dm_adi, int lvl, int option, double gamma,
                                               int normalized) {
   /**
-    The density-matrix form of Ehrenfest_forces_adi with the uniform gamma and identity transforms: one nadi x nadi
+    The density-matrix form of Ehrenfest_forces_adi with the uniform gamma: one nadi x nadi
     density per trajectory (dyn_variables::dm_adi), lvl 0 - this Hamiltonian serves every trajectory, lvl 1 -
     children[i] serves trajectory i
     Returns MATRIX(ndof, ntraj) - the Ehrenfest forces in the adiabatic representation
@@ -726,13 +663,11 @@ CMATRIX nHamiltonian::Ehrenfest_forces_adi_dm(vector<CMATRIX *> &dm_adi, int lvl
          << ") should be equal to the number of children Hamiltonians (" << children.size() << ")\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
-  CMATRIX I(nadi, nadi);
-  I.load_identity();
   CMATRIX frc_tmp(nnucl, 1);
   CMATRIX F(nnucl, ntraj);
   for (int i = 0; i < ntraj; i++) {
-    if (lvl == 0) { frc_tmp = Ehrenfest_forces_adi_unit_dm(*dm_adi[i], option, I, gamma, normalized); }
-    if (lvl == 1) { frc_tmp = children[i]->Ehrenfest_forces_adi_unit_dm(*dm_adi[i], option, I, gamma, normalized); }
+    if (lvl == 0) { frc_tmp = Ehrenfest_forces_adi_unit_dm(*dm_adi[i], option, gamma, normalized); }
+    if (lvl == 1) { frc_tmp = children[i]->Ehrenfest_forces_adi_unit_dm(*dm_adi[i], option, gamma, normalized); }
     for (int n = 0; n < nnucl; n++) { F.set(n, i, frc_tmp.get(n, 0)); }
   }
   return F;

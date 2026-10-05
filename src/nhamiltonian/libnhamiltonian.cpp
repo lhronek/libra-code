@@ -279,7 +279,7 @@ void export_nhamiltonian_objects(){
   = &nHamiltonian::Ehrenfest_energy_dia_dm;
   complex<double> (nHamiltonian::*expt_Ehrenfest_energy_dia_dm_v2)(CMATRIX& dm_dia, vector<int>& id_)
   = &nHamiltonian::Ehrenfest_energy_dia_dm;
-  CMATRIX (nHamiltonian::*expt_Ehrenfest_forces_adi_unit_dm_v1)(CMATRIX& dm_adi, int option, CMATRIX& transform, double gamma, int normalized)
+  CMATRIX (nHamiltonian::*expt_Ehrenfest_forces_adi_unit_dm_v1)(CMATRIX& dm_adi, int option, double gamma, int normalized)
   = &nHamiltonian::Ehrenfest_forces_adi_unit_dm;
   CMATRIX (nHamiltonian::*expt_Ehrenfest_forces_dia_unit_dm_v1)(CMATRIX& dm_dia, int option, double gamma, int normalized)
   = &nHamiltonian::Ehrenfest_forces_dia_unit_dm;
@@ -334,7 +334,7 @@ void export_nhamiltonian_objects(){
   = &nHamiltonian::QTSH_energy_dia_dm;
   complex<double> (nHamiltonian::*expt_QTSH_energy_dia_dm_v3)(CMATRIX& dm_dia, MATRIX& p, const MATRIX& invM)
   = &nHamiltonian::QTSH_energy_dia_dm;
-  CMATRIX (nHamiltonian::*expt_QTSH_forces_adi_unit_dm_v1)(CMATRIX& dm_adi, int option, CMATRIX& transform)
+  CMATRIX (nHamiltonian::*expt_QTSH_forces_adi_unit_dm_v1)(CMATRIX& dm_adi, int option)
   = &nHamiltonian::QTSH_forces_adi_unit_dm;
   CMATRIX (nHamiltonian::*expt_QTSH_forces_dia_unit_dm_v1)(CMATRIX& dm_dia, int option)
   = &nHamiltonian::QTSH_forces_dia_unit_dm;
