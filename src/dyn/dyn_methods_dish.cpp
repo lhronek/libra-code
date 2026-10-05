@@ -81,7 +81,7 @@ vector<int> decoherence_event(MATRIX& coherence_time, MATRIX& coherence_interval
       vector<int> selection(1,0);
       //randperm(which_decohere.size(), 1, selection);
       randperm(1, which_decohere.size(), selection, rnd);
-      res[traj] = selection[0];
+      res[traj] = which_decohere[selection[0]];   // the selected member of the elapsed set - selection indexes that set, not the states
     }
 
   }// for traj
