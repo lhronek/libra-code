@@ -78,6 +78,8 @@ public:
   int id;                           ///< index of this Hamiltonian in this level of hierarchy
   nHamiltonian* parent;             ///< the Hamiltonian of a higher level
   vector<nHamiltonian*> children;   ///< the Hamiltonians of the lower level
+  vector<int> children_owned;       ///< per child: 1 - allocated by add_new_children and deleted by this node's destructor, 0 - an
+                                    ///< external child of add_child, the caller's (detached, not deleted)
 
 
   int nnucl;                 ///< number of nuclear degrees of freedom - expected

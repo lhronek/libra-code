@@ -410,11 +410,17 @@ nHamiltonian::~nHamiltonian() {
       cum_phase_corr_mem_status = 0;
     }
 
-    /// Deallocate children if they aren't deallocated yet
+    /// The children this node allocated (add_new_children) are deleted - destroyed and freed (upstream called their
+    /// destructor explicitly and leaked the objects) - a child the caller handed over with add_child stays the
+    /// caller's and is only detached, so its parent pointer does not dangle and it is destroyed once
     for (n = 0u; n < children.size(); n++) {
-      if (children[n] != nullptr) {
-        children[n]->~nHamiltonian();
+      if (children[n] == nullptr) { continue; }
+      if (n < children_owned.size() && children_owned[n] == 0) {
+        children[n]->parent = nullptr;
+      } else {
+        delete children[n];
       }
+      children[n] = nullptr;
     } // for n
     children.clear();
 
@@ -731,6 +737,7 @@ void nHamiltonian::add_child(nHamiltonian &child) {
   // cout<<"in add_child, new child id = "<<child.id<<"\n";
   children.push_back(&child);
 
+  children_owned.push_back(0);
   child.parent = this;
   // cout<<"parent = "<<child.parent<<endl;
   child.set_levels(level + 1);
@@ -748,6 +755,7 @@ void nHamiltonian::add_new_children(int _ndia, int _nadi, int _nnucl,
   for (int i = 0; i < nchildren; i++) {
 
     children.push_back(new nHamiltonian(_ndia, _nadi, _nnucl));
+    children_owned.push_back(1);
 
     children[starting_indx + i]->id = starting_indx + i;
     children[starting_indx + i]->parent = this;
