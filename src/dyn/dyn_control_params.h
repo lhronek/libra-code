@@ -671,7 +671,7 @@ class dyn_control_params{
            variants of 1 on the diabatic state lists, the collapses and projections on the Lowdin diabatic state
            (the plain diabatic state for an identity metric), written through into the propagated adiabatic
            variable under rep_tdse 1 / 3 - 1 is its adiabatic twin for rep_sh 1 (sanity_check pairs them)
-      - 9: SCOTSH = state coherence transfer TSH (experimental)
+      - 9: SCOTSH = state coherence transfer TSH (experimental) - the adiabatic hopping alone (rep_sh 1)
 
   */
   double decoherence_algo;

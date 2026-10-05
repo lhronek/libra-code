@@ -475,6 +475,14 @@ void dyn_control_params::sanity_check(){
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
+  /// the simple decoherence (9) keeps its gap statistics and coherence factors per ADIABATIC pair and renormalizes the
+  /// adiabatic hop proposals - it has no diabatic form
+  if(decoherence_algo==9 && rep_sh==0){
+    std::cout<<"Error in dyn_control_params::sanity_check: decoherence_algo = 9 (the simple decoherence) keeps its gap statistics"
+        <<" and coherence factors per adiabatic pair and renormalizes the adiabatic hop proposals - under rep_sh = 0 (diabatic"
+        <<" hopping) it has no form - use rep_sh 1\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
   /// the time-overlap NAC route builds the couplings with nac_algo 0 (HST)
   /// or 1 (NPI) - with nac_algo -1 it computes nothing and stores zero
   /// couplings on every trajectory

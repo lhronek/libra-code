@@ -419,7 +419,7 @@ class DynControlParams:
     #:  8 the instantaneous decoherence in the diabatic basis - for the diabatic hopping (rep_sh 0): the variants of 1 on
     #:    the diabatic state lists, the collapses and projections on the Lowdin diabatic state, written through into
     #:    the propagated adiabatic variable under rep_tdse 1 / 3 - 1 is its adiabatic twin for rep_sh 1
-    #:  9 simple decoherence, experimental
+    #:  9 simple decoherence, experimental - the adiabatic hopping alone (rep_sh 1)
     decoherence_algo: float = -1
 
     #: SDM norm tolerance
