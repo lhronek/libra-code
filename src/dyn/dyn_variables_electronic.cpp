@@ -1476,6 +1476,12 @@ void dyn_variables::update_active_states(){
 
 
 
+static int image_generator_seed(unsigned int s){
+  /** The seed of the image generator from the main seed - mixed, so that the image draws of a run seeded k never replay the
+      hop decisions of a run seeded k + 1 (the worker pools seed consecutively) */
+  return (int)((s * 2654435761u + 0x9e3779b9u) & 0x7fffffffu);
+}
+
 void dyn_variables:: set_active_states_diff_rep(int rep_sh, Random& rnd){
 /*
   Set the active state in the other representation through the transformation matrix
@@ -1498,6 +1504,12 @@ void dyn_variables:: set_active_states_diff_rep(int rep_sh, Random& rnd){
   }
   
   // Transform the active states between representations based on the transformation matrix.
+  // the image draws come from their own generator, seeded once from the main generator's seed (not its stream): a saved
+  // property that needs the image neither consumes nor shifts the random numbers of the hop decisions
+  if(!image_rnd_seeded){
+    image_rnd = Random(image_generator_seed(rnd.get_seed()));
+    image_rnd_seeded = 1;
+  }
   CMATRIX pop_adi(nadi, nadi);
   CMATRIX pop_dia(ndia, ndia);
   CMATRIX U(ndia, nadi);
@@ -1522,7 +1534,7 @@ void dyn_variables:: set_active_states_diff_rep(int rep_sh, Random& rnd){
       vector<double> diag_els(ndia, 0.0);
       for(i=0;i<ndia; i++){ diag_els[i] = pop_dia.get(i,i).real(); }
 
-      ksi = rnd.uniform(0.0, 1.0);
+      ksi = image_rnd.uniform(0.0, 1.0);
       act_states_dia[traj] = hop(diag_els, ksi); 
     }
   }
@@ -1548,7 +1560,7 @@ void dyn_variables:: set_active_states_diff_rep(int rep_sh, Random& rnd){
       vector<double> diag_els(nadi, 0.0);
       for(i=0;i<nadi; i++){ diag_els[i] = pop_adi.get(i,i).real(); }
 
-      ksi = rnd.uniform(0.0, 1.0);
+      ksi = image_rnd.uniform(0.0, 1.0);
       act_states[traj] = hop(diag_els, ksi); 
     }
   }

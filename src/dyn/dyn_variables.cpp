@@ -116,6 +116,7 @@ dyn_variables::dyn_variables(int _ndia, int _nadi, int _ndof, int _ntraj){
 
   ///================= DISH ====================
   dish_vars_status = 0;
+  image_rnd_seeded = 0;
 
   ///================= FSSH2 ===================
   fssh2_vars_status = 0;
@@ -412,6 +413,7 @@ dyn_variables::dyn_variables(const dyn_variables& x){
   bllz_hist_size = 0;
   lz_gap_min_status = 0;
   dish_vars_status = 0;
+  image_rnd_seeded = 0;
   fssh2_vars_status = 0;
   shxf_vars_status = 0;
   mqcxf_vars_status = 0;

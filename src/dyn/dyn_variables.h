@@ -212,6 +212,9 @@ class dyn_variables{
      vector<int> act_states_dia(ntraj)
   */
   vector<int> act_states_dia;
+  Random image_rnd;              ///< the generator of the active-state image draws (set_active_states_diff_rep) - seeded once from the
+                                 ///< main generator's seed, not its stream, so a saved property that needs the image leaves the hop decisions untouched
+  int image_rnd_seeded;          ///< 0 until the first image draw seeds image_rnd
 
 
   /**

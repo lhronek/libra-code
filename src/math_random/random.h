@@ -43,6 +43,7 @@ class Random{
   // per-object generator: seeding one Random must not disturb any other
   // (the previous srand/rand pair shared one process-global stream)
   std::mt19937 gen;
+  unsigned int seed_value;   ///< the seed gen was constructed with (the random_device draw for the default)
 
   int fact(int k);
   double Gamma(double a);
@@ -50,8 +51,9 @@ class Random{
 
   public:
 
-  Random(){ std::random_device rd; gen.seed(rd()); }
-  Random(int seed_){ gen.seed((unsigned int)seed_); }  ///< reproducible / worker-safe seeding
+  Random(){ std::random_device rd; seed_value = rd(); gen.seed(seed_value); }
+  Random(int seed_){ seed_value = (unsigned int)seed_; gen.seed(seed_value); }  ///< reproducible / worker-safe seeding
+  unsigned int get_seed(){ return seed_value; }   ///< the seed - a derived generator (the active-state image draws) is seeded from it
   ~Random(){ ;; }
 
 

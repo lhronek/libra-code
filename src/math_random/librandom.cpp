@@ -41,6 +41,7 @@ void export_Random_objects(){
 //      .def("__copy__", &generic__copy__<Random>)
 //      .def("__deepcopy__", &generic__deepcopy__<Random>)
 
+      .def("get_seed",&Random::get_seed)
       .def("uniform",&Random::uniform)
       .def("p_uniform",&Random::p_uniform)
 
