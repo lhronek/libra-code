@@ -107,7 +107,7 @@ class DynControlParams:
     #: of the diabatic Hamiltonians, diabatic states overlaps, etc.
     #: 0 diabatic
     #: 1 adiabatic [default]
-    rep_force: int = 1
+    rep_force: int = 1   #: with force_method 1 rep_force must equal rep_sh (the hopping basis supplies the active state) unless enforce_state_following names it
 
     #: Force computation method
     #: 0 none, e.g. we do not really need them

@@ -429,6 +429,9 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
 
                 - 0: diabatic
                 - 1: adiabatic [ default ]
+                With force_method 1 (the force of the active state) rep_force must equal rep_sh - the hopping basis
+                supplies the state (sanity_check refuses the cross pairing), the mean-field forces and an enforced
+                state (enforce_state_following 1) take either
 
 
             * **dyn_params["force_method"]** ( int ): How to compute forces in the dynamics:

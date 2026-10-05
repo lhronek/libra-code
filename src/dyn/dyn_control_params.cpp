@@ -483,6 +483,17 @@ void dyn_control_params::sanity_check(){
         <<" hopping) it has no form - use rep_sh 1\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
+  /// the state-specific force (force_method 1) is the force of the ACTIVE state, which the hopping basis supplies
+  /// (driving_states) - the other representation's force indexed by that label would move the trajectory on the surface
+  /// of a different state - under enforce_state_following the user names the state itself, in either basis
+  if(force_method==1 && rep_force!=rep_sh && enforce_state_following!=1){
+    std::cout<<"Error in dyn_control_params::sanity_check: force_method = 1 (the force of the active state) with rep_force = "
+        <<rep_force<<" and rep_sh = "<<rep_sh<<" would index the forces of one representation by the active state of the other"
+        <<" - the hopping basis supplies the state, so rep_force must equal rep_sh (set rep_force = "<<rep_sh<<") - the mean-field"
+        <<" forces (force_method 2 / 3) and an enforced state (enforce_state_following = 1) take either rep_force\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
   /// the time-overlap NAC route builds the couplings with nac_algo 0 (HST)
   /// or 1 (NPI) - with nac_algo -1 it computes nothing and stores zero
   /// couplings on every trajectory

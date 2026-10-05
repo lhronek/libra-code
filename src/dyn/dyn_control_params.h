@@ -157,6 +157,10 @@ class dyn_control_params{
     Options:
       - 0: diabatic
       - 1: adiabatic [ default ]
+
+    With force_method 1 (the force of the active state) rep_force must equal rep_sh - the hopping basis supplies the
+    state, the other representation's force indexed by that label is a different state's (sanity_check refuses it);
+    the mean-field forces (force_method 2 / 3) and an enforced state (enforce_state_following 1) take either
   */
   int rep_force;
 
