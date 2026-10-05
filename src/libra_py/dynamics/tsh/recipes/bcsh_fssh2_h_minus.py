@@ -251,7 +251,7 @@ def load(dyn_general):
 
     #Reorganization energy of the bath, Ha  - for "decoherence_times_type":5
     #default: 0.0 Ha
-    dyn_general.update( { "reorg_eergy":0.0 } )
+    dyn_general.update( { "reorg_energy":0.0 } )
 
     #A flag to apply the dephasing-informed approach of Sifain et al 
     #to correct dephasing times: 
