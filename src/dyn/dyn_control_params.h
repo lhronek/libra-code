@@ -1015,8 +1015,10 @@ class dyn_control_params{
   ///===============================================================================
 
   /**
-    Temperature of the system. This parameter could be used even in the NVE simulations
-    e.g. as a parameters to compute hop acceptance probabilities based on Boltzmann factors [ default: 300 K]
+    Temperature of the system, K - read also in NVE runs by the Boltzmann hop acceptances (hop_acceptance_algo 31 / 32),
+    the Boltzmann scaling of the proposals (use_boltz_factor), the KC-RPMD forces and the Gu-Franco rates
+    (decoherence_times_type 5) - must not be negative, and 0 K is refused by the KC-RPMD forces (force_method 4,
+    use_kcrpmd 1), the acceptance 32 and the Gu-Franco rates, which have no zero-temperature limit [ default: 300 K]
   */ 
   double Temperature;
 

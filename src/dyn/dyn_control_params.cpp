@@ -469,6 +469,27 @@ void dyn_control_params::sanity_check(){
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
+  /// every reader of Temperature divides by kB T or takes its root - below 0 K the Boltzmann factors invert, while 0 K
+  /// is the limit the Boltzmann acceptance 31, the proposal scaling and the Langevin noise take (zero) and the readers
+  /// without that limit refuse below
+  if(Temperature<0.0){
+    std::cout<<"Error in dyn_control_params::sanity_check: Temperature = "<<Temperature<<" K must not be negative - the"
+        <<" Boltzmann factors of the hop acceptances and proposals, the KC-RPMD beta and the Gu-Franco rates divide by kB T\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  /// the KC-RPMD beta = 1/(kB T) is infinite at 0 K
+  if((force_method==4 || use_kcrpmd==1) && Temperature<=0.0){
+    std::cout<<"Error in dyn_control_params::sanity_check: Temperature = "<<Temperature<<" K with the KC-RPMD forces (force_method"
+        <<" 4) or propagation (use_kcrpmd 1) - beta = 1/(kB T) is infinite at 0 K, set a positive Temperature\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  /// the classical Maxwell-Boltzmann acceptance takes sqrt(E/(kB T)) - NaN at 0 K
+  if(hop_acceptance_algo==32 && Temperature<=0.0){
+    std::cout<<"Error in dyn_control_params::sanity_check: Temperature = "<<Temperature<<" K with hop_acceptance_algo = 32 (the"
+        <<" classical Maxwell-Boltzmann acceptance) - its probability takes sqrt(E/(kB T)), NaN at 0 K, set a positive Temperature\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
   /// the instantaneous decoherence reads the hops of one basis: decoherence_algo 1 the adiabatic ones (rep_sh 1),
   /// decoherence_algo 8 the diabatic ones (rep_sh 0, acting on the diabatic variable in the Lowdin frame of the
   /// diabats) - the cross pairings would act on lists the hopping never updates
