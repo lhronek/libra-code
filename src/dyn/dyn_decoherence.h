@@ -83,6 +83,17 @@ CMATRIX lowdin_ampl(CMATRIX& Coeff, nHamiltonian& ham, vector<CMATRIX>& X, vecto
 void lowdin_ampl_back(CMATRIX& Coeff, CMATRIX& d, CMATRIX& before, vector<CMATRIX>& X, vector<int>& lowdin);
 vector<CMATRIX> lowdin_dm(vector<CMATRIX*>& dm, nHamiltonian& ham, vector<CMATRIX>& X, vector<int>& lowdin);
 void lowdin_dm_back(vector<CMATRIX*>& dm, vector<CMATRIX>& rho, vector<CMATRIX>& before, vector<CMATRIX>& X, vector<int>& lowdin);
+// the once-per-step corrections in the diabatic basis (rep_sh 0) - on the Lowdin diabatic amplitudes / densities with the
+// diabatic lists and rates, written back through X
+void sdm_dia(CMATRIX& Coeff, nHamiltonian& ham, double dt, vector<int>& act_st, vector<MATRIX>& decoh_rates, double tol, int isNBRA);
+void sdm_dia_dm(vector<CMATRIX*>& dm, nHamiltonian& ham, double dt, vector<int>& act_st, vector<MATRIX>& decoh_rates, double tol, int isNBRA);
+void wp_reversal_events_dia(dyn_variables& dyn_var, nHamiltonian& ham, double dt);
+void bcsh_dia(CMATRIX& Coeff, nHamiltonian& ham, double dt, vector<int>& act_states, MATRIX& reversal_events);
+void bcsh_dia_dm(vector<CMATRIX*>& dm, nHamiltonian& ham, double dt, vector<int>& act_states, MATRIX& reversal_events);
+void mfsd_dia(MATRIX& p, CMATRIX& Coeff, MATRIX& invM, double dt, vector<int>& act_states, vector<MATRIX>& decoherence_rates,
+   nHamiltonian& ham, Random& rnd, int isNBRA);
+void mfsd_dia_dm(MATRIX& p, vector<CMATRIX*>& dm, MATRIX& invM, double dt, vector<int>& act_states, vector<MATRIX>& decoherence_rates,
+   nHamiltonian& ham, Random& rnd, int isNBRA);
 
 CMATRIX afssh_dzdt(CMATRIX& dz, CMATRIX& Hvib, CMATRIX& F, CMATRIX& C, double mass, int act_state);
 void integrate_afssh_moments(CMATRIX& dR, CMATRIX& dP, CMATRIX& Hvib, CMATRIX& F, CMATRIX& C, double mass, int act_state, double dt, int nsteps);
@@ -177,6 +188,8 @@ vector<int> dish_dm(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& d
 // DISH in the diabatic basis (rep_sh 0) on the Lowdin diabatic amplitudes ampl_dia / densities dm_dia with the diabatic rates
 vector<int> dish_dia(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates, dyn_control_params& prms, Random& rnd);
 vector<int> dish_dia_dm(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates, dyn_control_params& prms, Random& rnd);
+void dish_rev2023_dia(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates, dyn_control_params& prms, Random& rnd);
+void dish_rev2023_dia_dm(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates, dyn_control_params& prms, Random& rnd);
 void dish_rev2023_dm(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates, dyn_control_params& prms, Random& rnd);
 
 /*

@@ -457,6 +457,9 @@ void export_dyn_decoherence_objects(){
   void (*expt_sdm_dm_v1)(CMATRIX& rho, double dt, int act_st, MATRIX& decoh_rates, double tol) = &sdm_dm;
   def("sdm_dm", expt_sdm_dm_v1);
 
+  void (*expt_sdm_dia_v1)(CMATRIX& Coeff, nHamiltonian& ham, double dt, vector<int>& act_st, vector<MATRIX>& decoh_rates, double tol, int isNBRA) = &sdm_dia;
+  def("sdm_dia", expt_sdm_dia_v1);
+
   void (*expt_instantaneous_decoherence_v1)(CMATRIX& Coeff, 
   vector<int>& accepted_states, vector<int>& proposed_states, vector<int>& initial_states,
   int instantaneous_decoherence_variant, int collapse_option) = &instantaneous_decoherence;
@@ -472,9 +475,15 @@ void export_dyn_decoherence_objects(){
   (dyn_variables& dyn_var, nHamiltonian& ham, double dt) = &wp_reversal_events;
   def("wp_reversal_events", expt_wp_reversal_events_v1);
 
+  void (*expt_wp_reversal_events_dia_v1)(dyn_variables& dyn_var, nHamiltonian& ham, double dt) = &wp_reversal_events_dia;
+  def("wp_reversal_events_dia", expt_wp_reversal_events_dia_v1);
+
   CMATRIX (*expt_bcsh_v1)
   (CMATRIX& Coeff, double dt, vector<int>& act_states, MATRIX& reversal_events) = &bcsh;
   def("bcsh", expt_bcsh_v1);
+
+  void (*expt_bcsh_dia_v1)(CMATRIX& Coeff, nHamiltonian& ham, double dt, vector<int>& act_states, MATRIX& reversal_events) = &bcsh_dia;
+  def("bcsh_dia", expt_bcsh_dia_v1);
 
 
   CMATRIX (*expt_mfsd_v1)
@@ -486,6 +495,10 @@ void export_dyn_decoherence_objects(){
   (MATRIX& p, CMATRIX& Coeff, MATRIX& invM, double dt, vector<int>& act_states, vector<MATRIX>& decoherence_rates, 
    nHamiltonian& ham, Random& rnd) = &mfsd;
   def("mfsd", expt_mfsd_v2);
+
+  void (*expt_mfsd_dia_v1)(MATRIX& p, CMATRIX& Coeff, MATRIX& invM, double dt, vector<int>& act_states, vector<MATRIX>& decoherence_rates,
+                           nHamiltonian& ham, Random& rnd, int isNBRA) = &mfsd_dia;
+  def("mfsd_dia", expt_mfsd_dia_v1);
   
   void (*expt_xf_hop_reset)
   (dyn_variables& dyn_var, vector<int>& accepted_states, vector<int>& initial_states) = &xf_hop_reset;
@@ -610,6 +623,10 @@ void export_dyn_decoherence_objects(){
   (dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates,
    dyn_control_params& prms,Random& rnd) = &dish_dia;
   def("dish_dia", expt_dish_dia_v1);
+
+  void (*expt_dish_rev2023_dia_v1)(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates,
+                                   dyn_control_params& prms, Random& rnd) = &dish_rev2023_dia;
+  def("dish_rev2023_dia", expt_dish_rev2023_dia_v1);
 
   void (*expt_dish_rev2023_v1)(dyn_variables& dyn_var, nHamiltonian& ham,
                   vector<MATRIX>& decoherence_rates,

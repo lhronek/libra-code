@@ -760,15 +760,16 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
             * **dyn_params["decoherence_algo"]** ( int ): Selector of the method to incorporate decoherence.
 
                 - [-1]: no decoherence [ default ]
-                - 0: SDM and alike
+                - 0: SDM and alike (in the hopping basis of rep_sh - the Lowdin diabatic variable, lists and rates under 0)
                 - 1: instantaneous decoherence options (ID-S, ID-A, ID-C)
                 - 2: AFSSH - refused: its application apply_afssh is commented out upstream (2022-11-07)
                      and nothing else dispatches on 2
-                - 3: BCSH of Linjun Wang
-                - 4: MF-SD of Bedard-Hearn, Larsen, Schwartz
+                - 3: BCSH of Linjun Wang (in the hopping basis of rep_sh - the Lowdin diabatic variable, lists and rates under 0)
+                - 4: MF-SD of Bedard-Hearn, Larsen, Schwartz (in the hopping basis of rep_sh - the Lowdin diabatic variable, lists and rates under 0) - the
+                     diabatic collapse rescales the momentum isotropically, as the diabatic hop rescaling does
                 - 5: SHXF of Min
                 - 6: MQCXF
-                - 7: DISH, rev2023
+                - 7: DISH, rev2023 (in the hopping basis of rep_sh - the Lowdin diabatic variable, lists and rates under 0)
                 - 8: the instantaneous decoherence in the diabatic basis - for the diabatic hopping (rep_sh 0): the
                      variants of 1 on the diabatic state lists, the collapses and projections on the Lowdin diabatic
                      state (the plain diabatic state for an identity metric), written through into the propagated

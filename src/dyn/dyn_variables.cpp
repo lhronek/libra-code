@@ -171,6 +171,7 @@ void dyn_variables::allocate_bcsh(){
   if(bcsh_vars_status==0){
 
     reversal_events = new MATRIX(nadi, ntraj);
+    reversal_events_dia = new MATRIX(ndia, ntraj);
     bcsh_vars_status = 1;
 
   }
@@ -475,6 +476,7 @@ dyn_variables::dyn_variables(const dyn_variables& x){
 
     // Copy content
     *reversal_events = *x.reversal_events;
+    *reversal_events_dia = *x.reversal_events_dia;
 
   }// if BCSH vars
 
@@ -693,6 +695,7 @@ dyn_variables::~dyn_variables(){
 
   if(bcsh_vars_status==1){
     delete reversal_events;
+    delete reversal_events_dia;
 
     bcsh_vars_status = 0;
   }

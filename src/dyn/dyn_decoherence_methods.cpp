@@ -2225,6 +2225,224 @@ void mfsd_dm(MATRIX &p, vector<CMATRIX *> &dm, MATRIX &invM, double dt, vector<i
 // the collapses and projections take the density primitives, the XF Hamiltonian is Hermitian so its half step
 // is the unitary map rho -> D rho D^H - every twin is its amplitude form written on the density
 
+// the once-per-step corrections in the diabatic basis - after the adiabatic forms they call
+static vector<CMATRIX *> lowdin_pointers(vector<CMATRIX> &rho) {
+  vector<CMATRIX *> ptrs(rho.size());
+  for (std::size_t traj = 0; traj < rho.size(); traj++) { ptrs[traj] = &rho[traj]; }
+  return ptrs;
+}
+
+void sdm_dia(CMATRIX &Coeff, nHamiltonian &ham, double dt, vector<int> &act_st, vector<MATRIX> &decoh_rates, double tol, int isNBRA) {
+  /**
+    SDM in the diabatic basis (rep_sh 0): the Lowdin diabatic amplitudes d = Y c of every trajectory are damped toward the
+    active diabatic state act_st with the rates of the diabatic basis (sdm's map) and written back into Coeff through X
+  */
+  vector<CMATRIX> X;
+  vector<int> lowdin;
+  CMATRIX d(lowdin_ampl(Coeff, ham, X, lowdin));
+  CMATRIX before(d);
+  d = sdm(d, dt, act_st, decoh_rates, tol, isNBRA);
+  lowdin_ampl_back(Coeff, d, before, X, lowdin);
+}
+
+void sdm_dia_dm(vector<CMATRIX *> &dm, nHamiltonian &ham, double dt, vector<int> &act_st, vector<MATRIX> &decoh_rates, double tol,
+                int isNBRA) {
+  /** The density form of sdm_dia on the per-trajectory diabatic densities - rho_L = Y rho Y^H, back through X */
+  vector<CMATRIX> X;
+  vector<int> lowdin;
+  vector<CMATRIX> rho(lowdin_dm(dm, ham, X, lowdin));
+  vector<CMATRIX> before(rho);
+  vector<CMATRIX *> ptrs(lowdin_pointers(rho));
+  sdm_dm(ptrs, dt, act_st, decoh_rates, tol, isNBRA);
+  lowdin_dm_back(dm, rho, before, X, lowdin);
+}
+
+void wp_reversal_events_dia(dyn_variables &dyn_var, nHamiltonian &ham, double dt) {
+  /**
+    The diabatic twin of wp_reversal_events: the reflection flags per DIABATIC state of every trajectory
+    (dyn_var.reversal_events_dia, ndia x ntraj) from the Lowdin diabatic energies (the energies the diabatic hopping reads),
+    the diabatic state forces as forces_dia defines them per child (the Lowdin-frame gradient diagonal under a metric) and the
+    active state act_states_dia - the same prediction of the momentum on each state and of its reversal within dt
+  */
+  int ntraj = dyn_var.ntraj;
+  int ndia = dyn_var.ndia;
+  int ndof = dyn_var.ndof;
+  MATRIX pa(ndof, 1);
+  MATRIX pi(ndof, 1);
+  MATRIX pi_adv(ndof, 1);
+  MATRIX F(ndof, ndia);
+  MATRIX fi(ndof, 1);
+  CMATRIX E(ndia, ndia);
+  CMATRIX X(ndia, ndia);
+  CMATRIX Y(ndia, ndia);
+  dyn_var.reversal_events_dia->set(-1, -1, 0.0);
+  for (int itraj = 0; itraj < ntraj; itraj++) {
+    nHamiltonian *child = lowdin_child(ham, itraj);
+    int lowdin = child->lowdin_dia(X, Y);
+    int a = dyn_var.act_states_dia[itraj];
+    pa = dyn_var.p->col(itraj);
+    double T_a = compute_kinetic_energy(pa, *dyn_var.iM);
+    E = child->get_ham_dia_lowdin();
+    double E_a = E.get(a, a).real();
+    for (int idof = 0; idof < ndof; idof++) {
+      CMATRIX dH(lowdin ? child->get_d1ham_dia_lowdin(idof) : child->get_d1ham_dia(idof));
+      for (int i = 0; i < ndia; i++) { F.set(idof, i, -dH.get(i, i).real()); }
+    }
+    for (int i = 0; i < ndia; i++) {
+      if (i != a) {
+        double T_i = T_a + E_a - E.get(i, i).real();
+        if (T_i < 0) { pi = 0.0000001 * pa; }
+        else { pi = sqrt(T_i / T_a) * pa; }
+      } else {
+        pi = pa;
+      }
+      fi = F.col(i);
+      pi_adv = pi + fi * dt;
+      double dp_old = (pi.T() * fi).get(0, 0);
+      double dp_new = (pi_adv.T() * fi).get(0, 0);
+      if (dp_old * dp_new < 0.0) { dyn_var.reversal_events_dia->set(i, itraj, 1.0); }
+    }
+  }
+}
+
+void bcsh_dia(CMATRIX &Coeff, nHamiltonian &ham, double dt, vector<int> &act_states, MATRIX &reversal_events) {
+  /**
+    BCSH in the diabatic basis: bcsh's collapses and projections on the Lowdin diabatic amplitudes with the diabatic lists and
+    the diabatic reflection flags (wp_reversal_events_dia), written back through X
+  */
+  vector<CMATRIX> X;
+  vector<int> lowdin;
+  CMATRIX d(lowdin_ampl(Coeff, ham, X, lowdin));
+  CMATRIX before(d);
+  d = bcsh(d, dt, act_states, reversal_events);
+  lowdin_ampl_back(Coeff, d, before, X, lowdin);
+}
+
+void bcsh_dia_dm(vector<CMATRIX *> &dm, nHamiltonian &ham, double dt, vector<int> &act_states, MATRIX &reversal_events) {
+  /** The density form of bcsh_dia on the per-trajectory diabatic densities */
+  vector<CMATRIX> X;
+  vector<int> lowdin;
+  vector<CMATRIX> rho(lowdin_dm(dm, ham, X, lowdin));
+  vector<CMATRIX> before(rho);
+  vector<CMATRIX *> ptrs(lowdin_pointers(rho));
+  bcsh_dm(ptrs, dt, act_states, reversal_events);
+  lowdin_dm_back(dm, rho, before, X, lowdin);
+}
+
+void mfsd_dia(MATRIX &p, CMATRIX &Coeff, MATRIX &invM, double dt, vector<int> &act_states, vector<MATRIX> &decoherence_rates,
+              nHamiltonian &ham, Random &rnd, int isNBRA) {
+  /**
+    MF-SD in the diabatic basis: the collapse probabilities from the Lowdin diabatic populations and the diagonal of the diabatic
+    rates, the collapse on the Lowdin amplitudes, the energy before and after from Ehrenfest_energy_dia on the plain amplitudes,
+    the momentum rescaled isotropically (the diabatic hop rescaling 110 scales the whole momentum - the diabats carry no
+    derivative coupling to rescale along), the active diabatic state updated - the same random draws as mfsd
+  */
+  int ndia = Coeff.n_rows;
+  int ntraj = Coeff.n_cols;
+  int ndof = ham.nnucl;
+  vector<CMATRIX> X;
+  vector<int> lowdin;
+  CMATRIX d(lowdin_ampl(Coeff, ham, X, lowdin));
+  CMATRIX before(d);
+  CMATRIX dcol(ndia, 1);
+  CMATRIX ccol(ndia, 1);
+  MATRIX p_i(ndof, 1);
+  MATRIX dir(ndof, 1);
+  for (int itraj = 0; itraj < ntraj; itraj++) {
+    double ksi = rnd.uniform(0.0, 1.0);
+    vector<int> proposed_states;
+    vector<double> hopping_prob;
+    double summ_prob = 0.0;
+    int idx = (isNBRA == 1) ? 0 : itraj;
+    for (int i = 0; i < ndia; i++) {
+      complex<double> d_i = d.get(i, itraj);
+      double P_i = (std::conj(d_i) * d_i).real() * decoherence_rates[idx].get(i, i) * dt;
+      if (ksi < P_i) {
+        proposed_states.push_back(i);
+        hopping_prob.push_back(P_i);
+        summ_prob += P_i;
+      }
+    }
+    if (summ_prob > 0.0) {
+      for (auto i = 0u; i < proposed_states.size(); i++) { hopping_prob[i] /= summ_prob; }
+      int indx_i = hop(hopping_prob, rnd.uniform(0.0, 1.0));
+      int decohered_state = proposed_states[indx_i];
+      vector<int> _id(2, 0);
+      _id[1] = itraj;
+      ccol = Coeff.col(itraj);
+      double E_old = ham.Ehrenfest_energy_dia(ccol, _id).real();
+      dcol = d.col(itraj);
+      collapse(dcol, 0, decohered_state, 0);
+      ccol = lowdin[itraj] ? X[itraj] * dcol : dcol;
+      double E_new = ham.Ehrenfest_energy_dia(ccol, _id).real();
+      p_i = p.col(itraj);
+      dir = p_i;
+      double p_mag = (dir.T() * dir).get(0, 0);
+      if (p_mag > 0.0 && can_rescale_along_vector(E_old, E_new, p_i, invM, dir)) {
+        int do_reverse = 0;
+        rescale_along_vector(E_old, E_new, p_i, invM, dir, do_reverse);
+        for (int idof = 0; idof < ndof; idof++) { p.set(idof, itraj, p_i.get(idof, 0)); }
+        collapse(d, itraj, decohered_state, 0);
+        act_states[itraj] = decohered_state;
+      }
+    }
+  }
+  lowdin_ampl_back(Coeff, d, before, X, lowdin);
+}
+
+void mfsd_dia_dm(MATRIX &p, vector<CMATRIX *> &dm, MATRIX &invM, double dt, vector<int> &act_states, vector<MATRIX> &decoherence_rates,
+                 nHamiltonian &ham, Random &rnd, int isNBRA) {
+  /** The density form of mfsd_dia on the per-trajectory diabatic densities - the energies from Ehrenfest_energy_dia_dm on the plain
+      densities, the collapse on the Lowdin density, the same draws, rescaling and active-state update */
+  int ntraj = dm.size();
+  int ndof = ham.nnucl;
+  vector<CMATRIX> X;
+  vector<int> lowdin;
+  vector<CMATRIX> rho(lowdin_dm(dm, ham, X, lowdin));
+  vector<CMATRIX> before(rho);
+  MATRIX p_i(ndof, 1);
+  MATRIX dir(ndof, 1);
+  for (int itraj = 0; itraj < ntraj; itraj++) {
+    int ndia = rho[itraj].n_rows;
+    double ksi = rnd.uniform(0.0, 1.0);
+    vector<int> proposed_states;
+    vector<double> hopping_prob;
+    double summ_prob = 0.0;
+    int idx = (isNBRA == 1) ? 0 : itraj;
+    for (int i = 0; i < ndia; i++) {
+      double P_i = rho[itraj].get(i, i).real() * decoherence_rates[idx].get(i, i) * dt;
+      if (ksi < P_i) {
+        proposed_states.push_back(i);
+        hopping_prob.push_back(P_i);
+        summ_prob += P_i;
+      }
+    }
+    if (summ_prob > 0.0) {
+      for (auto i = 0u; i < proposed_states.size(); i++) { hopping_prob[i] /= summ_prob; }
+      int indx_i = hop(hopping_prob, rnd.uniform(0.0, 1.0));
+      int decohered_state = proposed_states[indx_i];
+      vector<int> _id(2, 0);
+      _id[1] = itraj;
+      double E_old = ham.Ehrenfest_energy_dia_dm(*dm[itraj], _id).real();
+      CMATRIX rho_tmp(rho[itraj]);
+      collapse_dm(rho_tmp, decohered_state);
+      CMATRIX plain_new(lowdin[itraj] ? X[itraj] * rho_tmp * X[itraj].H() : rho_tmp);
+      double E_new = ham.Ehrenfest_energy_dia_dm(plain_new, _id).real();
+      p_i = p.col(itraj);
+      dir = p_i;
+      double p_mag = (dir.T() * dir).get(0, 0);
+      if (p_mag > 0.0 && can_rescale_along_vector(E_old, E_new, p_i, invM, dir)) {
+        int do_reverse = 0;
+        rescale_along_vector(E_old, E_new, p_i, invM, dir, do_reverse);
+        for (int idof = 0; idof < ndof; idof++) { p.set(idof, itraj, p_i.get(idof, 0)); }
+        collapse_dm(rho[itraj], decohered_state);
+        act_states[itraj] = decohered_state;
+      }
+    }
+  }
+  lowdin_dm_back(dm, rho, before, X, lowdin);
+}
+
 void xf_destroy_AT_dm(dyn_variables &dyn_var, double threshold) {
   /** The density form of xf_destroy_AT(dyn_var, threshold): a recovered adiabatic state collapses the density */
   int ntraj = dyn_var.ntraj;

@@ -2791,17 +2791,18 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   //exit(0);
 
   //================= Update decoherence rates & times ================
-  // the adiabatic rates feed SDM, MFSD, DISH rev2023 and the adiabatic DISH - the diabatic DISH (tsh_method 5 under rep_sh 0)
-  // takes the rates of the diabatic basis
+  // the adiabatic rates feed SDM, MF-SD, DISH rev2023 and DISH under rep_sh 1 (and the saved ave_decoherence_rates) - under
+  // rep_sh 0 the same methods take the rates of the diabatic basis
   decoherence_rates = compute_decoherence_rates(prms, dyn_var, ham, 1, ntraj1);
-  if (prms.tsh_method == 5 && prms.rep_sh == 0) {
+  if (prms.rep_sh == 0 && (prms.tsh_method == 5 || prms.decoherence_algo == 0 || prms.decoherence_algo == 4 || prms.decoherence_algo == 7)) {
     decoherence_rates_dia = compute_decoherence_rates(prms, dyn_var, ham, 0, ntraj1);
   }
 
   //============ Apply pre-TSH decoherence corrections ==================
 
-  // SDM and alike methods - only in the adiabatic rep
-  if (prms.decoherence_algo == 0) {
+  // SDM and alike methods - in the hopping basis of rep_sh: the adiabatic variable and lists under 1, the Lowdin diabatic
+  // variable with the diabatic lists and rates under 0 (the derived variable written through by adopt_diabatic)
+  if (prms.decoherence_algo == 0 && prms.rep_sh == 1) {
     if (prms.rep_tdse == 0 || prms.rep_tdse == 1) {
       *dyn_var.ampl_adi =
           sdm(*dyn_var.ampl_adi, prms.dt, dyn_var.act_states, decoherence_rates,
@@ -2816,7 +2817,20 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       std::cout<<"Error in compute_dynamics(): rep_tdse = "<<prms.rep_tdse<<" has no branch here (implemented: 0, 1, 2, 3)\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
-  } else if (prms.decoherence_algo ==
+  }
+  else if (prms.decoherence_algo == 0 && prms.rep_sh == 0) {
+    if (prms.rep_tdse == 0 || prms.rep_tdse == 1) {
+      sdm_dia(*dyn_var.ampl_dia, ham, prms.dt, dyn_var.act_states_dia, decoherence_rates_dia, prms.sdm_norm_tolerance, prms.isNBRA);
+      if (prms.rep_tdse == 1) { dyn_var.adopt_diabatic(prms); }
+    } else if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
+      sdm_dia_dm(dyn_var.dm_dia, ham, prms.dt, dyn_var.act_states_dia, decoherence_rates_dia, prms.sdm_norm_tolerance, prms.isNBRA);
+      if (prms.rep_tdse == 3) { dyn_var.adopt_diabatic(prms); }
+    } else {
+      std::cout<<"Error in compute_dynamics(): rep_tdse = "<<prms.rep_tdse<<" has no branch here (implemented: 0, 1, 2, 3)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+  }
+  else if (prms.decoherence_algo ==
              1) { /* ID-A. Nothing to do here, this is done in the surface
                      hopping section */
   }
@@ -2826,7 +2840,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   //                   hopping section */
   //}
   // BCSH
-  else if (prms.decoherence_algo == 3) {
+  else if (prms.decoherence_algo == 3 && prms.rep_sh == 1) {
     if (prms.rep_tdse == 0 || prms.rep_tdse == 1) {
       wp_reversal_events(dyn_var, ham, prms.dt);
       *dyn_var.ampl_adi = bcsh(*dyn_var.ampl_adi, prms.dt, dyn_var.act_states,
@@ -2843,8 +2857,21 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
+  else if (prms.decoherence_algo == 3 && prms.rep_sh == 0) {
+    wp_reversal_events_dia(dyn_var, ham, prms.dt);
+    if (prms.rep_tdse == 0 || prms.rep_tdse == 1) {
+      bcsh_dia(*dyn_var.ampl_dia, ham, prms.dt, dyn_var.act_states_dia, *dyn_var.reversal_events_dia);
+      if (prms.rep_tdse == 1) { dyn_var.adopt_diabatic(prms); }
+    } else if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
+      bcsh_dia_dm(dyn_var.dm_dia, ham, prms.dt, dyn_var.act_states_dia, *dyn_var.reversal_events_dia);
+      if (prms.rep_tdse == 3) { dyn_var.adopt_diabatic(prms); }
+    } else {
+      std::cout<<"Error in compute_dynamics(): rep_tdse = "<<prms.rep_tdse<<" has no branch here (implemented: 0, 1, 2, 3)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+  }
   // MFSD
-  else if (prms.decoherence_algo == 4) {
+  else if (prms.decoherence_algo == 4 && prms.rep_sh == 1) {
     if (prms.rep_tdse == 0 || prms.rep_tdse == 1) {
       p = *dyn_var.p;
       // cout<<"p before mfsd\n"; dyn_var.p->show_matrix();
@@ -2871,6 +2898,23 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
+  else if (prms.decoherence_algo == 4 && prms.rep_sh == 0) {
+    p = *dyn_var.p;
+    if (prms.rep_tdse == 0 || prms.rep_tdse == 1) {
+      mfsd_dia(p, *dyn_var.ampl_dia, *dyn_var.iM, prms.dt, dyn_var.act_states_dia, decoherence_rates_dia, ham, rnd, prms.isNBRA);
+      *dyn_var.p = p;
+      if (prms.rep_tdse == 1) { dyn_var.adopt_diabatic(prms); }
+    } else if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
+      mfsd_dia_dm(p, dyn_var.dm_dia, *dyn_var.iM, prms.dt, dyn_var.act_states_dia, decoherence_rates_dia, ham, rnd, prms.isNBRA);
+      *dyn_var.p = p;
+      if (prms.rep_tdse == 3) { dyn_var.adopt_diabatic(prms); }
+    } else {
+      std::cout<<"Error in compute_dynamics(): rep_tdse = "<<prms.rep_tdse<<" has no branch here (implemented: 0, 1, 2, 3)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    // the momenta changed - NAC, Hvib and the rest follow
+    update_Hamiltonian_variables(prms, dyn_var, ham, ham_aux, py_funct, params, 1);
+  }
   // SHXF
   else if (prms.decoherence_algo == 5) {
     if (prms.rep_tdse == 1) {
@@ -2894,8 +2938,8 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
     }
   }
 
-  // DISH, rev2023
-  else if (prms.decoherence_algo == 7) {
+  // DISH, rev2023 - in the hopping basis of rep_sh
+  else if (prms.decoherence_algo == 7 && prms.rep_sh == 1) {
     // the density representations act on the adiabatic density, the amplitude ones on the adiabatic amplitudes -
     // the diabatic ones (0, 2) write the correction through into their propagated variable
     if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
@@ -2909,6 +2953,15 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
 
 
   // Simple decoherence
+  else if (prms.decoherence_algo == 7 && prms.rep_sh == 0) {
+    if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
+      dish_rev2023_dia_dm(dyn_var, ham, decoherence_rates_dia, prms, rnd);
+      if (prms.rep_tdse == 3) { dyn_var.adopt_diabatic(prms); }
+    } else {
+      dish_rev2023_dia(dyn_var, ham, decoherence_rates_dia, prms, rnd);
+      if (prms.rep_tdse == 1) { dyn_var.adopt_diabatic(prms); }
+    }
+  }
   else if (prms.decoherence_algo == 9) {
 
     double alpha = prms.dt/prms.gap_correlation_time; 

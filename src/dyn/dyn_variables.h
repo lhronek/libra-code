@@ -329,6 +329,7 @@ class dyn_variables{
     For Method: BCSH
   */
   MATRIX* reversal_events;
+  MATRIX* reversal_events_dia;   ///< MATRIX(ndia, ntraj) - the reflection flags of the diabatic states, the diabatic BCSH (rep_sh 0)
 
   /**
     Status of the BLLZ (tsh_method 3, rep_lz 4) variables

@@ -314,13 +314,12 @@ vector<int> dish_dia(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& 
   return res;
 }
 
-void dish_rev2023(dyn_variables& dyn_var, nHamiltonian& ham, 
-                  vector<MATRIX>& decoherence_rates,
-                  dyn_control_params& prms,Random& rnd){
+static void dish_rev2023_core(CMATRIX& Coeff, MATRIX& coherence_time, vector<MATRIX>& decoherence_rates, dyn_control_params& prms, Random& rnd){
+/**
+  The DISH rev2023 step on the variable of one hopping basis: Coeff (nst x ntraj) the amplitudes and coherence_time (nst x ntraj) the
+  counters of that basis, decoherence_rates its rates - dish_rev2023() hands the adiabatic ones, dish_rev2023_dia() the Lowdin diabatic
+*/
 
-  CMATRIX& Coeff = *dyn_var.ampl_adi;
-  vector<int> act_states = dyn_var.act_states;
-  MATRIX& coherence_time = *dyn_var.coherence_time;
 
   int collapse_option = 0;
 
@@ -380,6 +379,22 @@ void dish_rev2023(dyn_variables& dyn_var, nHamiltonian& ham,
 
 }// dish_rev2023
 
+
+void dish_rev2023(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates, dyn_control_params& prms, Random& rnd){
+/** DISH rev2023 in the adiabatic basis (rep_sh 1): ampl_adi and coherence_time */
+  dish_rev2023_core(*dyn_var.ampl_adi, *dyn_var.coherence_time, decoherence_rates, prms, rnd);
+}
+
+void dish_rev2023_dia(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates, dyn_control_params& prms, Random& rnd){
+/** DISH rev2023 in the diabatic basis (rep_sh 0): the Lowdin diabatic amplitudes, the counters coherence_time_dia and the diabatic rates,
+    the touched trajectories written back through X */
+  vector<CMATRIX> X;
+  vector<int> lowdin;
+  CMATRIX d(lowdin_ampl(*dyn_var.ampl_dia, ham, X, lowdin));
+  CMATRIX before(d);
+  dish_rev2023_core(d, *dyn_var.coherence_time_dia, decoherence_rates, prms, rnd);
+  lowdin_ampl_back(*dyn_var.ampl_dia, d, before, X, lowdin);
+}
 
 vector<int> dish_hop_proposal(vector<int>& act_states, CMATRIX& Coeff, 
   MATRIX& coherence_time, vector<MATRIX>& decoherence_rates, Random& rnd){
@@ -594,16 +609,14 @@ vector<int> dish_dia_dm(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX
   return res;
 }
 
-void dish_rev2023_dm(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates,
-                     dyn_control_params& prms, Random& rnd){
+static void dish_rev2023_dm_core(vector<CMATRIX*>& dm, MATRIX& coherence_time, vector<MATRIX>& decoherence_rates, dyn_control_params& prms,
+                                 Random& rnd){
 /**
-  The density form of dish_rev2023 on dyn_var.dm_adi (rep_tdse 3)
+  The density form of dish_rev2023_core on the per-trajectory densities dm of the hopping basis
 */
-  vector<CMATRIX*>& dm = dyn_var.dm_adi;
-  MATRIX& coherence_time = *dyn_var.coherence_time;
   int traj;
-  int nst = dyn_var.nadi;
-  int ntraj = dyn_var.ntraj;
+  int ntraj = dm.size();
+  int nst = (ntraj > 0) ? dm[0]->n_rows : 0;
   coherence_time.add(-1, -1, prms.dt);
   MATRIX coherence_interval(nst, ntraj);
   if(prms.decoherence_times_type==2 || prms.decoherence_times_type==4){
@@ -629,6 +642,23 @@ void dish_rev2023_dm(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& 
       else{   project_out_dm(*dm[traj], istate);    }
     }
   }
+}
+
+void dish_rev2023_dm(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates, dyn_control_params& prms, Random& rnd){
+/** The density form of DISH rev2023 in the adiabatic basis (rep_sh 1) on dyn_var.dm_adi */
+  dish_rev2023_dm_core(dyn_var.dm_adi, *dyn_var.coherence_time, decoherence_rates, prms, rnd);
+}
+
+void dish_rev2023_dia_dm(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>& decoherence_rates, dyn_control_params& prms, Random& rnd){
+/** The density form of dish_rev2023_dia on dyn_var.dm_dia - the Lowdin densities, back through X */
+  vector<CMATRIX> X;
+  vector<int> lowdin;
+  vector<CMATRIX> rho(lowdin_dm(dyn_var.dm_dia, ham, X, lowdin));
+  vector<CMATRIX> before(rho);
+  vector<CMATRIX*> ptrs(rho.size());
+  for(std::size_t traj = 0; traj < rho.size(); traj++){ ptrs[traj] = &rho[traj]; }
+  dish_rev2023_dm_core(ptrs, *dyn_var.coherence_time_dia, decoherence_rates, prms, rnd);
+  lowdin_dm_back(dyn_var.dm_dia, rho, before, X, lowdin);
 }
 
 }// namespace libdyn
