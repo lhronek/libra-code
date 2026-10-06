@@ -94,12 +94,57 @@ def _params_json_default(obj):
     return repr(obj)
 
 
-def _dump_simulation_params(prefix, dyn_params, model_params, init_params):
+# the keys of dyn_params that neither the engine nor run_dynamics reads but libra's own runners carry in the same dict
+# (the tutorial convention) - the old format: accepted with a warning, their place is runner_params (appended to the
+# records) or the runner's own dicts
+RUNNER_KEYS = ("nstates", "istate", "istep", "seed", "x0", "p0", "masses", "k", "which_adi_states", "which_dia_states",
+               "rep_ham", "elec_init_type", "nucl_init_type", "wait_time")
+# the keys generic_recipe adds to dyn_params for itself before calling run_dynamics
+LIBRA_LAYER_KEYS = ("direct_init", "ntraj")
+
+
+def _edit_distance(a, b):
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
+        prev = cur
+    return prev[-1]
+
+
+def check_dyn_params_keys(dyn_params, known):
+    """The keys of dyn_params against the engine (the exported parameters of dyn_control_params), the keys of
+    run_dynamics (known) and the ones generic_recipe adds: an unknown key is refused naming it and the nearest known key
+    (the engine ignores an unknown key silently - a misspelled one did nothing for a year), a runner-level key of the old
+    format is accepted with a warning"""
+    engine = {k for k in dir(dyn_control_params) if isinstance(getattr(dyn_control_params, k), property)}
+    allowed = engine | set(known) | set(LIBRA_LAYER_KEYS)
+    unknown = sorted(k for k in dyn_params if k not in allowed and k not in RUNNER_KEYS)
+    if unknown:
+        hints = []
+        for k in unknown:
+            best = min(allowed, key=lambda x: (_edit_distance(k.lower(), x.lower()), x))
+            if _edit_distance(k.lower(), best.lower()) <= 2:
+                hints.append(F"{k} -> {best}?")
+        raise ValueError(F"run_dynamics: dyn_params carries keys that neither the engine (dyn_control_params) nor run_dynamics "
+                         F"reads: {unknown}" + (F" (did you mean {hints}?)" if hints else "")
+                         + " - the engine ignores an unknown key silently, so a misspelled key must not pass")
+    old = sorted(k for k in dyn_params if k in RUNNER_KEYS)
+    if old:
+        print(F"WARNING in run_dynamics(): dyn_params carries the runner-level keys {old} - neither the engine nor run_dynamics "
+              F"reads them (the old format): pass them as runner_params (appended to the _dyn_params.txt record) or keep them "
+              F"in the runner's own dicts")
+
+
+def _dump_simulation_params(prefix, dyn_params, model_params, init_params, runner_params=None):
     """Write the full merged parameter dictionaries into
     {prefix}/simulation-params.json."""
     payload = {"dyn_params": dyn_params, "model_params": model_params}
     if init_params:
         payload.update(init_params)
+    if runner_params:
+        payload["runner_params"] = runner_params
     os.makedirs(prefix, exist_ok=True)
     with open(F"{prefix}/simulation-params.json", "w") as f:
         json.dump(payload, f, indent=2, default=_params_json_default)
@@ -323,12 +368,22 @@ def _sync_nbra_flag(dyn_params):
 
 
 @_with_blas_cap(1)
-def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, init_params=None):
+def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, init_params=None, runner_params=None):
     """
 
     Args:
         dyn_var ( dynamic_variables ): contains all the dynamical variables (momenta, coordinates, forces,
             quantum amplitudes, active states, projectors, etc.)
+
+        init_params ( dictionary ): the init_elec / init_nucl dictionaries of generic_recipe, for the printout and
+            the simulation-params.json dump [ default: None ]
+
+        runner_params ( dictionary ): the runner's own keys (the init values nstates / istate / x0 / p0 / masses / k,
+            the plot lists which_adi_states / which_dia_states, istep, seed, rep_ham, the step-4 selectors) - not read
+            here, appended to the _dyn_params.txt and simulation-params.json records so the plots keep reading them
+            from one file. Left in dyn_params (the old format) they are accepted with a warning naming them; any other
+            key of dyn_params that neither the engine nor run_dynamics reads is refused, with the nearest known key
+            named - the engine ignores an unknown key silently [ default: None ]
 
         dyn_params ( dictionary ): parameters controlling the execution of the dynamics
             Can contain:
@@ -1431,6 +1486,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                                                   "basis_transform",
                                                   "projector"]})
 
+    check_dyn_params_keys(dyn_params, set(default_params) | set(critical_params))
     comn.check_input(dyn_params, default_params, critical_params)
 
     # dm_dia is a derived quantity in the adiabatic representations, costing
@@ -1524,14 +1580,18 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
 
     if dyn_params["print_params"] > 0:
         _print_simulation_params(dyn_params, nadi, dyn_var.ntraj, init_params, model_params)
-        _dump_simulation_params(prefix, dyn_params, model_params, init_params)
+        _dump_simulation_params(prefix, dyn_params, model_params, init_params, runner_params)
     if dyn_params["print_params"] > 1:
         for key in sorted(dyn_params.keys()):
             print(F"  {key} = {dyn_params[key]}")
 
     # Initialize savers
     #_savers = save.init_tsh_savers(dyn_params, model_params, nsteps, ntraj, nnucl, nadi, ndia)
-    _savers = save.init_tsh_savers(dyn_params, model_params, math.ceil(nsteps / nprint), ntraj, nnucl, nadi, ndia)
+    # the runner's own keys reach the _dyn_params.txt record (the plots read istep and nstates there)
+    record_params = dict(dyn_params)
+    if runner_params:
+        record_params.update(runner_params)
+    _savers = save.init_tsh_savers(record_params, model_params, math.ceil(nsteps / nprint), ntraj, nnucl, nadi, ndia)
 
     # Open and close the output files for further writing
     if _savers["txt_saver"] is not None:
@@ -1682,7 +1742,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
 
 # def generic_recipe(q, p, iM, _dyn_params, compute_model, _model_params, _init_elec, rnd):
 @_with_blas_cap(0)
-def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_nucl, rnd):
+def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_nucl, rnd, runner_params=None):
     """
     This function initializes electronic variables and Hamiltonians for a given set of
     nuclear variables (those are needed, not initialized here) and then runs the calculations
@@ -1722,6 +1782,9 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
                   nuclear DOF, determins the width of the coordinate and momentum samplings [ default: [0.001] ]
 
         rnd ( Random ): random numbers generator object - controls the initialization of nuclear DOFs
+
+        runner_params ( dictionary ): the runner's own keys, handed to run_dynamics for the records - see there
+            [ default: None ]
 
     Returns:
         tuple : tuple returned by the :func:`libra_py.dynamics.run_dynamics` function
@@ -2002,7 +2065,7 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
     # Finally, start the dynamics calculations
     #sys.exit(0)
     res = run_dynamics(dyn_var, dyn_params, ham, compute_model, model_params, rnd,
-                       init_params={"init_elec": init_elec, "init_nucl": init_nucl})
+                       init_params={"init_elec": init_elec, "init_nucl": init_nucl}, runner_params=runner_params)
     return res
 
 

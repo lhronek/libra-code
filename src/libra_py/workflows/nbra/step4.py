@@ -756,7 +756,10 @@ def run_tsh(common_params, compute_model, model_params):
                   "ndia": nstates, "nadi": nstates}
 
     # ============= Dynamical variables ==============
-    dyn_params = dict(common_params)
+    # the engine's keys alone go to the dynamics, the runner's own (the init values, the plot lists, the seed) ride
+    # along as runner_params for the records
+    dyn_params = {key: val for key, val in common_params.items() if key not in tsh_dynamics.RUNNER_KEYS}
+    runner_params = {key: val for key, val in common_params.items() if key in tsh_dynamics.RUNNER_KEYS}
 
     # This should update only the properties that aren't defined, but not override the existing values!
     critical_params = []
@@ -768,7 +771,7 @@ def run_tsh(common_params, compute_model, model_params):
 
     start = time.time()
     res = tsh_dynamics.generic_recipe(dyn_params, compute_model, _model_params,
-                                      _init_elec, init_nucl, rnd)
+                                      _init_elec, init_nucl, rnd, runner_params=runner_params)
     end = time.time()
     print(F"Calculation time = {end - start} seconds")
 
