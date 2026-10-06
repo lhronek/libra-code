@@ -335,20 +335,9 @@ void dyn_control_params::sanity_check(){
   /// The corrections and DISH act on the ADIABATIC variable in every representation - the propagated one under
   /// rep_tdse 1 and 3, and under 0 and 2, which derive it from their propagated diabatic one every step, the
   /// corrected adiabatic amplitudes or density are written through into the propagated diabatic ones
-  /// (dyn_variables::adopt_adiabatic) before the end-of-step recompute. SHXF / MQCXF are the exception: their XF
-  /// half step is interleaved with the electronic propagation and its adiabatic bookkeeping (the phase gradients,
-  /// the quantum momentum) follows the adiabatic propagation's basis within the step - a diabatic representation
-  /// derives its adiabatic variable in the current basis, so the first half step of a step would see the old state
-  /// in the new basis (3e-5 in the populations per run on the certifier's crossing, enough to flip MQCXF's discrete
-  /// events) - they run under rep_tdse 1 and 3 alone
-  if((rep_tdse==0 || rep_tdse==2) && (decoherence_algo==5 || decoherence_algo==6)){
-    std::cout<<"Error in dyn_control_params::sanity_check: decoherence_algo = "<<decoherence_algo<<" (5 SHXF, 6 MQCXF) runs"
-        <<" under rep_tdse 1 or 3 alone - its XF half step is interleaved with the electronic propagation and follows the"
-        <<" adiabatic propagation's basis within the step, which rep_tdse = "<<rep_tdse<<" (a diabatic representation, its"
-        <<" adiabatic variable derived in the current basis) cannot reproduce - use rep_tdse 1 (amplitudes) or 3 (the"
-        <<" density matrix)\n";
-    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
-  }
+  /// (dyn_variables::adopt_adiabatic) before the end-of-step recompute - SHXF / MQCXF included: their XF half
+  /// step derives the adiabatic variable in the frame of the amplitude propagation (the previous step's basis
+  /// until the last substep's relabel) and writes it back (compute_dynamics, xf_half_step)
 
   /// the stochastic reorderings need a random generator, which the
   /// projector update (update_proj_adi -> compute_projector) does not

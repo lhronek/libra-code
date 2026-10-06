@@ -2303,6 +2303,21 @@ static void refresh_force_rows(dyn_control_params &prms, dyn_variables &dyn_var,
   }
 }
 
+static void xf_half_step(dyn_variables &dyn_var, nHamiltonian &ham, nHamiltonian &frame, dyn_control_params &prms) {
+  // the XF half step acts on the adiabatic variable in the labels of the amplitude propagation - the previous step's
+  // frame until the last substep's relabel, the current one after it: the diabatic representations derive their
+  // adiabatic variable in that frame and write the half step back through it, the adiabatic ones hold it already
+  dyn_var.derive_adiabatic(prms, frame);
+  if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
+    update_ham_xf_dm(dyn_var);
+    propagate_half_xf_dm(dyn_var, ham, prms);
+  } else {
+    update_ham_xf(dyn_var);
+    propagate_half_xf(dyn_var, ham, prms);
+  }
+  dyn_var.adopt_adiabatic(prms, frame);
+}
+
 void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
                       nHamiltonian &ham, nHamiltonian &ham_aux,
                       bp::object py_funct, bp::dict params, Random &rnd,
@@ -2580,16 +2595,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   // updates the basis re-projection matrices
   for (i = 0; i < num_el; i++) {
     if (prms.decoherence_algo == 5 or prms.decoherence_algo == 6) {
-      // the XF half step acts on the propagated adiabatic variable - the density under rep_tdse 3, the amplitudes
-      // under 1 (the diabatic representations are refused by sanity_check: interleaved with the propagation, the
-      // half step would see the old state in the new basis there)
-      if (prms.rep_tdse == 3) {
-        update_ham_xf_dm(dyn_var);
-        propagate_half_xf_dm(dyn_var, ham, prms);
-      } else {
-        update_ham_xf(dyn_var);
-        propagate_half_xf(dyn_var, ham, prms);
-      }
+      xf_half_step(dyn_var, ham, ham_aux, prms);
     }
 
     propagate_electronic(dyn_var, ham, ham_aux, prms, i);
@@ -2598,16 +2604,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
       // the phase gradients carry the amplitudes' state labels - the amplitude-side projector applies on the
       // last substep only (t_skip in propagate_electronic), so their rotation does too
       if (i == num_el - 1) { rotate_nab_phase(dyn_var, ham, prms); }
-      // the XF half step acts on the propagated adiabatic variable - the density under rep_tdse 3, the amplitudes
-      // under 1 (the diabatic representations are refused by sanity_check: interleaved with the propagation, the
-      // half step would see the old state in the new basis there)
-      if (prms.rep_tdse == 3) {
-        update_ham_xf_dm(dyn_var);
-        propagate_half_xf_dm(dyn_var, ham, prms);
-      } else {
-        update_ham_xf(dyn_var);
-        propagate_half_xf(dyn_var, ham, prms);
-      }
+      xf_half_step(dyn_var, ham, (i == num_el - 1) ? ham : ham_aux, prms);
     }
   }
 
@@ -2688,7 +2685,7 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   //
 
   if (prms.decoherence_algo == 6 and prms.use_xf_force == 1) {
-    if (prms.rep_tdse == 3) { update_forces_xf_dm(dyn_var, ham, ham_aux); }
+    if (prms.rep_tdse == 2 || prms.rep_tdse == 3) { update_forces_xf_dm(dyn_var, ham, ham_aux); }
     else { update_forces_xf(dyn_var, ham, ham_aux); }
   }
 
@@ -2913,23 +2910,31 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
   }
   // SHXF
   else if (prms.decoherence_algo == 5) {
-    if (prms.rep_tdse == 1) {
+    if (prms.rep_tdse == 0 || prms.rep_tdse == 1) {
       shxf(dyn_var, ham, ham_aux, prms);
-    } else if (prms.rep_tdse == 3) {
+      // rep_tdse 0 derives its adiabatic amplitudes - the corrected ones are written through into the propagated diabatic ones
+      if (prms.rep_tdse == 0) { dyn_var.adopt_adiabatic(prms); }
+    } else if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
       shxf_dm(dyn_var, ham, ham_aux, prms);
+      // rep_tdse 2 derives its adiabatic density - the corrected one is written through into the propagated diabatic one
+      if (prms.rep_tdse == 2) { dyn_var.adopt_adiabatic(prms); }
     } else {
-      std::cout<<"Error in compute_dynamics(): rep_tdse = "<<prms.rep_tdse<<" has no branch here (implemented: 1, 3 - the XF half step is interleaved with the adiabatic propagation, sanity_check refuses 0 and 2)\n";
+      std::cout<<"Error in compute_dynamics(): rep_tdse = "<<prms.rep_tdse<<" has no branch here (implemented: 0, 1, 2, 3)\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }
   // MQCXF
   else if (prms.decoherence_algo == 6) {
-    if (prms.rep_tdse == 1) {
+    if (prms.rep_tdse == 0 || prms.rep_tdse == 1) {
       mqcxf(dyn_var, ham, ham_aux, prms);
-    } else if (prms.rep_tdse == 3) {
+      // rep_tdse 0 derives its adiabatic amplitudes - the corrected ones are written through into the propagated diabatic ones
+      if (prms.rep_tdse == 0) { dyn_var.adopt_adiabatic(prms); }
+    } else if (prms.rep_tdse == 2 || prms.rep_tdse == 3) {
       mqcxf_dm(dyn_var, ham, ham_aux, prms);
+      // rep_tdse 2 derives its adiabatic density - the corrected one is written through into the propagated diabatic one
+      if (prms.rep_tdse == 2) { dyn_var.adopt_adiabatic(prms); }
     } else {
-      std::cout<<"Error in compute_dynamics(): rep_tdse = "<<prms.rep_tdse<<" has no branch here (implemented: 1, 3 - the XF half step is interleaved with the adiabatic propagation, sanity_check refuses 0 and 2)\n";
+      std::cout<<"Error in compute_dynamics(): rep_tdse = "<<prms.rep_tdse<<" has no branch here (implemented: 0, 1, 2, 3)\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
   }

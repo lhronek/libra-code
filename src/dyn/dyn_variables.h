@@ -815,6 +815,8 @@ class dyn_variables{
   void update_amplitudes(dyn_control_params& dyn_params);
   void adopt_adiabatic(dyn_control_params& dyn_params);   ///< the write-through of a corrected adiabatic variable into the propagated diabatic one (rep_tdse 0 / 2)
   void adopt_diabatic(dyn_control_params& dyn_params);    ///< the write-through of a corrected diabatic variable into the propagated adiabatic one (rep_tdse 1 / 3)
+  void derive_adiabatic(dyn_control_params& dyn_params, nHamiltonian& frame);  ///< the adiabatic variable derived from the propagated diabatic one in the basis of the given Hamiltonian (rep_tdse 0 / 2)
+  void adopt_adiabatic(dyn_control_params& dyn_params, nHamiltonian& frame);   ///< the write-through of adopt_adiabatic in the basis of the given Hamiltonian
   void update_amplitudes(dyn_control_params& dyn_params, nHamiltonian& ham);
   void update_amplitudes(bp::dict dyn_params, nHamiltonian& ham);
   void update_amplitudes(dyn_control_params& dyn_params, bp::object compute_model, bp::dict model_params);

@@ -264,6 +264,8 @@ void export_dyn_variables_objects(){
   void (dyn_variables::*expt_set_active_states_diff_rep_v1)(int rep_sh, Random& rnd) = &dyn_variables::set_active_states_diff_rep;
 
 
+  void (dyn_variables::*expt_adopt_adiabatic_v1)(dyn_control_params&) = &dyn_variables::adopt_adiabatic;
+
   class_<dyn_variables>("dyn_variables",init<int, int, int, int>())
       .def("__copy__", &generic__copy__<dyn_variables>)
       .def("__deepcopy__", &generic__deepcopy__<dyn_variables>)
@@ -360,7 +362,7 @@ void export_dyn_variables_objects(){
 
 
       .def("update_amplitudes", expt_update_amplitudes_v1)
-      .def("adopt_adiabatic", &dyn_variables::adopt_adiabatic)
+      .def("adopt_adiabatic", expt_adopt_adiabatic_v1)
       .def("adopt_diabatic", &dyn_variables::adopt_diabatic)
       .def("set_ampl_adi", &dyn_variables::set_ampl_adi)
       .def("set_ampl_dia", &dyn_variables::set_ampl_dia)

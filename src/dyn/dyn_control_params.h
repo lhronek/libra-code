@@ -65,8 +65,9 @@ class dyn_control_params{
           (the adiabatic one for decoherence_algo 0 / 1 / 3 / 4 / 7 and DISH under rep_sh 1, the diabatic
           one for decoherence_algo 8 and DISH under rep_sh 0) - the propagated one when the representation
           matches, otherwise the corrected variable is written through into the propagated one
-          (adopt_adiabatic / adopt_diabatic) before the end-of-step recompute - SHXF /
-          MQCXF (5 / 6) run under 1 and 3 alone (their half step is interleaved with the propagation),
+          (adopt_adiabatic / adopt_diabatic) before the end-of-step recompute - SHXF / MQCXF (5 / 6) derive
+          it for each half step in the frame of the amplitude propagation (the previous step's basis until the
+          last substep's relabel) and write it back,
           the python layer
           refuses an explicit Cadi / Cdia / q_mm / p_mm in properties_to_save and drops them from
           the default list

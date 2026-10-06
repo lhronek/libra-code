@@ -307,6 +307,59 @@ void dyn_variables::adopt_adiabatic(dyn_control_params& dyn_params){
   }
 }
 
+void dyn_variables::derive_adiabatic(dyn_control_params& dyn_params, nHamiltonian& frame){
+/**
+  The adiabatic variable derived from the propagated diabatic one in the basis of the given Hamiltonian (its
+  per-trajectory children): C_adi = U^H S C_dia under rep_tdse 0, rho_adi = (S U)^H rho_dia (S U) under 2 - the frame
+  of the amplitude propagation within a step is the previous step's Hamiltonian until the last substep's relabel.
+  Under rep_tdse 1 and 3 the adiabatic variable is the propagated one and nothing is done
+*/
+  int rep = dyn_params.rep_tdse;
+  if(rep==1 || rep==3){ return; }
+  if(rep!=0 && rep!=2){
+    std::cout<<"Error in dyn_variables::derive_adiabatic(): rep_tdse = "<<rep<<" has no branch here (implemented: 0, 1, 2, 3)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  for(int traj=0; traj<ntraj; traj++){
+    nHamiltonian* child = frame.child(traj);
+    CMATRIX SU(child->get_basis_transform());
+    if(child->ovlp_dia_supplied){ SU = child->get_ovlp_dia() * SU; }
+    if(rep==0){
+      CMATRIX ca(nadi, 1);
+      ca.product(adjoint(SU), ampl_dia->col(traj));
+      for(int i=0;i<nadi;i++){ ampl_adi->set(i, traj, ca.get(i,0)); }
+    }
+    else{
+      dm_adi[traj]->product(adjoint(SU), *dm_dia[traj], SU);
+    }
+  }
+}
+
+void dyn_variables::adopt_adiabatic(dyn_control_params& dyn_params, nHamiltonian& frame){
+/**
+  The write-through of adopt_adiabatic(dyn_params) in the basis of the given Hamiltonian (its per-trajectory
+  children): C_dia = U C_adi under rep_tdse 0, rho_dia = U rho_adi U^H under 2 - the frame the adiabatic variable was
+  derived in (derive_adiabatic). Under rep_tdse 1 and 3 nothing is done
+*/
+  int rep = dyn_params.rep_tdse;
+  if(rep==1 || rep==3){ return; }
+  if(rep!=0 && rep!=2){
+    std::cout<<"Error in dyn_variables::adopt_adiabatic(): rep_tdse = "<<rep<<" has no branch here (implemented: 0, 1, 2, 3)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  for(int traj=0; traj<ntraj; traj++){
+    CMATRIX U(frame.child(traj)->get_basis_transform());
+    if(rep==0){
+      CMATRIX cd(ndia, 1);
+      cd.product(U, ampl_adi->col(traj));
+      for(int i=0;i<ndia;i++){ ampl_dia->set(i, traj, cd.get(i,0)); }
+    }
+    else{
+      dm_dia[traj]->product(U, *dm_adi[traj], adjoint(U));
+    }
+  }
+}
+
 void dyn_variables::adopt_diabatic(dyn_control_params& dyn_params){
 /**
   The write-through of a correction made on the diabatic variable (the diabatic instantaneous decoherence): under
