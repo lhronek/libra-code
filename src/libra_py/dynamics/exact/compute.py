@@ -328,20 +328,32 @@ def run_dynamics(wfc, _params, model_params, savers):
 
 
 def run_relaxation(_params, _potential, model_params):
-    """
+    """The whole exact run in one call: the grid and the wavepacket (init_wfc), the savers under prefix, the propagation
+    (run_dynamics) - returns the mem saver when mem_output_level > 0
 
-    # For diabatic populations in boxes
-    _params["customs_pops"] = [ [0, [-100], [-10] ],
-                                [0, [-10], [10] ],
-                                [0, [10], [100] ]
-                              ]
+    Args:
+        _params ( dict ): the exact parameters - the keys of init_wfc and run_dynamics plus the output keys read here. A
+            key outside PARAMS_KEYS is refused, the nearest known key named.
 
-    # For adiabatic populations in boxes
-    _params["customs_pops"] = [ [1, [-100], [-10] ],
-                                [1, [-10], [10] ],
-                                [1, [10], [100] ]
-                              ]
+            * **_params["prefix"]** ( string ): the output directory - _dyn_params.txt, _model_params.txt, data.hdf and
+                mem_data.hdf are written there
+            * **_params["hdf5_output_level"]** ( int ): the level of the HDF5 saver, 0 - no file
+            * **_params["mem_output_level"]** ( int ): the level of the memory saver, 0 - none, its data written to
+                mem_data.hdf at the end
+            * **_params["txt_output_level"]** ( int ): no text saver exists yet - 0 is the only value doing anything
+            * **_params["use_compression"]** ( int ), **_params["compression_level"]** ( list of 3 ints ): of the HDF5
+                saver
+            * **_params["properties_to_save"]** ( list of strings ): the datasets the savers keep
+            * **_params["custom_pops"]** ( list of [rep, lower, upper] ): populations inside coordinate boxes, saved as
+                "custom_pops" - rep 0 diabatic or 1 adiabatic, lower and upper the box bounds per dof. Three boxes on
+                the diabatic states: [[0, [-100.0], [-10.0]], [0, [-10.0], [10.0]], [0, [10.0], [100.0]]]
+            * **_params["nsteps"]** ( int ), **_params["progress_frequency"]** ( float ): as in run_dynamics
 
+        _potential ( PyObject ): the function computing the Hamiltonian at a grid point (see init_wfc)
+        model_params ( dict ): its parameters - nstates = len(model_params["E_n"])
+
+    Returns:
+        data_savers.mem_saver: when mem_output_level > 0, else None
     """
 
     params = dict(_params)
