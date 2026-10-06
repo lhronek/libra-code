@@ -46,6 +46,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 
 
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 import libra_py.units as units
 from . import save
 
@@ -150,7 +151,8 @@ def run_dynamics(dyn_params, Ham, rho_init, adm_init=None):
 
     Args:
         dyn_params ( dictionary )
-            Parameters controlling the execution of the dynamics. Can contain:
+            Parameters controlling the execution of the dynamics. A key outside the ones listed here is refused
+            (ValueError naming it and the nearest known key). Can contain:
 
             =============== Properties of the bath ================
 
@@ -342,6 +344,8 @@ def run_dynamics(dyn_params, Ham, rho_init, adm_init=None):
                       "use_compression": 0, "compression_level": [0, 0, 0]
                       }
 
+    # check_input keeps every extra key, so a misspelled key would stay at its default silently
+    refuse_unknown_keys(params, set(default_params) | set(critical_params), "heom.run_dynamics", "dyn_params", "run_dynamics does not read")
     comn.check_input(params, default_params, critical_params)
 
     nsteps = params["nsteps"]
