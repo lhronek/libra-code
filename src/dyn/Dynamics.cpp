@@ -2601,7 +2601,9 @@ void compute_dynamics(dyn_variables &dyn_var, bp::dict dyn_params,
     propagate_electronic(dyn_var, ham, ham_aux, prms, i);
 
     if (prms.decoherence_algo == 5 or prms.decoherence_algo == 6) {
-      rotate_nab_phase(dyn_var, ham, prms);
+      // the phase gradients carry the amplitudes' state labels - the amplitude-side projector applies on the
+      // last substep only (t_skip in propagate_electronic), so their rotation does too
+      if (i == num_el - 1) { rotate_nab_phase(dyn_var, ham, prms); }
       // the XF half step acts on the propagated adiabatic variable - the density under rep_tdse 3, the amplitudes
       // under 1 (the diabatic representations are refused by sanity_check: interleaved with the propagation, the
       // half step would see the old state in the new basis there)
