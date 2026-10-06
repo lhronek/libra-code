@@ -103,17 +103,19 @@ def time_overlap(nQ, nP, nA, nS, nstate, oQ, oP, oA, oS, ostate):
 
 
 QTAG_MOMENTUM_DEFAULTS = {"d_weight": 1, "linfit_beta": 1e-1, "mom_calc_type": 1}
-PROPAGATE_BASIS_DEFAULTS = {"decpl_den": 0.25}
-# the keys propagate_basis reads without a default
-PROPAGATE_BASIS_KEYS = ("dt", "iM", "states", "q_update_method", "p_update_method", "a_update_method", "s_update_method",
-                        "q_sync_method", "p_sync_method", "a_sync_method", "s_sync_method")
+# the update methods (0 frozen, 1 adaptable) and the sync methods (0 keep, 1 take the most populated surface's value)
+PROPAGATE_BASIS_DEFAULTS = {"decpl_den": 0.25, "q_update_method": 1, "p_update_method": 1, "a_update_method": 0, "s_update_method": 0,
+                            "q_sync_method": 1, "p_sync_method": 1, "a_sync_method": 0, "s_sync_method": 0}
+PROPAGATE_BASIS_CRITICAL = ("dt", "iM", "states")
+# qtag_pot_approx_method 0 (BAT) is also the fallback of the C++ matrix elements when the key is absent
 RUN_QTAG_DEFAULTS = {"hdf5_output_level": -1, "prefix": "out", "use_compression": 0, "compression_level": [0, 0, 0],
                      "mem_output_level": 4, "txt2_output_level": 0, "properties_to_save": [], "progress_frequency": 1,
-                     "target_states": [0]}
-# every key a QTAG run reads - run_qtag and its savers, propagate_basis, qtag_momentum and the C++ matrix elements
-# (qtag_pot_approx_method) - one dyn_params dict serves them all, so run_qtag refuses a key outside this set
-DYN_PARAMS_KEYS = (frozenset(RUN_QTAG_DEFAULTS) | frozenset(QTAG_MOMENTUM_DEFAULTS) | frozenset(PROPAGATE_BASIS_DEFAULTS)
-                   | frozenset(PROPAGATE_BASIS_KEYS) | frozenset(("nsteps", "qtag_pot_approx_method")))
+                     "target_states": [0], "qtag_pot_approx_method": 0}
+RUN_QTAG_CRITICAL = ("nsteps", "dt", "states")          # iM comes from the _iM argument
+# every key a QTAG run reads - run_qtag and its savers, propagate_basis, qtag_momentum and the C++ matrix elements - one
+# dyn_params dict serves them all, so run_qtag refuses a key outside this set
+DYN_PARAMS_KEYS = (frozenset(RUN_QTAG_DEFAULTS) | frozenset(RUN_QTAG_CRITICAL) | frozenset(QTAG_MOMENTUM_DEFAULTS)
+                   | frozenset(PROPAGATE_BASIS_DEFAULTS) | frozenset(PROPAGATE_BASIS_CRITICAL))
 
 
 def qtag_momentum(_q, _p, _a, _s, coeff_on_surf, dyn_params):
@@ -285,6 +287,8 @@ def propagate_basis(_q, _p, _alp, _s, _states, coeff, dyn_params, surf_pops):
               on a given state is larger that this parameter, the trajectories evolve according to their own
               quantum momentum. If the population is less than this number, the trajectories evolve according
               to the quantum momentum for the most populated state.  [ default: 0.25 ]
+          * the update and sync methods of q, p, a and s as documented in run_qtag, with the same defaults
+          * **dyn_params[`dt`]**, **dyn_params[`iM`]**, **dyn_params[`states`]**: required (critical)
 
         _q ( MATRIX(nnucl, ntraj) ): coordinates of the "classical" particles [units: Bohr]
 
@@ -316,8 +320,7 @@ def propagate_basis(_q, _p, _alp, _s, _states, coeff, dyn_params, surf_pops):
     """
 
     params = dict(dyn_params)
-
-    critical_params = []
+    critical_params = list(PROPAGATE_BASIS_CRITICAL)
     default_params = copy.deepcopy(PROPAGATE_BASIS_DEFAULTS)
     comn.check_input(params, default_params, critical_params)
 
@@ -714,7 +717,7 @@ def run_qtag(_q, _p, _alp, _s, _states, _coeff, _iM, _dyn_params, _compute_model
 
             * **iM** ( MATRIX(nnucl, 1) ): optional - the inverse masses again, refused when it differs from _iM (the
                 argument is the one source, the key is filled from it)
-            * **states** ( list of ints ): all the quantum states of the basis
+            * **states** ( list of ints ): all the quantum states of the basis - required
             * **d_weight** ( float ): the weight of the single-surface momentum fit [ default: 1 ]
 
             * **q_update_method** (int): the parameter specifying whether positions should be updated (adaptable) or frozen
@@ -765,6 +768,7 @@ def run_qtag(_q, _p, _alp, _s, _states, _coeff, _iM, _dyn_params, _compute_model
 
 
             * **decpl_den** (float): a critical population above which a surface can evolve trajectories independently
+              [ default: 0.25 ]
 
 
             * **qtag_pot_approx_method** (int): the method for approximating potential matrix elements in a basis
@@ -773,15 +777,17 @@ def run_qtag(_q, _p, _alp, _s, _states, _coeff, _iM, _dyn_params, _compute_model
               - 1: LHA (Local Harmonic Approximation)
               - 2: LHAe (Local Harmonic Approximation w/ exact Gaussian coupling elements)
               - 3: BATe (Bra-ket Averaged Taylor expansion w/ exact Gaussian coupling elements)
+              [ default: 0 ]
 
 
             * **mom_calc_type** (int): how to modify the raw basis momenta for numerical stability
 
               - 0: unmodified (note that these are frequently unstable!)
-              - 1: linear fitting of single-surface momenta
+              - 1: linear fitting of single-surface momenta [ default ]
 
 
             * **linfit_beta** (float): a threshold for the linear fitting algorithm when needed for momenta modification
+              [ default: 0.1 ]
 
 
             * **prefix** (string): name of the directory where all the results will be stored [ default: "out" ]
@@ -796,16 +802,17 @@ def run_qtag(_q, _p, _alp, _s, _states, _coeff, _iM, _dyn_params, _compute_model
             * **progress_frequency** (int): how often to print out the results [ default: 1 - every timestep]
 
 
-            * **properties_to_save** (list of strings): a list containing the desired output quantities
+            * **properties_to_save** (list of strings): a list containing the desired output quantities [ default: [] ]
+            * **use_compression** (int), **compression_level** (list of 3 ints): of the HDF5 saver [ default: 0, [0, 0, 0] ]
 
 
-            * **target_states** (list of ints): the indices of quantum states for which to compute populations
+            * **target_states** (list of ints): the indices of quantum states for which to compute populations [ default: [0] ]
 
 
-            * **dt** (float): the timestep between each iteration [ in a.u. of time ]
+            * **dt** (float): the timestep between each iteration [ in a.u. of time ] - required
 
 
-            * **nsteps** (int): the number of total iterations; this together with `dt` determines the simulated time
+            * **nsteps** (int): the number of total iterations; this together with `dt` determines the simulated time - required
 
 
         _compute_model ( PyObject ): the function that computes the Hamiltonian object
@@ -821,7 +828,7 @@ def run_qtag(_q, _p, _alp, _s, _states, _coeff, _iM, _dyn_params, _compute_model
     C = CMATRIX(_coeff)
 
     default_params = copy.deepcopy(RUN_QTAG_DEFAULTS)
-    critical_params = []
+    critical_params = list(RUN_QTAG_CRITICAL)
     refuse_unknown_keys(dyn_params, DYN_PARAMS_KEYS, "qtag.run_qtag", "dyn_params", "no function of the QTAG run reads")
     comn.check_input(dyn_params, default_params, critical_params)
 
