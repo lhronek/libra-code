@@ -1114,11 +1114,14 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
 
                  0              -  the twin of the amplitude integrator 0: rho -> U rho U^H with its two half
                                    exponentials around the relabel
-                 1              -  Zhu Liouvillian (not the twin of the amplitude integrator 1)
+                 1              -  the twin of the amplitude integrator 1 (the symmetric splitting B T A T^H B on rho)
 
                 10              -  the twin of the amplitude integrator 10 (the rotation propagator on the columns of rho)
+                11              -  the twin of the amplitude integrator 11 (the symmetric splitting with rotations)
                  9              -  same as 0 with the second Magnus term (i dt/12) [A, B] in the mid-point Hamiltonian
                 19              -  same as 9, but with rotations
+                20              -  Zhu Liouvillian - a scheme of its own, not a twin: the coherence phases driven by
+                                   sqrt(E_tot - E_i) with the total energy of the active state (TSH runs only)
 
 
             * **dyn_params["ampl_transformation_method"]** (int): Whether transform the amplitudes by the T
@@ -1951,6 +1954,9 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
         # C C^H in every branch, S enters only the dia<->adi conversions)
         seed_prms = dict(dyn_params)
         seed_prms["rep_tdse"] = 0 if int(dyn_params["rep_tdse"]) == 2 else 1
+        # the seed converts, it does not propagate - the integrator of the propagated representation need not
+        # exist in the amplitude one (Zhu's 20 under rep_tdse 3), 0 is implemented in every representation
+        seed_prms["electronic_integrator"] = 0
         dyn_var.update_density_matrix(seed_prms, ham, 1)
     dyn_var.update_density_matrix(dyn_params, ham, 1)
     #sys.exit(0)

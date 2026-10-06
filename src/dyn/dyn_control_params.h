@@ -1149,11 +1149,14 @@ class dyn_control_params{
 
          0              -  the twin of the amplitude integrator 0: rho -> U rho U^H with its two half exponentials
                            around the relabel
-         1              -  Zhu Liouvillian (not the twin of the amplitude integrator 1)
+         1              -  the twin of the amplitude integrator 1 (the symmetric splitting B T A T^H B on rho)
 
         10              -  the twin of the amplitude integrator 10 (the rotation propagator on the columns of rho)
+        11              -  the twin of the amplitude integrator 11 (the symmetric splitting with rotations)
          9              -  same as 0 with the second Magnus term (i dt/12) [A, B] in the mid-point Hamiltonian
         19              -  same as 9, but with rotations
+        20              -  Zhu Liouvillian - a scheme of its own, not a twin: the coherence phases driven by
+                           sqrt(E_tot - E_i) with the total energy of the active state (TSH runs only)
 
   */
   int electronic_integrator;

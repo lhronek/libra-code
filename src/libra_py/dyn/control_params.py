@@ -703,8 +703,10 @@ class DynControlParams:
     #: 
     #: for `rep_tdse = 3` ( adiabatic, density matrix formalism): 1** - with NBRA
     #:  0 the twin of the amplitude integrator 0 (rho -> U rho U^H with its two half exponentials around the relabel)
-    #:  1 Zhu Liouvillian (not the twin of the amplitude integrator 1)
+    #:  1 the twin of the amplitude integrator 1 (the symmetric splitting B T A T^H B on rho)
     #: 10 the twin of the amplitude integrator 10 (the rotation propagator on the columns of rho)
+    #: 11 the twin of the amplitude integrator 11 (the symmetric splitting with rotations)
+    #: 20 Zhu Liouvillian - a scheme of its own, not a twin (the coherence phases driven by sqrt(E_tot - E_i), TSH runs only)
     electronic_integrator: int = 0
 
     #: Amplitude transformation option - whether transform the amplitudes by the T transformation matrix

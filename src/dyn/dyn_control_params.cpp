@@ -704,8 +704,8 @@ void dyn_control_params::sanity_check(){
     }
     else if(rep_tdse==2){ listed = (in_range && (m==0 || m==9)); implemented = "0, 9 or their +100 variants"; }
     else {
-      listed = (in_range && (m==0 || m==1 || m==9 || m==10 || m==19));
-      implemented = "0, 1, 9, 10, 19 or their +100 variants";
+      listed = (in_range && (m==0 || m==1 || m==9 || m==10 || m==11 || m==19 || m==20));
+      implemented = "0, 1, 9, 10, 11, 19, 20 or their +100 variants";
     }
     if(!listed){
       std::cout<<"Error in dyn_control_params::sanity_check: electronic_integrator = "
@@ -715,15 +715,15 @@ void dyn_control_params::sanity_check(){
     }
   }
 
-  /// rep_tdse == 3 (adiabatic density matrix): methods 0/10 dress bare
-  /// energies with T and frame-transform RHO, and the Zhu Liouvillian (1)
+  /// rep_tdse == 3 (adiabatic density matrix): the twins 0/1/10/11 dress bare
+  /// energies with T and frame-transform RHO, and the Zhu Liouvillian (20)
   /// generates nothing from a pure state without the rotation frame
   /// creating coherences - all three freeze under a relabel projector
   if(rep_tdse==3){
     int m = electronic_integrator % 100;
     int rot_proj = (state_tracking_algo==-1 || state_tracking_algo==5 ||
                     state_tracking_algo==6);
-    if((m==0 || m==1 || m==9 || m==10 || m==19) && (!rot_proj || assume_always_consistent==1)){
+    if((m==0 || m==1 || m==9 || m==10 || m==11 || m==19 || m==20) && (!rot_proj || assume_always_consistent==1)){
       std::cout<<"Error in dyn_control_params::sanity_check: the adiabatic"
           <<" density-matrix integrator (electronic_integrator = "
           <<electronic_integrator<<") carries the electronic coupling"

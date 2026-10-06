@@ -1872,12 +1872,13 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
       CMATRIX RHO(nst, nst);           // DM
       CMATRIX L(nst * nst, nst * nst); // Liouvillian
       /**
-           0              -  mid-point Hvib with the second-point correction of
-         Hvib 1              -  Zhu Liouvillian
-
-          10              -  same as 0, but with rotations
+           0              -  the twin of the amplitude integrator 0 (two half exponentials around the relabel)
+           1              -  the twin of the amplitude integrator 1 (the symmetric splitting B T A T^H B)
+          10              -  the twin of 10 (the rotation propagator on the columns of rho)
+          11              -  the twin of 11 (the symmetric splitting with rotations)
            9              -  same as 0 with the second Magnus term
           19              -  same as 9, but with rotations
+          20              -  Zhu Liouvillian - a scheme of its own, not a twin (TSH runs only)
       */
 
       if (method == 0 || method == 100) {
@@ -1900,29 +1901,22 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
       } // method == 0 or 100
 
       else if (method == 1 || method == 101) {
-        // Here goes the Zhu's method, Eqs. 3.34-3.35 of my Chapter
-        // run this with a TSH versions, not Ehrenfest, cause the total energies
-        // are different in these groups of methods
-
+        // the density twin of the amplitude integrator 1 (the Trotter symmetric splitting): rho -> U rho U^H with the
+        // amplitude form's U = T B T^H A T B (B the old-frame quarter step, A the new-frame half step, the leading
+        // relabel undone on the early substeps)
         CMATRIX Hvib(ham->nadi, ham->nadi);
-        Hvib = ham_prev->get_ham_adi(); // + ham_prev->get_ham_adi());
-
-        int st_indx = dyn_var.act_states[itraj];
-        double Epot = Hvib.get(st_indx, st_indx).real();
-        double Ekin = dyn_var.compute_kinetic_energy(itraj);
-
-        L = Zhu_Liouvillian(Epot + Ekin, Hvib, *dyn_var.dm_adi[itraj]);
-        //      L = make_Liouvillian(Hvib);
-        vRHO = vectorize_density_matrix(dyn_var.dm_adi[itraj]);
-        //      propagate_electronic_rot(dt, vRHO, L);
-        vRHO = exp_(L, complex<double>(0.0, -dt)) * vRHO;
-
-        RHO = unvectorize_density_matrix(vRHO);
-        // dyn-const to "raw", the same direction as methods 0/10:
-        // the Liouvillian is built in the previous step's frame
-        RHO = T_ampl * RHO * T_ampl.H();
+        CMATRIX A(ham->nadi, ham->nadi);
+        CMATRIX B(ham->nadi, ham->nadi);
+        Hvib = ham_prev->get_ham_adi();
+        if (is_ssy) { SSY_correction(Hvib, dyn_var, ham_prev, itraj); }
+        exp_(B, Hvib, complex<double>(0.0, -0.25 * dt));
+        Hvib = ham->get_ham_adi();
+        if (is_ssy) { SSY_correction(Hvib, dyn_var, ham, itraj); }
+        exp_(A, Hvib, complex<double>(0.0, -0.5 * dt));
+        CMATRIX U(B * T_new.H() * A * T_new * B);
+        if (!t_skip) { U = T_new * U; }
+        RHO = U * (*dyn_var.dm_adi[itraj]) * U.H();
         *dyn_var.dm_adi[itraj] = RHO;
-
       } // method == 1 or 101
 
       else if (method == 10 || method == 110) {
@@ -1952,6 +1946,60 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
         *dyn_var.dm_adi[itraj] = RHO;
       } // method == 10 or 110
 
+      else if (method == 11 || method == 111) {
+        // the density twin of the amplitude integrator 11: the symmetric splitting with the rotation propagator on the
+        // columns of rho and then of its adjoint, rho -> U rho U^H with the amplitude form's U
+        CMATRIX Hvib(ham->nadi, ham->nadi);
+        CMATRIX Hvib_prev(ham->nadi, ham->nadi);
+        Hvib_prev = ham_prev->get_ham_adi();
+        Hvib = ham->get_ham_adi();
+        if (is_ssy) {
+          SSY_correction(Hvib_prev, dyn_var, ham_prev, itraj);
+          SSY_correction(Hvib, dyn_var, ham, itraj);
+        }
+        CMATRIX col(nst, 1);
+        RHO = *dyn_var.dm_adi[itraj];
+        for (int pass = 0; pass < 2; pass++) {
+          for (int c = 0; c < nst; c++) {
+            col = RHO.col(c);
+            propagate_electronic_rot(0.25 * dt, col, Hvib_prev);
+            col = T_new * col;
+            propagate_electronic_rot(0.5 * dt, col, Hvib);
+            col = T_new.H() * col;
+            propagate_electronic_rot(0.25 * dt, col, Hvib_prev);
+            col = T_ampl * col;
+            for (int r = 0; r < nst; r++) { RHO.set(r, c, col.get(r, 0)); }
+          }
+          RHO = RHO.H();
+        }
+        *dyn_var.dm_adi[itraj] = RHO;
+      } // method == 11 or 111
+      else if (method == 20 || method == 120) {
+        // Zhu's Liouvillian (Eqs. 3.34-3.35 of the chapter) - a scheme of its own, not the twin of an amplitude
+        // integrator: the coherence phases driven by sqrt(E_tot - E_i) with the total energy of the active state
+        // run this with a TSH versions, not Ehrenfest, cause the total energies
+        // are different in these groups of methods
+
+        CMATRIX Hvib(ham->nadi, ham->nadi);
+        Hvib = ham_prev->get_ham_adi(); // + ham_prev->get_ham_adi());
+
+        int st_indx = dyn_var.act_states[itraj];
+        double Epot = Hvib.get(st_indx, st_indx).real();
+        double Ekin = dyn_var.compute_kinetic_energy(itraj);
+
+        L = Zhu_Liouvillian(Epot + Ekin, Hvib, *dyn_var.dm_adi[itraj]);
+        //      L = make_Liouvillian(Hvib);
+        vRHO = vectorize_density_matrix(dyn_var.dm_adi[itraj]);
+        //      propagate_electronic_rot(dt, vRHO, L);
+        vRHO = exp_(L, complex<double>(0.0, -dt)) * vRHO;
+
+        RHO = unvectorize_density_matrix(vRHO);
+        // dyn-const to "raw", the same direction as methods 0/10:
+        // the Liouvillian is built in the previous step's frame
+        RHO = T_ampl * RHO * T_ampl.H();
+        *dyn_var.dm_adi[itraj] = RHO;
+
+      } // method == 20 or 120
       else if (method == 9 || method == 109 || method == 19 || method == 119) {
         // Same as 0 (9) or 10 (19) with the second Magnus term: the
         // mid-point Hamiltonian plus (i dt/12) [A, B], A the old Hamiltonian
@@ -1985,7 +2033,7 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
 
       else {
         cout << "Error in propagate_electronic(): electronic_integrator = " << method
-             << " has no adiabatic density-matrix branch (rep_tdse = 3) - use 0, 1, 9, 10, 19 or "
+             << " has no adiabatic density-matrix branch (rep_tdse = 3) - use 0, 1, 9, 10, 11, 19, 20 or "
                 "their +100 variants\n";
         std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
