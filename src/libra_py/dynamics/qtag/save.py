@@ -85,6 +85,7 @@ def init_qtag_data(saver, output_level, _nsteps, _ntraj, _ndof, _nstates):
 
 
 def init_qtag_savers(params, model_params, nsteps, ntraj, ndof, nstates):
+    _savers = {"txt2_saver": None, "hdf5_saver": None, "mem_saver": None}
     # ====== CREATE DIRECTORIES ========
     if params["txt2_output_level"] > 0 or params["hdf5_output_level"] > 0 or params["mem_output_level"] > 0:
 
@@ -112,8 +113,6 @@ def init_qtag_savers(params, model_params, nsteps, ntraj, ndof, nstates):
         f = open(F"{prefix}/_model_params.txt", "w")
         f.write(str(model_params))
         f.close()
-
-        _savers = {"txt2_saver": None, "hdf5_saver": None, "mem_saver": None}
 
     # ====== txt2 ========
 
