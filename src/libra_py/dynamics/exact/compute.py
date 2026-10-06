@@ -61,6 +61,8 @@ INIT_WFC_DEFAULTS = {"nsteps": 200, "dt": 10.0, "progress_frequency": 0.1,
 RUN_DYNAMICS_DEFAULTS = {"nsteps": 200, "dt": 10.0, "progress_frequency": 0.1, "masses": [2000.0], "integrator": "SOFT",
                          "wfc_prefix": "wfc", "snap_freq": 1, "wfcr_params": [1, 1, 1], "wfcr_rep": 0, "wfcr_states": [0],
                          "wfck_params": [1, 1, 1], "wfck_rep": 0, "wfck_states": [0]}
+RELAXATION_DEFAULTS = {"nsteps": 200, "progress_frequency": 0.1, "prefix": "out", "hdf5_output_level": 0, "mem_output_level": 0,
+                       "txt_output_level": 0, "use_compression": 0, "compression_level": [0, 0, 0], "properties_to_save": []}
 # every key an exact run reads - one parameters dict serves init_wfc, the savers (save.SAVER_KEYS) and run_dynamics, so each
 # entry refuses a key outside this set (check_input keeps an unknown key silently)
 PARAMS_KEYS = frozenset(INIT_WFC_DEFAULTS) | frozenset(RUN_DYNAMICS_DEFAULTS) | frozenset(save.SAVER_KEYS)
@@ -336,18 +338,18 @@ def run_relaxation(_params, _potential, model_params):
             key outside PARAMS_KEYS is refused, the nearest known key named.
 
             * **_params["prefix"]** ( string ): the output directory - _dyn_params.txt, _model_params.txt, data.hdf and
-                mem_data.hdf are written there
-            * **_params["hdf5_output_level"]** ( int ): the level of the HDF5 saver, 0 - no file
+                mem_data.hdf are written there [ default: "out" ]
+            * **_params["hdf5_output_level"]** ( int ): the level of the HDF5 saver, 0 - no file [ default: 0 ]
             * **_params["mem_output_level"]** ( int ): the level of the memory saver, 0 - none, its data written to
-                mem_data.hdf at the end
-            * **_params["txt_output_level"]** ( int ): no text saver exists yet - 0 is the only value doing anything
+                mem_data.hdf at the end [ default: 0 ]
+            * **_params["txt_output_level"]** ( int ): no text saver exists yet - 0 is the only value doing anything [ default: 0 ]
             * **_params["use_compression"]** ( int ), **_params["compression_level"]** ( list of 3 ints ): of the HDF5
-                saver
-            * **_params["properties_to_save"]** ( list of strings ): the datasets the savers keep
+                saver [ default: 0, [0, 0, 0] ]
+            * **_params["properties_to_save"]** ( list of strings ): the datasets the savers keep [ default: [] ]
             * **_params["custom_pops"]** ( list of [rep, lower, upper] ): populations inside coordinate boxes, saved as
                 "custom_pops" - rep 0 diabatic or 1 adiabatic, lower and upper the box bounds per dof. Three boxes on
                 the diabatic states: [[0, [-100.0], [-10.0]], [0, [-10.0], [10.0]], [0, [10.0], [100.0]]]
-            * **_params["nsteps"]** ( int ), **_params["progress_frequency"]** ( float ): as in run_dynamics
+            * **_params["nsteps"]** ( int ), **_params["progress_frequency"]** ( float ): as in run_dynamics [ default: 200, 0.1 ]
 
         _potential ( PyObject ): the function computing the Hamiltonian at a grid point (see init_wfc)
         model_params ( dict ): its parameters - nstates = len(model_params["E_n"])
@@ -358,6 +360,9 @@ def run_relaxation(_params, _potential, model_params):
 
     params = dict(_params)
     refuse_unknown_keys(params, PARAMS_KEYS, "exact.run_relaxation", "params", "no function of the exact module reads")
+    critical_params = []
+    default_params = copy.deepcopy(RELAXATION_DEFAULTS)
+    comn.check_input(params, default_params, critical_params)
 
     nstates = len(model_params["E_n"])
     nsteps = params["nsteps"]
