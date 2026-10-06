@@ -301,10 +301,11 @@ def load(dyn_general):
     #
     #rep_tdse = 3 ( adiabatic, density matrix formalism): 1** - with NBRA
     #
-    #     0              -  mid-point Hvib with the second-point correction of Hvib
-    #     1              -  Zhu Liouvillian
-    #
-    #    10              -  same as 0, but with rotations
+    #     0              -  the twin of the amplitude integrator 0 (two half exponentials around the relabel)
+    #     1              -  the twin of the amplitude integrator 1 (the symmetric splitting)
+    #    10              -  the twin of 10 (the rotation propagator on the columns of rho)
+    #    11              -  the twin of 11 (the symmetric splitting with rotations)
+    #    20              -  Zhu Liouvillian - a scheme of its own, not a twin
     dyn_general.update({"rep_tdse":1, "electronic_integrator":2 })   # ld, original, with exp_
 
     #=========== Disable state tracking and phase corrections explicitly for the LD integrators ===============
