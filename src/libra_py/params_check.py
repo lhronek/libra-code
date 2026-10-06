@@ -34,6 +34,17 @@ def nearest_key(key, allowed, within=2):
     return best if edit_distance(key.lower(), best.lower()) <= within else None
 
 
+def unknown_keys(params, allowed, skip=()):
+    """The keys of `params` outside `allowed` and `skip`, sorted, and the hints "key -> nearest?" for those within two edits"""
+    unknown = sorted(k for k in params if k not in allowed and k not in skip)
+    hints = []
+    for k in unknown:
+        best = nearest_key(k, allowed)
+        if best is not None:
+            hints.append(F"{k} -> {best}?")
+    return unknown, hints
+
+
 def refuse_unknown_keys(params, allowed, where, carrier, nobody_reads, skip=()):
     """Raise ValueError when `params` carries a key outside `allowed` (and outside `skip`), naming the keys and their
     nearest known keys
@@ -47,14 +58,23 @@ def refuse_unknown_keys(params, allowed, where, carrier, nobody_reads, skip=()):
             run_dynamics reads", "run_dynamics does not read"
         skip ( iterable ): keys neither allowed nor refused here (a caller handling them on its own)
     """
-    unknown = sorted(k for k in params if k not in allowed and k not in skip)
+    unknown, hints = unknown_keys(params, allowed, skip)
     if not unknown:
         return
-    hints = []
-    for k in unknown:
-        best = nearest_key(k, allowed)
-        if best is not None:
-            hints.append(F"{k} -> {best}?")
     raise ValueError(F"{where}: {carrier} carries keys that {nobody_reads}: {unknown}"
                      + (F" (did you mean {hints}?)" if hints else "")
                      + " - an unknown key is ignored silently, so a misspelled key must not pass")
+
+
+def warn_unknown_keys(params, allowed, where, carrier, nobody_reads, skip=()):
+    """Print a WARNING naming the keys of `params` outside `allowed` (and `skip`) with their nearest known keys, and return
+    them - for the entries whose callers share one dict with other entries (the plot dicts of the tutorials), where a
+    refusal would reject the other entries' keys
+
+    Args: as refuse_unknown_keys
+    """
+    unknown, hints = unknown_keys(params, allowed, skip)
+    if unknown:
+        print(F"WARNING in {where}(): {carrier} carries keys that {nobody_reads}: {unknown}"
+              + (F" (did you mean {hints}?)" if hints else ""))
+    return unknown
