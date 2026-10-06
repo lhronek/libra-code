@@ -243,6 +243,10 @@ CMATRIX sdm(CMATRIX &Coeff, double dt, vector<int> &act_st,
   return sdm(Coeff, dt, act_st, decoh_rates, tol, is_nbra);
 }
 
+// the population the other states must hold for a projection to leave a state - the square of the amplitude
+// roundoff (1e-14), below it the remainder is noise and the renormalized state would be noise
+const double PROJECT_OUT_MIN_REST = 1.0e-28;
+
 void project_out(CMATRIX &Coeff, int traj, int i) {
   /** Projects the state `i` out of a coherent superposition of states
 
@@ -257,21 +261,21 @@ void project_out(CMATRIX &Coeff, int traj, int i) {
 
  */
 
-  complex<double> ci;
-  ci = Coeff.get(i, traj);
-  double pi;
-  pi = (std::conj(ci) * ci).real();
-  double nrm = 1.0 - pi;
-
-  if (nrm <= 0.0) {
-    nrm = 0.0;
+  // the remaining population is summed over the other states - 1 - |c_i|^2 reads zero for any remainder below the
+  // roundoff of 1 and scaled the state to zero
+  int nst = Coeff.n_rows;
+  double rest = 0.0;
+  for (int j = 0; j < nst; j++) {
+    if (j != i) { rest += std::norm(Coeff.get(j, traj)); }
   }
-  if (nrm > 0.0) {
-    nrm = 1.0 / sqrt(nrm);
+  if (rest < PROJECT_OUT_MIN_REST) {
+    std::cout << "Error in project_out(): state " << i << " carries the population of trajectory " << traj
+              << " - the other states hold " << rest << " (below " << PROJECT_OUT_MIN_REST
+              << "), nothing remains to renormalize and the electronic state would be zero\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
-
-  Coeff.scale(-1, traj, nrm);
   Coeff.set(i, traj, complex<double>(0.0, 0.0));
+  Coeff.scale(-1, traj, 1.0 / sqrt(rest));
 }
 
 void collapse(CMATRIX &Coeff, int traj, int i, int collapse_option) {
@@ -1982,15 +1986,21 @@ void collapse_dm(CMATRIX &rho, int i) {
 }
 
 void project_out_dm(CMATRIX &rho, int i) {
-  /** The density form of project_out: rho -> (1 - P_i) rho (1 - P_i) / (1 - rho_ii), the zero matrix when the
-      state carries the whole population (the amplitude form yields the zero vector there) */
-  double pi = rho.get(i, i).real();
-  double nrm = 1.0 - pi;
-  if (nrm <= 0.0) { nrm = 0.0; }
-  if (nrm > 0.0) { nrm = 1.0 / nrm; }
-  rho *= nrm;
+  /** The density form of project_out: rho -> (1 - P_i) rho (1 - P_i) / tr[(1 - P_i) rho], the remaining
+      population summed over the other states like the amplitude form, a projection that leaves nothing refused */
+  int nst = rho.n_rows;
+  double rest = 0.0;
+  for (int j = 0; j < nst; j++) {
+    if (j != i) { rest += rho.get(j, j).real(); }
+  }
+  if (rest < PROJECT_OUT_MIN_REST) {
+    std::cout << "Error in project_out_dm(): state " << i << " carries the population - the other states hold " << rest
+              << " (below " << PROJECT_OUT_MIN_REST << "), nothing remains to renormalize and the density would be zero\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
   rho.scale(i, -1, 0.0);
   rho.scale(-1, i, 0.0);
+  rho *= 1.0 / rest;
 }
 
 void sdm_dm(CMATRIX &rho, double dt, int act_st, MATRIX &decoh_rates, double tol) {
