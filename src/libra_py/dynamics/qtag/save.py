@@ -149,8 +149,8 @@ def save_qtag_hdf5_1D(saver, dt, step, Etot, dEtot, txt_type=0):
     if txt_type == 0:
         t = step
 
-    # Time
-    saver.save_scalar(t, "time", dt * step)
+    # Time - the saved state is the one after step `step` (0-based), its time is (step + 1) dt
+    saver.save_scalar(t, "time", dt * (step + 1))
 
     # Energy
     saver.save_scalar(t, "Etot", Etot)

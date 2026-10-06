@@ -905,7 +905,7 @@ def run_qtag(_q, _p, _alp, _s, _states, _coeff, _iM, _dyn_params, _compute_model
             print(etot, pops)
 
         # Save the specified data...
-        save.save_qtag_data(_savers, dyn_params, step + 1, etot, 0, pops, C, Q, P, A, S)
+        save.save_qtag_data(_savers, dyn_params, step, etot, 0, pops, C, Q, P, A, S)      # row `step`, time (step + 1) dt
         if _savers["txt2_saver"] is not None:
             _savers["txt2_saver"].save_data_txt(F"{prefix}", properties_to_save, "a", 0)
 
