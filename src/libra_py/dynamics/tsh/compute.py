@@ -46,6 +46,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 from libra_py.blas_threads import blas_thread_limit
 import libra_py.units as units
 import libra_py.data_outs as data_outs
@@ -103,33 +104,15 @@ RUNNER_KEYS = ("nstates", "istate", "istep", "seed", "x0", "p0", "masses", "k", 
 LIBRA_LAYER_KEYS = ("direct_init", "ntraj")
 
 
-def _edit_distance(a, b):
-    prev = list(range(len(b) + 1))
-    for i, ca in enumerate(a, 1):
-        cur = [i]
-        for j, cb in enumerate(b, 1):
-            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
-        prev = cur
-    return prev[-1]
-
-
 def check_dyn_params_keys(dyn_params, known):
     """The keys of dyn_params against the engine (the exported parameters of dyn_control_params), the keys of
     run_dynamics (known) and the ones generic_recipe adds: an unknown key is refused naming it and the nearest known key
-    (the engine ignores an unknown key silently - a misspelled one did nothing for a year), a runner-level key of the old
-    format is accepted with a warning"""
+    (params_check.refuse_unknown_keys - the engine ignores an unknown key silently, a misspelled one did nothing for a
+    year), a runner-level key of the old format is accepted with a warning"""
     engine = {k for k in dir(dyn_control_params) if isinstance(getattr(dyn_control_params, k), property)}
     allowed = engine | set(known) | set(LIBRA_LAYER_KEYS)
-    unknown = sorted(k for k in dyn_params if k not in allowed and k not in RUNNER_KEYS)
-    if unknown:
-        hints = []
-        for k in unknown:
-            best = min(allowed, key=lambda x: (_edit_distance(k.lower(), x.lower()), x))
-            if _edit_distance(k.lower(), best.lower()) <= 2:
-                hints.append(F"{k} -> {best}?")
-        raise ValueError(F"run_dynamics: dyn_params carries keys that neither the engine (dyn_control_params) nor run_dynamics "
-                         F"reads: {unknown}" + (F" (did you mean {hints}?)" if hints else "")
-                         + " - the engine ignores an unknown key silently, so a misspelled key must not pass")
+    refuse_unknown_keys(dyn_params, allowed, "run_dynamics", "dyn_params", "neither the engine (dyn_control_params) nor run_dynamics reads",
+                        skip=RUNNER_KEYS)
     old = sorted(k for k in dyn_params if k in RUNNER_KEYS)
     if old:
         print(F"WARNING in run_dynamics(): dyn_params carries the runner-level keys {old} - neither the engine nor run_dynamics "
