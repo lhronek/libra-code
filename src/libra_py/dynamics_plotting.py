@@ -44,6 +44,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 
 import util.libutil as comn
+from libra_py.params_check import warn_unknown_keys
 import libra_py.data_visualize as data_visualize
 
 import matplotlib.pyplot as plt   # plots
@@ -125,6 +126,7 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
                           "xmin": -10.0, "xmax": 10.0, "dx": 1.0,
                           "tmin": 0, "tmax": 10, "dt": 1
                           }
+    warn_unknown_keys(pes_params, set(pes_params_default) | set(pes_params_critical) | {"which_ham_dia", "which_ham_adi", "which_d1ham_dia", "which_d1ham_adi", "which_dc1_dia", "which_dc1_adi"}, "plot_pes_properties", "pes_params", "plot_pes_properties does not read")
     comn.check_input(pes_params, pes_params_default, pes_params_critical)
 
     active_dof = pes_params["active_dof"]
@@ -170,6 +172,7 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
                            "which_dc1_dia": [], "which_dc1_adi": [],
                            "colors": colors_, "clrs_index": clrs_index_
                            }
+    warn_unknown_keys(plot_params, set(plot_params_default) | set(plot_params_critical), "plot_pes_properties", "plot_params", "plot_pes_properties does not read")
     comn.check_input(plot_params, plot_params_default, plot_params_critical)
     which_ham_dia = plot_params["which_ham_dia"]
     which_ham_adi = plot_params["which_ham_adi"]
@@ -469,6 +472,7 @@ def plot_surfaces(_compute_model, _param_sets, states_of_interest, xmin, xmax, d
                       "margin_left": 0.2, "margin_right": 0.95, "margin_bottom": 0.13, "margin_top": 0.88,
                       "linewidth": 7
                       }
+    warn_unknown_keys(plot_params, set(default_params) | set(critical_params), "plot_surfaces", "plot_params", "plot_surfaces does not read")
     comn.check_input(plot_params, default_params, critical_params)
 
     colors = plot_params["colors"]

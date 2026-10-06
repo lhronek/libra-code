@@ -48,6 +48,33 @@ import libra_py.units as units
 from libra_py.hdf5_io import open_hdf5
 
 import util.libutil as comn
+from libra_py.params_check import warn_unknown_keys
+
+
+COMMON_PLOT_DEFAULTS = {"prefix": "out", "filename": "mem_data.hdf", "output_level": 3,
+                      "which_trajectories": [0], "which_dofs": [0],
+                      "which_adi_states": [0], "which_dia_states": [0],
+                      "which_energies": ["kinetic", "potential", "total"],
+                      "colors": davis.colors, "clrs_index": davis.clrs_index,
+                      "save_figures": 1, "do_show": 1, "dpi": 300, "figsize": (6.42, 2.41),
+                      "figure_format": "png",
+                      "axes_fontsize": (8, 8), "axes_label_fontsize": (8, 8),
+                      "legend_fontsize": 8, "title_fontsize": 8,
+                      "linewidth": 2,
+                      "frameon": True,
+                      "xlim": None, "ylim": None,
+                      "what_to_plot": ["energies", "energy_fluctuations",
+                                       "traj_resolved_adiabatic_ham", "traj_resolved_diabatic_ham",
+                                       "coordinates", "phase_space",
+                                       "sh_pop", "se_pop_adi", "se_pop_dia",
+                                       "sh_pop_raw", "se_pop_adi_raw", "se_pop_dia_raw",
+                                       "time_overlaps", "projectors", "basis_transform"
+                                       ],
+                      "no_label": 0
+                      }
+# every key the TSH plots read - plot_dyn's own defaults are a subset: the entries warn about a key outside this set (the
+# tutorials share one plot dict with other modules' plots, so no refusal)
+TSH_PLOT_KEYS = frozenset(COMMON_PLOT_DEFAULTS)
 
 
 def common_defaults(plot_params_):
@@ -122,27 +149,7 @@ def common_defaults(plot_params_):
     plot_params = dict(plot_params_)
 
     critical_params = []
-    default_params = {"prefix": "out", "filename": "mem_data.hdf", "output_level": 3,
-                      "which_trajectories": [0], "which_dofs": [0],
-                      "which_adi_states": [0], "which_dia_states": [0],
-                      "which_energies": ["kinetic", "potential", "total"],
-                      "colors": davis.colors, "clrs_index": davis.clrs_index,
-                      "save_figures": 1, "do_show": 1, "dpi": 300, "figsize": (6.42, 2.41),
-                      "figure_format": "png",
-                      "axes_fontsize": (8, 8), "axes_label_fontsize": (8, 8),
-                      "legend_fontsize": 8, "title_fontsize": 8,
-                      "linewidth": 2,
-                      "frameon": True,
-                      "xlim": None, "ylim": None,
-                      "what_to_plot": ["energies", "energy_fluctuations",
-                                       "traj_resolved_adiabatic_ham", "traj_resolved_diabatic_ham",
-                                       "coordinates", "phase_space",
-                                       "sh_pop", "se_pop_adi", "se_pop_dia",
-                                       "sh_pop_raw", "se_pop_adi_raw", "se_pop_dia_raw",
-                                       "time_overlaps", "projectors", "basis_transform"
-                                       ],
-                      "no_label": 0
-                      }
+    default_params = copy.deepcopy(COMMON_PLOT_DEFAULTS)
     comn.check_input(plot_params, default_params, critical_params)
 
     return plot_params
@@ -1006,6 +1013,7 @@ def plot_dynamics(plot_params_):
 
     """
 
+    warn_unknown_keys(plot_params_, TSH_PLOT_KEYS, "plot_dynamics", "plot_params", "the TSH plots do not read")
     plot_params = common_defaults(plot_params_)
 
     filename = plot_params["filename"]
@@ -1263,6 +1271,7 @@ def plot_dyn(plot_params):
                       "which_adi_states": [0], "which_dia_states": [0],
                       "colors": colors, "clrs_index": clrs_index
                       }
+    warn_unknown_keys(plot_params, TSH_PLOT_KEYS, "plot_dyn", "plot_params", "the TSH plots do not read")
     comn.check_input(plot_params, default_params, critical_params)
 
     filename = plot_params["filename"]
@@ -2224,6 +2233,7 @@ def plot_dynamics_xf(plot_params_):
 
     """
 
+    warn_unknown_keys(plot_params_, TSH_PLOT_KEYS, "plot_dynamics_xf", "plot_params", "the TSH plots do not read")
     plot_params = common_defaults(plot_params_)
 
     filename = plot_params["filename"]

@@ -48,6 +48,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 
 import util.libutil as comn
+from libra_py.params_check import warn_unknown_keys
 import libra_py.units as units
 from libra_py.hdf5_io import open_hdf5
 import libra_py.data_outs as data_outs
@@ -88,6 +89,7 @@ def plot_mem(res, _params, model_params, plot_params):
     # Parameters and dimensions
     critical_params = []
     default_params = {"colors": colors, "clrs_index": clrs_index}
+    warn_unknown_keys(plot_params, set(default_params) | set(critical_params), "plot_mem", "plot_params", "plot_mem does not read")
     comn.check_input(plot_params, default_params, critical_params)
 
     colors = plot_params["colors"]
@@ -289,6 +291,7 @@ def plot_hdf5(plot_params, ax=plt, use_default_ax=True):
                        "denmat_dia", "denmat_adi",
                        "PSI_dia", "PSI_adi", "reciPSI_dia", "reciPSI_adi"]
                       }
+    warn_unknown_keys(plot_params, set(default_params) | set(critical_params), "plot_hdf5", "plot_params", "plot_hdf5 does not read")
     comn.check_input(plot_params, default_params, critical_params)
 
     filename = plot_params["filename"]
@@ -481,6 +484,7 @@ def plot_1D_png(ax, plt_params, prefix, snap, states,
                       "lmargin": 0.2, "rmargin": 0.95, "bmargin": 0.13, "tmargin": 0.88,
                       "show": False
                       }
+    warn_unknown_keys(plot_params, set(default_params) | set(critical_params), "plot_1D_png", "plot_params", "plot_1D_png does not read")
     comn.check_input(plot_params, default_params, critical_params)
 
     _colors = plot_params["colors"]
@@ -669,6 +673,7 @@ def plot_2D_png(ax, plt_params, prefix, snap, state,
                       "lmargin": 0.2, "rmargin": 0.95, "bmargin": 0.13, "tmargin": 0.88,
                       "show": False
                       }
+    warn_unknown_keys(plot_params, set(default_params) | set(critical_params), "plot_2D_png", "plot_params", "plot_2D_png does not read")
     comn.check_input(plot_params, default_params, critical_params)
 
     colormap = plot_params["colormap"]
