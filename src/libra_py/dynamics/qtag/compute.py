@@ -53,6 +53,7 @@ import libra_py.data_outs as data_outs
 import libra_py.data_savers as data_savers
 
 from . import save
+from libra_py.params_check import refuse_unknown_keys
 
 
 def time_overlap(nQ, nP, nA, nS, nstate, oQ, oP, oA, oS, ostate):
@@ -101,6 +102,20 @@ def time_overlap(nQ, nP, nA, nS, nstate, oQ, oP, oA, oS, ostate):
     return St
 
 
+QTAG_MOMENTUM_DEFAULTS = {"d_weight": 1, "linfit_beta": 1e-1, "mom_calc_type": 1}
+PROPAGATE_BASIS_DEFAULTS = {"decpl_den": 0.25}
+# the keys propagate_basis reads without a default
+PROPAGATE_BASIS_KEYS = ("dt", "iM", "states", "q_update_method", "p_update_method", "a_update_method", "s_update_method",
+                        "q_sync_method", "p_sync_method", "a_sync_method", "s_sync_method")
+RUN_QTAG_DEFAULTS = {"hdf5_output_level": -1, "prefix": "out", "use_compression": 0, "compression_level": [0, 0, 0],
+                     "mem_output_level": 4, "txt2_output_level": 0, "properties_to_save": [], "progress_frequency": 1,
+                     "target_states": [0]}
+# every key a QTAG run reads - run_qtag and its savers, propagate_basis, qtag_momentum and the C++ matrix elements
+# (qtag_pot_approx_method) - one dyn_params dict serves them all, so run_qtag refuses a key outside this set
+DYN_PARAMS_KEYS = (frozenset(RUN_QTAG_DEFAULTS) | frozenset(QTAG_MOMENTUM_DEFAULTS) | frozenset(PROPAGATE_BASIS_DEFAULTS)
+                   | frozenset(PROPAGATE_BASIS_KEYS) | frozenset(("nsteps", "qtag_pot_approx_method")))
+
+
 def qtag_momentum(_q, _p, _a, _s, coeff_on_surf, dyn_params):
     """Calculates the single-surface momentum for a set of basis functions, received from
        the `propagate( )' function.
@@ -143,7 +158,7 @@ def qtag_momentum(_q, _p, _a, _s, coeff_on_surf, dyn_params):
     params = dict(dyn_params)
 
     critical_params = []
-    default_params = {"d_weight": 1, "linfit_beta": 1e-1, "mom_calc_type": 1}
+    default_params = copy.deepcopy(QTAG_MOMENTUM_DEFAULTS)
     comn.check_input(params, default_params, critical_params)
 
     # Extract parameters from params dict...
@@ -303,7 +318,7 @@ def propagate_basis(_q, _p, _alp, _s, _states, coeff, dyn_params, surf_pops):
     params = dict(dyn_params)
 
     critical_params = []
-    default_params = {"decpl_den": 0.25}
+    default_params = copy.deepcopy(PROPAGATE_BASIS_DEFAULTS)
     comn.check_input(params, default_params, critical_params)
 
     dt = params["dt"]
@@ -692,8 +707,13 @@ def run_qtag(_q, _p, _alp, _s, _states, _coeff, _iM, _dyn_params, _compute_model
         _states ( intList, or list of ntraj ints ): the quantum state of each trajectory
         _coeff ( CMATRIX(nstates x ntraj) ): amplitudes of the GBFs
         _iM ( MATRIX(nnucl, 1) ): masses of classical particles [units: a.u.^-1]
-        _dyn_params ( dictionary ): parameters controlling the execution of the dynamics
+        _dyn_params ( dictionary ): parameters controlling the execution of the dynamics. A key outside the QTAG
+            parameters (DYN_PARAMS_KEYS - the keys below) is refused, the nearest known key named.
             Can contain:
+
+            * **iM** ( MATRIX(nnucl, 1) ): the inverse masses read by the basis propagation (the same as _iM)
+            * **states** ( list of ints ): all the quantum states of the basis
+            * **d_weight** ( float ): the weight of the single-surface momentum fit [ default: 1 ]
 
             * **q_update_method** (int): the parameter specifying whether positions should be updated (adaptable) or frozen
 
@@ -798,12 +818,9 @@ def run_qtag(_q, _p, _alp, _s, _states, _coeff, _iM, _dyn_params, _compute_model
     S = MATRIX(_s)
     C = CMATRIX(_coeff)
 
-    default_params = {
-        "hdf5_output_level": -1, "prefix": "out", "use_compression": 0, "compression_level": [0, 0, 0],
-        "mem_output_level": 4, "txt2_output_level": 0, "properties_to_save": [], "progress_frequency": 1,
-        "target_states": [0]
-    }
+    default_params = copy.deepcopy(RUN_QTAG_DEFAULTS)
     critical_params = []
+    refuse_unknown_keys(dyn_params, DYN_PARAMS_KEYS, "qtag.run_qtag", "dyn_params", "no function of the QTAG run reads")
     comn.check_input(dyn_params, default_params, critical_params)
 
     ndof = Q.num_of_rows
