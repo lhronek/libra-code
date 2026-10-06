@@ -1881,28 +1881,21 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
       */
 
       if (method == 0 || method == 100) {
-        // Based on Lowdin transformations, using mid-point Hvib
+        // the density twin of the amplitude integrator 0: the half step in the old frame, the relabel, the half step
+        // in the new frame - rho -> U rho U^H with the amplitude form's U = B T A (T^H B T A on the early substeps,
+        // the relabel undone) - a midpoint exponential differs at first order in the substep
         CMATRIX Hvib(ham->nadi, ham->nadi);
-        CMATRIX Hvib_prev(ham->nadi, ham->nadi);
-        Hvib = T_new.H() * ham->get_ham_adi() * T_new; // "raw" to dyn-const
-        Hvib_prev = ham_prev->get_ham_adi();
-        // SSY REPLACES the diagonal - correct each endpoint with its
-        // own step, then take the midpoint (the m4/m5 convention)
-        if (is_ssy) {
-          SSY_correction(Hvib, dyn_var, ham, itraj);
-          SSY_correction(Hvib_prev, dyn_var, ham_prev, itraj);
-        }
-        Hvib = 0.5 * (Hvib + Hvib_prev);
-
-        L = make_Liouvillian(Hvib);
-
-        // RHO = T_new.H() * (*dyn_var.dm_adi[itraj]) * T; // "raw" to dyn-const
-        RHO = *dyn_var.dm_adi[itraj];
-        vRHO = vectorize_density_matrix(RHO);
-        vRHO = exp_(L, complex<double>(0.0, -dt)) * vRHO;
-
-        RHO = unvectorize_density_matrix(vRHO);
-        RHO = T_ampl * RHO * T_ampl.H(); // dyn-const to "raw"
+        CMATRIX A(ham->nadi, ham->nadi);
+        CMATRIX B(ham->nadi, ham->nadi);
+        Hvib = ham_prev->get_ham_adi();
+        if (is_ssy) { SSY_correction(Hvib, dyn_var, ham_prev, itraj); }
+        exp_(A, Hvib, complex<double>(0.0, -0.5 * dt));
+        Hvib = ham->get_ham_adi();
+        if (is_ssy) { SSY_correction(Hvib, dyn_var, ham, itraj); }
+        exp_(B, Hvib, complex<double>(0.0, -0.5 * dt));
+        CMATRIX U(B * T_new * A);
+        if (t_skip) { U = T_new.H() * U; }
+        RHO = U * (*dyn_var.dm_adi[itraj]) * U.H();
         *dyn_var.dm_adi[itraj] = RHO;
       } // method == 0 or 100
 
@@ -1933,28 +1926,29 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
       } // method == 1 or 101
 
       else if (method == 10 || method == 110) {
-        // Same as 0, but with rotations
+        // the density twin of the amplitude integrator 10: the rotation propagator applied to the columns of rho and
+        // then of its adjoint, rho -> U rho U^H with the amplitude form's U (the relabel undone on the early substeps)
         CMATRIX Hvib(ham->nadi, ham->nadi);
         CMATRIX Hvib_prev(ham->nadi, ham->nadi);
-        Hvib = T_new.H() * ham->get_ham_adi() * T_new; // "raw" to dyn-const
         Hvib_prev = ham_prev->get_ham_adi();
-        // SSY REPLACES the diagonal - correct each endpoint with its
-        // own step, then take the midpoint (the m4/m5 convention)
+        Hvib = ham->get_ham_adi();
         if (is_ssy) {
-          SSY_correction(Hvib, dyn_var, ham, itraj);
           SSY_correction(Hvib_prev, dyn_var, ham_prev, itraj);
+          SSY_correction(Hvib, dyn_var, ham, itraj);
         }
-        Hvib = 0.5 * (Hvib + Hvib_prev);
-
-        L = make_Liouvillian(Hvib);
-        // RHO = T_new.H() * (*dyn_var.dm_adi[itraj]) * T; // "raw" to dyn-const
+        CMATRIX col(nst, 1);
         RHO = *dyn_var.dm_adi[itraj];
-        vRHO = vectorize_density_matrix(RHO);
-
-        propagate_electronic_rot(dt, vRHO, L);
-
-        RHO = unvectorize_density_matrix(vRHO);
-        RHO = T_ampl * RHO * T_ampl.H(); // dyn-const to "raw"
+        for (int pass = 0; pass < 2; pass++) {
+          for (int c = 0; c < nst; c++) {
+            col = RHO.col(c);
+            propagate_electronic_rot(0.5 * dt, col, Hvib_prev);
+            col = T_new * col;
+            propagate_electronic_rot(0.5 * dt, col, Hvib);
+            if (t_skip) { col = T_new.H() * col; }
+            for (int r = 0; r < nst; r++) { RHO.set(r, c, col.get(r, 0)); }
+          }
+          RHO = RHO.H();
+        }
         *dyn_var.dm_adi[itraj] = RHO;
       } // method == 10 or 110
 
