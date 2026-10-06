@@ -1112,10 +1112,11 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
 
               rep_tdse = 3 ( adiabatic, density matrix formalism): 1** - with NBRA
 
-                 0              -  mid-point Hvib with the second-point correction of Hvib
-                 1              -  Zhu Liouvillian
+                 0              -  the twin of the amplitude integrator 0: rho -> U rho U^H with its two half
+                                   exponentials around the relabel
+                 1              -  Zhu Liouvillian (not the twin of the amplitude integrator 1)
 
-                10              -  same as 0, but with rotations
+                10              -  the twin of the amplitude integrator 10 (the rotation propagator on the columns of rho)
                  9              -  same as 0 with the second Magnus term (i dt/12) [A, B] in the mid-point Hamiltonian
                 19              -  same as 9, but with rotations
 
