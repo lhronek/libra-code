@@ -134,6 +134,12 @@ def init_qtag_savers(params, model_params, nsteps, ntraj, ndof, nstates):
         _savers["hdf5_saver"].set_compression_level(params["use_compression"], params["compression_level"])
         init_qtag_data(_savers["hdf5_saver"], hdf5_output_level, nsteps, ntraj, ndof, nstates)
 
+    # ====== MEM ========
+    mem_output_level = params["mem_output_level"]
+    if mem_output_level > 0:
+        _savers["mem_saver"] = data_savers.mem_saver(properties_to_save)
+        init_qtag_data(_savers["mem_saver"], mem_output_level, nsteps, ntraj, ndof, nstates)
+
     return (_savers)
 
 
@@ -194,6 +200,7 @@ def save_qtag_data(_savers, params,
 
     hdf5_output_level = params["hdf5_output_level"]
     txt2_output_level = params["txt2_output_level"]
+    mem_output_level = params["mem_output_level"]
 
     nsteps = params["nsteps"]
     nstates = len(params["states"])
@@ -205,6 +212,8 @@ def save_qtag_data(_savers, params,
 
     if txt2_output_level >= 1 and _savers["txt2_saver"] is not None:
         save_qtag_hdf5_1D(_savers["txt2_saver"], params['dt'], step, Etot, dEtot, 1)
+    if mem_output_level >= 1 and _savers["mem_saver"] is not None:
+        save_qtag_hdf5_1D(_savers["mem_saver"], params['dt'], step, Etot, dEtot)
 
     # ======LEVEL 2======
     if hdf5_output_level >= 2 and _savers["hdf5_saver"] is not None:
@@ -212,6 +221,8 @@ def save_qtag_data(_savers, params,
 
     if txt2_output_level >= 2 and _savers["txt2_saver"] is not None:
         save_qtag_hdf5_2D(_savers["txt2_saver"], nstates, step, pops, coeffs, 1)
+    if mem_output_level >= 2 and _savers["mem_saver"] is not None:
+        save_qtag_hdf5_2D(_savers["mem_saver"], nstates, step, pops, coeffs)
 
     # ======LEVEL 3======
     if hdf5_output_level >= 3 and _savers["hdf5_saver"] is not None:
@@ -219,3 +230,5 @@ def save_qtag_data(_savers, params,
 
     if txt2_output_level >= 3 and _savers["txt2_saver"] is not None:
         save_qtag_hdf5_3D(_savers["txt2_saver"], step, qvals, pvals, avals, svals, 1)
+    if mem_output_level >= 3 and _savers["mem_saver"] is not None:
+        save_qtag_hdf5_3D(_savers["mem_saver"], step, qvals, pvals, avals, svals)
