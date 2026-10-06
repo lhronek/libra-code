@@ -706,12 +706,14 @@ def run_qtag(_q, _p, _alp, _s, _states, _coeff, _iM, _dyn_params, _compute_model
         _s ( MATRIX(1, ntraj) ): phases of all GBFs [ units: no ]
         _states ( intList, or list of ntraj ints ): the quantum state of each trajectory
         _coeff ( CMATRIX(nstates x ntraj) ): amplitudes of the GBFs
-        _iM ( MATRIX(nnucl, 1) ): masses of classical particles [units: a.u.^-1]
+        _iM ( MATRIX(nnucl, 1) ): the inverse masses of the classical particles [units: a.u.^-1] - run_qtag writes them
+            into dyn_params["iM"] for the basis propagation
         _dyn_params ( dictionary ): parameters controlling the execution of the dynamics. A key outside the QTAG
             parameters (DYN_PARAMS_KEYS - the keys below) is refused, the nearest known key named.
             Can contain:
 
-            * **iM** ( MATRIX(nnucl, 1) ): the inverse masses read by the basis propagation (the same as _iM)
+            * **iM** ( MATRIX(nnucl, 1) ): optional - the inverse masses again, refused when it differs from _iM (the
+                argument is the one source, the key is filled from it)
             * **states** ( list of ints ): all the quantum states of the basis
             * **d_weight** ( float ): the weight of the single-surface momentum fit [ default: 1 ]
 
@@ -835,7 +837,15 @@ def run_qtag(_q, _p, _alp, _s, _states, _coeff, _iM, _dyn_params, _compute_model
     target_states = dyn_params["target_states"]
     nsteps = dyn_params["nsteps"]
     dt = dyn_params["dt"]
-    iM = dyn_params["iM"]
+    iM = MATRIX(_iM)
+    if "iM" in dyn_params:
+        given = dyn_params["iM"]
+        same = (given.num_of_rows == iM.num_of_rows and given.num_of_cols == iM.num_of_cols
+                and all(given.get(i, 0) == iM.get(i, 0) for i in range(iM.num_of_rows)))
+        if not same:
+            raise ValueError("run_qtag: dyn_params['iM'] differs from the _iM argument - the argument is the inverse masses, "
+                             "pass them once")
+    dyn_params["iM"] = iM                  # the basis propagation reads the dict
     progress_frequency = dyn_params["progress_frequency"]
     prefix = dyn_params["prefix"]
 
