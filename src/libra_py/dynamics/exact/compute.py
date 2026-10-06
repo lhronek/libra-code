@@ -52,6 +52,18 @@ import libra_py.data_outs as data_outs
 import libra_py.data_savers as data_savers
 
 from . import save
+from libra_py.params_check import refuse_unknown_keys
+
+
+INIT_WFC_DEFAULTS = {"nsteps": 200, "dt": 10.0, "progress_frequency": 0.1,
+                     "rmin": [-15.0], "rmax": [15.0], "dx": [0.1], "nstates": 2,
+                     "x0": [0.0], "p0": [0.0], "istate": [1, 0], "masses": [2000.0], "k": [0.001]}
+RUN_DYNAMICS_DEFAULTS = {"nsteps": 200, "dt": 10.0, "progress_frequency": 0.1, "masses": [2000.0], "integrator": "SOFT",
+                         "wfc_prefix": "wfc", "snap_freq": 1, "wfcr_params": [1, 1, 1], "wfcr_rep": 0, "wfcr_states": [0],
+                         "wfck_params": [1, 1, 1], "wfck_rep": 0, "wfck_states": [0]}
+# every key an exact run reads - one parameters dict serves init_wfc, the savers (save.SAVER_KEYS) and run_dynamics, so each
+# entry refuses a key outside this set (check_input keeps an unknown key silently)
+PARAMS_KEYS = frozenset(INIT_WFC_DEFAULTS) | frozenset(RUN_DYNAMICS_DEFAULTS) | frozenset(save.SAVER_KEYS)
 
 
 def init_wfc(params, _potential, model_params):
@@ -61,13 +73,12 @@ def init_wfc(params, _potential, model_params):
 
     istate = [rep, index_of_the_state]
 
+    A key of params outside the exact parameters (PARAMS_KEYS - the keys of init_wfc, run_dynamics and the savers) is
+    refused, the nearest known key named
     """
-
     critical_params = []
-    default_params = {"nsteps": 200, "dt": 10.0, "progress_frequency": 0.1,
-                      "rmin": [-15.0], "rmax": [15.0], "dx": [0.1], "nstates": 2,
-                      "x0": [0.0], "p0": [0.0], "istate": [1, 0], "masses": [2000.0], "k": [0.001]
-                      }
+    default_params = copy.deepcopy(INIT_WFC_DEFAULTS)
+    refuse_unknown_keys(params, PARAMS_KEYS, "exact.init_wfc", "params", "no function of the exact module reads")
     comn.check_input(params, default_params, critical_params)
 
     # Grid properties
@@ -135,7 +146,8 @@ def run_dynamics(wfc, _params, model_params, savers):
     """
     Args:
         wfc ( Wfcgrid2 object ): object that stores the wavefunction and all related properties
-        params ( dict ): parameters controlling the execution of the dynamics
+        params ( dict ): parameters controlling the execution of the dynamics. A key outside the exact parameters
+            (PARAMS_KEYS - the keys of init_wfc, run_dynamics and the savers) is refused, the nearest known key named.
             Can contain:
 
             * **params["nsteps"]** ( int ): the number of integration steps to compute [ default: 200 ]
@@ -191,10 +203,8 @@ def run_dynamics(wfc, _params, model_params, savers):
                        }
 
     critical_params = []
-    default_params = {"nsteps": 200, "dt": 10.0, "progress_frequency": 0.1, "masses": [2000.0], "integrator": "SOFT",
-                      "wfc_prefix": "wfc", "snap_freq": 1, "wfcr_params": [1, 1, 1], "wfcr_rep": 0, "wfcr_states": [0],
-                      "wfck_params": [1, 1, 1], "wfck_rep": 0, "wfck_states": [0]
-                      }
+    default_params = copy.deepcopy(RUN_DYNAMICS_DEFAULTS)
+    refuse_unknown_keys(params, PARAMS_KEYS, "exact.run_dynamics", "params", "no function of the exact module reads")
     comn.check_input(params, default_params, critical_params)
 
     integrator_id = integrators_map[params["integrator"]]
@@ -335,6 +345,8 @@ def run_relaxation(_params, _potential, model_params):
     """
 
     params = dict(_params)
+    refuse_unknown_keys(params, PARAMS_KEYS, "exact.run_relaxation", "params", "no function of the exact module reads")
+
     nstates = len(model_params["E_n"])
     nsteps = params["nsteps"]
     print_freq = int(params["progress_frequency"] * nsteps)

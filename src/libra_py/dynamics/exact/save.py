@@ -53,6 +53,12 @@ import libra_py.data_savers as data_savers
 # ===================== Exact calculations output ====================
 
 
+# the output keys the savers read from the run's parameters dict (the same dict feeds init_wfc and run_dynamics) - part of
+# compute.PARAMS_KEYS
+SAVER_KEYS = ("prefix", "prefix2", "hdf5_output_level", "txt_output_level", "txt2_output_level", "mem_output_level",
+              "properties_to_save", "use_compression", "compression_level", "custom_pops")
+
+
 def exact_init_hdf5(saver, hdf5_output_level, _nsteps, _ndof, _nstates, _ngrid):
 
     if hdf5_output_level >= 1:
