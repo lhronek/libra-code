@@ -15,6 +15,7 @@
 ..moduleauthors :: Matthew Dutra
 """
 
+import copy
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -22,8 +23,40 @@ from matplotlib import cm
 
 from liblibra_core import *
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
+from . import compute
 
 from libra_py import data_read
+
+
+PLOT_WF_1D_DEFAULTS = {'which_states': [0], 'xmin': [-4.0], 'xmax': [4.0], 'snaps': [0],
+                      'size': [16, 16], 'xlabel': 'Position (a.u.)', 'ylabel': 'Density',
+                      '1Dcolors': ['Black'], 'legend_loc': [0.6, 0.8], 'legend_size': 12
+                      }
+PLOT_WF_2D_DEFAULTS = {'which_states': [0], 'xmin': [-4.0, -4.0], 'xmax': [4.0, 4.0], 'snaps': [0],
+                      'xlabel': 'X Coordinate (a.u.)', 'ylabel': 'Y Coordinate (a.u.)', 'zlabel': 'Density',
+                      '2Dcolors': ['Reds'], 'legend_loc': [0.6, 0.8], 'legend_size': 12
+                      }
+WF_PLOT_DEFAULTS = {'states': [0], "which_states": [0],
+                      "ndof": 1, "prefix": "out", "snaps": [0],
+                      }
+ENERGY_AND_POPS_DEFAULTS = {"nsteps": 1, 'states': [0], "ndof": 1,
+                      "prefix": "out", "xmin": [0.0], "xmax": [1.0], "1Dcolors": ["Black"],
+                      "legend_loc": [0.6, 0.8], "legend_size": 12
+                      }
+TRAJECTORIES_DEFAULTS = {"data_type": 0,
+                      'states': [0], "ndof": 1, "which_states": [0], "active_dof": 0,
+                      "prefix": "out", "xmin": [0.0], "xmax": [1.0], "1Dcolors": ["Black"],
+                      "legend_loc": [0.6, 0.8], "legend_size": 12
+                      }
+TRAJECTORIES_CRITICAL = ("grid_dims",)
+# one dict serves compute.wf_calc_nD, wf_plot and the plot_wf_1D / plot_wf_2D it calls - the union is the vocabulary of all
+# four, with the keys read without a default (npoints, size, states)
+WF_KEYS = (frozenset(compute.WF_CALC_DEFAULTS) | frozenset(compute.WF_CALC_CRITICAL) | frozenset(PLOT_WF_1D_DEFAULTS)
+           | frozenset(PLOT_WF_2D_DEFAULTS) | frozenset(WF_PLOT_DEFAULTS) | frozenset(("npoints", "size", "states")))
+ENERGY_AND_POPS_KEYS = frozenset(ENERGY_AND_POPS_DEFAULTS) | frozenset(("size",))
+TRAJECTORIES_KEYS = (frozenset(TRAJECTORIES_DEFAULTS) | frozenset(TRAJECTORIES_CRITICAL)
+                     | frozenset(("size", "which_traj", "xlabel", "ylabel")))
 
 
 def plot_wf_1D(_plt_params, data):
@@ -59,10 +92,8 @@ def plot_wf_1D(_plt_params, data):
 
     plt_params = dict(_plt_params)
     critical_params = []
-    default_params = {'which_states': [0], 'xmin': [-4.0], 'xmax': [4.0], 'snaps': [0],
-                      'size': [16, 16], 'xlabel': 'Position (a.u.)', 'ylabel': 'Density',
-                      '1Dcolors': ['Black'], 'legend_loc': [0.6, 0.8], 'legend_size': 12
-                      }
+    default_params = copy.deepcopy(PLOT_WF_1D_DEFAULTS)
+    refuse_unknown_keys(plt_params, WF_KEYS, "qtag.plot_wf_1D", "plt_params", "no QTAG wavefunction entry reads")
     comn.check_input(plt_params, default_params, critical_params)
 
     fig = plt.figure(figsize=(plt_params['size'][0], plt_params['size'][1]))
@@ -133,10 +164,8 @@ def plot_wf_2D(_plt_params, data):
 
     plt_params = dict(_plt_params)
     critical_params = []
-    default_params = {'which_states': [0], 'xmin': [-4.0, -4.0], 'xmax': [4.0, 4.0], 'snaps': [0],
-                      'xlabel': 'X Coordinate (a.u.)', 'ylabel': 'Y Coordinate (a.u.)', 'zlabel': 'Density',
-                      '2Dcolors': ['Reds'], 'legend_loc': [0.6, 0.8], 'legend_size': 12
-                      }
+    default_params = copy.deepcopy(PLOT_WF_2D_DEFAULTS)
+    refuse_unknown_keys(plt_params, WF_KEYS, "qtag.plot_wf_2D", "plt_params", "no QTAG wavefunction entry reads")
     comn.check_input(plt_params, default_params, critical_params)
 
     fig = plt.figure(figsize=plt_params['size'])
@@ -209,9 +238,8 @@ def wf_plot(_plt_params):
 
     plt_params = dict(_plt_params)
     critical_params = []
-    default_params = {'states': [0], "which_states": [0],
-                      "ndof": 1, "prefix": "out", "snaps": [0],
-                      }
+    default_params = copy.deepcopy(WF_PLOT_DEFAULTS)
+    refuse_unknown_keys(plt_params, WF_KEYS, "qtag.wf_plot", "plt_params", "no QTAG wavefunction entry reads")
     comn.check_input(plt_params, default_params, critical_params)
 
     npts_1D = [100]
@@ -283,10 +311,8 @@ def energy_and_pops(_plt_params):
 
     plt_params = dict(_plt_params)
     critical_params = []
-    default_params = {"nsteps": 1, 'states': [0], "ndof": 1,
-                      "prefix": "out", "xmin": [0.0], "xmax": [1.0], "1Dcolors": ["Black"],
-                      "legend_loc": [0.6, 0.8], "legend_size": 12
-                      }
+    default_params = copy.deepcopy(ENERGY_AND_POPS_DEFAULTS)
+    refuse_unknown_keys(plt_params, ENERGY_AND_POPS_KEYS, "qtag.energy_and_pops", "plt_params", "energy_and_pops does not read")
     comn.check_input(plt_params, default_params, critical_params)
 
     prefix = plt_params['prefix']
@@ -377,12 +403,9 @@ def trajectories(_plt_params):
     """
 
     plt_params = dict(_plt_params)
-    critical_params = ["grid_dims"]
-    default_params = {"data_type": 0,
-                      'states': [0], "ndof": 1, "which_states": [0], "active_dof": 0,
-                      "prefix": "out", "xmin": [0.0], "xmax": [1.0], "1Dcolors": ["Black"],
-                      "legend_loc": [0.6, 0.8], "legend_size": 12
-                      }
+    critical_params = list(TRAJECTORIES_CRITICAL)
+    default_params = copy.deepcopy(TRAJECTORIES_DEFAULTS)
+    refuse_unknown_keys(plt_params, TRAJECTORIES_KEYS, "qtag.trajectories", "plt_params", "trajectories does not read")
     comn.check_input(plt_params, default_params, critical_params)
 
     data_type = plt_params["data_type"]

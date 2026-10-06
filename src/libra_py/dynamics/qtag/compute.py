@@ -554,6 +554,12 @@ def qtag_energy(coeff, H):
     return e
 
 
+WF_CALC_DEFAULTS = {"states": [0], "ndof": 1, "xmin": [-4.0], "xmax": [4.0],
+                      "npoints": [100], "snaps": [0], "prefix": "out"
+                      }
+WF_CALC_CRITICAL = ("grid_dims",)
+
+
 def wf_calc_nD(_params):
     """Computes the wavefunction on an nD-dimensional grid, as specified by the parameters obtained
     from the dyn_params and plt_params dictionaries.
@@ -586,10 +592,10 @@ def wf_calc_nD(_params):
 
     params = dict(_params)
 
-    critical_params = ["grid_dims"]
-    default_params = {"states": [0], "ndof": 1, "xmin": [-4.0], "xmax": [4.0],
-                      "npoints": [100], "snaps": [0], "prefix": "out"
-                      }
+    critical_params = list(WF_CALC_CRITICAL)
+    default_params = copy.deepcopy(WF_CALC_DEFAULTS)
+    from . import plot as qtag_plot                    # the wavefunction plots share this dict - their keys are allowed here
+    refuse_unknown_keys(params, qtag_plot.WF_KEYS, "qtag.wf_calc_nD", "params", "no QTAG wavefunction entry reads")
     comn.check_input(params, default_params, critical_params)
 
     # Collect simulation parameters from dyn_params dict...
