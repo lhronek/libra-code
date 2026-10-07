@@ -33,7 +33,7 @@ PLOT_WF_1D_DEFAULTS = {'which_states': [0], 'xmin': [-4.0], 'xmax': [4.0], 'snap
                       'size': [16, 16], 'xlabel': 'Position (a.u.)', 'ylabel': 'Density',
                       '1Dcolors': ['Black'], 'legend_loc': [0.6, 0.8], 'legend_size': 12
                       }
-PLOT_WF_2D_DEFAULTS = {'which_states': [0], 'xmin': [-4.0, -4.0], 'xmax': [4.0, 4.0], 'snaps': [0],
+PLOT_WF_2D_DEFAULTS = {'which_states': [0], 'xmin': [-4.0, -4.0], 'xmax': [4.0, 4.0], 'snaps': [0], 'size': [16, 16],
                       'xlabel': 'X Coordinate (a.u.)', 'ylabel': 'Y Coordinate (a.u.)', 'zlabel': 'Density',
                       '2Dcolors': ['Reds'], 'legend_loc': [0.6, 0.8], 'legend_size': 12
                       }
@@ -42,21 +42,21 @@ WF_PLOT_DEFAULTS = {'states': [0], "which_states": [0],
                       }
 ENERGY_AND_POPS_DEFAULTS = {"nsteps": 1, 'states': [0], "ndof": 1,
                       "prefix": "out", "xmin": [0.0], "xmax": [1.0], "1Dcolors": ["Black"],
-                      "legend_loc": [0.6, 0.8], "legend_size": 12
+                      "legend_loc": [0.6, 0.8], "legend_size": 12, "size": [16, 8]
                       }
 TRAJECTORIES_DEFAULTS = {"data_type": 0,
-                      'states': [0], "ndof": 1, "which_states": [0], "active_dof": 0,
+                      'states': [0], "ndof": 1, "which_states": [0], "active_dof": 0, "which_traj": "all",
                       "prefix": "out", "xmin": [0.0], "xmax": [1.0], "1Dcolors": ["Black"],
-                      "legend_loc": [0.6, 0.8], "legend_size": 12
+                      "legend_loc": [0.6, 0.8], "legend_size": 12, "size": [16, 8],
+                      "xlabel": "Time (a.u.)", "ylabel": None                                # None - by data_type
                       }
 TRAJECTORIES_CRITICAL = ("grid_dims",)
 # one dict serves compute.wf_calc_nD, wf_plot and the plot_wf_1D / plot_wf_2D it calls - the union is the vocabulary of all
-# four, with the keys read without a default (npoints, size, states)
+# four
 WF_KEYS = (frozenset(compute.WF_CALC_DEFAULTS) | frozenset(compute.WF_CALC_CRITICAL) | frozenset(PLOT_WF_1D_DEFAULTS)
-           | frozenset(PLOT_WF_2D_DEFAULTS) | frozenset(WF_PLOT_DEFAULTS) | frozenset(("npoints", "size", "states")))
-ENERGY_AND_POPS_KEYS = frozenset(ENERGY_AND_POPS_DEFAULTS) | frozenset(("size",))
-TRAJECTORIES_KEYS = (frozenset(TRAJECTORIES_DEFAULTS) | frozenset(TRAJECTORIES_CRITICAL)
-                     | frozenset(("size", "which_traj", "xlabel", "ylabel")))
+           | frozenset(PLOT_WF_2D_DEFAULTS) | frozenset(WF_PLOT_DEFAULTS))
+ENERGY_AND_POPS_KEYS = frozenset(ENERGY_AND_POPS_DEFAULTS)
+TRAJECTORIES_KEYS = frozenset(TRAJECTORIES_DEFAULTS) | frozenset(TRAJECTORIES_CRITICAL)
 
 
 def plot_wf_1D(_plt_params, data):
@@ -306,6 +306,7 @@ def energy_and_pops(_plt_params):
           * **_plt_params[`legend_loc`]** ( [float, float]): position of the legend [ default: [0.6, 0.8] ]
 
           * **_plt_params[`legend_size`]** ( int ) : font size of the legend [ default: 12 ]
+          * **_plt_params[`size`]** ( list: [int, int] ): size of the plot [ default: [16, 8] ]
 
     """
 
@@ -388,13 +389,17 @@ def trajectories(_plt_params):
 
           * **_plt_params[`which_states`]** (list of ints) : the list containing surfaces for which data is to be plotted
 
-          * **_plt_params["which_traj"]** (list of ints or string) : the list of trajectories to print
+          * **_plt_params["which_traj"]** (list of ints or string) : the list of trajectories to print [ default: "all" ]
 
           * **_plt_params[`xmin`]** (list of floats) : the list of domain minima for the plot
 
           * **_plt_params[`xmax`]** (list of floats) : the list of domain maxima for the plot
 
           * **_plt_params[`active_dof`]** (int) : index of the active DOF to plot. [defualt : 0 ]
+          * **_plt_params[`size`]** ( list: [int, int] ): size of the plot [ default: [16, 8] ]
+          * **_plt_params[`xlabel`]** ( string ): x label of the plot [ default: "Time (a.u.)" ]
+          * **_plt_params[`ylabel`]** ( string ): y label of the plot [ default: by data_type - "Position (a.u.)",
+              "Momentum (a.u.)", "Width (a.u.)" ]
 
              The format of the q, p, etc. files is:
              q0 (t,    traj=0, state=0) q1(t,    traj=0, state=0) ... q0(t,    traj=ntraj-1, state0) .. then state 1  state 2 ,etc
@@ -479,7 +484,8 @@ def trajectories(_plt_params):
             ax.plot(x, y, color=colors[state])
 
         ax.set_xlabel(plt_params['xlabel'])
-        ax.set_ylabel(plt_params['ylabel'])
+        ax.set_ylabel(plt_params['ylabel'] if plt_params['ylabel'] is not None
+                      else {0: "Position (a.u.)", 1: "Momentum (a.u.)", 2: "Width (a.u.)"}[data_type])
 
         ax.axes.set_xlim(xlimits[0], xlimits[1])
         ax.axes.set_ylim(ylimits[0], ylimits[1])
