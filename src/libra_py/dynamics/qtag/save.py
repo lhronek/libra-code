@@ -96,14 +96,11 @@ def init_qtag_savers(params, model_params, nsteps, ntraj, ndof, nstates):
         if not os.path.isdir(prefix):
             os.mkdir(prefix)
         else:
-            if os.path.isdir(prefix + "/wfc"):
-                subdir = prefix + "/wfc"
-                for file in os.listdir(subdir):
-                    os.remove(os.path.join(subdir, file))
-                os.rmdir(subdir)
-
-            for file in os.listdir(prefix):
-                os.remove(os.path.join(prefix, file))
+            # the txt2 saver appends, so this run's own output files start empty - nothing else under prefix is touched
+            for name in [F"{p}.txt" for p in properties_to_save] + ["data.hdf", "mem_data.hdf"]:
+                path = os.path.join(prefix, name)
+                if os.path.isfile(path):
+                    os.remove(path)
 
         # Simulation parameters
         f = open(F"{prefix}/_dyn_params.txt", "w")
