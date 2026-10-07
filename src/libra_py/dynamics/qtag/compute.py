@@ -803,7 +803,8 @@ def run_qtag(_q, _p, _alp, _s, _states, _coeff, _iM, _dyn_params, _compute_model
 
 
             * **txt2_output_level** (int): the level of output for txt printing of data; 3 is the current maximum  [ default: 0 ]
-            * **mem_output_level** (int): the level of the memory saver - 1 time and energy, 2 populations and coefficients,
+            * **mem_output_level** (int): the level of the memory saver - 1 time, Etot and dEtot (Etot minus the initial
+              total energy), 2 populations and coefficients,
               3 the basis parameters - written to prefix/mem_data.hdf at the end of the run [ default: 4 ]
 
 
@@ -888,6 +889,8 @@ def run_qtag(_q, _p, _alp, _s, _states, _coeff, _iM, _dyn_params, _compute_model
                                  _compute_model, _model_params, dyn_params, ovlp, hmat)
 
     # Run the dynamics...
+    etot0 = qtag_energy(C, hmat)                        # the reference of dEtot - the initial total energy
+
     for step in range(nsteps):
         # Built-in function for propagation in the non-othogonal basis
         propagate_electronic_qtag(0.5 * dt, C, hmat, ovlp)
@@ -911,7 +914,7 @@ def run_qtag(_q, _p, _alp, _s, _states, _coeff, _iM, _dyn_params, _compute_model
             print(etot, pops)
 
         # Save the specified data...
-        save.save_qtag_data(_savers, dyn_params, step, etot, 0, pops, C, Q, P, A, S)      # row `step`, time (step + 1) dt
+        save.save_qtag_data(_savers, dyn_params, step, etot, etot - etot0, pops, C, Q, P, A, S)      # row `step`, time (step + 1) dt
         if _savers["txt2_saver"] is not None:
             _savers["txt2_saver"].save_data_txt(F"{prefix}", properties_to_save, "a", 0)
 
