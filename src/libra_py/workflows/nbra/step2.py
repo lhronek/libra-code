@@ -44,9 +44,33 @@ from libra_py import units
 
 # import libra_py.common_utils as comn
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 
 from . import compute_properties
 from . import compute_hprime
+
+
+STEP2_QE_CRITICAL = ("rd",)
+# the keys the QE step 2 and its readers (run_qe, read_info, read_wfc_grid, read_all, compute_properties_onekpt) read without a
+# default in the dict run() checks
+STEP2_QE_READS = ("BATCH_SYSTEM", "EXE", "EXE_EXPORT", "NP", "compute_Hprime", "curr_index", "maxband", "maxband_soc", "minband",
+                  "minband_soc", "nac_method", "orthogonalize", "pdos_flg", "prefix", "prefix0", "prefix1", "read_grid", "read_wfc",
+                  "verb0", "verb1", "verb2", "wd")
+
+
+def qe_step2_defaults():
+    """The defaults of run - the QE step 2"""
+    return {"start_indx": 0, "stop_indx": 1, "dt": 1.0 * units.fs2au,
+            "wd": "wd",
+            "nac_method": 0,
+            "pdos_flg": 0,
+            "compute_Hprime": False,
+            "verbosity": 0
+            }
+
+
+# every key the QE step-2 workflow reads - refused outside this set at run()
+STEP2_QE_KEYS = frozenset(qe_step2_defaults()) | frozenset(STEP2_QE_CRITICAL) | frozenset(STEP2_QE_READS)
 
 
 def run(params):
@@ -107,14 +131,9 @@ def run(params):
     """
 
     # Now try to get parameters from the input
-    critical_params = ["rd"]
-    default_params = {"start_indx": 0, "stop_indx": 1, "dt": 1.0 * units.fs2au,
-                      "wd": "wd",
-                      "nac_method": 0,
-                      "pdos_flg": 0,
-                      "compute_Hprime": False,
-                      "verbosity": 0
-                      }
+    critical_params = list(STEP2_QE_CRITICAL)
+    default_params = qe_step2_defaults()
+    refuse_unknown_keys(params, STEP2_QE_KEYS, "step2.run", "params", "no function of the QE step-2 workflow reads")
     comn.check_input(params, default_params, critical_params)
 
     rd = params["rd"]
@@ -473,7 +492,8 @@ def run_cp2k_libint_step2(params):
 
     Args:
 
-        params (dictionary): A dictionary containing the following parameters:
+        params (dictionary): A dictionary containing the following parameters - a key none of the step-2 functions
+                             reads (outside STEP2_CP2K_KEYS) is refused, the nearest known key named:
 
                              res_dir (string): The directory for saving the MO overlaps.
 
@@ -636,6 +656,7 @@ def run_cp2k_libint_step2(params):
     # form can only be a typo and would silently fall back to the DFT branch
     if 'isXTB' in params:
         raise ValueError("params['isXTB'] is not read by this workflow - use 'isxTB'")
+    refuse_unknown_keys(params, STEP2_CP2K_KEYS, "step2.run_cp2k_libint_step2", "params", "no function of the CP2K step-2 workflow reads")
     comn.check_input(params, default_params, critical_params)
     if params['is_periodic'] and params['translational_vectors'] is None:
         params['translational_vectors'] = translational_vectors_of(params)
