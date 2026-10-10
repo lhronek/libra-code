@@ -33,6 +33,14 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 # import common_utils as comn
 from libra_py import data_conv
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
+
+
+# the keys get_all_data reads from its params dict - refused at the entry
+GET_ALL_DATA_KEYS = frozenset((
+    "Hvib_im_prefix", "Hvib_im_suffix", "Hvib_re_prefix", "Hvib_re_suffix", "St_re_prefix", "St_re_suffix", "is_sparse",
+    "istep", "nsteps", "path_to_res_files"
+))
 
 
 def warn_legacy_hvib_dir(path):
@@ -398,6 +406,7 @@ def get_all_data(params):
         nstates (integer): The number of states which is equivalent to the number of rows of one of the files.
     """
     Hadi, Hvib, nac, St = [], [], [], []
+    refuse_unknown_keys(params, GET_ALL_DATA_KEYS, "data_read.get_all_data", "params", "get_all_data does not read")
     istep = params['istep']
     fstep = istep + params['nsteps']
     path_to_res_files = params['path_to_res_files']

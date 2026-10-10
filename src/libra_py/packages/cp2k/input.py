@@ -11,6 +11,20 @@ import sys
 if sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
+
+
+# the keys generate reads from its params dict (its defaults and critical keys included) - refused at the entry
+GENERATE_KEYS = frozenset((
+    "HF_exchange", "HF_exchange_fraction", "added_mos", "admm_calculations", "admm_purification_method", "cell.A", "cell.B",
+    "cell.C", "cell.periodic", "center_coordinates", "charge", "dft_print", "diag.energygap", "diag.preconditioner",
+    "ensemble", "eps_default", "eps_scf", "eps_schwarz", "functional_key_vals", "functional_keys", "functional_names",
+    "input_filename", "interaction_potential", "interaction_potential_type", "istate", "kinds", "max_disp", "max_force",
+    "max_iter", "max_scf", "method", "multiplicity", "nstates", "nsteps", "omega", "ot.energygap", "ot.linesearch",
+    "ot.minimizer", "ot.preconditioner", "outer_scf", "poisson_solver", "print_level", "project", "run_type", "scale_coulomb",
+    "scale_longrange", "scf_guess", "smearing", "smearing.electronic_temperature", "smearing.method", "solver", "tddft_kernel",
+    "temperature", "time_const", "time_step", "uks", "wfn_restart_name", "xyz_file"
+))
 
 
 def get_kind(elt):
@@ -171,6 +185,7 @@ def generate(_params):
 
 # .update({"dft_plus_u": {"L":2, "U_minus_J":0.1 } })
 
+    refuse_unknown_keys(params, GENERATE_KEYS, "cp2k.input.generate", "params", "generate does not read")
     comn.check_input(params, default_params, critical_params)
 
     # Unpack

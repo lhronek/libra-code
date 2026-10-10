@@ -31,8 +31,23 @@ from libra_py import units
 from libra_py.hdf5_io import open_hdf5
 import libra_py.packages.cp2k.methods as cp2k
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 
 #%matplotlib inline
+
+
+# the keys compute_trpes reads from its params dict (its defaults and critical keys included) - refused at the entry
+COMPUTE_TRPES_KEYS = frozenset((
+    "de", "dprefix", "dsuffix", "dt", "emax", "emin", "eprefix", "esuffix", "fstep", "iconds", "input_file_type", "istep",
+    "logfile_read_params", "namd_nsteps", "sigma_e", "units"
+))
+
+# the keys plot_trpes reads from its plt_params dict (its defaults and critical keys included) - refused at the entry
+PLOT_TRPES_KEYS = frozenset((
+    "cfont_size", "cmap_name", "ctick_size", "do_save", "do_show", "dpi", "energy_units", "fig_size", "figurename",
+    "time_units", "xlabel_size", "xtick_size", "ylabel_size", "ytick_size"
+))
+
 
 def compute_trpes(_params):
     """
@@ -71,6 +86,7 @@ def compute_trpes(_params):
     """
 
     params = dict(_params)
+    refuse_unknown_keys(params, COMPUTE_TRPES_KEYS, "trpes.compute_trpes", "params", "compute_trpes does not read")
     comn.check_input(params, {"istep": 1, "fstep": 10, "dt":1.0, "namd_nsteps":9,
                               "eprefix":"Hvib_ci_", "esuffix":"_re",
                               "input_file_type":0, "logfile_read_params": {},
@@ -230,6 +246,7 @@ def plot_trpes(t_grid, e_grid, trpes, _plt_params):
     """
 
     plt_params = dict(_plt_params)
+    refuse_unknown_keys(plt_params, PLOT_TRPES_KEYS, "trpes.plot_trpes", "plt_params", "plot_trpes does not read")
     comn.check_input(plt_params, {"fig_size":[8,3], "cmap_name":"rainbow",
                                   "cfont_size": 20, "ctick_size": 16,
                                   "xlabel_size" : 20, "xtick_size": 16,

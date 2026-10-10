@@ -30,7 +30,25 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 from . import units, data_conv
 import libra_py.packages.cp2k.methods as CP2K_methods
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 import numpy as np
+
+
+# the keys cp2k_pdos reads from its params dict (its defaults and critical keys included) - refused at the entry
+CP2K_PDOS_KEYS = frozenset((
+    "de", "de_new", "do_convolve", "element_mapping", "emax", "emin", "nspin", "outfile_prefix", "prefix", "projections",
+    "snapshots", "var"
+))
+
+# the keys pdos_plot reads from its params dict (its defaults and critical keys included) - refused at the entry
+PDOS_PLOT_KEYS = frozenset((
+    "colors", "labels", "title", "which_projections"
+))
+
+# the keys convolve_cp2k_pdos reads from its params dict (its defaults and critical keys included) - refused at the entry
+CONVOLVE_CP2K_PDOS_KEYS = frozenset((
+    "angular_momentum_cols", "coef", "cp2k_pdos_file", "energy_conversion", "npoints", "sigma", "time_step"
+))
 
 
 def convolve(X0, Y0, dx0, dx, var):
@@ -434,6 +452,7 @@ def cp2k_pdos(_params):
                       "outfile_prefix": "pdos",
                       "do_convolve": True, "de_new": 0.025, "var": 0.05, "nspin": 1
                       }
+    refuse_unknown_keys(params, CP2K_PDOS_KEYS, "pdos.cp2k_pdos", "params", "cp2k_pdos does not read")
     comn.check_input(params, default_params, critical_params)
 
     prefix = params["prefix"]
@@ -581,6 +600,7 @@ def pdos_plot(plt, E, pDOSa, pDOSb, _params):
 
     critical_params = []
     default_params = {"which_projections": [0], "labels": ["s"], "colors": ["black"], "title": "No title"}
+    refuse_unknown_keys(params, PDOS_PLOT_KEYS, "pdos.pdos_plot", "params", "pdos_plot does not read")
     comn.check_input(params, default_params, critical_params)
 
     which_projections = params["which_projections"]
@@ -651,6 +671,7 @@ def convolve_cp2k_pdos(params: dict):
     # Default parameters
     default_params = {"time_step": 0, "sigma": 0.02, "coef": 1.0, "npoints": 4000, "energy_conversion": units.au2ev}
     # Check input
+    refuse_unknown_keys(params, CONVOLVE_CP2K_PDOS_KEYS, "pdos.convolve_cp2k_pdos", "params", "convolve_cp2k_pdos does not read")
     comn.check_input(params, default_params, critical_params)
 
     # The CP2K log file name

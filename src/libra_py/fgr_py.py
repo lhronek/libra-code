@@ -32,7 +32,19 @@ elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 # import common_utils as comn
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 from . import units
+
+
+# the keys run_NEFGRL_populations reads from its params dict (its defaults and critical keys included) - refused at the entry
+NEFGRL_POPULATIONS_KEYS = frozenset((
+    "Temperature", "do_output", "dt", "dtau", "dyn_type", "filename", "method", "tmax"
+))
+
+# the keys run_NEFRG_acf reads from its params dict (its defaults and critical keys included) - refused at the entry
+NEFGR_ACF_KEYS = frozenset((
+    "Temperature", "do_output", "dtau", "dyn_type", "filename", "method"
+))
 
 
 def run_NEFGRL_populations(omega_DA, V, omega_nm, gamma_nm, req_nm, shift_NE, params):
@@ -98,6 +110,7 @@ def run_NEFGRL_populations(omega_DA, V, omega_nm, gamma_nm, req_nm, shift_NE, pa
                       "dtau": 0.02 * units.fs2au, "tmax": 10.0 * units.fs2au, "dt": 0.1 * units.fs2au,
                       "do_output": False, "filename": "FGR.txt"
                       }
+    refuse_unknown_keys(params, NEFGRL_POPULATIONS_KEYS, "fgr_py.run_NEFGRL_populations", "params", "run_NEFGRL_populations does not read")
     comn.check_input(params, default_params, critical_params)
 
     method = params["method"]
@@ -172,6 +185,7 @@ def run_NEFRG_acf(t, omega_DA, V, omega_nm, gamma_nm, req_nm, shift_NE, params):
                       "dtau": 0.02 * units.fs2au,
                       "do_output": False, "filename": "FGR.txt"
                       }
+    refuse_unknown_keys(params, NEFGR_ACF_KEYS, "fgr_py.run_NEFRG_acf", "params", "run_NEFRG_acf does not read")
     comn.check_input(params, default_params, critical_params)
 
     method = params["method"]

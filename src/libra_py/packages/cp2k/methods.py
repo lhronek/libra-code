@@ -35,6 +35,7 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 from libra_py.packages.driver_forces import ForceHandover, fill_diagonal_forces, force_diagonals, refreshed_rows
 
 from libra_py import data_outs, data_read, data_stat, data_conv
@@ -554,6 +555,11 @@ def read_cp2k_tddfpt_log_file(params):
     return info, data
 
 
+# the keys read_cp2k_tddfpt_log_file_old reads from its params dict (its defaults and critical keys included) - refused at the entry
+READ_TDDFPT_LOG_OLD_KEYS = frozenset((
+    "ci_threshold", "highest_orbital", "isUKS", "logfile_name", "lowest_orbital", "number_of_states"
+))
+
 
 def read_cp2k_tddfpt_log_file_old(params):
     """
@@ -591,6 +597,7 @@ def read_cp2k_tddfpt_log_file_old(params):
     # Default parameters
     default_params = {"ci_threshold": 0.05, "isUKS": 0, "lowest_orbital": 1, "highest_orbital": int(1e10)}
     # Check input
+    refuse_unknown_keys(params, READ_TDDFPT_LOG_OLD_KEYS, "cp2k.methods.read_cp2k_tddfpt_log_file_old", "params", "read_cp2k_tddfpt_log_file_old does not read")
     comn.check_input(params, default_params, critical_params)
 
     logfile_name = params["logfile_name"]
@@ -1009,6 +1016,12 @@ def read_energies_from_cp2k_log_file(params):
     return ks_energies[min_band - 1:max_band], total_energy
 
 
+# the keys read_energies_from_cp2k_md_log_file reads from its params dict (its defaults and critical keys included) - refused at the entry
+READ_ENERGIES_MD_LOG_KEYS = frozenset((
+    "final_time", "init_time", "logfile_name", "max_band", "min_band", "spin"
+))
+
+
 def read_energies_from_cp2k_md_log_file(params):
     """
     This function reads the energies from CP2K molecular dynamics log file for a specific spin. The difference between this function
@@ -1043,6 +1056,7 @@ def read_energies_from_cp2k_md_log_file(params):
     # Default parameters
     default_params = {"spin": 1, "init_time": 0, "final_time": 1}
     # Check input
+    refuse_unknown_keys(params, READ_ENERGIES_MD_LOG_KEYS, "cp2k.methods.read_energies_from_cp2k_md_log_file", "params", "read_energies_from_cp2k_md_log_file does not read")
     comn.check_input(params, default_params, critical_params)
 
     cp2k_log_file_name = params["logfile_name"]
@@ -2629,6 +2643,12 @@ def aux_pdos(
     return ave_energy_grid, homo_energy, ave_pdos_convolved_all, labels
 
 
+# the keys pdos reads from its params dict (its defaults and critical keys included) - refused at the entry
+PDOS_KEYS = frozenset((
+    "atoms", "is_spin_polarized", "npoints", "orbitals", "orbitals_cols", "path_to_all_pdos", "shift", "sigma"
+))
+
+
 def pdos(params):
     """
     This function computes the weighted pdos for a set of CP2K pdos files.
@@ -2663,6 +2683,7 @@ def pdos(params):
                       "sigma": 0.05, "shift": 2.0, "npoints": 2000, "is_spin_polarized": 0
                       }
     # Check input
+    refuse_unknown_keys(params, PDOS_KEYS, "cp2k.methods.pdos", "params", "pdos does not read")
     comn.check_input(params, default_params, critical_params)
 
     path_to_all_pdos = params['path_to_all_pdos']
@@ -2747,6 +2768,13 @@ def pdos(params):
             ave_energy_grid_bet, homo_energy_bet, ave_pdos_convolved_all_bet, labels_bet, ave_pdos_convolved_total_bet
 
 
+# the keys exc_analysis reads from its params dict (its defaults and critical keys included) - refused at the entry
+EXC_ANALYSIS_KEYS = frozenset((
+    "ci_read_drops", "ci_threshold", "isUKS", "logfile_name", "nsds", "number_of_states", "orbital_space", "path_to_logfiles",
+    "tolerance"
+))
+
+
 def exc_analysis(params):
     """
     This function computes the average configuration interaction coefficients for excited states (originally written by Brendan Smith).
@@ -2768,6 +2796,8 @@ def exc_analysis(params):
     # Default parameters
     default_params = {"isUKS": 0, "ci_threshold": 0.01, "nsds": 2}
     # Check input
+    refuse_tolerance_key(params)
+    refuse_unknown_keys(params, EXC_ANALYSIS_KEYS, "cp2k.methods.exc_analysis", "params", "exc_analysis and the tddfpt reader it calls do not read")
     comn.check_input(params, default_params, critical_params)
 
     path_to_logfiles = params['path_to_logfiles']
@@ -2820,6 +2850,12 @@ def exc_analysis(params):
     return coeffs_avg, coeffs_error
 
 
+# the keys extract_energies_sparse reads from its params dict (its defaults and critical keys included) - refused at the entry
+EXTRACT_ENERGIES_SPARSE_KEYS = frozenset((
+    "dt", "fstep", "istep", "path_to_energy_files", "prefix", "suffix"
+))
+
+
 def extract_energies_sparse(params):
     """
     This function extract the energies vs time data from scipy.sparse files
@@ -2839,6 +2875,7 @@ def extract_energies_sparse(params):
     # Default parameters
     default_params = {"dt": 1.0, "prefix": "Hvib_sd_", "suffix": "_re", "istep": 0, "fstep": 5}
     # Check input
+    refuse_unknown_keys(params, EXTRACT_ENERGIES_SPARSE_KEYS, "cp2k.methods.extract_energies_sparse", "params", "extract_energies_sparse does not read")
     comn.check_input(params, default_params, critical_params)
 
     path_to_energy_files = params['path_to_energy_files']

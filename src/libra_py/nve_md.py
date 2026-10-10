@@ -24,12 +24,26 @@ elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 from . import units
 from . import LoadPT
 from . import LoadUFF
 
 
 ##############################################################
+
+
+# the keys nve_md_step reads from its params dict (its defaults and critical keys included) - refused at the entry
+NVE_MD_STEP_KEYS = frozenset((
+    "dt", "fixed_fragment_rotation", "fixed_fragment_translation", "integrator"
+))
+
+# the keys optimize_syst reads from its params dict (its defaults and critical keys included) - refused at the entry
+OPTIMIZE_SYST_KEYS = frozenset((
+    "anneal_schedule", "cooling_out1", "cooling_out2", "dt", "elements_file", "fixed_fragment_rotation",
+    "fixed_fragment_translation", "integrator"
+))
+
 
 def syst2xyz(syst):
     """
@@ -160,6 +174,7 @@ def nve_md_step(syst, mol, el, ham, params):
     default_params = {"dt": 20.0, "integrator": "DLML", "fixed_fragment_translation": [],
                       "fixed_fragment_rotation": []
                       }
+    refuse_unknown_keys(params, NVE_MD_STEP_KEYS, "nve_md.nve_md_step", "params", "nve_md_step does not read")
     comn.check_input(params, default_params, critical_params)
 
     dt = params["dt"]
@@ -273,6 +288,7 @@ def optimize_syst(syst, params):
                       "fixed_fragment_translation": [],
                       "fixed_fragment_rotation": []
                       }
+    refuse_unknown_keys(params, OPTIMIZE_SYST_KEYS, "nve_md.optimize_syst", "params", "optimize_syst and the nve_md_step it drives do not read")
     comn.check_input(params, default_params, critical_params)
 
     elements_file = params["elements_file"]

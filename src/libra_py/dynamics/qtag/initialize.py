@@ -22,6 +22,14 @@ import numpy as np
 
 from liblibra_core import *
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
+
+
+# every key the QTAG initialization reads from the one dict handed to gbfs, grid, gaussian and wfc_centers - refused at each
+QTAG_INIT_KEYS = frozenset((
+    "alp_scl", "grid_dims", "grid_max", "grid_min", "init_placement", "rho_cut", "states", "wfc_a0", "wfc_p0", "wfc_q0",
+    "wfc_s0"
+))
 
 
 def gbfs(_params):
@@ -58,6 +66,7 @@ def gbfs(_params):
 
     critical_params = []
     default_params = {"init_placement": 0}
+    refuse_unknown_keys(params, QTAG_INIT_KEYS, "qtag.initialize.gbfs", "params", "no function of the QTAG initialization reads")
     comn.check_input(params, default_params, critical_params)
 
     init_placement = params['init_placement']
@@ -133,6 +142,7 @@ def grid(_params):
                       "wfc_q0": [0.0], "wfc_p0": [0.0], "wfc_a0": [1.0], "wfc_s0": [0.0],
                       "grid_min": [-1.0], "grid_max": [1.0]
                       }
+    refuse_unknown_keys(params, QTAG_INIT_KEYS, "qtag.initialize.grid", "params", "no function of the QTAG initialization reads")
     comn.check_input(params, default_params, critical_params)
 
     states = params['states']
@@ -260,6 +270,7 @@ def gaussian(_params):
     default_params = {"grid_dims": [5], "rho_cut": 1e-12,
                       "wfc_q0": [0.0], "wfc_p0": [0.0], "wfc_a0": [1.0], "alp_scl": [1.0], "wfc_s0": [0.0]
                       }
+    refuse_unknown_keys(params, QTAG_INIT_KEYS, "qtag.initialize.gaussian", "params", "no function of the QTAG initialization reads")
     comn.check_input(params, default_params, critical_params)
 
     states = params["states"]
@@ -338,6 +349,7 @@ def wfc_centers(_params):
 
     critical_params = []
     default_params = {"wfc_q0": [0.0], "wfc_p0": [0.0], "wfc_a0": [1.0], "wfc_s0": [0.0]}
+    refuse_unknown_keys(params, QTAG_INIT_KEYS, "qtag.initialize.wfc_centers", "params", "no function of the QTAG initialization reads")
     comn.check_input(params, default_params, critical_params)
 
     ndof = len(params["wfc_q0"])

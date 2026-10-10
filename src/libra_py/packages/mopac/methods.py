@@ -24,6 +24,7 @@ import numpy as np
 
 from liblibra_core import *
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 
 from libra_py import units
 from libra_py import scan
@@ -37,6 +38,18 @@ import libra_py.citools.slatdet as sd
 import libra_py.citools.interfaces as interfaces
 import libra_py.citools.ci as ci
 import libra_py.orthogonalizations as ortho
+
+
+# the keys run_mopac reads from its params_ dict - refused at the entry
+RUN_MOPAC_KEYS = frozenset((
+    "atom_labels", "exe", "mopac_input_prefix", "mopac_jobid", "mopac_output_prefix", "mopac_run_params", "working_directory"
+))
+
+# the keys read_mopac_orbital_info reads from its params_ dict (its defaults included) - refused at the entry
+READ_MOPAC_ORBITAL_INFO_KEYS = frozenset((
+    "filename", "nstates", "orbital_space"
+))
+
 
 def make_mopac_input(mopac_input_filename, mopac_run_params, labels, coords):
     """
@@ -211,6 +224,7 @@ def run_mopac(coords, params_):
     
     params = dict(params_)
 
+    refuse_unknown_keys(params, RUN_MOPAC_KEYS, "mopac.run_mopac", "params", "run_mopac does not read")
     labels = params["atom_labels"]
     exe = params.get("exe", "mopac")
     mopac_run_params = params.get("mopac_run_params", "INDO C.I.=(6,3) CHARGE=0 RELSCF=0.000001 ALLVEC WRTCONF=0.00 WRTCI=2" )
@@ -358,6 +372,7 @@ def read_mopac_orbital_info(params_):
 
     critical_params = []
     default_params = {"filename": "output", "orbital_space": None, "nstates":2 }
+    refuse_unknown_keys(params, READ_MOPAC_ORBITAL_INFO_KEYS, "mopac.read_mopac_orbital_info", "params", "read_mopac_orbital_info does not read")
     comn.check_input(params, default_params, critical_params)
 
     out_file = params["filename"]

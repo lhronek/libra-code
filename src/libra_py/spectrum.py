@@ -29,7 +29,19 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 from . import units, data_conv, pdos
 import libra_py.packages.cp2k.methods as CP2K_methods
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 import numpy as np
+
+
+# the keys cp2k_spectrum reads from its params dict (its defaults and critical keys included) - refused at the entry
+CP2K_SPECTRUM_KEYS = frozenset((
+    "de", "de_new", "do_convolve", "emax", "emin", "outfile_prefix", "prefix", "snapshots", "states", "var"
+))
+
+# the keys spectrum_plot reads from its params dict (its defaults and critical keys included) - refused at the entry
+SPECTRUM_PLOT_KEYS = frozenset((
+    "colors", "labels", "output_prefix", "title", "which_projections"
+))
 
 
 def gaussian_broadening(energy_levels, intensities, fwhm, num_points=3500):
@@ -101,6 +113,7 @@ def cp2k_spectrum(_params):
                       "outfile_prefix": "spectrum",
                       "do_convolve": True, "de_new": 0.025, "var": 0.05
                       }
+    refuse_unknown_keys(params, CP2K_SPECTRUM_KEYS, "spectrum.cp2k_spectrum", "params", "cp2k_spectrum does not read")
     comn.check_input(params, default_params, critical_params)
 
     states = params["states"]
@@ -210,6 +223,7 @@ def spectrum_plot(plt, E, spectr, _params):
         "colors": ["black"],
         "title": "No title",
         "output_prefix": "spectrum_"}
+    refuse_unknown_keys(params, SPECTRUM_PLOT_KEYS, "spectrum.spectrum_plot", "params", "spectrum_plot does not read")
     comn.check_input(params, default_params, critical_params)
 
     which_projections = params["which_projections"]

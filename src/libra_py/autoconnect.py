@@ -32,6 +32,13 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 
 # import common_utils as comn
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
+
+
+# the keys autoconnect reads from its params dict (its defaults and critical keys included) - refused at the entry
+AUTOCONNECT_KEYS = frozenset((
+    "Rcut", "opt", "pbc_opt", "tv1", "tv2", "tv3", "verbosity"
+))
 
 
 def autoconnect(R, MaxCoord, params):
@@ -77,6 +84,7 @@ def autoconnect(R, MaxCoord, params):
                       "tv3": VECTOR(0.0, 0.0, 1.0e+10),
                       "verbosity": 0
                       }
+    refuse_unknown_keys(params, AUTOCONNECT_KEYS, "autoconnect.autoconnect", "params", "autoconnect does not read")
     comn.check_input(params, default_params, critical_params)
 
     Rcut = params["Rcut"]
