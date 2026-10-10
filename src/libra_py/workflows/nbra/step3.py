@@ -49,7 +49,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 from . import mapping, step2_many_body, step3_many_body
 from libra_py.citools import slatdet
 import util.libutil as comn
-from libra_py.params_check import refuse_unknown_keys
+from libra_py.params_check import refuse_unknown_keys, restrict
 import libra_py.packages.cp2k.methods as CP2K_methods
 import libra_py.units as units
 import libra_py.data_read as data_read
@@ -173,7 +173,7 @@ def get_step2_data(_params):
     comn.check_input(params, default_params, critical_params)
 
     S, St, Hvib = [], [], []
-    prms = dict(_params)
+    prms = restrict(_params, data_read.DATA_READ_KEYS)
 
     # Fetching the overlap matricies
     if (params["read_S_data"] == 1):

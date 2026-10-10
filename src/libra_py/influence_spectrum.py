@@ -35,10 +35,19 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 
 # import common_utils as comn
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 from . import units
 from . import data_stat
 from . import acf
 from . import ft
+
+
+# every key recipe1, compute_mat_elt and compute_all read from the one dict (data_stat.find_maxima's included) - refused at each,
+# the in-library callers hand them a copy restricted to this set
+INFLUENCE_SPECTRUM_KEYS = frozenset((
+    "acf_filename", "acf_type", "data_type", "do_center", "do_output", "dt", "dw", "filename", "logname", "nfreqs",
+    "spectrum_filename", "verbose", "wspan"
+))
 
 
 def recipe1(data, params):
@@ -84,6 +93,7 @@ def recipe1(data, params):
     default_params = {"dt": 1.0, "wspan": 3000.0, "dw": 1.0, "do_output": False,
                       "acf_filename": "acf.txt", "spectrum_filename": "spectrum.txt",
                       "do_center": True, "acf_type": 0, "data_type": 0}
+    refuse_unknown_keys(params, INFLUENCE_SPECTRUM_KEYS, "influence_spectrum.recipe1", "params", "no function of influence_spectrum reads")
     comn.check_input(params, default_params, critical_params)
 
     dt = params["dt"] * units.fs2au            # convert to  atomic units of time
@@ -191,6 +201,7 @@ def compute_mat_elt(X, a, b, params):
     critical_params = []
     default_params = {"nfreqs": 1, "logname": "out.log", "filename": "influence_spectra_", "do_output": 0,
                       "do_center": True, "acf_type": 1, "data_type": 0}
+    refuse_unknown_keys(params, INFLUENCE_SPECTRUM_KEYS, "influence_spectrum.compute_mat_elt", "params", "no function of influence_spectrum reads")
     comn.check_input(params, default_params, critical_params)
 
     # Local variables and dimensions
@@ -284,6 +295,7 @@ def compute_all(X, params):
 
     critical_params = []
     default_params = {"filename": "influence_spectra_"}
+    refuse_unknown_keys(params, INFLUENCE_SPECTRUM_KEYS, "influence_spectrum.compute_all", "params", "no function of influence_spectrum reads")
     comn.check_input(params, default_params, critical_params)
 
     params_re = dict(params)

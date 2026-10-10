@@ -36,6 +36,13 @@ import util.libutil as comn
 from libra_py.params_check import refuse_unknown_keys
 
 
+# every key get_data and get_data_sets read from the one dict (their defaults and critical keys included) - refused at both,
+# step 3 hands them a copy restricted to this set
+DATA_READ_KEYS = frozenset((
+    "active_space", "data_dim", "data_im_prefix", "data_im_suffix", "data_re_prefix", "data_re_suffix", "data_set_paths",
+    "fsnap", "get_imag", "get_real", "isnap"
+))
+
 # the keys get_all_data reads from its params dict - refused at the entry
 GET_ALL_DATA_KEYS = frozenset((
     "Hvib_im_prefix", "Hvib_im_suffix", "Hvib_re_prefix", "Hvib_re_suffix", "St_re_prefix", "St_re_suffix", "is_sparse",
@@ -160,6 +167,7 @@ def get_data(params):
 
     """
 
+    refuse_unknown_keys(params, DATA_READ_KEYS, "data_read.get_data", "params", "neither get_data nor get_data_sets reads")
     critical_params = ["data_dim", "isnap", "fsnap", "data_re_prefix", "data_im_prefix"]
     default_params = {
         "data_re_suffix": "_re",
@@ -234,6 +242,7 @@ def get_data_sets(params):
 
     critical_params = ["data_set_paths"]
     default_params = {}
+    refuse_unknown_keys(params, DATA_READ_KEYS, "data_read.get_data_sets", "params", "neither get_data nor get_data_sets reads")
     comn.check_input(params, default_params, critical_params)
 
     data = []

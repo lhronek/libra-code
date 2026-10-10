@@ -78,3 +78,18 @@ def warn_unknown_keys(params, allowed, where, carrier, nobody_reads, skip=()):
         print(F"WARNING in {where}(): {carrier} carries keys that {nobody_reads}: {unknown}"
               + (F" (did you mean {hints}?)" if hints else ""))
     return unknown
+
+
+def restrict(params, allowed):
+    """Return a new dict holding the items of `params` whose keys are in `allowed` - the copy an in-library caller hands an
+    entry that refuses unknown keys when the caller's own dict carries more; the entry's defaults land in the copy, not in
+    `params`
+
+    Args:
+        params ( dict ): the caller's dict
+        allowed ( iterable of str ): the entry's key vocabulary
+
+    Returns:
+        dict: the restricted copy
+    """
+    return {k: v for k, v in params.items() if k in allowed}

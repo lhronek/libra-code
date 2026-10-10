@@ -35,7 +35,7 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
-from libra_py.params_check import refuse_unknown_keys
+from libra_py.params_check import refuse_unknown_keys, restrict
 from libra_py.packages.driver_forces import ForceHandover, fill_diagonal_forces, force_diagonals, refreshed_rows
 
 from libra_py import data_outs, data_read, data_stat, data_conv
@@ -208,6 +208,13 @@ def _report_drop(reader, state, text):
     print(F"{reader}: state {state}: {text} (reported once per state and process)")
 
 
+# the keys read_cp2k_tddfpt_log_file reads (ci_read_drops is the drop record it writes back, tolerance reaches its own refusal) -
+# refused at the entry, an in-library caller hands it a copy restricted to this set
+READ_TDDFPT_LOG_KEYS = frozenset((
+    "ci_read_drops", "ci_threshold", "isUKS", "logfile_name", "number_of_states", "orbital_space", "tolerance"
+))
+
+
 def read_cp2k_tddfpt_log_file(params):
     """
     Parse a CP2K TD-DFPT log file and extract excitation energies and CI expansion data.
@@ -356,6 +363,7 @@ def read_cp2k_tddfpt_log_file(params):
     """
 
     # ===================== Parameters =====================
+    refuse_unknown_keys(params, READ_TDDFPT_LOG_KEYS, "cp2k.methods.read_cp2k_tddfpt_log_file", "params", "read_cp2k_tddfpt_log_file does not read")
     logfile_name = params.get("logfile_name", "output.log")
     nstates_req = params.get("number_of_states", 1)
     refuse_tolerance_key(params)
@@ -2810,7 +2818,7 @@ def exc_analysis(params):
     ci_coeffs = []
     for logfile in logfiles:
         params.update({"logfile_name": logfile})
-        info, data = read_cp2k_tddfpt_log_file(params)
+        info, data = read_cp2k_tddfpt_log_file(restrict(params, READ_TDDFPT_LOG_KEYS))
         excitation_energies, ci_basis_raw, ci_coefficients_raw_unnorm, spin_components = data[0], data[1], data[2], data[3]
 
         ci_coefficients_raw_norm = step2_many_body.normalize_ci_coefficients(ci_coefficients_raw_unnorm)

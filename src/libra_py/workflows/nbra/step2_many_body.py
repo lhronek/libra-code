@@ -43,6 +43,7 @@ from libra_py.workflows.nbra import step3
 from libra_py import units
 
 import util.libutil as comn
+from libra_py.params_check import restrict
 
 
 def curr_and_final_step_job(istep, fstep, njobs, njob):
@@ -177,8 +178,10 @@ def get_excitation_analysis_output(params):
         params.update({"logfile_name": logfile_name})
         # Extract the excitation energies and their configurations from the output file.
         # this chain and its consumers expect the master 4-tuple with eV, whichever form the reader returned
+        read_params = restrict(params, CP2K_methods.READ_TDDFPT_LOG_KEYS)
         excitation_energies, ci_basis_raw, ci_coefficients_raw_unnorm, spin_components = \
-            CP2K_methods.tddfpt_log_ci_tuple(CP2K_methods.read_cp2k_tddfpt_log_file(params))
+            CP2K_methods.tddfpt_log_ci_tuple(CP2K_methods.read_cp2k_tddfpt_log_file(read_params))
+        params["ci_read_drops"] = read_params.get("ci_read_drops")
 
     elif es_software == "gaussian":
 

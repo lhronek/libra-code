@@ -27,7 +27,7 @@ import libra_py.influence_spectrum as influence_spectrum
 from . import step4
 import libra_py.units as units
 import util.libutil as comn
-from libra_py.params_check import refuse_unknown_keys
+from libra_py.params_check import refuse_unknown_keys, restrict
 import matplotlib.pyplot as plt
 import cmath
 import math
@@ -100,7 +100,7 @@ def compute_freqs(H_vib, params):
     nstates = H_vib[0].num_of_rows
 
     freqs, T, norm_acf, raw_acf, W, J, J2 = influence_spectrum.compute_all(
-        H_vib, params)  # T in fs, W and freqs in cm^-1
+        H_vib, restrict(params, influence_spectrum.INFLUENCE_SPECTRUM_KEYS))  # T in fs, W and freqs in cm^-1
 
     # ============ Plot the spectra =============
     nsteps = params["nsteps"]

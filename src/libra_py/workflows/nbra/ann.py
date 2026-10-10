@@ -30,7 +30,7 @@ from . import decoherence_times as dectim
 import libra_py.data_conv as data_conv
 import libra_py.data_read as data_read
 import util.libutil as comn
-from libra_py.params_check import refuse_unknown_keys
+from libra_py.params_check import refuse_unknown_keys, restrict
 import matplotlib.pyplot as plt
 import sys
 import cmath
@@ -288,7 +288,7 @@ def step1_workflow(data, _params, _plt):
         x.set(0, 0, dat)
         all_data.append(x)
 
-    T, ACF, uACF, W, J, J2 = infsp.recipe1(all_data, params)
+    T, ACF, uACF, W, J, J2 = infsp.recipe1(all_data, restrict(params, infsp.INFLUENCE_SPECTRUM_KEYS))
 
     # ============ Plot the spectra =============
 
