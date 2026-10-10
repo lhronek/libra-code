@@ -42,6 +42,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 from libra_py.citools.sd_basis import check_sd_capture, check_read_capture
 from libra_py import units as units
 from libra_py import influence_spectrum as infsp
@@ -91,6 +92,7 @@ def get_step2_mb_sp_properties(_params):
                       "es_software": "cp2k", "isUKS": 0, "number_of_states": 1,
                       "ci_threshold": 0.01, "isnap": 0, "fsnap": 1}
     # Check input
+    refuse_unknown_keys(params, step3.STEP3_KEYS, "step3_many_body.get_step2_mb_sp_properties", "params", "no function of the step-3 workflow reads")
     comn.check_input(params, default_params, critical_params)
 
     # Just a quick fix to input parameter names
@@ -196,6 +198,7 @@ def compute_ci_energies_midpoint(ci_energies, _params):
     # Default parameters
     default_params = {"number_of_states": 1, "isnap": 0, "fsnap": 1}
     # Check input
+    refuse_unknown_keys(params, step3.STEP3_KEYS, "step3_many_body.compute_ci_energies_midpoint", "params", "no function of the step-3 workflow reads")
     comn.check_input(params, default_params, critical_params)
 
     nstates = params["number_of_states"]
@@ -310,6 +313,7 @@ def make_T_matrices(ci_coefficients, ci_basis_states, spin_components, sd_states
     # Default parameters
     default_params = {"number_of_states": 1, "isnap": 0, "fsnap": 1, "verbosity": 0, "outdir": "res"}
     # Check input
+    refuse_unknown_keys(params, step3.STEP3_KEYS, "step3_many_body.make_T_matrices", "params", "no function of the step-3 workflow reads")
     comn.check_input(params, default_params, critical_params)
 
     number_of_states = params["number_of_states"]
@@ -448,6 +452,7 @@ def make_T_matrices_fast(ci_coefficients, ci_basis_states, spin_components, sd_b
     # Default parameters
     default_params = {"number_of_states": 1, "isnap": 0, "fsnap": 1, "verbosity": 0, "outdir": "res"}
     # Check input
+    refuse_unknown_keys(params, step3.STEP3_KEYS, "step3_many_body.make_T_matrices_fast", "params", "no function of the step-3 workflow reads")
     comn.check_input(params, default_params, critical_params)
 
     number_of_states = params["number_of_states"]
@@ -575,6 +580,7 @@ def run(_params):
                       }
 
     # Check input
+    refuse_unknown_keys(params, step3.STEP3_KEYS, "step3_many_body.run", "params", "no function of the step-3 workflow reads")
     comn.check_input(params, default_params, critical_params)
 
     homo_index = params["homo_index"]

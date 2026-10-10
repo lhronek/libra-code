@@ -49,6 +49,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 from . import mapping, step2_many_body, step3_many_body
 from libra_py.citools import slatdet
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 import libra_py.packages.cp2k.methods as CP2K_methods
 import libra_py.units as units
 import libra_py.data_read as data_read
@@ -64,6 +65,33 @@ from libra_py.orthogonalizations import (validate_overlap_matrix,
                                          get_Lowdin_scipy,
                                          apply_orthonormalization_scipy,
                                          lowdin_digest)
+
+
+# every key the step-3 workflow reads - the union over its entries (run, the three run_step3_* routes, the SD-basis sorting, get_step2_data,
+# pyxaid2libra, the reorderings, output_sorted_Hvibs, step3_many_body.run and its helpers) and the readers they forward the dict to - one
+# dict serves the whole step, so every entry refuses a key outside this set (tier0_workflow_keys [step3] recomputes the union from the source)
+STEP3_KEYS = frozenset((
+    "CI_basis", "Hvib_im_prefix", "Hvib_im_suffix", "Hvib_re_prefix", "Hvib_re_suffix", "SD_basis", "SD_energy_corr",
+    "S_data_im_prefix", "S_data_im_suffix", "S_data_re_prefix", "S_data_re_suffix", "St_data_im_prefix", "St_data_im_suffix",
+    "St_data_re_prefix", "St_data_re_suffix", "active_space", "active_space_num_occ_orbitals", "active_space_selection",
+    "active_space_selection_algo", "active_space_selection_alpha", "allow_nonorthonormal_overlaps", "apply_orthonormalization",
+    "apply_phase_correction", "blas_num_threads", "ci_read_drops", "ci_threshold", "curr_step", "data_dim", "data_im_prefix",
+    "data_im_suffix", "data_re_prefix", "data_re_suffix", "data_set_paths", "diabatic_state_reordering_alpha",
+    "diabatic_state_reordering_min_overlap", "diabatization_scheme", "do_diabatic_state_reordering", "do_orthogonalization",
+    "do_output", "do_phase_correction", "do_state_reordering", "dt", "es_software", "finish_time", "fsnap", "get_imag",
+    "get_real", "highest_orbital", "homo_alpha_index", "homo_beta_index", "homo_index", "hvib_data_im_prefix",
+    "hvib_data_im_suffix", "hvib_data_re_prefix", "hvib_data_re_suffix", "isUKS", "is_many_body", "isnap", "ks_homo_index",
+    "ks_orbital_indicies", "localized_carrier", "logfile_directory", "logfile_name", "lowest_orbital", "nac_algo", "nprocs",
+    "npz_file_ks_homo_alpha_index", "npz_file_ks_homo_beta_index", "npz_file_ks_homo_index", "num_occ_alpha", "num_occ_beta",
+    "num_occ_states", "num_occ_states_per_block", "num_unocc_alpha", "num_unocc_beta", "num_unocc_states", "number_of_states",
+    "occupancy_tolerance", "orbital_indices", "orbital_normalization", "orbital_perms", "orbital_phase_correction",
+    "orbital_space", "outdir", "output_dir_prefix", "output_set_paths", "path_to_npz_files", "path_to_save_ks_Hvibs",
+    "path_to_save_sd_Hvibs", "pod_occupied", "read_S_data", "read_S_im", "read_S_re", "read_St_data", "read_St_im",
+    "read_St_re", "read_hvib_data", "read_hvib_im", "read_hvib_re", "save_files", "sd_capture_max_drop", "sd_charge",
+    "sd_overlap_kernel", "sd_states_reindexed_sorted", "sd_unique_basis", "sorting_type", "spin_adapted", "start_time",
+    "state_normalization", "state_phase_correction", "state_reordering_alpha", "state_reordering_min_overlap", "time_step",
+    "use_multiprocessing", "verbosity"
+))
 
 
 def get_step2_data(_params):
@@ -141,6 +169,7 @@ def get_step2_data(_params):
                       "hvib_data_re_prefix": "hvib_dia_ks_", "hvib_data_re_suffix": "_re",
                       "hvib_data_im_prefix": "hvib_dia_ks_", "hvib_data_im_suffix": "_im"
                       }
+    refuse_unknown_keys(params, STEP3_KEYS, "step3.get_step2_data", "params", "no function of the step-3 workflow reads")
     comn.check_input(params, default_params, critical_params)
 
     S, St, Hvib = [], [], []
@@ -261,6 +290,7 @@ def output_sorted_Hvibs(Hvib, orbital_index_energy_pairs, _params={}):
                       "hvib_data_re_prefix": "Hvib_sorted_", "hvib_data_re_suffix": "_re",
                       "hvib_data_im_prefix": "Hvib_sorted_", "hvib_data_im_suffix": "_im"
                       }
+    refuse_unknown_keys(params, STEP3_KEYS, "step3.output_sorted_Hvibs", "params", "no function of the step-3 workflow reads")
     comn.check_input(params, default_params, critical_params)
 
     save_files = params["save_files"]
@@ -857,6 +887,7 @@ def apply_state_reordering(St, E, params):
 
     critical_params = []
     default_params = {"do_state_reordering": 2, "state_reordering_alpha": 0.0}
+    refuse_unknown_keys(params, STEP3_KEYS, "step3.apply_state_reordering", "params", "no function of the step-3 workflow reads")
     comn.check_input(params, default_params, critical_params)
 
     nsteps = len(St)
@@ -1614,6 +1645,7 @@ def run(S_dia_ks, St_dia_ks, E_dia_ks, params):
                       "Hvib_re_suffix": "_re", "Hvib_im_suffix": "_im",
 
                       }
+    refuse_unknown_keys(params, STEP3_KEYS, "step3.run", "params", "no function of the step-3 workflow reads")
     comn.check_input(params, default_params, critical_params)
 
     dt = params["dt"]
@@ -1731,6 +1763,7 @@ def pyxaid2libra(Hvib_pyxaid, params):
                       "Hvib_re_prefix": "Hvib_", "Hvib_im_prefix": "Hvib_",
                       "Hvib_re_suffix": "_re", "Hvib_im_suffix": "_im",
                       }
+    refuse_unknown_keys(params, STEP3_KEYS, "step3.pyxaid2libra", "params", "no function of the step-3 workflow reads")
     comn.check_input(params, default_params, critical_params)
 
     ndata = len(Hvib_pyxaid)
@@ -1821,6 +1854,7 @@ def apply_state_reordering_general(St, E, params):
 
     critical_params = []
     default_params = {"do_state_reordering": 2, "state_reordering_alpha": 0.0}
+    refuse_unknown_keys(params, STEP3_KEYS, "step3.apply_state_reordering_general", "params", "no function of the step-3 workflow reads")
     comn.check_input(params, default_params, critical_params)
 
     nsteps = len(St)
@@ -1971,6 +2005,7 @@ def sort_unique_SD_basis(E_ks, sd_states_unique, sd_states_reindexed, _params):
     # Default parameters
     default_params = {"isnap": 0, "fsnap": 1, "sorting_type": "energy"}
     # Check input
+    refuse_unknown_keys(params, STEP3_KEYS, "step3.sort_unique_SD_basis", "params", "no function of the step-3 workflow reads")
     comn.check_input(params, default_params, critical_params)
 
     istep = params["isnap"]
@@ -2072,6 +2107,7 @@ def sort_unique_SD_basis_scipy(step, sd_states_unique, sd_states_reindexed, _par
     # Default parameters
     default_params = {"isnap": 0, "fsnap": 1, "sorting_type": "energy"}
     # Check input
+    refuse_unknown_keys(params, STEP3_KEYS, "step3.sort_unique_SD_basis_scipy", "params", "no function of the step-3 workflow reads")
     comn.check_input(params, default_params, critical_params)
 
     istep = params["isnap"]
@@ -2342,6 +2378,7 @@ def run_step3_ks_nacs_libint(params):
     if unknown:
         raise ValueError(F"run_step3_ks_nacs_libint: params {unknown} are not options of the KS route - its keys are "
                          F"{sorted(known)}")
+    refuse_unknown_keys(params, STEP3_KEYS, "step3.run_step3_ks_nacs_libint", "params", "no function of the step-3 workflow reads")
     comn.check_input(params, default_params, critical_params)
     params['apply_orthonormalization'] = _orthonormalization_mode(params['apply_orthonormalization'])
     _check_reordering_options(params, 'run_step3_ks_nacs_libint')
@@ -3891,6 +3928,7 @@ def run_step3_pod(params):
     if unknown:
         raise ValueError(F"run_step3_pod: params {unknown} are not options of the POD route - its keys are "
                          F"{sorted(set(default_params) | set(critical_params))}")
+    refuse_unknown_keys(params, STEP3_KEYS, "step3.run_step3_pod", "params", "no function of the step-3 workflow reads")
     comn.check_input(params, default_params, critical_params)
     # the values the route implements - every other value is refused
     for key, allowed, hint in (('sd_charge', (1,), "the frozen-orbital hole basis of the cation"),
@@ -4372,6 +4410,7 @@ def run_step3_sd_nacs_libint(params):
     params.pop('orbital_perms', None)
 
     # Check input, set output dirs
+    refuse_unknown_keys(params, STEP3_KEYS, "step3.run_step3_sd_nacs_libint", "params", "no function of the step-3 workflow reads")
     comn.check_input(params, default_params, critical_params)
     if params['is_many_body'] and params['isUKS']:
         raise Exception('Unrestricted-spin calculations are not supported for many-body basis yet!')  # TODO
