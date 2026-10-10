@@ -27,11 +27,18 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
 import libra_py.units as units
 
 
 class tmp:
     pass
+
+
+# the keys Ferretti reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+FERRETTI_KEYS = frozenset((
+    "Delta", "Kx", "Ky", "X1", "X2", "X3", "alpha", "beta", "gamma"
+))
 
 
 def Ferretti(q, params, full_id=None):
@@ -74,6 +81,7 @@ def Ferretti(q, params, full_id=None):
 
 
     """
+    refuse_unknown_keys(params, FERRETTI_KEYS, "Ferretti.Ferretti", "params", "Ferretti does not read", skip=DISPATCH_KEYS)
 
     # Define potential specific constants
     critical_params = []

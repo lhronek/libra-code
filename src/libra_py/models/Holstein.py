@@ -26,11 +26,43 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
 import libra_py.units as units
 
 
 class tmp:
     pass
+
+
+# the keys Holstein_uncoupled reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+HOLSTEIN_UNCOUPLED_KEYS = frozenset((
+    "el-phon_coupling", "is_periodic", "k_harmonic", "site_coupling"
+))
+
+# the keys Holstein2 reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+HOLSTEIN2_KEYS = frozenset((
+    "E_n", "V", "k_n", "x_n"
+))
+
+# the keys Holstein3 reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+HOLSTEIN3_KEYS = frozenset((
+    "E_n", "V_n", "k_n", "x_n"
+))
+
+# the keys Holstein4 reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+HOLSTEIN4_KEYS = frozenset((
+    "E_n", "V", "k_n", "x_n"
+))
+
+# the keys Holstein5 reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+HOLSTEIN5_KEYS = frozenset((
+    "E_n", "V", "alpha", "k_n", "x_n", "x_nm"
+))
+
+# the keys Holstein_gen reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+HOLSTEIN_GEN_KEYS = frozenset((
+    "A", "B", "C", "T", "a", "b", "c", "t"
+))
 
 
 def Holstein_uncoupled(q, params):
@@ -59,6 +91,7 @@ def Holstein_uncoupled(q, params):
 
 
     """
+    refuse_unknown_keys(params, HOLSTEIN_UNCOUPLED_KEYS, "Holstein.Holstein_uncoupled", "params", "Holstein_uncoupled does not read", skip=DISPATCH_KEYS)
 
     critical_params = ["k_harmonic", "el-phon_coupling", "site_coupling", "is_periodic"]
     default_params = {}
@@ -173,6 +206,7 @@ def Holstein2(q, params, full_id):
             * obj.dc1_dia ( list of 1 CMATRIX(4,4) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
+    refuse_unknown_keys(params, HOLSTEIN2_KEYS, "Holstein.Holstein2", "params", "Holstein2 does not read", skip=DISPATCH_KEYS)
 
     critical_params = ["E_n", "x_n", "k_n"]
     default_params = {"V": 0.001}
@@ -257,6 +291,7 @@ def Holstein3(q, params, full_id):
                                 0.002    0.001
                                          0.002
     """
+    refuse_unknown_keys(params, HOLSTEIN3_KEYS, "Holstein.Holstein3", "params", "Holstein3 does not read", skip=DISPATCH_KEYS)
 
     critical_params = ["E_n", "x_n", "k_n", "V_n"]
     default_params = {
@@ -335,6 +370,7 @@ def Holstein4(q, params, full_id):
             * obj.dc1_dia ( list of 1 CMATRIX(4,4) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
+    refuse_unknown_keys(params, HOLSTEIN4_KEYS, "Holstein.Holstein4", "params", "Holstein4 does not read", skip=DISPATCH_KEYS)
 
     critical_params = ["E_n", "x_n", "k_n"]
     default_params = {"V": [[0.001, 0.001, 0.001, 0.001], [0.001, 0.001, 0.001, 0.001],
@@ -415,6 +451,7 @@ def Holstein5(q, params, full_id):
             * obj.dc1_dia ( list of 1 CMATRIX(4,4) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
+    refuse_unknown_keys(params, HOLSTEIN5_KEYS, "Holstein.Holstein5", "params", "Holstein5 does not read", skip=DISPATCH_KEYS)
 
     critical_params = ["E_n", "x_n", "k_n"]
     default_params = {"V": [[0.001, 0.001, 0.001, 0.001], [0.001, 0.001, 0.001, 0.001],
@@ -577,6 +614,7 @@ def Holstein_gen(_q, params, full_id=None):
             * obj.dc1_dia ( list of ndof CMATRIX(nstates,nstates) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
+    refuse_unknown_keys(params, HOLSTEIN_GEN_KEYS, "Holstein.Holstein_gen", "params", "Holstein_gen does not read", skip=DISPATCH_KEYS)
 
     critical_params = []
 

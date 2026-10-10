@@ -18,6 +18,14 @@
 """
 
 import torch
+from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
+
+
+# the keys Martens_model reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+MARTENS_MODEL_KEYS = frozenset((
+    "Va", "Vb", "Vc"
+))
+
 
 def sech(x):
   return 1 / torch.cosh(x)
@@ -29,6 +37,7 @@ def Martens_model(q, params):
     Martens_model1 is just this one but with Vc = 0.0
     Martens_model2 is              --        Vc = 0.4
     """
+    refuse_unknown_keys(params, MARTENS_MODEL_KEYS, "Martens_for_exact_pytorch.Martens_model", "params", "Martens_model does not read", skip=DISPATCH_KEYS)
     #params = {"Va": 0.00625, "Vb": 0.0106}
     Va = params.get("Va", 0.00625)
     Vb = params.get("Vb", 0.0106)

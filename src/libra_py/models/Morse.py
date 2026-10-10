@@ -27,11 +27,18 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
 import libra_py.units as units
 
 
 class tmp:
     pass
+
+
+# the keys general reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+GENERAL_KEYS = frozenset((
+    "D", "E", "V", "alpha", "beta", "x_n", "x_nm"
+))
 
 
 def set_Coronado_Xing_Miller_params(params, model_indx):
@@ -136,6 +143,7 @@ def general(q, params, full_id):
             * obj.dc1_dia ( list of 1 CMATRIX(3,3) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
+    refuse_unknown_keys(params, GENERAL_KEYS, "Morse.general", "params", "general does not read", skip=DISPATCH_KEYS)
 
     critical_params = ["E"]
     default_params = {"D": [0.00, 0.00, 0.00],

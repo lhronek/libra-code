@@ -25,10 +25,17 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
 
 
 class tmp:
     pass
+
+
+# the keys Henon_Heiles reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+HENON_HEILES_KEYS = frozenset((
+    "lam",
+))
 
 
 def Henon_Heiles(q, params, full_id=None):
@@ -56,6 +63,7 @@ def Henon_Heiles(q, params, full_id=None):
             * obj.dc1_dia ( list of 2 CMATRIX(1,1) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
+    refuse_unknown_keys(params, HENON_HEILES_KEYS, "Henon_Heiles.Henon_Heiles", "params", "Henon_Heiles does not read", skip=DISPATCH_KEYS)
 
     critical_params = []
     default_params = {"lam": 0.2, }

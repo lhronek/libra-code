@@ -25,11 +25,23 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
 import libra_py.units as units
 
 
 class tmp:
     pass
+
+
+# the keys model1 reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+MODEL1_KEYS = frozenset((
+    "Va", "Vb"
+))
+
+# the keys model2 reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+MODEL2_KEYS = frozenset((
+    "Va", "Vb", "Vc"
+))
 
 
 def model1(q, params, full_id=None):
@@ -59,6 +71,7 @@ def model1(q, params, full_id=None):
             * obj.dc1_dia ( list of 2 CMATRIX(1,1) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
+    refuse_unknown_keys(params, MODEL1_KEYS, "Martens.model1", "params", "model1 does not read", skip=DISPATCH_KEYS)
 
     # Define potential specific constants
     critical_params = []
@@ -147,6 +160,7 @@ def model2(q, params, full_id=None):
 
 
     """
+    refuse_unknown_keys(params, MODEL2_KEYS, "Martens.model2", "params", "model2 does not read", skip=DISPATCH_KEYS)
 
     # Define potential specific constants
     critical_params = []

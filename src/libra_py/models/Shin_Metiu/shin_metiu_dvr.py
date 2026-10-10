@@ -4,6 +4,7 @@ from scipy.special import erf
 from functools import reduce
 from liblibra_core import *
 from libra_py.hdf5_io import open_hdf5
+from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
 
 """
 .. module:: models_shin_meitu and dvr calculations
@@ -28,6 +29,14 @@ from libra_py.hdf5_io import open_hdf5
 # ---------------------------------------------------------------
 # Kinetic Energy Matrix
 # ---------------------------------------------------------------
+
+
+# the keys compute_model reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+COMPUTE_MODEL_KEYS = frozenset((
+    "L_sm1", "L_sm2", "N", "Rc_sm1", "a_sm2", "af_sm2", "dvr_file", "model", "nstates", "r_max", "r_min"
+))
+
+
 def kinetic_energy_matrix(N, dr):
     """
     Construct the kinetic energy matrix in a sine DVR (Discrete Variable Representation) basis.
@@ -214,6 +223,7 @@ def compute_model(q, params, full_id=None):
         Contains DVR results including adiabatic Hamiltonian,
         nonadiabatic couplings, and transformation matrices.
     """
+    refuse_unknown_keys(params, COMPUTE_MODEL_KEYS, "Shin_Metiu.shin_metiu_dvr.compute_model", "params", "compute_model does not read", skip=DISPATCH_KEYS)
     # --- Extract grid parameters --- 
     N = params["N"]
     nstates = params["nstates"]

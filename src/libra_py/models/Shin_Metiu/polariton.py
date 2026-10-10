@@ -25,6 +25,7 @@ from functools import reduce
 from liblibra_core import *
 from libra_py.hdf5_io import open_hdf5
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
 
 # constants
 from dataclasses import dataclass
@@ -54,6 +55,12 @@ class DVRData:
     mu: np.ndarray
     d_mu: np.ndarray
     mu_deri: np.ndarray
+
+
+# the keys compute_model reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+COMPUTE_MODEL_KEYS = frozenset((
+    "epsilon", "g_c", "model", "nstates", "omega_c"
+))
 
 
 def load_dvr_from_file(filename: str) -> DVRData:
@@ -364,6 +371,7 @@ def compute_model(q, params, full_id):
           and the nonadiabatic coupling matrix in the adiabatic basis.
         - Overlap matrix `S_adia` is set to the identity matrix in this implementation.
     """
+    refuse_unknown_keys(params, COMPUTE_MODEL_KEYS, "Shin_Metiu.polariton.compute_model", "params", "compute_model does not read", skip=DISPATCH_KEYS)
 
     critical_params = []
     default_params = {"g_c": 0.005, "omega_c": 0.1, "epsilon": 1.0, "nstates": 4}

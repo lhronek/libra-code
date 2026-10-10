@@ -17,6 +17,7 @@ import os
 import sys
 import math
 import copy
+from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
 
 if sys.platform == "cygwin":
     from cyglibra_core import *
@@ -26,6 +27,10 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 
 class tmp:
     pass
+
+
+# the keys Beswick_Jortner reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+BESWICK_JORTNER_KEYS = frozenset(())
 
 
 def Beswick_Jortner(q, params):
@@ -44,6 +49,7 @@ def Beswick_Jortner(q, params):
         (2) Brown, R. C.; Heller, E. J. Classical Trajectory Approach to Photodissociation: The Wigner Method.
         J. Chem. Phys. 1981, 75, 186-188.
     """
+    refuse_unknown_keys(params, BESWICK_JORTNER_KEYS, "Beswick_Jortner.Beswick_Jortner", "params", "Beswick_Jortner does not read", skip=DISPATCH_KEYS)
 
     eV = 0.036749309  # Ha
     Angst = 1.889725989  # Bohr

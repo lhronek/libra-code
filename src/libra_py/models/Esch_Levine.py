@@ -25,11 +25,23 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
 import libra_py.units as units
 
 
 class tmp:
     pass
+
+
+# the keys JCP_2020 reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+JCP_2020_KEYS = frozenset((
+    "V", "delta", "eps", "i_crit", "nstates", "w0", "w1"
+))
+
+# the keys general reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+GENERAL_KEYS = frozenset((
+    "V", "nstates", "w"
+))
 
 
 def get_JCP_2020_params(set_indx):
@@ -104,6 +116,7 @@ def JCP_2020(q, params, full_id):
             * obj.dc1_dia ( list of 1 CMATRIX(M,M) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
+    refuse_unknown_keys(params, JCP_2020_KEYS, "Esch_Levine.JCP_2020", "params", "JCP_2020 does not read", skip=DISPATCH_KEYS)
 
     critical_params = []
     default_params = {"w0": 0.25, "w1": 0.025, "V": 0.005, "eps": 0.0, "i_crit": 2, "nstates": 2, "delta": 0.01}
@@ -181,6 +194,7 @@ def general(q, params, full_id):
             * obj.dc1_dia ( list of 1 CMATRIX(M,M) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
+    refuse_unknown_keys(params, GENERAL_KEYS, "Esch_Levine.general", "params", "general does not read", skip=DISPATCH_KEYS)
 
     critical_params = []
     default_params = {"nstates": 2, "V": [[0.00, 0.00], [0.00, 0.00]], "w": [[0.00, 0.00], [0.00, 0.00]]}

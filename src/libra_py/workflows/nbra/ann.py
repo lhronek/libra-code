@@ -30,7 +30,7 @@ from . import decoherence_times as dectim
 import libra_py.data_conv as data_conv
 import libra_py.data_read as data_read
 import util.libutil as comn
-from libra_py.params_check import refuse_unknown_keys, restrict
+from libra_py.params_check import refuse_unknown_keys, restrict, DISPATCH_KEYS
 import matplotlib.pyplot as plt
 import sys
 import cmath
@@ -589,6 +589,13 @@ def load_ann_and_parameters(params, nstates=2, prefix="./"):
             cnt = cnt + 1
 
 
+# the keys compute_model_nbra_ann reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+COMPUTE_MODEL_NBRA_ANN_KEYS = frozenset((
+    "dt", "gap_ann", "gap_ann_scale", "gap_ann_shift", "gap_ann_tau", "gap_ann_w", "istep", "nac_ann", "nac_ann_scale",
+    "nac_ann_shift", "nac_ann_tau", "nac_ann_w", "nstates", "timestep"
+))
+
+
 def compute_model_nbra_ann(q, params, full_id):
     """
     This function construct the ANN-based Hamiltonians for NBRA calculations
@@ -640,6 +647,7 @@ def compute_model_nbra_ann(q, params, full_id):
 
 
     """
+    refuse_unknown_keys(params, COMPUTE_MODEL_NBRA_ANN_KEYS, "ann.compute_model_nbra_ann", "params", "compute_model_nbra_ann does not read", skip=DISPATCH_KEYS)
 
     hvib_adi, basis_transform, time_overlap_adi = None, None, None
 

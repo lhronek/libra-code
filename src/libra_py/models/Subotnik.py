@@ -24,11 +24,23 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
 import libra_py.units as units
 
 
 class tmp:
     pass
+
+
+# the keys dumbbell_geometry reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+DUMBBELL_GEOMETRY_KEYS = frozenset((
+    "A", "B", "C", "Z"
+))
+
+# the keys double_arch_geometry reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+DOUBLE_ARCH_GEOMETRY_KEYS = frozenset((
+    "A", "B", "C", "Z"
+))
 
 
 def dumbbell_geometry(q, params, full_id=None):
@@ -64,6 +76,7 @@ def dumbbell_geometry(q, params, full_id=None):
             * obj.dc1_dia ( list of 1 CMATRIX(2,2) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
+    refuse_unknown_keys(params, DUMBBELL_GEOMETRY_KEYS, "Subotnik.dumbbell_geometry", "params", "dumbbell_geometry does not read", skip=DISPATCH_KEYS)
 
     critical_params = []
     default_params = {"A": 0.0006, "B": 0.1, "C": 0.9, "Z": 10.000}
@@ -175,6 +188,7 @@ def double_arch_geometry(q, params, full_id=None):
             * obj.dc1_dia ( list of 1 CMATRIX(2,2) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
+    refuse_unknown_keys(params, DOUBLE_ARCH_GEOMETRY_KEYS, "Subotnik.double_arch_geometry", "params", "double_arch_geometry does not read", skip=DISPATCH_KEYS)
 
     critical_params = []
     default_params = {"A": 0.0006, "B": 0.1, "C": 0.9, "Z": 4.000}
