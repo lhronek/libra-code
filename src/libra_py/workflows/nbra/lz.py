@@ -392,7 +392,7 @@ def run(H_vib, params):
                       "Boltz_opt_BL": 1,
                       "do_output": True, "outfile": "_out.txt", "do_return": True,
                       "extend_md": False, "extend_md_time": 1,
-                      "detect_SD_differences": False,
+                      "detect_SD_difference": False,
                       "return_probabilities": False,
                       "init_times": [0]}
 
@@ -407,7 +407,7 @@ def run(H_vib, params):
     do_output = params["do_output"]
     do_return = params["do_return"]
     ntraj = params["ntraj"]
-    detect_SD_difference = params["detect_SD_differences"]
+    detect_SD_difference = params["detect_SD_difference"]
     return_probabilities = params["return_probabilities"]
     extend_md = params["extend_md"]
     extend_md_time = params["extend_md_time"]
