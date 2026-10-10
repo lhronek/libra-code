@@ -30,6 +30,7 @@ from . import decoherence_times as dectim
 import libra_py.data_conv as data_conv
 import libra_py.data_read as data_read
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 import matplotlib.pyplot as plt
 import sys
 import cmath
@@ -57,6 +58,21 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 
 class tmp:
     pass
+
+
+# the keys of the three ANN dicts - step1_workflow's params (with the influence_spectrum keys it forwards), step2_workflow's params
+# and its ann_params - each entry refuses a key outside its set
+ANN_STEP1_KEYS = frozenset((
+    "acf_filename", "acf_type", "data_type", "deriv_scaling", "do_center", "do_output", "dt", "dw", "leading_w_fraction",
+    "output_files_prefix", "spectrum_filename", "tau", "training_steps", "wspan"
+))
+ANN_STEP2_KEYS = frozenset((
+    "ann_arch", "input_files_prefix", "mode1", "mode2"
+))
+ANN_TRAINING_KEYS = frozenset((
+    "a_minus", "a_plus", "dB_max", "dB_min", "dW_max", "dW_min", "epoch_size", "error_collect_frequency", "etha",
+    "learning_method", "learning_rate", "momentum_term", "num_epochs", "steps_per_epoch", "verbosity", "weight_decay_lambda"
+))
 
 
 def preprocess_data(npdata, verbose=False):
@@ -248,6 +264,7 @@ def step1_workflow(data, _params, _plt):
                       "tau": [5000.0], "training_steps": [-1],
                       "output_files_prefix": "data"
                       }
+    refuse_unknown_keys(params, ANN_STEP1_KEYS, "ann.step1_workflow", "params", "no function of the ann workflow reads")
     comn.check_input(params, default_params, critical_params)
 
     w_fract = params["leading_w_fraction"]
@@ -450,6 +467,7 @@ def step2_workflow(_params, _ann_params, rnd, _plt):
 
     critical_params = []
     default_params = {"input_files_prefix": "data", "ann_arch": [10, 10], "mode1": 0, "mode2": 1}
+    refuse_unknown_keys(params, ANN_STEP2_KEYS, "ann.step2_workflow", "params", "no function of the ann workflow reads")
     comn.check_input(params, default_params, critical_params)
 
     input_files_prefix = params["input_files_prefix"]
@@ -492,6 +510,7 @@ def step2_workflow(_params, _ann_params, rnd, _plt):
                           "dB_min": 0.000001, "dB_max": 10.1,
                           "dW_min": 0.000001, "dW_max": 10.1,
                           }
+    refuse_unknown_keys(ann_params, ANN_TRAINING_KEYS, "ann.step2_workflow", "ann_params", "no function of the ann workflow reads")
     comn.check_input(ann_params, ann_default_params, ann_critical_params)
 
     err = ANN.train(rnd, ann_params, training_input, training_target)

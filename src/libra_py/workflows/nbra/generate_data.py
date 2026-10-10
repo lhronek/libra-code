@@ -26,6 +26,18 @@ import sys
 import glob
 import libra_py.packages.cp2k.methods as CP2K_methods
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
+
+
+# every key the data generation reads from its one params dict - distribute_jobs's defaults and critical keys and the reads of every
+# function of the module (distribute_jobs dumps the dict, each job's run.py reads it back for gen_data), refused at distribute_jobs
+GENERATE_DATA_KEYS = frozenset((
+    "do_guess", "do_more", "do_more_steps", "do_ref", "fstep", "guess_dir", "guess_input_template", "guess_mpi_exe",
+    "guess_software", "guess_software_exe", "istep", "job_steps", "njobs", "nprocs", "prefix", "random_selection",
+    "reference_dir", "reference_input_template", "reference_mpi_exe", "reference_software", "reference_software_exe",
+    "reference_steps", "remove_raw_outputs", "scratch", "software_load_instructions", "steps", "submit_exe", "submit_template",
+    "trajectory_xyz_file", "user_steps"
+))
 
 
 def make_input(prefix, input_template, software, trajectory_xyz_file, step):
@@ -284,6 +296,7 @@ def distribute_jobs(params):
         'remove_raw_outputs': True,
         'submit_exe': 'sbatch'}
     # First load the default parameters etc
+    refuse_unknown_keys(params, GENERATE_DATA_KEYS, "generate_data.distribute_jobs", "params", "no function of the generate_data workflow reads")
     comn.check_input(params, default_params, critical_params)
     # Now let's create the random numbers
     # nsteps = params["fstep"]-params["istep"]

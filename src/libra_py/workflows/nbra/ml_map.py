@@ -43,6 +43,22 @@ import libra_py.packages.dftbplus.methods as DFTB_methods
 from . import generate_data
 from libra_py import units, molden_methods, data_conv
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
+
+
+# every key the ML mapping reads from its one params dict - train's defaults and critical keys and the reads of every function of
+# the module (train dumps the dict, distribute_jobs reads it back and hands it to each job's compute_properties), refused at train
+# and distribute_jobs
+ML_MAP_KEYS = frozenset((
+    "A_cell_vector", "B_cell_vector", "C_cell_vector", "alpha", "compute_ml_total_energy", "compute_overlap",
+    "cp2k_ml_input_template", "degree", "do_error_analysis", "fstep", "gamma", "highest_orbital", "input_partition",
+    "input_property", "is_periodic", "istep", "job", "kernel", "lowest_orbital", "memory_efficient", "njobs", "npartition",
+    "nprocs", "output_property", "partitioning_method", "path_to_input_mats", "path_to_output_mats", "path_to_sample_files",
+    "path_to_save_models", "path_to_save_ref_mos", "path_to_save_wfn_files", "path_to_trajectory_xyz_file", "periodicity_type",
+    "prefix", "res_dir", "sample_molden_file", "sample_wfn_file", "save_ao_overlap", "save_ml_ham", "save_ml_mos",
+    "save_models", "save_ref_eigenvalues", "save_ref_eigenvectors", "scaler", "steps", "submit_template", "train_indices",
+    "train_parallel", "translational_vectors", "user_train_indices", "write_wfn_file"
+))
 
 
 def find_indices(params):
@@ -359,6 +375,7 @@ def train(params):
         'res_dir': './res',
         'train_parallel': False}
     # First load the default parameters etc
+    refuse_unknown_keys(params, ML_MAP_KEYS, "ml_map.train", "params", "no function of the ml_map workflow reads")
     comn.check_input(params, default_params, critical_params)
 
     # Find the training indices
@@ -926,6 +943,7 @@ def distribute_jobs(params):
         None
     """
     # Split the steps
+    refuse_unknown_keys(params, ML_MAP_KEYS, "ml_map.distribute_jobs", "params", "no function of the ml_map workflow reads")
     steps_split = np.array_split(params["steps"], params["njobs"])
     # Read the submit file
     f = open(params["submit_template"], "r")
