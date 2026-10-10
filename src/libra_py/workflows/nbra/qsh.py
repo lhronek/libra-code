@@ -24,8 +24,10 @@
 import libra_py.data_conv as data_conv
 import libra_py.data_stat as data_stat
 import libra_py.influence_spectrum as influence_spectrum
+from . import step4
 import libra_py.units as units
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 import matplotlib.pyplot as plt
 import cmath
 import math
@@ -89,6 +91,7 @@ def compute_freqs(H_vib, params):
     # Set defaults and check critical parameters
     critical_params = []
     default_params = {"output_files_prefix": "_qsh", "nsteps": len(H_vib)}
+    refuse_unknown_keys(params, step4.STEP4_KEYS, "qsh.compute_freqs", "params", "no function of the step-4 family reads")
     comn.check_input(params, default_params, critical_params)
 
     output_files_prefix = params["output_files_prefix"]
@@ -299,6 +302,7 @@ def run(H_vib, params):
                       "qsh_Hvib_re_prefix": "qsh_Hvib_", "qsh_Hvib_im_prefix": "qsh_Hvib_",
                       "qsh_Hvib_re_suffix": "_re", "qsh_Hvib_im_suffix": "_im",
                       "meta_info": "qsh-meta"}
+    refuse_unknown_keys(params, step4.STEP4_KEYS, "qsh.run", "params", "no function of the step-4 family reads")
     comn.check_input(params, default_params, critical_params)
 
     # Local parameters

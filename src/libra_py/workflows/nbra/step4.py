@@ -48,6 +48,7 @@ from . import decoherence_times as dectim
 from libra_py import data_conv
 import libra_py.data_read as data_read
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 import matplotlib.pyplot as plt
 import sys
 import cmath
@@ -70,6 +71,21 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 # import libra_py.common_utils as comn
 
 # import libra_py.tsh as tsh
+
+
+# every key the step-4 family reads - the union over step4.get_Hvib / get_Hvib2 / run, lz.Belyaev_Lebedev / run, qsh.compute_freqs / run
+# and the influence_spectrum / data_stat helpers they forward the dict to - one dict serves a step-4 run (the Hvib reading, the
+# NBRA hopping, the LZ and QSH variants), so each entry refuses a key outside this set; run_tsh hands its dict to the TSH
+# run_dynamics, whose own check covers it (tier0_workflow_keys [step4] recomputes the union from the source)
+STEP4_KEYS = frozenset((
+    "Boltz_opt", "Boltz_opt_BL", "Hvib_im_prefix", "Hvib_im_suffix", "Hvib_re_prefix", "Hvib_re_suffix", "Hvib_type", "T",
+    "acf_filename", "acf_type", "active_space", "data_set_paths", "data_type", "decoherence_constants", "decoherence_method",
+    "decoherence_times", "detect_SD_difference", "do_QSH_output", "do_center", "do_output", "do_return", "dt", "dw",
+    "excitations", "extend_md", "extend_md_time", "filename", "gap_fit", "gap_min_exception", "init_time", "init_times",
+    "istate", "logname", "meta_info", "nfiles", "nfreqs", "nstates", "nsteps", "ntraj", "outfile", "output_files_prefix",
+    "output_set_paths", "qsh_Hvib_im_prefix", "qsh_Hvib_im_suffix", "qsh_Hvib_re_prefix", "qsh_Hvib_re_suffix",
+    "return_probabilities", "sh_method", "spectrum_filename", "target_space", "tdse_Ham", "verbose", "wspan"
+))
 
 
 def get_Hvib(params):
@@ -121,6 +137,7 @@ def get_Hvib(params):
     default_params = {"Hvib_re_suffix": "_re", "Hvib_im_suffix": "_im", "active_space": list(range(params["nstates"])),
                       "init_time": 0
                       }
+    refuse_unknown_keys(params, STEP4_KEYS, "step4.get_Hvib", "params", "no function of the step-4 family reads")
     comn.check_input(params, default_params, critical_params)
 
     nstates = params["nstates"]  # the number of states in the input files
@@ -185,6 +202,7 @@ def get_Hvib2(params):
 
     critical_params = ["data_set_paths"]
     default_params = {}
+    refuse_unknown_keys(params, STEP4_KEYS, "step4.get_Hvib2", "params", "no function of the step-4 family reads")
     comn.check_input(params, default_params, critical_params)
 
     H_vib = []
@@ -578,6 +596,7 @@ def run(H_vib, params):
         "istate": 0,
         "init_times": [0],
         "outfile": "_out.txt"}
+    refuse_unknown_keys(params, STEP4_KEYS, "step4.run", "params", "no function of the step-4 family reads")
     comn.check_input(params, default_params, critical_params)
 
     rnd = Random()

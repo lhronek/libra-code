@@ -27,6 +27,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 
 # import libra_py.common_utils as comn
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 
 import libra_py.units as units
 import libra_py.probabilities as prob
@@ -94,6 +95,7 @@ def Belyaev_Lebedev(Hvib, params):
     # Control parameters
     critical_params = []
     default_params = {"T": 300.0, "Boltz_opt_BL": 1, "dt": 41.0, "gap_min_exception": 0, "target_space": 1, "gap_fit": 0}
+    refuse_unknown_keys(params, step4.STEP4_KEYS, "lz.Belyaev_Lebedev", "params", "no function of the step-4 family reads")
     comn.check_input(params, default_params, critical_params)
 
     boltz_opt = params["Boltz_opt_BL"]
@@ -396,6 +398,7 @@ def run(H_vib, params):
                       "return_probabilities": False,
                       "init_times": [0]}
 
+    refuse_unknown_keys(params, step4.STEP4_KEYS, "lz.run", "params", "no function of the step-4 family reads")
     comn.check_input(params, default_params, critical_params)
 
     rnd = Random()
