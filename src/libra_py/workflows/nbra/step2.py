@@ -385,6 +385,86 @@ def _check_homo_bracket(step, isxTB, isUKS, lowest_orbital, highest_orbital):
                          F"lowest_orbital <= HOMO < highest_orbital")
 
 
+STEP2_CP2K_CRITICAL = ("cp2k_diag_input_template", "trajectory_xyz_filename")
+# the keys the CP2K step 2 reads without a default: the cell when is_periodic, the OT flag of run_cp2k_xtb, the step counter
+# the loop writes for it
+STEP2_CP2K_READS = ("A_cell_vector", "B_cell_vector", "C_cell_vector", "ot_first_call_only", "step")
+
+
+def cp2k_libint_step2_defaults():
+    """The defaults of run_cp2k_libint_step2 - a fresh dict (the directory defaults read the working directory at call time)"""
+    return {
+        "cp2k_ot_input_template": None,
+        "res_dir": os.getcwd() +
+        "/res",
+        "all_logfiles": os.getcwd() +
+        "/all_logfiles",
+        "all_pdosfiles": os.getcwd() +
+        "/all_pdosfiles",
+        "all_images": os.getcwd() +
+        "/all_images",
+        "image_format": 'bmp',
+        "istep": 0,
+        "fstep": 2,
+        "lowest_orbital": 1,
+        "highest_orbital": 2,
+        "is_spherical": True,
+        "isxTB": False,
+        "isUKS": False,
+        "is_periodic": False,
+        "periodicity_type": "none",
+        "periodic_images": [1, 1, 1],
+        "translational_vectors": None,
+        "remove_molden": True,
+        "nprocs": 2,
+        "cp2k_exe": "cp2k.psmp",
+        "mpi_executable": "mpirun",
+        "cube_visualization": False,
+        "vmd_input_template": "vmd.tcl",
+        "states_to_plot": [1],
+        "plot_phase_corrected": True,
+        "vmd_exe": "vmd",
+        "tachyon_exe": "tachyon_LINIXAMD64",
+        "x_pixels": 1024,
+        "y_pixels": 1024,
+        "remove_cube": True,
+        'together_mode': False,
+        'restart_file': True,
+        'ao_overlap_method': 'cp2k',
+        'mo_source': 'wfn',
+        'fragment_atom_lists': None,
+        'read_pod_cp2k_files': False,
+        'compute_pod': False,
+        'pod_schemes': ['pod'],
+        'pod2gs_kept_block': 0,
+        'overlap_template': '',
+        'overlap_csr_write': True,
+        'cp2k_data_dir': '',
+        'omp_num_threads': 1,
+        'use_emultipole': False,
+        # the multipole reference point (a.u.) - moments about any other
+        # origin are exact binomial combinations of these plus S
+        'emultipole_origin': [0.0, 0.0, 0.0],
+        'emultipole_components': [
+            'S',
+            'x',
+            'y',
+            'z']}
+
+
+# every key the CP2K step-2 workflow reads - its defaults, critical keys and the reads without a default (the leaves run_cp2k_xtb
+# and plot_cube_v2 included): a key outside this set is refused at the entry
+STEP2_CP2K_KEYS = frozenset(cp2k_libint_step2_defaults()) | frozenset(STEP2_CP2K_CRITICAL) | frozenset(STEP2_CP2K_READS)
+
+
+def translational_vectors_of(params):
+    """The translational vectors of a periodic step-2 run: the given params["translational_vectors"] when not None, else the
+    images of the cell from params["periodicity_type"] and params["periodic_images"] about the origin (cell units)"""
+    if params["translational_vectors"] is not None:
+        return params["translational_vectors"]
+    return CP2K_methods.generate_translational_vectors([0, 0, 0], params["periodic_images"], params["periodicity_type"])
+
+
 def run_cp2k_libint_step2(params):
     """
     This function runs the step2 for computing the MO overlaps for both DFT and xTB calculations and saves them as sparse
@@ -418,6 +498,19 @@ def run_cp2k_libint_step2(params):
                                            xTB-UKS orbitals are spin-DEGENERATE (identical alpha and
                                            beta channels) - only the occupations and per-spin HOMOs
                                            differ.
+
+                             is_periodic (bool): Flag for periodic systems - the AO overlaps include the images of the
+                                                 cell A_cell_vector, B_cell_vector, C_cell_vector (Angstrom) [default: False].
+
+                             periodicity_type (string): the periodic directions - "none", "XY", "XZ", "YZ" or "XYZ" - the
+                                                        translational vectors are built from it and periodic_images when
+                                                        translational_vectors is None [default: "none"].
+
+                             periodic_images (list of 3 ints): the number of image cells in each direction for the
+                                                                translational vectors [default: [1, 1, 1]].
+
+                             translational_vectors (list or None): the translational vectors (cell units) used instead of
+                                                                   building them - None builds them [default: None].
 
                              remove_molden (bool): Flag for removing the molden files after computing the MO overlaps.
 
@@ -537,65 +630,15 @@ def run_cp2k_libint_step2(params):
     """
 
     # Now try to get parameters from the input
-    critical_params = ["cp2k_diag_input_template", "trajectory_xyz_filename"]
-    default_params = {
-        "cp2k_ot_input_template": None,
-        "res_dir": os.getcwd() +
-        "/res",
-        "all_logfiles": os.getcwd() +
-        "/all_logfiles",
-        "all_pdosfiles": os.getcwd() +
-        "/all_pdosfiles",
-        "all_images": os.getcwd() +
-        "/all_images",
-        "image_format": 'bmp',
-        "istep": 0,
-        "fstep": 2,
-        "lowest_orbital": 1,
-        "highest_orbital": 2,
-        "is_spherical": True,
-        "isxTB": False,
-        "isUKS": False,
-        "is_periodic": False,
-        "remove_molden": True,
-        "nprocs": 2,
-        "cp2k_exe": "cp2k.psmp",
-        "mpi_executable": "mpirun",
-        "cube_visualization": False,
-        "vmd_input_template": "vmd.tcl",
-        "states_to_plot": [1],
-        "plot_phase_corrected": True,
-        "vmd_exe": "vmd",
-        "tachyon_exe": "tachyon_LINIXAMD64",
-        "x_pixels": 1024,
-        "y_pixels": 1024,
-        "remove_cube": True,
-        'together_mode': False,
-        'restart_file': True,
-        'ao_overlap_method': 'cp2k',
-        'mo_source': 'wfn',
-        'fragment_atom_lists': None,
-        'read_pod_cp2k_files': False,
-        'compute_pod': False,
-        'pod_schemes': ['pod'],
-        'pod2gs_kept_block': 0,
-        'overlap_template': '',
-        'cp2k_data_dir': '',
-        'omp_num_threads': 1,
-        'use_emultipole': False,
-        # the multipole reference point (a.u.) - moments about any other
-        # origin are exact binomial combinations of these plus S
-        'emultipole_origin': [0.0, 0.0, 0.0],
-        'emultipole_components': [
-            'S',
-            'x',
-            'y',
-            'z']}
+    critical_params = list(STEP2_CP2K_CRITICAL)
+    default_params = cp2k_libint_step2_defaults()
     # every read of the xTB flag uses 'isxTB' - a dict carrying the capital
     # form can only be a typo and would silently fall back to the DFT branch
     if 'isXTB' in params:
         raise ValueError("params['isXTB'] is not read by this workflow - use 'isxTB'")
     comn.check_input(params, default_params, critical_params)
+    if params['is_periodic'] and params['translational_vectors'] is None:
+        params['translational_vectors'] = translational_vectors_of(params)
 
     # Making the required directories for gatherig all the information needed
     # including the overlap data and pdos files. The logfiles do not contain
