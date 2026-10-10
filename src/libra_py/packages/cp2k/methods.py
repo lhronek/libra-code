@@ -4563,8 +4563,7 @@ def read_ci_data(logfile, nstates, ci_threshold=0.01, lowest_orbital=1, highest_
     all amplitudes/energies are fine) - prefer the NAMD_PRINT vectors for UKS.
     """
     pp = {"logfile_name": logfile, "number_of_states": nstates,
-          "ci_threshold": ci_threshold,
-          "isUKS": bool(isUKS), "lowest_orbital": lowest_orbital, "highest_orbital": highest_orbital}
+          "ci_threshold": ci_threshold, "isUKS": bool(isUKS)}
     E_ev, basis, coeff, spin = tddfpt_log_ci_tuple(read_cp2k_tddfpt_log_file(pp))
     E = E_ev[:nstates] * units.ev2Ha
     basis = [list(b) for b in basis[:nstates]]
