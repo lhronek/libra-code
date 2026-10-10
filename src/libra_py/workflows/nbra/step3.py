@@ -4367,15 +4367,14 @@ def run_step3_sd_nacs_libint(params):
                       'active_space_selection_alpha': 0.0
                       }
 
-    if params['is_many_body'] and params['isUKS']:
-        raise Exception('Unrestricted-spin calculations are not supported for many-body basis yet!')  # TODO
-
     _refuse_former_names(params)
     # written below from active_space_selection into this dict, which a runner may hand in again - never an input
     params.pop('orbital_perms', None)
 
     # Check input, set output dirs
     comn.check_input(params, default_params, critical_params)
+    if params['is_many_body'] and params['isUKS']:
+        raise Exception('Unrestricted-spin calculations are not supported for many-body basis yet!')  # TODO
     params['apply_orthonormalization'] = _orthonormalization_mode(params['apply_orthonormalization'])
     _check_reordering_options(params, 'run_step3_sd_nacs_libint')
     dia_reordering, dia_alpha = params['do_diabatic_state_reordering'], params['diabatic_state_reordering_alpha']
