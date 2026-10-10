@@ -17,6 +17,15 @@
 """
 
 
+# the keys the dispatch layer puts into a model dict - the caller's model / model0 / nstates / deriv_lvl and run_dynamics' timestep /
+# timestep_st / act_state - which a model function skips when it refuses the keys it does not read
+DISPATCH_KEYS = frozenset(("model", "model0", "nstates", "deriv_lvl", "timestep", "timestep_st", "act_state"))
+
+# the (entry, carrier, key set) triples that passed refuse_unknown_keys - an entry's vocabulary is a constant, so a key set that
+# passed once passes again and the model functions on the hot path pay one lookup per call
+_passed = set()
+
+
 def edit_distance(a, b):
     """The Levenshtein distance of two strings"""
     prev = list(range(len(b) + 1))
@@ -60,8 +69,12 @@ def refuse_unknown_keys(params, allowed, where, carrier, nobody_reads, skip=()):
             run_dynamics reads", "run_dynamics does not read"
         skip ( iterable ): keys neither allowed nor refused here (a caller handling them on its own)
     """
+    signature = (where, carrier, frozenset(params))
+    if signature in _passed:
+        return
     unknown, hints = unknown_keys(params, allowed, skip)
     if not unknown:
+        _passed.add(signature)
         return
     raise ValueError(F"{where}: {carrier} carries keys that {nobody_reads}: {unknown}"
                      + (F" (did you mean {hints}?)" if hints else "")
