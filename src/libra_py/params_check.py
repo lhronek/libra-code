@@ -30,6 +30,8 @@ def edit_distance(a, b):
 
 def nearest_key(key, allowed, within=2):
     """The allowed key nearest to `key` (case-insensitive edit distance) when it lies within `within` edits, else None"""
+    if not allowed:                                   # an entry reading no key has nothing to suggest
+        return None
     best = min(allowed, key=lambda x: (edit_distance(key.lower(), x.lower()), x))
     return best if edit_distance(key.lower(), best.lower()) <= within else None
 
