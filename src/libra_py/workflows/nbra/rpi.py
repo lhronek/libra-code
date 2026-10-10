@@ -34,6 +34,7 @@ from libra_py import data_conv
 from libra_py.hdf5_io import open_hdf5
 import libra_py.data_read as data_read
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 import libra_py.dynamics.tsh.compute as tsh_dynamics
     
 def run_patch_dyn_serial(_rpi_params, _dyn_params, compute_model, _model_params, _init_elec, _init_nucl, ibatch, ipatch, istate):
@@ -131,6 +132,7 @@ def run_patch_dyn_serial(_rpi_params, _dyn_params, compute_model, _model_params,
                       "run_python_file": 'run_template.py', "python_exe": 'python',  
                       "nsteps": 1, "npatches": 1, "nstates":2, "iconds": [0], "dt": 1.0*units.fs2au, "prefix": 'out_'}
     
+    refuse_unknown_keys(rpi_params, RPI_KEYS, "rpi.run_patch_dyn_serial", "rpi_params", "no function of the rpi workflow reads")
     comn.check_input(rpi_params, default_params, critical_params)
     
     # ========== Model params ==========
@@ -253,6 +255,7 @@ def generic_patch_dyn(_rpi_params, _dyn_params, compute_model, _model_params, _i
                       "run_python_file": 'run_template.py', "python_exe": 'python', "nsteps": 1, "npatches": 1, "nstates":2, "iconds": [0], 
                       "dt": 1.0*units.fs2au, "prefix": 'out_'}
     
+    refuse_unknown_keys(rpi_params, RPI_KEYS, "rpi.generic_patch_dyn", "rpi_params", "no function of the rpi workflow reads")
     comn.check_input(rpi_params, default_params, critical_params)
     
     # ========== Model params ==========
@@ -357,6 +360,7 @@ def process_batch(args):
     default_params = {"nprocs": 1, "nsteps": 1, "dt": 1.0*units.fs2au, "istate": 0, "nbatches": 1, "npatches": 1, "nstates": 2, 
                       "prefix_patch": 'out_', "prefix": 'POP_NPATCH_'}
 
+    refuse_unknown_keys(rpi_sum_params, RPI_SUM_KEYS, "rpi.process_batch", "rpi_sum_params", "no function of the rpi workflow reads")
     comn.check_input(rpi_sum_params, default_params, critical_params)
     
     nsteps, dt, istate = rpi_sum_params["nsteps"], rpi_sum_params["dt"], rpi_sum_params["istate"]
@@ -436,6 +440,7 @@ def run_sum(rpi_sum_params):
     default_params = {"nprocs": 1, "nsteps": 1, "dt": 1.0*units.fs2au, "istate": 0, "nbatches": 1, "npatches": 1, "nstates": 2, 
                       "prefix_patch": 'out_', "prefix": 'POP_NPATCH_'}
 
+    refuse_unknown_keys(rpi_sum_params, RPI_SUM_KEYS, "rpi.run_sum", "rpi_sum_params", "no function of the rpi workflow reads")
     comn.check_input(rpi_sum_params, default_params, critical_params)
 
     nprocs = rpi_sum_params["nprocs"]
@@ -458,6 +463,13 @@ def run_sum(rpi_sum_params):
     
     print("Print the final population from all batches")
     print_pop(prefix + F"{npatches}_all.dat", time, pops_avg)
+
+
+# the keys of the two rpi dicts - the patch run's rpi_params (generic_patch_dyn / run_patch_dyn_serial) and the summation's
+# rpi_sum_params (run_sum / run_sum_crude / process_batch): each entry refuses a key outside its set; the dyn, model and
+# initial-condition dicts keep their own checks (the TSH run_dynamics refuses the dyn keys it does not read)
+RPI_KEYS = frozenset(("dt", "iconds", "npatches", "nstates", "nsteps", "prefix", "python_exe", "run_python_file", "run_slurm", "submission_exe", "submit_template"))
+RPI_SUM_KEYS = frozenset(("dt", "istate", "nbatches", "npatches", "nprocs", "nstates", "nsteps", "path_to_save_patch", "prefix", "prefix_patch"))
 
 
 def run_sum_crude(rpi_sum_params):
@@ -497,6 +509,7 @@ def run_sum_crude(rpi_sum_params):
     default_params = {"nprocs": 1, "nsteps": 1, "dt": 1.0*units.fs2au, "istate": 0, "nbatches": 1, "npatches": 1, "nstates": 2, 
                       "prefix_patch": 'out_', "prefix": 'POP_NPATCH_'}
 
+    refuse_unknown_keys(rpi_sum_params, RPI_SUM_KEYS, "rpi.run_sum_crude", "rpi_sum_params", "no function of the rpi workflow reads")
     comn.check_input(rpi_sum_params, default_params, critical_params)
 
     nsteps, dt, istate = rpi_sum_params["nsteps"], rpi_sum_params["dt"], rpi_sum_params["istate"]
