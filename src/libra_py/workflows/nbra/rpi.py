@@ -466,7 +466,7 @@ def run_sum(rpi_sum_params):
 
 
 # the keys of the two rpi dicts - the patch run's rpi_params (generic_patch_dyn / run_patch_dyn_serial) and the summation's
-# rpi_sum_params (run_sum / run_sum_crude / process_batch): each entry refuses a key outside its set; the dyn, model and
+# rpi_sum_params (run_sum / run_sum_crude / process_batch): each entry refuses a key outside its set - the dyn, model and
 # initial-condition dicts keep their own checks (the TSH run_dynamics refuses the dyn keys it does not read)
 RPI_KEYS = frozenset(("dt", "iconds", "npatches", "nstates", "nsteps", "prefix", "python_exe", "run_python_file", "run_slurm", "submission_exe", "submit_template"))
 RPI_SUM_KEYS = frozenset(("dt", "istate", "nbatches", "npatches", "nprocs", "nstates", "nsteps", "path_to_save_patch", "prefix", "prefix_patch"))

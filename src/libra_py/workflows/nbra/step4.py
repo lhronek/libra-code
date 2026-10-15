@@ -75,7 +75,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 
 # every key the step-4 family reads - the union over step4.get_Hvib / get_Hvib2 / run, lz.Belyaev_Lebedev / run, qsh.compute_freqs / run
 # and the influence_spectrum / data_stat helpers they forward the dict to - one dict serves a step-4 run (the Hvib reading, the
-# NBRA hopping, the LZ and QSH variants), so each entry refuses a key outside this set; run_tsh hands its dict to the TSH
+# NBRA hopping, the LZ and QSH variants), so each entry refuses a key outside this set - run_tsh hands its dict to the TSH
 # run_dynamics, whose own check covers it (tier0_workflow_keys [step4] recomputes the union from the source)
 STEP4_KEYS = frozenset((
     "Boltz_opt", "Boltz_opt_BL", "Hvib_im_prefix", "Hvib_im_suffix", "Hvib_re_prefix", "Hvib_re_suffix", "Hvib_type", "T",
