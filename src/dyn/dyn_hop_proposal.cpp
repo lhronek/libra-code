@@ -339,7 +339,7 @@ MATRIX hopping_probabilities_gfsh(dyn_control_params& prms, CMATRIX& Coeff, CMAT
             g.set(i,j,0.0);
           }
           else{  // here we have opposite signs of a_dot[i] and a_dot[j], but this is not enough yet
-            if(a_dot[i]<0.0 & a_dot[j]>0.0){ ;; } // this is out transition probability, but it is already computed
+            if(a_dot[i]<0.0 && a_dot[j]>0.0){ ;; } // this is out transition probability, but it is already computed
             else{  g.set(i,j,0.0); } // wrong transition
           }
 
