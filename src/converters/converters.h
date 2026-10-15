@@ -90,8 +90,8 @@ boost::python::list Cpp2Py(vector<T>& x){
 
 
 /// from : https://wiki.python.org/moin/boost.python/StlContainers
-void IndexError();
-void KeyError();
+[[noreturn]] void IndexError();
+[[noreturn]] void KeyError();
 
 template<class T>
 struct std_item
