@@ -1338,7 +1338,7 @@ vector<MATRIX> compute_F_cost_matrix_dof_resolved(CMATRIX& F_curr,  CMATRIX& F_p
 
       for(j=0;j<nst; j++){
 
-        double fj_curr = F_curr.get(j,idof).real();
+        //double fj_curr = F_curr.get(j,idof).real();
         double fj_prev = F_prev.get(j,idof).real();
         //double aj = fj_curr * iM.get(idof,0);
         double dq_j = vel * dt + 0.5 * ai * dt * dt;

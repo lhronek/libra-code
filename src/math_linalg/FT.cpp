@@ -320,7 +320,6 @@ void cfft1(CMATRIX& in,CMATRIX& out,double xmin,double kmin,double dx){
     // Some constants and variables
     double dk = 1.0/(dx*N);
     int Nhalf = N/2;
-    int kp;
     complex<double> one(0.0,1.0);
     complex<double> p1, p2,ea;
 
@@ -474,7 +473,7 @@ void cfft1_2D(CMATRIX& in, CMATRIX& out,double xmin,double ymin, double kxmin, d
   
   complex<double> one(0.0,1.0);
   int Nxhalf,Nyhalf;
-  int indx,INDX;
+  int indx;
 
   //cout<<"cfft1_2D: Nx = "<<Nx<<endl;
   //cout<<"cfft1_2D: Ny = "<<Ny<<endl;
@@ -838,7 +837,6 @@ void inv_cfft1(CMATRIX& in,CMATRIX& out,double xmin,double kmin,double dx){
     // Some constants and variables
     double dk = 1.0/(dx*N);
     int Nhalf = N/2;
-    int kp;
     complex<double> one(0.0,1.0);
     complex<double> p1, p2,ea;
 
@@ -911,7 +909,7 @@ void inv_cft1_2D(CMATRIX& in, CMATRIX& out,double xmin,double ymin, double kxmin
   double Ly = dy*Ny;
   double dkx = 1.0/Lx;
   double dky = 1.0/Ly;
-  double Kx,Ky,Rx,Ry;
+  double Rx, Ry;
 
   // Conceptually:  out.M[nx*Ny+ny] +=  in.M[kx*Ny+ky] * exp(2.0*M_PI*one*(Kx*Rx + Ky*Ry));
 

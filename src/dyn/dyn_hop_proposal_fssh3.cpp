@@ -97,11 +97,10 @@ MATRIX find_best_matrix(MATRIX& c_new, MATRIX& c_old, MATRIX& J){
 //  j.show_matrix();
 
 //  cout<<"Errors: "<<err1<<" "<<err2<<" "<<err3<<" "<<err4<<endl;
-  int choice = 1;
   double err = err1; j = j1; 
-  if(err2<err) { j = j2; err = err2; choice = 2; }
-  if(err3<err) { j = j3; err = err3; choice = 3; }
-  if(err4<err) { j = j4; err = err4; choice = 4; }
+  if(err2<err) { j = j2; err = err2; }
+  if(err3<err) { j = j3; err = err3; }
+  if(err4<err) { j = j4; err = err4; }
 //  cout<<"Choice: "<<choice<<endl;
   
 

@@ -1125,7 +1125,6 @@ void dyn_variables::init_active_states(bp::dict _params, Random& rnd){
   int istate = -1;
   vector<double> istates;
   int rep = -1;
-  int verbosity = 0;
 
 
   std::string key;
@@ -1137,7 +1136,7 @@ void dyn_variables::init_active_states(bp::dict _params, Random& rnd){
     else if(key=="istate") {  istate = bp::extract<int>(params.values()[i]); }
     else if(key=="istates") {  istates = liblibra::libconverters::Py2Cpp<double>( bp::extract< bp::list >(params.values()[i]) ); }
     else if(key=="rep") {  rep = bp::extract<int>(params.values()[i]); }
-    else if(key=="verbosity") {  verbosity = bp::extract<int>(params.values()[i]); }
+    else if(key=="verbosity") { ; }   // a documented key, nothing to print here
 
   }
 
@@ -1256,7 +1255,6 @@ void dyn_variables::init_active_states_dia(bp::dict _params, Random& rnd){
   int istate = -1;
   vector<double> istates;
   int rep = -1;
-  int verbosity = 0;
 
 
   std::string key;
@@ -1268,7 +1266,7 @@ void dyn_variables::init_active_states_dia(bp::dict _params, Random& rnd){
     else if(key=="istate") {  istate = bp::extract<int>(params.values()[i]); }
     else if(key=="istates") {  istates = liblibra::libconverters::Py2Cpp<double>( bp::extract< bp::list >(params.values()[i]) ); }
     else if(key=="rep") {  rep = bp::extract<int>(params.values()[i]); }
-    else if(key=="verbosity") {  verbosity = bp::extract<int>(params.values()[i]); }
+    else if(key=="verbosity") { ; }   // a documented key, nothing to print here
 
   }
 
@@ -1560,11 +1558,9 @@ void dyn_variables:: set_active_states_diff_rep(int rep_sh, Random& rnd){
   Tempelaar, R.; Reichman, D. R. Generalization of Fewest-Switches Surface Hopping for Coherences. 
   The Journal of Chemical Physics 2018, 148 (10), 102309. https://doi.org/10.1063/1.5000843
 */
-  int sz, i, j, traj;
-  double ksi; 
-  if(rep_sh==0){ sz = ndia; }
-  else if(rep_sh==1){ sz = nadi; }
-  else{ 
+  int i, j, traj;
+  double ksi;
+  if(rep_sh!=0 && rep_sh!=1){
     cout<<"Wrong representation = "<<rep_sh<<"\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }

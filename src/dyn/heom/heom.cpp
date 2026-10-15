@@ -54,7 +54,6 @@ int compute_nn_tot(int d, int max_tier){
 
 */
 
-  int i;
   double tmp = 1.0;
 
   for(int i=1; i<=d; i++){
@@ -188,8 +187,6 @@ void gen_hierarchy(int d, int max_tier, int verbosity,
     }
 
     for(i=0; i<num_nodes; i++){
-        int L = all_coordinates[i][0];
-        int ipos = all_coordinates[i][1];
 
         for(k=0; k<d; k++){
             vector<int> np = all_vectors[i];
@@ -300,12 +297,11 @@ CMATRIX compute_deriv_n(int n, vector<CMATRIX>& rho, CMATRIX& Ham, vector<CMATRI
   
 */
 
-  int nn_tot = rho.size();
   int nquant = rho[0].n_cols;
 
   int KK = gamma_matsubara.size() - 1; // KK+1 is the number of Matsubara freqs.
 
-  int m,k,d,nplus,nminus;
+  int m, k, nplus, nminus;
   CMATRIX drho_n_dt(nquant, nquant);
   CMATRIX commut(nquant, nquant);
   CMATRIX term1(nquant, nquant);
@@ -319,7 +315,6 @@ CMATRIX compute_deriv_n(int n, vector<CMATRIX>& rho, CMATRIX& Ham, vector<CMATRI
 
   double scaling_factor = 1.0;
   complex<double> iota(0.0, 1.0);
-  double kB = boltzmann/hartree;
  
 
   if(nonzero[n]==1){
@@ -445,7 +440,7 @@ CMATRIX compute_heom_derivatives(CMATRIX& RHO, bp::dict prms){
     int do_scale = 1;
 
 
-    int i, n;
+    int i;
     int nquant = RHO.n_cols;
     int nn_tot = int(RHO.n_rows / nquant);
 
@@ -632,7 +627,7 @@ void setup_bath(int KK, double eta, double gamma, double temperature,
   temperature - the bath temperature [K]
 */
 
-  int k, i;
+  int k;
 
   complex<double> one(1.0, 0.0);
   complex<double> iota(0.0, 1.0);

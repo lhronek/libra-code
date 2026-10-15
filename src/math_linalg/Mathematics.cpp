@@ -106,7 +106,6 @@ void MATRIX_TO_QUATERNION(MATRIX& M,QUATERNION& L){
 ***********************************************************/
 
 //----------- Quaternion initialization ---------
-  double a,b,c,d,e,f;
   //****************************************************
   // from www.gamedev.ru/users/wat/articles/quaternions
   // *****************************************************/
@@ -176,7 +175,6 @@ void MATRIX_TO_QUATERNION(MATRIX3x3& M,QUATERNION& L){
 ***********************************************************/
 
 //----------- Quaternion initialization ---------
-  double a,b,c,d,e,f;
   //****************************************************
   // from www.gamedev.ru/users/wat/articles/quaternions
   // *****************************************************/

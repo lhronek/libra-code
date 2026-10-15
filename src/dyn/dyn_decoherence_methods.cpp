@@ -1919,8 +1919,6 @@ void propagate_half_xf(dyn_variables &dyn_var, nHamiltonian &Ham,
 
   int num_el = prms.num_electronic_substeps;
   double dt = prms.dt / num_el;
-  int method = prms.electronic_integrator;
-
   //======= Parameters of the dyn variables ==========
   int ntraj = dyn_var.ntraj;
   int nadi = dyn_var.nadi;
@@ -1938,11 +1936,6 @@ void propagate_half_xf(dyn_variables &dyn_var, nHamiltonian &Ham,
   for (itraj = 0; itraj < ntraj; itraj++) {
 
     C = Coeff.col(itraj);
-
-    int traj1 = itraj;
-    if (method >= 100 && method < 200) {
-      traj1 = 0;
-    }
 
 
     // Generate the half-time exponential operator

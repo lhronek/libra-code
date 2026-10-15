@@ -221,7 +221,6 @@ complex<double> gwp_overlap(MATRIX& R1, MATRIX& P1, double gamma1,
   The function returns the value of the overlap - a complex number
 */
 
-  int Ndof = check_dimensions("libgwp::gwp_overlap", R1, P1, R2, P2);
 
   double re = -0.5*alp* ((R2-R1).T() * (R2-R1)).M[0] - (0.125/(alp*hbar*hbar)) * ((P2-P1).T() * (P2-P1)).M[0];
   double im = -(0.5/hbar)* ((P1+P2).T()*(R2-R1)).M[0] + (gamma2 - gamma1)/hbar; 

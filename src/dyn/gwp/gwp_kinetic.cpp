@@ -234,7 +234,6 @@ complex<double> gwp_kinetic(MATRIX& R1, MATRIX& P1, double gamma1,
   The function returns the matrix element value - a complex number (scalar)
 */
  
-  int Ndof = check_dimensions("libgwp::gwp_kinetic", R1, P1, R2, P2);
 
   // Overlap part 
   double re = -alp + alp*alp*( (R2-R1).T()*(R2-R1) ).M[0] - 0.25 * ( (P2+P1).T()*(P2+P1) ).M[0]/(hbar*hbar)  ;

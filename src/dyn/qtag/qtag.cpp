@@ -48,7 +48,7 @@ CMATRIX qtag_psi(MATRIX& q, MATRIX& q1, MATRIX& p1, MATRIX& alp1, MATRIX& s1, CM
       wfc - CMATRIX(nstates, 1) - complex value of the wavefunction at q for all states
 
 */
-  int idof, itraj, istate;
+  int itraj, istate;
   int ndof = q1.n_rows;
   int ntraj = q1.n_cols;
   int nstates = Coeff.n_rows;
@@ -387,9 +387,7 @@ complex<double> LHA(CMATRIX* Ham1, CMATRIX* Ham2,
       double a2i = alp1.get(dof2);
       double a2j = alp2.get(dof2);
 
-      double dq2 = q2j - q2i;
       double dp2 = p2j - p2i;
-      double denom2 = a2i + a2j;
  
       double X2_ij = (a2i * q2i + a2j * q2j)/denom;
       double P2_ij = dp2/denom;
@@ -464,7 +462,7 @@ complex<double> LHAe(int i, int j,
   }
   else if(n1!=n2){// Exact integral for Gaussian coupling
 
-    v = (0.0, 0.0);
+    v = complex<double>(0.0, 0.0);
 
     for(int dof=0; dof<ndof; dof++){
 
@@ -556,7 +554,7 @@ complex<double> BATe(int i, int j,
   }
   else if(n1!=n2){// Exact integral for Gaussian coupling
 
-    v = (0.0, 0.0);
+    v = complex<double>(0.0, 0.0);
 
     for(int dof=0; dof<ndof; dof++){
 
@@ -730,7 +728,7 @@ void qtag_hamiltonian_and_overlap(MATRIX& q, MATRIX& p, MATRIX& alp, MATRIX& s, 
   int ndof = q.n_rows;
   int ntraj = q.n_cols;
   int nstates = Coeff.n_rows;
-  int i, j, itraj, n1, n2, indx;
+  int i, itraj, n1, n2, indx;
 
   vector<int> dof_dim(ndof); for(i=0;i<ndof;i++){ dof_dim[i] = i; }
   vector< vector<int> > traj_on_surf(nstates); // indices of trajectories on each state
@@ -844,7 +842,7 @@ CMATRIX qtag_momentum(MATRIX& q, MATRIX& p, MATRIX& alp, MATRIX& s, CMATRIX& Coe
   int ndof = q.n_rows;
   int ntraj = q.n_cols;
   complex<double> dzt;
-  double dq, nrm;
+  double dq;
 
   CMATRIX mom(ndof,ntraj); // real = mom, imag = r
   CMATRIX dz(ndof,1);
