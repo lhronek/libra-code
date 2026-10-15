@@ -1068,13 +1068,17 @@ def _refuse_former_names(params):
 def _check_reordering_options(params, route):
     """The state-reordering options the step-3 writers share, refused outside their domains: do_state_reordering and
     do_diabatic_state_reordering in 0 (none), 1 (Sato), 2 (Munkres-Kuhn by libra_py.hungarian), 22 (the same
-    assignment by scipy's linear_sum_assignment), the two alphas non-negative widths in 1/Hartree, the two
-    continuity thresholds between 0 (off) and 1 - the keys a route carries. One contract for
+    assignment by scipy's linear_sum_assignment) - the diabatic one also in 5 and 52 (the reordering of 2 and 22
+    with the orthogonal alignment of a group's states, _polar_factor) - the two alphas non-negative widths in
+    1/Hartree, the two continuity thresholds between 0 (off) and 1 - the keys a route carries. One contract for
     run_step3_ks_nacs_libint, run_step3_sd_nacs_libint and run_step3_pod."""
     for key in ('do_state_reordering', 'do_diabatic_state_reordering'):
-        if key in params and params[key] not in (0, 1, 2, 22):
+        listed = (0, 1, 2, 22, 5, 52) if key == 'do_diabatic_state_reordering' else (0, 1, 2, 22)
+        if key in params and params[key] not in listed:
             raise ValueError(F"{route}: {key} = {params[key]!r} is not a listed option - 0 (none), 1 (Sato), 2 "
-                             F"(Munkres-Kuhn, libra_py.hungarian) and 22 (the same assignment by scipy) are supported")
+                             F"(Munkres-Kuhn, libra_py.hungarian) and 22 (the same assignment by scipy) are supported"
+                             + (", and 5 / 52 (the reordering of 2 / 22 with the orthogonal alignment of a group's "
+                                "states to the previous frame)" if key == 'do_diabatic_state_reordering' else ""))
     for key in ('state_reordering_alpha', 'diabatic_state_reordering_alpha'):
         if key in params and not (np.isreal(params[key]) and params[key] >= 0.0):
             raise ValueError(F"{route}: {key} = {params[key]!r} - a non-negative width in 1/Hartree is needed")
@@ -3340,6 +3344,30 @@ def _assign_states(O, reordering, alpha=0.0, energies=None, col_energies=None):
     return _munkres_assignment(_assignment_weights(O, energies, col_energies, alpha), reordering)
 
 
+def _assignment_of(reordering):
+    """The assignment step of a diabatic reordering value - 5 and 52 (the alignment) assign as 2 and 22."""
+    return {5: 2, 52: 22}.get(reordering, reordering)
+
+
+def _polar_factor(O):
+    """The orthogonal alignment of a group's states to the previous frame: R, the polar factor of the group's
+    time-overlap block O = <d(k)|d(k+1)> (O = U S V^T, R = V U^T), is the orthogonal transform of the later frame's
+    states that makes O R symmetric positive definite - the nearest the group can come to continuing itself. It
+    holds the signs and the rotation within degenerate states, whose orientation is the eigensolver's otherwise."""
+    U, _, Vt = np.linalg.svd(np.asarray(O, dtype=float))
+    return Vt.T @ U.T
+
+
+def _rotation_angle(R):
+    """The rotation of an orthogonal transform beyond its nearest signed permutation, in degrees (the largest
+    principal angle) - of the polar factor of a raw time-overlap block the turn of the eigensolver's orientation
+    between two frames, of a cumulative alignment the drift of the aligned states from the energy-ordered ones."""
+    P = np.zeros_like(R)
+    for i, c in enumerate(_munkres_assignment(np.abs(R), 2)):
+        P[i, c] = 1.0 if R[i, c] >= 0.0 else -1.0
+    return float(np.degrees(np.abs(np.angle(np.linalg.eigvals(P.T @ R)))).max())
+
+
 def _state_energies(energy_records):
     """The energy of every diabatic state per frame from the records of the diabatization (the orbital energy of a
     localized state - the same sign for all states of a group - the electron minus the hole orbital energy of a
@@ -3399,7 +3427,14 @@ def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=N
     (edges) and the run goes on - or an INTERNAL MIXING when the space carries it but no single state does (the
     states mixed by more than the threshold's angle within one frame, 1/sqrt(2) = 45 degrees), which is refused: the
     frame spacing does not resolve that crossing. A threshold below the floor lets internal mixings through and records
-    those below it.
+    those below it. reordering 5 or 52: the assignment and the signs of 2 or 22 follow the energy-ordered states as
+    before (the swap frames keep their meaning), and the aligned states are those followed states combined by a
+    cumulative orthogonal transform A(i) of every group - A(i+1) the polar factor of the aligned states' overlap with
+    the followed states of frame i+1 (_polar_factor), so that the aligned time-overlap block is symmetric positive
+    definite: the signs and the rotation within degenerate states, whose orientation the eigensolver sets anew at
+    every frame, are taken out, the within-group derivative coupling of a diabatic propagation vanishes, and the
+    continuity is the diagonal of the aligned block. W(i) becomes W(i) A(i) in place at the end and the records of
+    the states are rotated as diagonal quantities (_rotate_records).
 
     Returns:
         perms (list of arrays): perms[i][c] is the column, in the energy order of frame i, that carries the state
@@ -3408,11 +3443,17 @@ def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=N
         unresolved (list of int): the frames let through with an internal continuation below the floor
         min_continuity (float): the smallest |O_cc| of the run
         edges (list of lists): the edge departures as [frame, state, |O_cc|, the weight kept in the space]
+        align (dict): "rotations" - the cumulative orthogonal transform A of every frame (the identity without
+            the alignment), "angles" - the turn of the eigensolver's orientation within a group between the frames
+            of every interval in degrees (the rotation of the raw block's polar factor beyond its signed
+            permutation, empty without the alignment), "drifts" - the rotation of A of every frame from the
+            energy-ordered states, "groups" - the tracking groups
     """
     n = W_list[0].shape[1]
     groups = _tracking_groups(dia_index) if (reordering and dia_index is not None) else [[c] for c in range(n)]
     perms = [np.arange(n)]
     swaps, unresolved, edges = [], [], []
+    rots, angles, drifts = [np.eye(n)], [], [0.0]
     min_continuity = 1.0
     for i in range(len(St_list)):
         O = W_list[i].T @ np.asarray(St_list[i].todense()).real @ W_list[i + 1]
@@ -3423,12 +3464,32 @@ def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=N
             e = None if energies is None else np.asarray(energies[i], dtype=float)
             for g in groups:
                 if len(g) > 1:
-                    perm[g] = np.array(g)[_assign_states(O[np.ix_(g, g)], reordering, alpha,
+                    perm[g] = np.array(g)[_assign_states(O[np.ix_(g, g)], _assignment_of(reordering), alpha,
                                                          None if e is None else e[perms[i]][g],
                                                          None if e is None else e[g])]
             if np.any(perm != np.arange(n)):
                 W_list[i + 1] = W_list[i + 1][:, perm]
                 O = O[:, perm]
+        # the sign of every followed state - an exactly zero overlap keeps the sign (np.sign would drop the state
+        # from every later frame)
+        sgn = np.where(np.diag(O) < 0.0, -1.0, 1.0)
+        W_list[i + 1] = W_list[i + 1] * sgn
+        O = O * sgn[None, :]
+        rot = np.eye(n)
+        if reordering in (5, 52):
+            # the aligned states of frame i against the followed states of frame i + 1, the polar factor of every
+            # group the transform of frame i + 1 - the angles of the raw blocks and of the transform recorded
+            O_al = rots[i].T @ O
+            angle, drift = 0.0, 0.0
+            for g in groups:
+                if len(g) > 1:
+                    R = _polar_factor(O_al[np.ix_(g, g)])
+                    rot[np.ix_(g, g)] = R
+                    angle = max(angle, _rotation_angle(_polar_factor(O[np.ix_(g, g)])))
+                    drift = max(drift, _rotation_angle(R))
+            O = O_al @ rot
+            angles.append(angle)
+            drifts.append(drift)
         d = np.abs(np.diag(O))
         min_continuity = min(min_continuity, float(d.min()))
         inside = np.sqrt(np.sum(O ** 2, axis=1))
@@ -3442,7 +3503,8 @@ def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=N
             partner = int(np.argmax(row))
             if reordering:
                 raise ValueError(F"the diabatic {basis.upper()} state {c} of frame {start_time + i} carries "
-                                 F"|<{c}|{c}>| = {d[c]:.3f} into frame {start_time + i + 1} even after the reordering "
+                                 F"|<{c}|{c}>| = {d[c]:.3f} into frame {start_time + i + 1} even after the reordering"
+                                 F"{' and the alignment' if reordering in (5, 52) else ''} "
                                  F"within its group (the largest other overlap |<{c}|{partner}>| = {row[partner]:.3f}, "
                                  F"the space carries {inside[c]:.3f} of the state, the threshold "
                                  F"{min_overlap:.4g}) - the "
@@ -3459,11 +3521,15 @@ def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=N
                              F"'identity' (across groups, or a group of one state)")
         if len(unresolved_idx):
             unresolved.append(start_time + i + 1)
-        W_list[i + 1] = W_list[i + 1] * np.where(np.diag(O) < 0.0, -1.0, 1.0)
         perms.append(perm)
+        rots.append(rot)
         if np.any(perm != perms[i]):
             swaps.append(start_time + i + 1)
-    return perms, swaps, unresolved, min_continuity, edges
+    if reordering in (5, 52):
+        for k in range(len(W_list)):
+            W_list[k] = W_list[k] @ rots[k]
+    return perms, swaps, unresolved, min_continuity, edges, {"rotations": rots, "angles": angles, "drifts": drifts,
+                                                              "groups": groups}
 
 
 def _permute_records(records, perms):
@@ -3472,18 +3538,55 @@ def _permute_records(records, perms):
     return [np.asarray(r)[p] for r, p in zip(records, perms)]
 
 
-def _tracking_record(reordering, alpha, min_overlap, perms, swaps, unresolved, min_continuity, edges, start_time):
+def _rotate_records(records, align):
+    """The per-frame record rows of states aligned by the orthogonal transforms of align["rotations"] (block-diagonal
+    over align["groups"]): a diagonal quantity q of a group's states becomes diag(R^T diag(q) R) = (R * R)^T q,
+    column by column - the records keep no within-group off-diagonal elements, so a rotated energy is the diagonal
+    of the rotated energy matrix alone."""
+    out = []
+    for r, R in zip(records, align["rotations"]):
+        r = np.array(r, dtype=float)
+        for g in align["groups"]:
+            if len(g) > 1:
+                r[g] = (R[np.ix_(g, g)] ** 2).T @ r[g]
+        out.append(r)
+    return out
+
+
+def _alignment_record(reordering, angles, frames, drifts):
+    """The "alignment" entry of a labels file or a report under the alignment (None under the other reorderings):
+    the turn of the eigensolver's orientation within a group between the frames of every interval (frames[i] ->
+    frames[i + 1]) - its largest and mean value and the later frames of the intervals above 30 degrees - and the
+    largest drift of the aligned states from the energy-ordered ones over the frames."""
+    if reordering not in (5, 52):
+        return None
+    angles = [float(a) for a in angles]
+    return {"max_angle_deg": round(max(angles), 3) if angles else 0.0,
+            "mean_angle_deg": round(float(np.mean(angles)), 3) if angles else 0.0,
+            "frames_above_30_deg": [int(frames[i + 1]) for i, a in enumerate(angles) if a > 30.0],
+            "max_drift_deg": round(max(float(x) for x in drifts), 3) if drifts else 0.0}
+
+
+def _tracking_record(reordering, alpha, min_overlap, perms, swaps, unresolved, min_continuity, edges, start_time,
+                     align=None):
     """The entries of the labels file that say how the states were followed."""
     off = int(sum(np.any(p != np.arange(len(p))) for p in perms))
+    angles = align["angles"] if align is not None else []
+    drifts = align["drifts"] if align is not None else []
     return {"do_diabatic_state_reordering": int(reordering), "diabatic_state_reordering_alpha": float(alpha),
             "diabatic_state_reordering_min_overlap": float(min_overlap),
             "swap_frames": [int(k) for k in swaps], "frames_off_energy_order": off,
             "unresolved_frames": [int(k) for k in unresolved], "min_continuity": float(min_continuity),
             "edge_departures": edges,
+            "alignment": _alignment_record(reordering, angles, list(range(start_time, start_time + len(perms))), drifts),
             "reordering_note": F"the ranks are the energy order at the starting frame {start_time}" + (
                 " and the states keep that identity through the crossings of swap_frames (a followed state may "
                 "lie above its lower-ranked partner from a swap frame on)" if reordering else
-                " and every state continues itself between the frames") + " - an internal mixing below the threshold "
+                " and every state continues itself between the frames") + (
+                " - the states of a group are aligned to the previous frame by the orthogonal transform of their "
+                "largest overlap (the signs and the rotation within degenerate states), alignment holds the turn of "
+                "the eigensolver's orientation between the frames and the drift of the aligned states from the "
+                "energy-ordered ones" if reordering in (5, 52) else "") + " - an internal mixing below the threshold "
                 "is refused, unresolved_frames lists the frames a lower threshold let through with less than it, "
                 "edge_departures the states that left the active space ([frame, state, kept, carried by the space, "
                 "the state that took most of it])"}
@@ -3871,7 +3974,14 @@ def run_step3_pod(params):
                 the block state assigned to it, so a state keeps the block state that carries it through a crossing
                 of the block's levels, at the window edge too - the labels record swap_frames and
                 frames_off_energy_order, the report the followed block states of the frames off the starting order,
-                and the ranks name the energy order at start_time only. A continuation
+                and the ranks name the energy order at start_time only. 5: the reordering of 2 and then the
+                orthogonal alignment of every block's basis states to the previous frame (52: with the assignment of
+                22) - the polar factor of the block's time-overlap block combines the followed block states so that
+                the block is symmetric positive definite: the signs and the rotation within degenerate block states,
+                whose orientation the eigensolver sets anew at every frame, are taken out, the couplings and the
+                time overlaps of the basis are transformed along (the block energies become the diagonal of the
+                rotated block Hamiltonian, the adiabatic files do not change, U_sd does), and the labels and the
+                report carry the rotation angles (alignment). A continuation
                 below diabatic_state_reordering_min_overlap is refused when it is an internal mixing and recorded
                 when the state left the basis of its block (edge_departures - without a reordering only, the
                 reordering follows a state anywhere in its block).
@@ -4011,10 +4121,12 @@ def run_step3_pod(params):
     idx, frag, rank = _pod_route_hole_basis(nmo, occupied, per_block)
     n = len(idx)
     # the block state that carries every diabatic state at every frame (the energy-ordered basis of start_time at
-    # the start), the printed sign of every block state followed along the trajectory - one frame's time overlaps
-    # in memory at a time, the slice over the tracked states kept
+    # the start), the printed sign of every block state followed along the trajectory - A[k] the cumulative
+    # orthogonal transform of the followed basis, the signs alone or, aligned, the rotation within every block -
+    # one frame's time overlaps in memory at a time, the slice over the tracked states kept
     track = [list(idx)]
-    signs = [np.ones(n)]
+    A = [np.eye(n)]
+    angles, drifts = [], [0.0]
     swaps, unresolved, edges = [], [], []
     St_act = []
     min_continuity = 1.0
@@ -4032,29 +4144,50 @@ def run_step3_pod(params):
             # follows the block state assigned to the one that carried it
             for f in range(nblk):
                 cols = list(range(off[f], off[f + 1]))
-                assigned = _assign_states(St[np.ix_(cols, cols)], dia_reordering, dia_alpha, h_diag[i][cols])
+                assigned = _assign_states(St[np.ix_(cols, cols)], _assignment_of(dia_reordering), dia_alpha,
+                                          h_diag[i][cols])
                 for c in range(n):
                     if frag[c] == f:
                         nxt[c] = cols[assigned[cur[c] - off[f]]]
-        d = np.array([abs(St[cur[c], nxt[c]]) for c in range(n)])
+        # the overlap of the aligned basis of frame i with the followed block states of frame i + 1, then the
+        # transform of the next frame's basis: the signs of the diagonal (an exactly zero overlap keeps the sign -
+        # np.sign would drop the state from every later frame), aligned the polar factor within every block
+        O = A[i].T @ St[np.ix_(cur, nxt)]
+        A_next = np.diag(np.where(np.diag(O) < 0.0, -1.0, 1.0))
+        if dia_reordering in (5, 52):
+            angle, drift = 0.0, 0.0
+            for f in range(nblk):
+                cols_f = [c for c in range(n) if frag[c] == f]
+                if len(cols_f) > 1:
+                    R = _polar_factor(O[np.ix_(cols_f, cols_f)])
+                    A_next[np.ix_(cols_f, cols_f)] = R
+                    raw = St[np.ix_([cur[c] for c in cols_f], [nxt[c] for c in cols_f])]
+                    angle = max(angle, _rotation_angle(_polar_factor(raw)))
+                    drift = max(drift, _rotation_angle(R))
+            angles.append(angle)
+            drifts.append(drift)
+        O = O @ A_next
+        rows = A[i].T @ St[cur, :]
+        d = np.abs(np.diag(O))
         min_continuity = min(min_continuity, float(d.min()))
         # the space of a basis state: the basis of its block without a reordering (a partner outside it is an edge
         # departure, recorded), the whole block with one (a low continuation the block carries is an internal mixing)
         space = [list(range(off[frag[c]], off[frag[c] + 1])) if dia_reordering
                  else [cur[b] for b in range(n) if frag[b] == frag[c]] for c in range(n)]
-        inside = np.array([float(np.sqrt(np.sum(St[cur[c], space[c]] ** 2))) for c in range(n)])
+        inside = np.array([float(np.sqrt(np.sum(rows[c, space[c]] ** 2))) for c in range(n)])
         edge_idx, mixed_idx, unresolved_idx = _classify_continuations(d, inside, dia_min_overlap)
         for c in edge_idx:
             edges.append([int(frames[i + 1]), int(c), round(float(d[c]), 4), round(float(inside[c]), 4),
-                          _partner(St[cur[c]], nxt[c])])
+                          _partner(rows[c], nxt[c])])
         for c in mixed_idx[:1]:
-            row = np.abs(St[cur[c]]).copy()
+            row = np.abs(rows[c]).copy()
             row[nxt[c]] = -1.0
             partner = int(np.argmax(row))
             if dia_reordering:
                 raise ValueError(F"the POD block state {cur[c]} (block {frag[c]}, rank {rank[c]} of frame "
                                  F"{start_time}) carries |<s|s'>| = {d[c]:.3f} into frame {frames[i + 1]} even after "
-                                 F"the reordering of its block (the largest other overlap {row[partner]:.3f} into the "
+                                 F"the reordering{' and the alignment' if dia_reordering in (5, 52) else ''} of its "
+                                 F"block (the largest other overlap {row[partner]:.3f} into the "
                                  F"block state {partner}, the threshold "
                                  F"{dia_min_overlap:.4g}) - the states mix by more "
                                  F"than the threshold's angle within one frame: the frame spacing does not resolve the "
@@ -4079,14 +4212,13 @@ def run_step3_pod(params):
         if nxt != cur:
             swaps.append(frames[i + 1])
         track.append(nxt)
-        # the printed sign of every followed block state - an exactly zero overlap keeps the sign (np.sign would drop
-        # the state from every later frame)
-        signs.append(signs[-1] * np.where(np.array([St[cur[c], nxt[c]] for c in range(n)]) < 0.0, -1.0, 1.0))
-        St_act.append(signs[i][:, None] * St[np.ix_(cur, nxt)] * signs[i + 1][None, :])
+        A.append(A_next)
+        St_act.append(A[i].T @ St[np.ix_(cur, nxt)] @ A[i + 1])
     h_act = []
     for k, frame in enumerate(frames):
         h, _ = _pod_route_frame(np.load(F'{res_dir_1}/POD_cp2k_hab_{frame}.npz'))
-        h_act.append(signs[k][:, None] * h[np.ix_(track[k], track[k])] * signs[k][None, :])
+        h_act.append(A[k].T @ h[np.ix_(track[k], track[k])] @ A[k])
+    alignment = _alignment_record(dia_reordering, angles, frames, drifts)
     # the one-hole determinants in the phase convention (-1)^i
     H_hole = [np.trace(h) * np.eye(n) - h for h in h_act]
     St_hole = [np.linalg.det(St) * _cofactor_matrix(St) for St in St_act]
@@ -4169,12 +4301,18 @@ def run_step3_pod(params):
                                         "swap_frames": [int(k) for k in swaps], "frames_off_energy_order": off_order,
                                         "unresolved_frames": [int(k) for k in unresolved],
                                         "min_continuity": float(min_continuity), "edge_departures": edges,
+                                        "alignment": alignment,
                                         "reordering_note": F"the ranks are the energy order of the block states at the "
                                                            F"starting frame {start_time}" + (
                                             " and every state keeps the block state that carries it through the "
                                             "crossings of swap_frames (pod_route_report.json lists the followed block "
                                             "states of the frames off that order)" if dia_reordering else
-                                            " and every state continues itself between the frames") + " - an "
+                                            " and every state continues itself between the frames") + (
+                                            " - the basis states of a block are aligned to the previous frame by the "
+                                            "orthogonal transform of their largest overlap (the signs and the rotation "
+                                            "within degenerate block states), alignment holds the turn of the "
+                                            "eigensolver's orientation between the frames and the drift of the aligned "
+                                            "states from the energy-ordered ones" if dia_reordering in (5, 52) else "") + " - an "
                                             "internal mixing below the threshold is refused, unresolved_frames lists "
                                             "the frames a lower threshold let through with less than the floor, "
                                             "edge_departures the states that left the basis of their block ([frame, "
@@ -4189,7 +4327,7 @@ def run_step3_pod(params):
               "do_diabatic_state_reordering": int(dia_reordering), "diabatic_state_reordering_alpha": float(dia_alpha),
               "diabatic_state_reordering_min_overlap": float(dia_min_overlap),
               "swap_frames": [int(k) for k in swaps], "frames_off_energy_order": off_order,
-              "unresolved_frames": [int(k) for k in unresolved], "edge_departures": edges,
+              "unresolved_frames": [int(k) for k in unresolved], "edge_departures": edges, "alignment": alignment,
               "adiabatic": {"do_state_reordering": int(params['do_state_reordering']),
                             "state_reordering_alpha": float(params['state_reordering_alpha']),
                             "state_reordering_min_overlap": float(sd_min_overlap),
@@ -4291,7 +4429,14 @@ def run_step3_sd_nacs_libint(params):
                 states) the states of frame k+1 are assigned to those of frame k, so a state keeps the identity it
                 had at start_time through a crossing of its fragment's levels - U_sd_labels.json records swap_frames
                 (the frames at which the assignment changed) and frames_off_energy_order, and the ranks name the
-                energy order at start_time only. A state whose
+                energy order at start_time only. 5: the assignment of 2 and then the orthogonal alignment of every
+                fragment's states to the previous frame (52: with the assignment of 22) - the polar factor of the
+                fragment's block of O combines the states of frame k+1 so that the block is symmetric positive
+                definite: the signs and the rotation within degenerate states, whose orientation the eigensolver
+                sets anew at every frame, are taken out, U_sd rotates within the fragment while the SD-level files
+                do not change, the within-fragment derivative coupling of a diabatic propagation vanishes, the
+                records' energies and populations are those of the aligned states as diagonal quantities, and
+                U_sd_labels.json carries the rotation angles (alignment). A state whose
                 continuation carries less than diabatic_state_reordering_min_overlap even after the reordering is
                 refused as well when the space still carries it (an internal mixing the frame spacing does not
                 resolve) and recorded when it left the active space through its edge (edge_departures). Applies to
@@ -4785,14 +4930,15 @@ def run_step3_sd_nacs_libint(params):
     print('Done with computing the SD overlaps. Elapsed time:', time.time() - t2)
     if W_dia is not None:
         # the records follow the states: written once the columns of W stand in the order of start_time
-        perms_dia, swaps_dia, unresolved_dia, cont_dia, edges_dia = _follow_diabatic_states(
+        perms_dia, swaps_dia, unresolved_dia, cont_dia, edges_dia, align_dia = _follow_diabatic_states(
             W_dia, St_sds, start_time, "sd", dia_index, dia_reordering, dia_alpha, _state_energies(dia_energies),
             dia_min_overlap)
-        _write_diabatization_records(res_dir_2, localized_carrier, dia_index, _permute_records(dia_pops, perms_dia),
-                                     _permute_records(dia_hole, perms_dia), _permute_records(dia_energies, perms_dia),
-                                     start_time, str(params['diabatization_scheme']).lower(),
+        followed = lambda records: _rotate_records(_permute_records(records, perms_dia), align_dia)
+        _write_diabatization_records(res_dir_2, localized_carrier, dia_index, followed(dia_pops), followed(dia_hole),
+                                     followed(dia_energies), start_time, str(params['diabatization_scheme']).lower(),
                                      extra=_tracking_record(dia_reordering, dia_alpha, dia_min_overlap, perms_dia,
-                                                            swaps_dia, unresolved_dia, cont_dia, edges_dia, start_time))
+                                                            swaps_dia, unresolved_dia, cont_dia, edges_dia, start_time,
+                                                            align_dia))
         print(F"diabatic SD states: {len(swaps_dia)} swap frames, {len(unresolved_dia)} frames let through with a "
               F"continuation below the floor, {len(edges_dia)} edge departures, continuity min {cont_dia:.4f}")
     if params['do_state_reordering'] in (1, 2, 22):
@@ -4911,17 +5057,16 @@ def run_step3_sd_nacs_libint(params):
 
         if V_dia is not None:
             # the CI records hold eV, the penalty width alpha is per Hartree as for the SD states
-            perms_ci_dia, swaps_ci_dia, unresolved_ci_dia, cont_ci_dia, edges_ci_dia = _follow_diabatic_states(
+            perms_ci_dia, swaps_ci_dia, unresolved_ci_dia, cont_ci_dia, edges_ci_dia, align_ci = _follow_diabatic_states(
                 V_dia, St_cis, start_time, "ci", ci_dia_index, dia_reordering, dia_alpha,
                 [e / units.au2ev for e in _state_energies(ci_dia_energies)], dia_min_overlap)
-            _write_diabatization_records(res_dir_2, localized_carrier, ci_dia_index,
-                                         _permute_records(ci_pops, perms_ci_dia),
-                                         _permute_records(ci_hole, perms_ci_dia),
-                                         _permute_records(ci_dia_energies, perms_ci_dia), start_time,
+            followed_ci = lambda records: _rotate_records(_permute_records(records, perms_ci_dia), align_ci)
+            _write_diabatization_records(res_dir_2, localized_carrier, ci_dia_index, followed_ci(ci_pops),
+                                         followed_ci(ci_hole), followed_ci(ci_dia_energies), start_time,
                                          str(params['diabatization_scheme']).lower(), basis="ci",
                                          extra=_tracking_record(dia_reordering, dia_alpha, dia_min_overlap,
                                                                 perms_ci_dia, swaps_ci_dia, unresolved_ci_dia,
-                                                                cont_ci_dia, edges_ci_dia, start_time))
+                                                                cont_ci_dia, edges_ci_dia, start_time, align_ci))
         route_report["ci"] = _continuity_record(St_cis, start_time, params['do_state_reordering'],
                                                 params['state_reordering_alpha'], sd_min_overlap,
                                                 perms_ci if params['do_state_reordering'] in (1, 2, 22) else None, "CI")
