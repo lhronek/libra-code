@@ -845,13 +845,19 @@ dyn_variables::~dyn_variables(){
 CMATRIX dyn_variables::get_dm_adi(int i, int prev_steps){
   if(prev_steps==0){ return *dm_adi[i]; }
   else if(prev_steps==1){ return *dm_adi_prev[i]; }
-  else{ ;; }
+  else{
+    std::cout<<"Error in dyn_variables::get_dm_adi(): prev_steps = "<<prev_steps<<" has no branch here (implemented: 0, 1)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 }
 
 CMATRIX dyn_variables::get_dm_dia(int i, int prev_steps){
   if(prev_steps==0){ return *dm_dia[i]; }
   else if(prev_steps==1){ return *dm_dia_prev[i]; }
-  else{ ;; }
+  else{
+    std::cout<<"Error in dyn_variables::get_dm_dia(): prev_steps = "<<prev_steps<<" has no branch here (implemented: 0, 1)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 }
 
 vector< vector<double> > dyn_variables::get_fssh3_errors(){
