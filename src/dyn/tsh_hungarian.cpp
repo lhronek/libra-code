@@ -493,7 +493,7 @@ vector<int> Munkres_Kuhn_minimize(MATRIX& _X, int verbosity){
 
             if(verbosity > 0){  
                 cout<<"Done\n";                    
-                for(i=0;i<res.size();i++){
+                for(i=0;i<(int)res.size();i++){
                     cout<<res[i][0]<<"  "<<res[i][1]<<" \n";
                 }
             }
@@ -504,8 +504,8 @@ vector<int> Munkres_Kuhn_minimize(MATRIX& _X, int verbosity){
             cout<<"X = \n"; X.show_matrix();
             cout<<"M = \n"; show_M(M);
             cout<<"Ccov = \n";
-            for(i=0;i<Ccov.size();i++){ cout<<Ccov[i]<<" "; } cout<<"\n";
-            for(i=0;i<Rcov.size();i++){ cout<<Rcov[i]<<" "; } cout<<"\n";
+            for(i=0;i<(int)Ccov.size();i++){ cout<<Ccov[i]<<" "; } cout<<"\n";
+            for(i=0;i<(int)Rcov.size();i++){ cout<<Rcov[i]<<" "; } cout<<"\n";
             cout<<"============================\n";
         }
 

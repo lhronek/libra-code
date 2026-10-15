@@ -801,8 +801,8 @@ vector<int> get_stochastic_reordering3
 
       //======= check if hop is accepted =========
       is_accepted = 1; 
-      for(i = 0; i < chosen_perm.size() && is_accepted; i++){
-          for(j = 0; j < chosen_perm.size() && is_accepted; j++){
+      for(i = 0; i < (int)chosen_perm.size() && is_accepted; i++){
+          for(j = 0; j < (int)chosen_perm.size() && is_accepted; j++){
               if(i!=j){
                   if(chosen_perm[i] == chosen_perm[j]){
                       is_accepted = 0;
@@ -1171,7 +1171,7 @@ CMATRIX raw_to_dynconsyst(CMATRIX& amplitudes, vector<CMATRIX>& projectors){
   vector<int> x_stenc(1, 0);
   vector<int> y_stenc(nst,0); for(int i=0; i<nst; i++){ y_stenc[i] = i; }
 
-  if(projectors.size() != ntraj){  
+  if((int)projectors.size() != ntraj){  
     cout<<"ERROR in raw_to_dynconsyst: the dimensions do not agree\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
@@ -1217,7 +1217,7 @@ CMATRIX dynconsyst_to_raw(CMATRIX& amplitudes, vector<CMATRIX>& projectors){
   vector<int> x_stenc(1, 0);
   vector<int> y_stenc(nst,0); for(int i=0; i<nst; i++){ y_stenc[i] = i; }
 
-  if(projectors.size() != ntraj){  
+  if((int)projectors.size() != ntraj){  
     cout<<"ERROR in raw_to_dynconsyst: the dimensions do not agree\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }

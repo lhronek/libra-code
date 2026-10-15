@@ -826,17 +826,17 @@ void dyn_variables::init_amplitudes(bp::dict _params, Random& rnd){
   }
 
   if(init_type==2 || init_type==3){
-    if(istates.size()!=ndia && rep==0){
+    if((int)istates.size()!=ndia && rep==0){
       cout<<"ERROR in init_amplitudes: the istates array is of length = "<<istates.size()<<", but should be of length "<<ndia<<"\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
-    if(istates.size()!=nadi && rep==1){
+    if((int)istates.size()!=nadi && rep==1){
       cout<<"ERROR in init_amplitudes: the istates array is of length = "<<istates.size()<<", but should be of length "<<nadi<<"\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     double summ = 0.0;
-    for(i=0; i<istates.size(); i++){  summ += istates[i]; }
+    for(i=0; i<(int)istates.size(); i++){  summ += istates[i]; }
     if( fabs(summ - 1.0) > 1e-5 ){
       cout<<"ERROR in init_amplitudes: the sum of the entries in the istates array is "<<summ<<", but should be 1.0\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
@@ -879,7 +879,7 @@ void dyn_variables::init_amplitudes(bp::dict _params, Random& rnd){
 
       }
 
-      for(i=0; i<istates.size(); i++){
+      for(i=0; i<(int)istates.size(); i++){
           double ampl = sqrt( istates[i] );
 
           if(rep==0){ ampl_dia->set(i, traj, complex<double>(ampl, 0.0) );  }
@@ -895,7 +895,7 @@ void dyn_variables::init_amplitudes(bp::dict _params, Random& rnd){
 
       }
 
-      for(i=0; i<istates.size(); i++){
+      for(i=0; i<(int)istates.size(); i++){
           ksi = rnd.uniform(0.0, 1.0);
           complex<double> ampl(cos(2.0*M_PI*ksi), sin(2.0*M_PI*ksi) );
           ampl = ampl * sqrt( istates[i] );
@@ -913,7 +913,7 @@ void dyn_variables::init_amplitudes(bp::dict _params, Random& rnd){
       }
 
       istates = rnd.voron(istates.size(), istate);
-      for(i=0; i<istates.size(); i++){
+      for(i=0; i<(int)istates.size(); i++){
         cout<<"Voron_mag["<<i<<"]= "<<istates[i]<<endl;
         ksi = rnd.uniform(0.0, 1.0);
         complex<double> ampl(cos(2.0*M_PI*ksi), sin(2.0*M_PI*ksi) );
@@ -1165,17 +1165,17 @@ void dyn_variables::init_active_states(bp::dict _params, Random& rnd){
   }
 
   if(init_type==2 || init_type==3){
-    if(istates.size()!=ndia && rep==0){
+    if((int)istates.size()!=ndia && rep==0){
       cout<<"ERROR in init_active_states: the istates array is of length = "<<istates.size()<<", but should be of length "<<ndia<<"\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
-    if(istates.size()!=nadi && rep==1){
+    if((int)istates.size()!=nadi && rep==1){
       cout<<"ERROR in init_active_states: the istates array is of length = "<<istates.size()<<", but should be of length "<<nadi<<"\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     double summ = 0.0;
-    for(i=0; i<istates.size(); i++){  summ += istates[i]; }
+    for(i=0; i<(int)istates.size(); i++){  summ += istates[i]; }
     if( fabs(summ - 1.0) > 1e-5 ){
       cout<<"ERROR in init_active_states: the sum of the entries in the istates array is "<<summ<<", but should be 1.0\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
@@ -1296,17 +1296,17 @@ void dyn_variables::init_active_states_dia(bp::dict _params, Random& rnd){
   }
 
   if(init_type==2 || init_type==3){
-    if(istates.size()!=ndia && rep==0){
+    if((int)istates.size()!=ndia && rep==0){
       cout<<"ERROR in init_active_states_dia: the istates array is of length = "<<istates.size()<<", but should be of length "<<ndia<<"\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
-    if(istates.size()!=ndia && rep==1){
+    if((int)istates.size()!=ndia && rep==1){
       cout<<"ERROR in init_active_states_dia: the istates array is of length = "<<istates.size()<<", but should be of length "<<ndia<<"\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
     double summ = 0.0;
-    for(i=0; i<istates.size(); i++){  summ += istates[i]; }
+    for(i=0; i<(int)istates.size(); i++){  summ += istates[i]; }
     if( fabs(summ - 1.0) > 1e-5 ){
       cout<<"ERROR in init_active_states_dia: the sum of the entries in the istates array is "<<summ<<", but should be 1.0\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");

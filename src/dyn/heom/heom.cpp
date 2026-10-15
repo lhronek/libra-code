@@ -212,7 +212,7 @@ void gen_hierarchy(int d, int max_tier, int verbosity,
     if(verbosity>0){
         cout<<"Number of nodes = "<<num_nodes<<endl;
         cout<<"Tier nums: \n";
-        for(i=0; i<tier_nums.size(); i++){
+        for(i=0; i<(int)tier_nums.size(); i++){
             cout<<"Tier "<<i<<" nums = "<<tier_nums[i]<<endl;
         }
     }
@@ -668,7 +668,7 @@ void unpack_mtx(vector<CMATRIX>& rho_unpacked, CMATRIX& RHO){
     int nquant = RHO.n_cols;
     int num_adm = int(RHO.n_rows / nquant);
 
-    if(rho_unpacked.size() != num_adm ) {   cout<<"ERROR in unpack_rho: \n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
+    if((int)rho_unpacked.size() != num_adm ) {   cout<<"ERROR in unpack_rho: \n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
     
     vector<int> sub_x(nquant, 0);
     vector<int> sub_y(nquant, 0);
@@ -691,7 +691,7 @@ void pack_mtx(vector<CMATRIX>& rho_unpacked, CMATRIX& RHO){
     int nquant = RHO.n_cols;
     int num_adm = int(RHO.n_rows / nquant);
 
-    if(rho_unpacked.size() != num_adm) {   cout<<"ERROR in pack_rho: \n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
+    if((int)rho_unpacked.size() != num_adm) {   cout<<"ERROR in pack_rho: \n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
     
 
     vector<int> sub_x(nquant, 0);
