@@ -211,10 +211,13 @@ class DynControlParams:
     #:  1 method of Kosuke Sato (may fail by getting trapped into an infinite loop)
     #:  2 Munkres-Kuhn (Hungarian)
     #: 21 ChatGPT-generated Munkres-Kuhn (Hungarian) algorithm
+    #: 22 Jonker-Volgenant shortest augmenting path (the algorithm of scipy's linear_sum_assignment), the same assignment as 2 and 21
     #:  3 experimental stochastic algorithm, the original version with elimination (known problems)
     #: 32 experimental stochastic algorithms with all permutations (too expensive)
     #: 33 the improved stochastic algorithm with good scaling and performance, on par with the mincost
     #:  4 new, experimental force-based tracking
+    #:  5 SVD-based LD, the polar factor V U^H of the time overlap
+    #:  6 adaptive SVD-based LD, the singular directions weighted sigma / (sigma + eps), then the polar factor
     state_tracking_algo: int = -1
 
     #: Munkres–Kuhn alpha (selects the range of orbitals included in reordering) [default: 0.0]

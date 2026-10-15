@@ -612,6 +612,10 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 (update_proj_adi -> compute_projector) receives no random generator, so there they would keep the
                 identity permutation, i.e. run as algorithm 0 under another name.
                 - 4: new, experimental force-based tracking
+                - 5: SVD-based LD - the polar factor V U^H of the time overlap from its SVD, the rotation of -1
+                  without the inverse
+                - 6: adaptive SVD-based LD - the singular directions weighted sigma / (sigma + eps), the lost
+                  subspace completed by the identity, then the polar factor
 
 
             * **dyn_params["MK_alpha"]** ( double ): Munkres-Kuhn alpha

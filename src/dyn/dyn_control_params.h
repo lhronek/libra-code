@@ -351,7 +351,9 @@ class dyn_control_params{
       - 32: experimental stochastic algorithms with all permutations (too expensive)
       - 33: the improved stochastic algorithm with good scaling and performance, on par with the mincost
       - 4: new, experimental force-based tracking
-      - 5: SVD-reformulated LD approach of Granucci and Persico
+      - 5: SVD-reformulated LD approach of Granucci and Persico - the polar factor V U^H of the time overlap
+      - 6: adaptive SVD-based LD - the singular directions weighted sigma / (sigma + eps), the lost subspace
+           completed by the identity, then the polar factor
 
 
   */
