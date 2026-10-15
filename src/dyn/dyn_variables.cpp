@@ -682,8 +682,8 @@ dyn_variables::~dyn_variables(){
 
   if(afssh_vars_status==1){
 
-    for(int itraj; itraj<ntraj; itraj++){
-      for(int idof; idof<ndof; idof++){
+    for(int itraj=0; itraj<ntraj; itraj++){
+      for(int idof=0; idof<ndof; idof++){
 
         delete dR[itraj][idof];
         delete dP[itraj][idof];
@@ -742,7 +742,7 @@ dyn_variables::~dyn_variables(){
   }
 
   if(shxf_vars_status==1){
-    for(int itraj; itraj<ntraj; itraj++){
+    for(int itraj=0; itraj<ntraj; itraj++){
 
         delete q_aux[itraj];
         delete p_aux[itraj];
@@ -777,7 +777,7 @@ dyn_variables::~dyn_variables(){
   }
 
   if(mqcxf_vars_status==1){
-    for(int itraj; itraj<ntraj; itraj++){
+    for(int itraj=0; itraj<ntraj; itraj++){
 
         delete q_aux[itraj];
         delete p_aux[itraj];
