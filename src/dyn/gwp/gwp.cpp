@@ -113,6 +113,7 @@ complex<double> gwp_value(MATRIX& r, MATRIX& R, MATRIX& P, MATRIX& alp){
 
   int Ndof = check_dimensions("libgwp::gwp_overlap", r, P, R, P);
   double re, im, nrm;
+  re = 0.0;
   nrm = 1.0;
   MATRIX dR(Ndof, 1);  dR = r - R;
 
@@ -151,6 +152,7 @@ complex<double> gwp_value(MATRIX& r, MATRIX& R, MATRIX& alp){
   int Ndof = R.n_rows;
 
   double re, nrm;
+  re = 0.0;
   nrm = 1.0;
   MATRIX dR(Ndof, 1);  dR = r - R;
 
