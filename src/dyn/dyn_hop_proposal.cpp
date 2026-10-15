@@ -677,7 +677,6 @@ MATRIX hopping_probabilities_mssh(dyn_control_params& prms, CMATRIX& Coeff, CMAT
 */
 
   const double kb = 3.166811429e-6; // Hartree/K
-  int i, j;
   double g_ij, argg;
 
   double T = prms.Temperature;
@@ -690,19 +689,21 @@ MATRIX hopping_probabilities_mssh(dyn_control_params& prms, CMATRIX& Coeff, CMAT
 
   double norm; norm = (Coeff.H() * Coeff).get(0,0).real();  // <- this is the norm <PSI|PSI>
 
-  // Calculate the hopping probabilities
+  // Calculate the hopping probabilities - the Boltzmann factor of an uphill hop i -> j per pair, as the vector form
   for(int j=0;j<nstates;j++){
     double gjj = (std::conj(Coeff.get(j)) * Coeff.get(j)).real()/norm; // c_j^* * c_j
 
-    for(int i=0;i<nstates;i++){ g.set(i,j,gjj);}
-  }
-
-  if(use_boltz_factor){
-    if(Hvib.get(j,j).real() > Hvib.get(i,i).real()){
-      argg = -(Hvib.get(j,j).real() - Hvib.get(i,i).real())/(kb*T);        
-      if(argg<500.0){ g_ij = g_ij * std::exp(argg); }
+    for(int i=0;i<nstates;i++){
+      g_ij = gjj;
+      if(use_boltz_factor){
+        if(Hvib.get(j,j).real() > Hvib.get(i,i).real()){
+          argg = -(Hvib.get(j,j).real() - Hvib.get(i,i).real())/(kb*T);
+          if(argg<500.0){ g_ij = g_ij * std::exp(argg); }
+        }
+      }// if use_boltz_factor
+      g.set(i,j,g_ij);
     }
-  }// if use_boltz_factor
+  }
 
 
   return g;
