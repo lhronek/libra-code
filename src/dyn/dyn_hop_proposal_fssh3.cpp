@@ -265,6 +265,10 @@ vector<double> hopping_probabilities_fssh3_dev(dyn_control_params& prms, CMATRIX
   int nst2;
   if(size_option==0){ nst2 = nstates; }
   else  if(size_option==1){ nst2 = nstates * nstates; }
+  else{
+    std::cout<<"Error in hopping_probabilities_fssh3_dev(): fssh3_size_option = "<<size_option<<" has no branch here (implemented: 0, 1)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
   MATRIX rho_old(nst2, 2);
   MATRIX rho(nst2, 2);
