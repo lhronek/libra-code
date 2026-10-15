@@ -689,7 +689,6 @@ vector<int> permute_states(vector<vector<int> >& perms, vector<int>& act_states)
 */
 
   int ntraj = perms.size();
-  int nstates = perms[0].size();
   vector<int> res(ntraj, 0);
 
   for(int itraj=0; itraj<ntraj; itraj++){
@@ -1341,7 +1340,7 @@ vector<MATRIX> compute_F_cost_matrix_dof_resolved(CMATRIX& F_curr,  CMATRIX& F_p
 
         double fj_curr = F_curr.get(j,idof).real();
         double fj_prev = F_prev.get(j,idof).real();
-        double aj = fj_curr * iM.get(idof,0);
+        //double aj = fj_curr * iM.get(idof,0);
         double dq_j = vel * dt + 0.5 * ai * dt * dt;
         double dE_j = -fj_prev * dq_j;
 
@@ -1390,10 +1389,8 @@ CMATRIX compute_F_cost_matrix2(CMATRIX& F_curr,  CMATRIX& F_prev, MATRIX& e_curr
       fj_curr = F_curr.row(j).real();
       fj_prev = F_prev.row(j).real();
 
-      double ni_curr = (fi_curr.T() * fi_curr).get(0, 0);
       double nj_curr = (fj_curr.T() * fj_curr).get(0, 0);
       double ni_prev = (fi_prev.T() * fi_prev).get(0, 0);
-      double nj_prev = (fj_prev.T() * fj_prev).get(0, 0);
       double nij = (fi_prev.T() * fj_curr).get(0,0);
 
       if(ni_prev >= 1e-12 && nj_curr>= 1e-12 ){ 

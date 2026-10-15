@@ -617,7 +617,6 @@ static CMATRIX magnus2_generator(CMATRIX &A, CMATRIX &B, CMATRIX &invS,
 // into the frame, the Liouvillian of G over dt, X1 rho X1^H out of it - the density-matrix
 // image of the amplitude step b = Y0 c, exp(-i G dt), c = X1 b
 static void dia_dm_lowdin_step(double dt, CMATRIX &RHO, CMATRIX &G, CMATRIX &Y0, CMATRIX &X1) {
-  int sz = G.n_cols;
   CMATRIX rho_b(Y0 * RHO * Y0.H());
   CMATRIX L(make_Liouvillian(G));
   CMATRIX v(vectorize_density_matrix(&rho_b));
@@ -1328,7 +1327,6 @@ void propagate_electronic(dyn_variables &dyn_var, nHamiltonian *Ham,
                           nHamiltonian *Ham_prev, dyn_control_params &prms,
                           int isub) {
 
-  int itraj;
 
   int num_el = prms.num_electronic_substeps;
   double dt = prms.dt / num_el;
@@ -2195,7 +2193,6 @@ void reset_coherence_factors(dyn_variables &dyn_var, vector<int> &act_states, ve
 
     // This means the hop i -> j  has happened
     if (act_states[itraj] != old_states[itraj]) {
-      int i = old_states[itraj];
       int j = act_states[itraj];
 
       for (int k = 0; k < nstates; k++) {

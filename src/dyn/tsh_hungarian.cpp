@@ -433,7 +433,7 @@ vector<int> Munkres_Kuhn_minimize(MATRIX& _X, int verbosity){
 
     MATRIX X(_X);
 
-    int i,j;
+    int i;
     int n = X.n_cols;
 
     vector<vector<int> > M(n, vector<int>(n, 0));

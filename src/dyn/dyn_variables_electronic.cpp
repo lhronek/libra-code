@@ -1006,8 +1006,7 @@ void dyn_variables::init_density_matrix(bp::dict _params){
   check_input(params, default_params, critical_params);
 
 
-  int i, traj;
-  double ksi;
+  int traj;
   int init_dm_type = -1;
   int rep = -1;
   int verbosity = 0;
@@ -1416,7 +1415,6 @@ void dyn_variables::init_auxiliary_variables(bp::dict _params, Random& rnd){
   vector<double> _P_aux_var;
   vector<double> _M_aux_var;
 
-  int idof;
 
   std::string key;
   for(int i=0;i<len(params.values());i++){

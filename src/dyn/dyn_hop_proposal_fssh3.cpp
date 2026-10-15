@@ -140,8 +140,8 @@ vector<double> hopping_probabilities_fssh3(dyn_control_params& prms, CMATRIX& de
   Returns: A nstates-vector of hopping probabilities to all states from the current active state
 */
 
-  int i,j,k, cnt;
-  double sum,g_ij,argg, nrm;
+  int i, j;
+  double nrm;
 
   double dt = prms.dt;
 
@@ -243,13 +243,10 @@ vector<double> hopping_probabilities_fssh3_dev(dyn_control_params& prms, CMATRIX
   Returns: A nstates-vector of hopping probabilities to all states from the current active state
 */
 
-  const double kb = 3.166811429e-6; // Hartree/K
-  int i,j,k, cnt;
-  double sum,g_ij,argg, nrm;
+  int i, j, cnt;
+  double nrm;
 
   double dt = prms.dt;
-  double T = prms.Temperature;
-  int use_boltz_factor = prms.use_boltz_factor;
 
   int nstates = denmat.n_rows;
   vector<double> g(nstates, 0.0);

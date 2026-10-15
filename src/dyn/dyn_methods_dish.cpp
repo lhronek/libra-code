@@ -104,16 +104,16 @@ static vector<int> dish_core(dyn_variables& dyn_var, nHamiltonian& ham, CMATRIX&
 */
 
 
-    MATRIX& q = *dyn_var.q;
-    MATRIX& p = *dyn_var.p;
-    MATRIX& invM = *dyn_var.iM;
+    //MATRIX& q = *dyn_var.q;
+    //MATRIX& p = *dyn_var.p;
+    //MATRIX& invM = *dyn_var.iM;
 
     /// Advance coherence times
     coherence_time.add(-1, -1, prms.dt);
 
     int collapse_option = prms.collapse_option;   // the phase choice of the collapse, as every decoherence scheme takes it
 
-    int i,j, traj;
+    int traj;
     int nst = Coeff.n_rows; 
     int ntraj = Coeff.n_cols;
 
@@ -323,7 +323,7 @@ static void dish_rev2023_core(CMATRIX& Coeff, MATRIX& coherence_time, vector<MAT
 
   int collapse_option = prms.collapse_option;   // the phase choice of the collapse, as every decoherence scheme takes it
 
-  int i,j, traj;
+  int traj;
   int nst = Coeff.n_rows;
   int ntraj = Coeff.n_cols;
 
@@ -399,7 +399,7 @@ void dish_rev2023_dia(dyn_variables& dyn_var, nHamiltonian& ham, vector<MATRIX>&
 vector<int> dish_hop_proposal(vector<int>& act_states, CMATRIX& Coeff, 
   MATRIX& coherence_time, vector<MATRIX>& decoherence_rates, Random& rnd){
 
-    int i,traj;
+    int traj;
     int nst = Coeff.n_rows; 
     int ntraj = Coeff.n_cols;
 

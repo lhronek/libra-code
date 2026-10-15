@@ -308,12 +308,10 @@ double Boltz_cl_prob(double E, double T){
 
     */
  
-    int n;
  
     double kB = boltzmann/hartree; 
     double b = 1.0/(kB * T);
 
-    double Z = 0.0;  // partition function
 
     double x = sqrt(E * b);
     double res = 1.0;
@@ -562,7 +560,7 @@ vector<int> accept_hops(dyn_variables& dyn_var, nHamiltonian& ham, vector<int>& 
   int ntraj = q.n_cols;
   int ntraj_active = which_trajectories.size();
   int nst = C.n_rows;    
-  int itraj, traj, dof, i, idof;
+  int itraj, traj, dof, idof;
   int isNBRA = prms.isNBRA;
 
   vector<int> fstates(ntraj, -1); 
