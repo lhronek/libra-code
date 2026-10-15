@@ -115,7 +115,7 @@ void dyn_variables::init_nuclear_dyn_var(bp::dict _params, Random& rnd){
   check_input(params, default_params, critical_params);
 
 
-  int init_type;
+  int init_type = 0;
   vector<double> _Q;
   vector<double> _P;
   vector<double> _M;

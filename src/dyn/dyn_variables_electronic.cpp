@@ -1410,7 +1410,7 @@ void dyn_variables::init_auxiliary_variables(bp::dict _params, Random& rnd){
   check_input(params, default_params, critical_params);
 
 
-  int init_type;
+  int init_type = 0;
   vector<double> _Y_aux_var;
   vector<double> _P_aux_var;
   vector<double> _M_aux_var;
