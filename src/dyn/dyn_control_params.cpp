@@ -316,6 +316,15 @@ dyn_control_params::~dyn_control_params() {
 }
 
 
+int dyn_control_params::rotation_projector() const {
+  /** The projectors that rotate the amplitudes by the St-derived transform: -1 (LD through the inverse), 5 (the
+      polar factor from the SVD), 6 (its regularized form) and their label twins -12, 52, 62, which take the same
+      transform and the Jonker-Volgenant assignment of |T|^2 for the active state's label */
+  return (state_tracking_algo==-1 || state_tracking_algo==-12 || state_tracking_algo==5 || state_tracking_algo==52 ||
+          state_tracking_algo==6 || state_tracking_algo==62);
+}
+
+
 void dyn_control_params::sanity_check(){
 
   /// the MMST representation is a stub: no propagation branch exists for it,
@@ -348,7 +357,7 @@ void dyn_control_params::sanity_check(){
         <<state_tracking_algo<<" (stochastic reordering) is not wired into the"
         <<" projector update - compute_projector receives no random generator and"
         <<" would keep the identity permutation - use 1, 2, 21, 22 or 4 (deterministic"
-        <<" reorderings), or -1, 5, 6 (rotation projectors)\n";
+        <<" reorderings), or -1, 5, 6 (rotation projectors, -12, 52, 62 their label twins)\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
@@ -377,7 +386,7 @@ void dyn_control_params::sanity_check(){
     {"do_ssy", do_ssy, {0, 1}},
     {"do_phase_correction", do_phase_correction, {0, 1}},
     {"do_nac_phase_correction", do_nac_phase_correction, {0, 1}},
-    {"state_tracking_algo", state_tracking_algo, {-1, 0, 1, 2, 4, 5, 6, 21, 22}},
+    {"state_tracking_algo", state_tracking_algo, {-12, -1, 0, 1, 2, 4, 5, 6, 21, 22, 52, 62}},
     {"MK_verbosity", MK_verbosity, {0, 1}},
     {"MK_scaling_function", MK_scaling_function, {-1, 0, 1, 2}},
     {"convergence", convergence, {0, 1}},
@@ -581,15 +590,16 @@ void dyn_control_params::sanity_check(){
   /// relabel projector (0, 1, 2, 4, 21, 22) is a signed permutation, which
   /// makes the frame one too and the diabatic Hamiltonian exactly diagonal:
   /// a propagation IN the frame (rep_tdse 0 or 2) then carries no coupling,
-  /// so it needs a rotation projector built from St (-1, 5, 6). The adiabatic
+  /// so it needs a rotation projector built from St (-1, 5, 6 or the label
+  /// twins -12, 52, 62). The adiabatic
   /// propagation (rep_tdse 1) with the frame as the analysis basis keeps the
   /// relabel projectors - its frame Hamiltonian is the gauge-smoothed diagonal
   if(ham_transform_method==4 && (rep_tdse==0 || rep_tdse==2) &&
-     !(state_tracking_algo==-1 || state_tracking_algo==5 || state_tracking_algo==6)){
+     !rotation_projector()){
     std::cout<<"Error in dyn_control_params::sanity_check: ham_transform_method = 4 with"
         <<" rep_tdse = "<<rep_tdse<<" propagates in the local-diabatization frame, which"
         <<" accumulates the per-step projector - it requires a rotation projector"
-        <<" (state_tracking_algo -1, 5 or 6, got "<<state_tracking_algo<<"): a relabel"
+        <<" (state_tracking_algo -1, 5, 6 or the label twins -12, 52, 62, got "<<state_tracking_algo<<"): a relabel"
         <<" projector is a signed permutation, which leaves the frame Hamiltonian"
         <<" exactly diagonal and the propagation coupling-free\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
@@ -636,14 +646,14 @@ void dyn_control_params::sanity_check(){
   ///============== Integrator vs projector family pairing ==============
   /// rep_tdse == 1: the bare-energy local-diabatization integrators carry
   /// the whole electronic coupling through the rotation projector
-  /// (state_tracking_algo -1/5/6 build T from St), while the NAC-carrying
+  /// (state_tracking_algo -1/5/6 and the label twins -12/52/62 build T from St),
+  /// while the NAC-carrying
   /// Hvib integrators need a relabel-only projector - crossing the
   /// families silently double-counts the basis rotation or freezes the
   /// electronic subsystem
   if(rep_tdse==1){
     int m = electronic_integrator % 100; // the 10x variants share the classification
-    int rot_proj = (state_tracking_algo==-1 || state_tracking_algo==5 ||
-                    state_tracking_algo==6);
+    int rot_proj = rotation_projector();
     int ld_int = (m==0 || m==1 || m==2 || m==9 || m==10 || m==11 || m==12 || m==19);
     int hvib_int = (m==3 || m==4 || m==5 || m==7 || m==8 || m==13 ||
                     m==14 || m==15);
@@ -652,7 +662,7 @@ void dyn_control_params::sanity_check(){
           <<" local-diabatization integrator (electronic_integrator = "
           <<electronic_integrator<<") carries the whole electronic coupling"
           <<" through the St-derived rotation projector - it requires"
-          <<" state_tracking_algo -1, 5 or 6 and assume_always_consistent = 0"
+          <<" state_tracking_algo -1, 5, 6 (or -12, 52, 62) and assume_always_consistent = 0"
           <<" (got state_tracking_algo = "<<state_tracking_algo
           <<", assume_always_consistent = "<<assume_always_consistent
           <<"); a relabel-only or identity projector freezes the electronic"
@@ -721,14 +731,13 @@ void dyn_control_params::sanity_check(){
   /// creating coherences - all three freeze under a relabel projector
   if(rep_tdse==3){
     int m = electronic_integrator % 100;
-    int rot_proj = (state_tracking_algo==-1 || state_tracking_algo==5 ||
-                    state_tracking_algo==6);
+    int rot_proj = rotation_projector();
     if((m==0 || m==1 || m==9 || m==10 || m==11 || m==19 || m==20) && (!rot_proj || assume_always_consistent==1)){
       std::cout<<"Error in dyn_control_params::sanity_check: the adiabatic"
           <<" density-matrix integrator (electronic_integrator = "
           <<electronic_integrator<<") carries the electronic coupling"
           <<" through the St-derived rotation projector - it requires"
-          <<" state_tracking_algo -1, 5 or 6 and assume_always_consistent = 0"
+          <<" state_tracking_algo -1, 5, 6 (or -12, 52, 62) and assume_always_consistent = 0"
           <<" (got state_tracking_algo = "<<state_tracking_algo
           <<", assume_always_consistent = "<<assume_always_consistent<<")\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");

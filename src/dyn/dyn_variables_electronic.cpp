@@ -1476,6 +1476,10 @@ void dyn_variables:: update_active_states(int direction, int property){
 
    act_states[itraj] - index of the active adiabatic state for the trajectory `itraj`
                        in terms of the energy-ordered (instantaneous) eign-states
+
+   Under the label twins of the rotation projectors (state_tracking_algo -12, 52, 62) the active state moves by
+   the assignment's permutation of the step (proj_perm) instead of the largest weight of its moved unit vector,
+   which can send two states to one label at a near 50/50 mixing - the amplitudes move by T in both cases.
 */
 
   int i;
@@ -1488,6 +1492,16 @@ void dyn_variables:: update_active_states(int direction, int property){
 
     //================ Active states ===================
     if(property==0 || property==2){
+      if(label_assignment){
+        // the assignment's permutation moves the label - forward old -> new, backward its inverse
+        int act = act_states[itraj];
+        if(direction==1){ act = proj_perm[itraj][act]; }
+        else if(direction==-1){
+          for(int j=0; j<nst; j++){ if(proj_perm[itraj][j]==act_states[itraj]){ act = j; break; } }
+        }
+        act_states[itraj] = act;
+      }
+      else{
       coeff = 0.0;
       coeff.set(act_states[itraj], 0, complex<double>(1.0, 0.0));
 
@@ -1505,6 +1519,7 @@ void dyn_variables:: update_active_states(int direction, int property){
         if( fabs(rho_tmp.get(j,j)) > max_val){  max_val_indx = j; max_val = fabs(rho_tmp.get(j,j)); } 
       }
       act_states[itraj] = max_val_indx;
+      }
     }
 
     //============ Amplitudes of states ===================

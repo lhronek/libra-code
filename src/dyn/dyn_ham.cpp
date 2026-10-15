@@ -615,9 +615,7 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
         // undone in St (else the pair's coupling is zero for this step),
         // and only the relabel routes need it folded back into the
         // re-signed amplitude gauge afterwards
-        int rotation_proj = (prms.state_tracking_algo == -1 ||
-                             prms.state_tracking_algo == 5 ||
-                             prms.state_tracking_algo == 6);
+        int rotation_proj = prms.rotation_projector();
         int relabel_gauge = (prms.assume_always_consistent == 0 && !rotation_proj);
         // the relabel routes swap the labels of a pair that crosses within the step
         // (an unresolved crossing) and move the amplitudes along. The raw St of a
@@ -655,12 +653,11 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
             }
           }
           st = st * perm;
-        } else if (!relabel_gauge || prms.state_tracking_algo == -1 || prms.state_tracking_algo == 0 ||
-                   prms.state_tracking_algo == 5 || prms.state_tracking_algo == 6) {
-          ; // the raw gauge, the rotation projectors (-1, 5, 6) and no reordering (0) take the new states as
+        } else if (!relabel_gauge || rotation_proj || prms.state_tracking_algo == 0) {
+          ; // the raw gauge, the rotation projectors (-1, 5, 6 and their label twins) and no reordering (0) take the new states as
             // stored
         } else {
-          std::cout<<"Error in update_Hamiltonian_variables(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: -1, 0, 1, 2, 4, 5, 6, 21, 22)\n";
+          std::cout<<"Error in update_Hamiltonian_variables(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: -12, -1, 0, 1, 2, 4, 5, 6, 21, 22, 52, 62)\n";
           std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
         vector<double> flip(nadi, 1.0);
@@ -877,8 +874,7 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
   // opt-out stays legitimate for flip-free sources (driver-side sign
   // alignment, a model-supplied smooth transformation, the rotation
   // projectors, which fold the flip into T)
-  if (prms.do_phase_correction == 0 && prms.state_tracking_algo != -1 &&
-      prms.state_tracking_algo != 5 && prms.state_tracking_algo != 6) {
+  if (prms.do_phase_correction == 0 && !prms.rotation_projector()) {
     static int warned_flip_nopc = 0;
     if (!warned_flip_nopc) {
       for (int itraj = 0; itraj < ntraj && !warned_flip_nopc; itraj++) {
@@ -905,6 +901,9 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
   // iteration writes only proj_adi[itraj]) - identical for any thread count
   // exceptions cannot leave an OMP-outlined region (even a serialized
   // one) - capture and rethrow outside so the guards stay translatable
+  // the label twins of the rotation projectors take the assignment's permutation for the active state's label
+  dyn_var.label_assignment = (prms.state_tracking_algo == -12 || prms.state_tracking_algo == 52 ||
+                              prms.state_tracking_algo == 62) ? 1 : 0;
   std::exception_ptr omp_eptr = nullptr;
   #pragma omp parallel for num_threads(prms.omp_num_threads) \
       if (prms.omp_num_threads > 1)
@@ -931,7 +930,7 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
 
     P = ham->get_time_overlap_adi(); // U_old.H() * U
 
-    if (prms.state_tracking_algo == -1) { // This is LD
+    if (prms.state_tracking_algo == -1 || prms.state_tracking_algo == -12) { // This is LD
       // More consistent with the new derivations:
       FullPivLU_inverse(P, T_new);
 
@@ -968,7 +967,7 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
           prms, Eadi, T_new); // CMATRIX compute_projector(dyn_control_params&
                               // prms, CMATRIX& Eadi, CMATRIX& St){
       //  T_new = orthogonalized_T( T_new );
-    } else if (prms.state_tracking_algo == 5) { // This is SVD-based LD
+    } else if (prms.state_tracking_algo == 5 || prms.state_tracking_algo == 52) { // This is SVD-based LD
       CMATRIX svd_u(dyn_var.nadi, dyn_var.nadi);
       CMATRIX svd_s(dyn_var.nadi, dyn_var.nadi);
       CMATRIX svd_v(dyn_var.nadi, dyn_var.nadi);
@@ -981,7 +980,7 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
       T_new = svd_v * svd_u.H();
     }// 5 - SVD-based LD
 
-    else if (prms.state_tracking_algo == 6) { // adaptive SVD-based LD
+    else if (prms.state_tracking_algo == 6 || prms.state_tracking_algo == 62) { // adaptive SVD-based LD
       CMATRIX svd_u(dyn_var.nadi, dyn_var.nadi);
       CMATRIX svd_s(dyn_var.nadi, dyn_var.nadi);
       CMATRIX svd_v(dyn_var.nadi, dyn_var.nadi);
@@ -1017,10 +1016,20 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
 
     }// 6 adaptive SVD-based LD
     else {
-      std::cout<<"Error in update_proj_adi(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: -1, 0, 1, 2, 4, 5, 6, 21, 22 - the stochastic 3, 32, 33 are refused by sanity_check)\n";
+      std::cout<<"Error in update_proj_adi(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: -12, -1, 0, 1, 2, 4, 5, 6, 21, 22, 52, 62 - the stochastic 3, 32, 33 are refused by sanity_check)\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
 
+    // the label twins -12 / 52 / 62: the same transform, the labels by the Jonker-Volgenant assignment of |T|^2 -
+    // T carries old state i into new state j with the weight |T(j, i)|^2, so the assignment reads T^H as the
+    // time overlap <old i|new j> with the step's energies for the MK penalty, as the relabel projectors do. The
+    // active state then follows the permutation (update_active_states) instead of the largest weight of its own
+    // moved vector, which can send two states to one label at a near 50/50 mixing
+    if (dyn_var.label_assignment) {
+      CMATRIX Eadi(ham->get_ham_adi());
+      CMATRIX TH(T_new.H());
+      dyn_var.proj_perm[itraj] = jonker_volgenant(TH, Eadi, prms.MK_alpha, prms.MK_scaling_function);
+    }
     *dyn_var.proj_adi[itraj] = T_new;
     } catch (...) {
       #pragma omp critical

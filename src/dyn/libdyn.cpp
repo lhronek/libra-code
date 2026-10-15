@@ -326,6 +326,8 @@ void export_dyn_variables_objects(){
       .def("get_energy_gap_fluctuations", &dyn_variables::get_energy_gap_fluctuations)
       .def("get_energy_gap_correlations", &dyn_variables::get_energy_gap_correlations)
       .def("get_proj_adi", &dyn_variables::get_proj_adi)
+      .def("get_proj_perm", &dyn_variables::get_proj_perm)
+      .def("get_label_assignment", &dyn_variables::get_label_assignment)
       .def("get_ld_frame", &dyn_variables::get_ld_frame)
       .def("get_ovlp_dia_is_identity", &dyn_variables::get_ovlp_dia_is_identity)
       .def("reset_ld_frame", &dyn_variables::reset_ld_frame)

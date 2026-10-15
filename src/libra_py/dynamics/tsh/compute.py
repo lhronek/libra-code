@@ -204,7 +204,7 @@ def _print_simulation_params(dyn_params, nadi, ntraj, init_params=None, model_pa
     if int(p.get("do_phase_correction", 0)) and "phase_correction_tol" in p:
         lines.append(row("phase_correction_tol:", p["phase_correction_tol"]))
     tracking = int(p["state_tracking_algo"])
-    if tracking in (2, 21, 22, 4):
+    if tracking in (2, 21, 22, 4, -12, 52, 62):   # the label twins read MK_alpha and MK_scaling_function too
         for key in ("MK_alpha", "MK_verbosity", "MK_scaling_function"):
             if key in p:
                 lines.append(row(F"{key}:", p[key]))
@@ -425,7 +425,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                   the saved basis_transform is V^H (the frame, not a model
                   transform), and the frame is not persisted across restarts.
                   A propagation in the frame (rep_tdse 0 or 2) needs a rotation
-                  projector (state_tracking_algo -1, 5 or 6): a relabel projector
+                  projector (state_tracking_algo -1, 5, 6 or -12, 52, 62): a relabel projector
                   makes the frame a signed permutation and the frame Hamiltonian
                   a gauge-smoothed diagonal, admitted as the analysis readout of
                   the adiabatic propagation (rep_tdse 1) alone ]
@@ -616,6 +616,11 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                   without the inverse
                 - 6: adaptive SVD-based LD - the singular directions weighted sigma / (sigma + eps), the lost
                   subspace completed by the identity, then the polar factor
+                - -12, 52, 62: the rotations of -1, 5, 6 with the labels by the Jonker-Volgenant assignment of
+                  |T|^2 (the port behind 22): the amplitudes those of -1, 5, 6, the active state's label the
+                  assignment's permutation instead of the largest weight of its moved unit vector, which can
+                  send two states to one label at a near 50/50 mixing - the engine twin of step 3's
+                  do_diabatic_state_reordering 5 / 52
 
 
             * **dyn_params["MK_alpha"]** ( double ): Munkres-Kuhn alpha
@@ -1134,9 +1139,9 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                                    old and B the new Hamiltonian in the old frame - for H linear in the step 2 has the
                                    error constant -1/12 and 0 has +1/24, this one neither
               The projector family must match the integrator family (enforced by sanity_check):
-              0-2, 9 and 10-12, 19 need a rotation projector (state_tracking_algo -1/5/6), 3-8 and 13-15 a
-              relabel projector (state_tracking_algo 0/1/2/21/22). The +100 variants (100-115) share the
-              classification and pin the child Hamiltonian.
+              0-2, 9 and 10-12, 19 need a rotation projector (state_tracking_algo -1/5/6 or their label twins
+              -12/52/62), 3-8 and 13-15 a relabel projector (state_tracking_algo 0/1/2/21/22). The +100 variants
+              (100-115) share the classification and pin the child Hamiltonian.
 
                 10              -  same as 0, but with rotations
                 11              -  same as 1, but with rotations

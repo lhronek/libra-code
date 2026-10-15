@@ -218,6 +218,7 @@ class DynControlParams:
     #:  4 new, experimental force-based tracking
     #:  5 SVD-based LD, the polar factor V U^H of the time overlap
     #:  6 adaptive SVD-based LD, the singular directions weighted sigma / (sigma + eps), then the polar factor
+    #: -12, 52, 62 the rotations of -1, 5, 6 with the labels by the Jonker-Volgenant assignment of |T|^2
     state_tracking_algo: int = -1
 
     #: Munkres–Kuhn alpha (selects the range of orbitals included in reordering) [default: 0.0]

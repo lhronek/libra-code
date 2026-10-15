@@ -35,6 +35,8 @@ void dyn_variables::allocate_electronic_vars(){
     p_mm = new MATRIX(nadi, ntraj);
     ave_decoherence_rates = new MATRIX(nadi, nadi);
     proj_adi = vector<CMATRIX*>(ntraj);
+    proj_perm = vector< vector<int> >(ntraj, vector<int>(nadi, 0));
+    label_assignment = 0;
     ld_frame = vector<CMATRIX*>(ntraj);
     ld_frame_stale = 1;   // the init-call rotation must run
     dm_dia = vector<CMATRIX*>(ntraj);
@@ -46,6 +48,7 @@ void dyn_variables::allocate_electronic_vars(){
     for(int itraj=0; itraj<ntraj; itraj++){
       proj_adi[itraj] = new CMATRIX(nadi, nadi);
       proj_adi[itraj]->load_identity();
+      for(int i=0; i<nadi; i++){ proj_perm[itraj][i] = i; }
       ld_frame[itraj] = new CMATRIX(nadi, nadi);
       ld_frame[itraj]->load_identity();
       dm_dia[itraj] = new CMATRIX(ndia, ndia);
@@ -433,6 +436,8 @@ dyn_variables::dyn_variables(const dyn_variables& x){
     *p_mm = *x.p_mm;
     *ave_decoherence_rates = *x.ave_decoherence_rates;
     ld_frame_stale = x.ld_frame_stale;
+    proj_perm = x.proj_perm;
+    label_assignment = x.label_assignment;
     for(itraj=0; itraj<ntraj; itraj++){
       *proj_adi[itraj] = *x.proj_adi[itraj];
       *ld_frame[itraj] = *x.ld_frame[itraj];
@@ -656,6 +661,7 @@ dyn_variables::~dyn_variables(){
       delete ovlp_dia[itraj];
     }
     proj_adi.clear();
+    proj_perm.clear();
     ld_frame.clear();
     dm_dia.clear();
     dm_adi.clear();

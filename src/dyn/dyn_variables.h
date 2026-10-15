@@ -162,6 +162,24 @@ class dyn_variables{
   vector<CMATRIX*> proj_adi;
 
   /**
+    The label permutation of the step under the label twins of the rotation projectors (state_tracking_algo
+    -12, 52, 62): proj_perm[traj][i] is the new label of old state i by the Jonker-Volgenant assignment of
+    |T|^2, T the step's transform in proj_adi - update_active_states moves the active state by it while
+    label_assignment is 1, by the largest weight of its moved unit vector otherwise. Like proj_adi it is NOT
+    persisted across restarts.
+
+    Options:
+    vector<ntraj, vector<nadi, int>>
+  */
+  vector< vector<int> > proj_perm;
+
+  /**
+    1 while update_active_states moves the active state by proj_perm (the label twins -12, 52, 62), 0 for the
+    largest-weight rule - set by update_proj_adi every step from state_tracking_algo
+  */
+  int label_assignment;
+
+  /**
     The cumulative local-diabatization frame V(t_n) = T_n V(t_n-1),
     V(0) = I (ham_transform_method == 4): ham_dia = V^H ham_adi V is
     the t0-anchored transported basis. Identity until transform 4 runs -
@@ -750,6 +768,8 @@ class dyn_variables{
   MATRIX get_q_mm(){ return *q_mm; }
   MATRIX get_p_mm(){ return *p_mm; }
   CMATRIX get_proj_adi(int i){ return *proj_adi[i]; } 
+  vector<int> get_proj_perm(int i){ return proj_perm[i]; }   ///< the label permutation of trajectory i under the label twins
+  int get_label_assignment(){ return label_assignment; }   ///< 1 while update_active_states moves the label by proj_perm
   CMATRIX get_ld_frame(int i){ return *ld_frame[i]; }
   void reset_ld_frame();  ///< re-anchor the transform-4 frame: V = I on every trajectory, rotation marked stale
   CMATRIX get_dm_adi(int i){  return *dm_adi[i]; }

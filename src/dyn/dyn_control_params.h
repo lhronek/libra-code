@@ -354,6 +354,9 @@ class dyn_control_params{
       - 5: SVD-reformulated LD approach of Granucci and Persico - the polar factor V U^H of the time overlap
       - 6: adaptive SVD-based LD - the singular directions weighted sigma / (sigma + eps), the lost subspace
            completed by the identity, then the polar factor
+      - -12, 52, 62: the rotations of -1, 5, 6 with the labels by the Jonker-Volgenant assignment of |T|^2 - the
+           amplitudes those of -1, 5, 6, the active state's label the assignment's permutation instead of the
+           largest weight of its moved unit vector, which can send two states to one label at a near 50/50 mixing
 
 
   */
@@ -1131,8 +1134,9 @@ class dyn_control_params{
                            B the new Hamiltonian in the old frame - for H linear in the step 2 has the error constant
                            -1/12 and 0 has +1/24, this one neither
       The projector family must match the integrator family (enforced by sanity_check):
-      0-2, 9 and 10-12, 19 need a rotation projector (state_tracking_algo -1/5/6), 3-8 and 13-15 a
-      relabel projector (state_tracking_algo 0/1/2/21/22) - the +100 variants share the classification.
+      0-2, 9 and 10-12, 19 need a rotation projector (state_tracking_algo -1/5/6 or their label twins -12/52/62),
+      3-8 and 13-15 a relabel projector (state_tracking_algo 0/1/2/21/22) - the +100 variants share the
+      classification.
 
         10              -  same as 0, but with rotations
         11              -  same as 1, but with rotations
@@ -1260,6 +1264,7 @@ class dyn_control_params{
   ~dyn_control_params();
 
   void sanity_check();
+  int rotation_projector() const;   ///< 1 for the St-rotation projectors -1, 5, 6 and their label twins -12, 52, 62
   void set_parameters(bp::dict params);
 
   /// the MATRIX parameters (NULL = unset) take a copy of x, the matrix held before is freed
