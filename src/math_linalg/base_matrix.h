@@ -881,7 +881,7 @@ public:
   ///< Print the matrix out in a formatted way
   void show_matrix() { std::cout << *this << endl; }
 
-  void show_matrix(char *Output_File) {
+  void show_matrix(const char *Output_File) {
     /** This function prints the matrix elements into a file
     in a text format
     */

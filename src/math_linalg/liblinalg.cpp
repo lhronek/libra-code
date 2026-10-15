@@ -74,7 +74,7 @@ void export_base_matrix(){
 
 
   void (base_matrix<T1>::*expt_show_matrix_v1)() = &base_matrix<T1>::show_matrix;
-  void (base_matrix<T1>::*expt_show_matrix_v2)(char * Output_File) = &base_matrix<T1>::show_matrix;
+  void (base_matrix<T1>::*expt_show_matrix_v2)(const char * Output_File) = &base_matrix<T1>::show_matrix;
 
 
   // Also expose some functions
