@@ -511,7 +511,6 @@ def reindex_cp2k_sd_states(
             if i < alp_homo_matrix_index + 2:
                 sd_basis[0].append(i)
                 sd_basis[0].append(-i)
-    print("ground state = ", sd_basis)
 
     # Now that we have done the ground state slater
     for j in range(len(excitations)):
