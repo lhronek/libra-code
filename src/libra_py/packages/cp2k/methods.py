@@ -39,6 +39,8 @@ import util.libutil as comn
 from libra_py.params_check import refuse_unknown_keys, restrict
 from libra_py.packages.driver_forces import (ForceHandover, check_excitation_energies, fill_diagonal_forces, force_diagonals,
                                              refreshed_rows)
+from libra_py.packages.cp2k.spin_flip import (read_tdwfn, spin_flip_amplitudes, s2_spin_flip, classify_spin,
+                                              spin_flip_sd_basis, spin_flip_sd2ci)
 
 from libra_py import data_outs, data_read, data_stat, data_conv
 from libra_py import units, molden_methods
@@ -4376,8 +4378,9 @@ def compute_state_energy_and_force(coords_bohr, params):
                              f"check the LIST line and keep THRESHOLD 0.0 "
                              f"(dark states are screened otherwise)")
         forces_all = np.stack([f_gs] + [f_ex[k] for k in range(1, nexc + 1)])
-        check_excitation_energies(omegas, F"{wd} step {params.get('timestep', '?')}",
-                                  params.get("allow_negative_excitation_energy", 0))
+        if not params.get("spin_flip", 0):       # spin-flip roots lie below their reference by construction
+            check_excitation_energies(omegas, F"{wd} step {params.get('timestep', '?')}",
+                                      params.get("allow_negative_excitation_energy", 0))
         E_adi = np.concatenate(([E_gs], E_gs + omegas))
         return {"E_total": float(E_adi[act_state]), "E_gs": E_gs,
                 "forces": forces_all[act_state], "forces_all": forces_all,
@@ -4415,8 +4418,9 @@ def compute_state_energy_and_force(coords_bohr, params):
             # by the geometry-dependent omega_act
             E_gs = E_total
 
-    check_excitation_energies(omegas, F"{params.get('working_directory', 'wd')} step {params.get('timestep', '?')}",
-                              params.get("allow_negative_excitation_energy", 0))
+    if not params.get("spin_flip", 0):           # spin-flip roots lie below their reference by construction
+        check_excitation_energies(omegas, F"{params.get('working_directory', 'wd')} step {params.get('timestep', '?')}",
+                                  params.get("allow_negative_excitation_energy", 0))
     E_adi = np.concatenate(([E_gs], E_gs + omegas))
     return {"E_total": E_total, "E_gs": E_gs, "forces": forces,
             "omegas": omegas, "fosc": fosc, "E_adi": E_adi, "logfile": logfile}
@@ -5795,7 +5799,7 @@ def _cp2k_run_params(params, is_first_time, wd, act_state, force_source, nexc, n
                   ("atom_labels", "input_template", "ot_template", "time_dependent",
                    "force_source", "cp2k_exe", "cp2k_data_dir",
                    "omp_num_threads", "mpi_executable", "nprocs", "project",
-                   "retry_templates", "allow_unconverged_scf")
+                   "retry_templates", "allow_unconverged_scf", "spin_flip")
                   if k in params}
     if params.get("ot_first_call_only", False) and not is_first_time:
         run_params.pop("ot_template", None)
@@ -5824,6 +5828,21 @@ def _cp2k_force_refresh(params, itraj, coordinates, nat, nstates):
 
     def force_of(new_state):
         wd = F"{params.get('working_directory_prefix', 'wd')}_itraj{itraj}"
+        if params.get("spin_flip", 0):
+            # the new singlet's root of this step, the roots up to it
+            root = int(params["sf_roots"][itraj][new_state])
+            run_params = _cp2k_run_params(params, False, wd, root, params.get("force_source", "active_state"),
+                                          nstates - 1, nexc_override=root)
+            res = compute_state_energy_and_force(coordinates, run_params)
+            w_last = np.asarray(params["sf_omegas"][itraj], dtype=float)
+            w_now = np.asarray(res["omegas"], dtype=float)
+            m = min(w_last.size, w_now.size)
+            dev = max(abs(float(res["E_adi"][0]) - float(params["sf_eref"][itraj])),
+                      float(np.abs(w_now[:m] - w_last[:m]).max()))
+            if dev > 1e-4:
+                raise RuntimeError(F"force_refresh of trajectory {itraj}: the roots at the call-back differ from the "
+                                   F"regular call of the step by {dev:.2e} Ha - the geometry moved between them")
+            return res["forces"]
         # the roots up to the new state alone (the regular call's variational roots in a smaller subspace) - a hop
         # to the ground state needs none, CP2K aborts on NSTATES 0, so one root stays
         run_params = _cp2k_run_params(params, False, wd, new_state, params.get("force_source", "active_state"),
@@ -6160,7 +6179,32 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     X vectors from the &TDDFPT &PRINT &NAMD_PRINT file (the
                     template must carry that print with PRINT_VIRTUALS T) -
                     "log" = excitation-analysis block (~5 digits, works with
-                    any TDDFPT template)
+                    any TDDFPT template) - "tddfpt_restart" = the eigenvectors
+                    of the TDDFPT restart file (RESTART.tdwfn), the source of
+                    the spin-flip mode: the only one that carries a spin-flip
+                    response (the NAMD print projects it on the alpha virtuals)
+                spin_flip (int): 0 (default) or 1 - the TDDFPT roots are
+                    spin-flip excitations of the high-spin reference of the
+                    template (UKS, MULTIPLICITY 3, &TDDFPT SPINFLIP): the roots
+                    are read from the TDDFPT restart, expanded over the beta
+                    virtual MOs of the wfn restart (ADDED_MOS must cover every
+                    virtual, lowest_orbital 1 and highest_orbital the MO count),
+                    classified by <S^2>, and the lowest nstates SINGLETS are the
+                    adiabatic states - S0 the lowest singlet, the reference no
+                    state of the manifold, the energies E_ref + omega - with the
+                    active singlet's root in &EXCITED_STATES STATE (the previous
+                    step's root is assumed, the force is rerun on the right root
+                    when the classification moves it, the first call computes
+                    the energies first). Needs time_dependent, force_source
+                    "active_state" or "none", mo_source "wfn", ci_source
+                    "tddfpt_restart", ao_overlap_method "cp2k", overlap_backend
+                    "sd" and dia_basis "none" - the roots' omega, <S^2> and class
+                    of every step are appended to <wd>/spin-flip-record.txt
+                s2_singlet_max (float): a root with <S^2> below it is a singlet
+                    [default 0.5]
+                s2_triplet_min (float): a root with <S^2> at or above it is a
+                    triplet (the Ms = 0 component) [default 1.5] - between the
+                    two bounds a spin-incomplete mixture, in no manifold
                 UKS (open shell): detected from the CP2K output itself (two
                     spin channels) - no flag. The SD basis becomes per-channel
                     electron-only excitations around each spin's own HOMO,
@@ -6286,7 +6330,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
 
     # ---------------- per-trajectory caches ----------------
     for key in ("mo_prev", "ci_prev", "E_adi_last", "force_rows", "S_prev", "sd_prev",
-                "coordinates_prev", "is_first_time", "act_state", "homo", "nelec"):
+                "coordinates_prev", "is_first_time", "act_state", "homo", "nelec",
+                "sf_roots", "sf_prev", "sf_omegas", "sf_eref"):
         params.setdefault(key, {})
     is_first_time = params["is_first_time"].get(itraj, True)
     act_state = int(params["act_state"].get(itraj, 0))
@@ -6342,6 +6387,29 @@ def cp2k_compute_adi_impl(q, params, full_id):
         raise ValueError(F"dia_basis_max_drop must be in [0, 1], got {dia_max_drop}")
     if not 0.0 <= cap_max_drop <= 1.0:
         raise ValueError(F"sd_capture_max_drop must be in [0, 1], got {cap_max_drop}")
+    spin_flip = params.get("spin_flip", 0)
+    if spin_flip not in (0, 1):
+        raise ValueError(F"spin_flip = {spin_flip!r} is not a listed option - 0 (the roots are excitations of the "
+                         F"reference's own spin) or 1 (spin-flip roots of a high-spin reference)")
+    if spin_flip:
+        s2_singlet_max = float(params.get("s2_singlet_max", 0.5))
+        s2_triplet_min = float(params.get("s2_triplet_min", 1.5))
+        if not 0.0 < s2_singlet_max <= s2_triplet_min:
+            raise ValueError(F"s2_singlet_max = {s2_singlet_max} and s2_triplet_min = {s2_triplet_min} - "
+                             F"0 < s2_singlet_max <= s2_triplet_min is needed")
+        needs = (("time_dependent", True, (True,), "the spin-flip roots are TDDFPT states"),
+                 ("force_source", "active_state", ("active_state", "none"), "CP2K gives the force of one root"),
+                 ("mo_source", "wfn", ("wfn",), "the beta virtual MOs come from the wfn restart"),
+                 ("ci_source", "namd_print", ("tddfpt_restart",), "only the TDDFPT restart carries a spin-flip "
+                                                                  "response"),
+                 ("ao_overlap_method", "cp2k", ("cp2k",), "the AO overlap of the step comes from the OVERLAP_DELTAT "
+                                                          "run"),
+                 ("overlap_backend", "sd", ("sd",), "the flipped determinants go through the determinant kernels"),
+                 ("dia_basis", "none", ("none",), "no diabatic basis on the spin-flip manifold"))
+        for key, default, allowed, why in needs:
+            if params.get(key, default) not in allowed:
+                raise ValueError(F"spin_flip 1 needs {key} in {list(allowed)} - {why} - got "
+                                 F"{params.get(key, default)!r}")
     # tblite runs (&XTB &TBLITE): CP2K's TDDFPT excited-state force assembly
     # calls the native-xTB Coulomb Hessian (xtb_ehess), whose neighbor lists a
     # tblite run never populates - hard segfault, verified
@@ -6392,7 +6460,18 @@ def cp2k_compute_adi_impl(q, params, full_id):
                  glob.glob(os.path.join(wd, "*-RESTART.tdwfn*")):
             os.remove(f)
 
-    run_params = _cp2k_run_params(params, is_first_time, wd, act_state, force_source, nexc)
+    sf_root_guess = None
+    if spin_flip:
+        # the CP2K root of the active singlet is known after this step's roots are classified: the previous step's
+        # root is assumed for the force run (rerun on the right root below when the roots moved), the first call
+        # computes the energies alone
+        sf_prev_roots = params["sf_roots"].get(itraj)
+        sf_root_guess = None if sf_prev_roots is None else int(sf_prev_roots[act_state])
+        run_params = _cp2k_run_params(params, is_first_time, wd, sf_root_guess or 0, force_source, nexc)
+        if sf_root_guess is None:
+            run_params["force_source"] = "none"
+    else:
+        run_params = _cp2k_run_params(params, is_first_time, wd, act_state, force_source, nexc)
     _remove_stale_prints(wd, run_params.get("project", "libra"))
     _prefetch_abort_check(params)                # a failed sibling chain stops this one before its CP2K run
     res = compute_state_energy_and_force(coordinates, run_params)
@@ -6480,9 +6559,10 @@ def cp2k_compute_adi_impl(q, params, full_id):
                 params["_ao_atom_map"] = _wfn_ao_atom_map(basis_w)
             mo_curr["ao_atom"] = params["_ao_atom_map"]
         _ovl = mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev, coordinates, LO, HI, odt,
-                                    fragment_atom_lists=frag_atoms)
+                                    fragment_atom_lists=frag_atoms, return_ao_overlap=bool(spin_flip))
         St_mo, S_prev, S_curr = _ovl[:3]
         P_frag_win = _ovl[3] if frag_atoms is not None else None
+        S_ao_curr = _ovl[3 + (frag_atoms is not None)] if spin_flip else None
     else:
         if isUKS:
             raise ValueError('ao_overlap_method="libint" is restricted-only in '
@@ -6544,7 +6624,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
         sd_cache = params.setdefault("s_ihalf_prev", {}).setdefault(itraj, {})
 
     time_dependent = params.get("time_dependent", True)
-    if "sd_basis" not in params:
+    if "sd_basis" not in params and not spin_flip:
         # per-spin excitation counts follow the step3 SD vocabulary: the alpha
         # window defaults to num_occ_states/num_unocc_states, beta to alpha
         noa = int(params.get("num_occ_alpha", params["num_occ_states"]))
@@ -6558,9 +6638,88 @@ def cp2k_compute_adi_impl(q, params, full_id):
         else:
             params["sd_basis"] = make_sd_basis(homos[0] - LO + 1, noa, nua,
                                                HI - LO + 1)
-    sd_unique, sd_states = params["sd_basis"]
+    sd_unique, sd_states = params["sd_basis"] if not spin_flip else (None, None)
 
-    if time_dependent:
+    if spin_flip:
+        # ---------------- the spin-flip manifold ----------------
+        # the roots of the high-spin reference read from the TDDFPT restart and expanded over the beta virtual MOs,
+        # every root classified by <S^2>, the lowest nstates singlets handed over as the states
+        n_a_occ, n_b_occ = int(homos[0]), int(homos[1])
+        nmo = mo_curr["C"].shape[0]
+        if LO != 1 or HI != nmo:
+            raise ValueError(F"spin_flip needs the whole MO set in the orbital window - lowest_orbital 1 and "
+                             F"highest_orbital {nmo} (the beta virtual expansion of the roots is complete over every "
+                             F"virtual) - got {LO}..{HI}")
+        td = read_tdwfn(f"{wd}/{project}-RESTART.tdwfn")
+        if td["nspins"] != 1 or td["nmo_active"][0] != n_a_occ or td["nao"] != mo_curr["C"].shape[1]:
+            raise ValueError(F"{wd}: the TDDFPT restart carries {td['nspins']} spin block(s) of {td['nmo_active']} "
+                             F"active orbitals over {td['nao']} AOs - a spin-flip run writes one block of the "
+                             F"{n_a_occ} alpha occupied responses over {mo_curr['C'].shape[1]} AOs")
+        omegas = np.asarray(res["omegas"], dtype=float)
+        nroots = min(td["nstates"], len(omegas))
+        S_ab = mo_curr["C"] @ S_ao_curr @ mo_curr["C_b"].T
+        X_all, s2_all, cls_all = [], [], []
+        for k in range(nroots):
+            X, left, total = spin_flip_amplitudes(td["evects"][k][0], mo_curr["C_b"], S_ao_curr, n_b_occ)
+            if abs(total - 1.0) > 1e-4:
+                raise ValueError(F"spin-flip root {k + 1}: the beta MOs of the wfn carry {total:.6f} of the "
+                                 F"response - ADDED_MOS must cover every virtual of both spins")
+            if left > 1e-6:
+                raise ValueError(F"spin-flip root {k + 1}: {left:.1e} of the response lies on the beta occupied "
+                                 F"orbitals - not a spin-flip response of this reference")
+            X = X * phases_ch[0][None, :n_a_occ]        # the aligned alpha occupied phases (the beta ones ride in C_b)
+            X_all.append(X)
+            s2_all.append(s2_spin_flip(X, n_a_occ, n_b_occ, S_ab))
+            cls_all.append(classify_spin(s2_all[-1], s2_singlet_max, s2_triplet_min))
+        singlets = [int(k) for k in np.argsort(omegas[:nroots]) if cls_all[k] == "singlet"]
+        if len(singlets) < nstates:
+            raise ValueError(F"{wd} step {params.get('timestep', '?')}: {len(singlets)} singlet roots among the "
+                             F"{nroots} spin-flip roots (<S^2> {np.round(s2_all, 3).tolist()}) for {nstates} states "
+                             F"- raise number_of_states")
+        roots = [k + 1 for k in singlets[:nstates]]              # CP2K's 1-based root of every state
+        E_ref = float(res["E_adi"][0])
+        E_adi_curr = E_ref + omegas[np.array(roots) - 1]
+        mixed_inside = [k + 1 for k in range(nroots) if cls_all[k] == "mixed" and omegas[k] < omegas[roots[-1] - 1]]
+        rerun = force_source == "active_state" and roots[act_state] != sf_root_guess
+        if rerun:
+            # the force of the active singlet on its root of this step
+            run_params = _cp2k_run_params(params, False, wd, roots[act_state], force_source, nexc)
+            res_force = compute_state_energy_and_force(coordinates, run_params)
+            w_force = np.asarray(res_force["omegas"], dtype=float)
+            m = min(w_force.size, nroots)
+            dev = max(abs(float(res_force["E_adi"][0]) - E_ref), float(np.abs(w_force[:m] - omegas[:m]).max()))
+            if dev > 1e-5:
+                raise RuntimeError(F"{wd} step {params.get('timestep', '?')}: the force run on root "
+                                   F"{roots[act_state]} gives roots {dev:.1e} Ha away from the step's")
+            forces = res_force["forces"]
+        params["sf_roots"][itraj] = roots
+        params["sf_omegas"][itraj] = omegas
+        params["sf_eref"][itraj] = E_ref
+        # the flipped determinants and the time overlaps of the states - the sign of every state continues the
+        # previous step's, as align_ci_state_signs does for the spin-conserving states
+        if "sf_basis" not in params:
+            params["sf_basis"] = spin_flip_sd_basis(n_a_occ, n_b_occ, nmo)
+        sd_states, sf_index = params["sf_basis"]
+        T_curr = spin_flip_sd2ci([X_all[r - 1] for r in roots], sf_index, len(sd_states))
+        T_prev = _carried(params, "sf_prev", itraj, T_curr, is_first_time)
+        st_sd, _ = sd_overlaps(sd_states, St_in, Sp_in, Sc_in, orthonormalize=sd_orthon, kernel=sd_kernel,
+                               cache=sd_cache)
+        st_ci = T_prev.T @ st_sd @ T_curr
+        for k in range(nstates):
+            if st_ci[k, k] < 0.0:
+                st_ci[:, k] *= -1.0
+                T_curr[:, k] *= -1.0
+        params["sf_prev"][itraj] = T_curr
+        T_dia = None
+        with open(f"{wd}/spin-flip-record.txt", "a") as rec:
+            rec.write(F"step {params.get('timestep', '?')}  E_ref {E_ref:.8f} Ha  states -> roots {roots}  "
+                      F"active {act_state}" + (F"  force rerun on root {roots[act_state]}" if rerun else "")
+                      + (F"  mixed roots inside the manifold's range {mixed_inside}" if mixed_inside else "") + "\n")
+            for k in range(nroots):
+                st = roots.index(k + 1) if (k + 1) in roots else "-"
+                rec.write(F"  root {k + 1:3d}  omega {omegas[k] * units.au2ev:9.4f} eV  <S^2> {s2_all[k]:.4f}  "
+                          F"{cls_all[k]:8s}  state {st}\n")
+    elif time_dependent:
         # ---------------- CI data, phase-consistent ----------------
         if params.get("ci_source", "namd_print") == "namd_print":
             # full-precision unthresholded X vectors from &NAMD_PRINT
@@ -6859,7 +7018,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
 
     # ---------------- store per-trajectory state ----------------
     params["mo_prev"][itraj] = mo_curr
-    if time_dependent:
+    if time_dependent and not spin_flip:
         params["ci_prev"][itraj] = ci_curr
     params["E_adi_last"][itraj] = E_adi_curr.copy()
     params["S_prev"][itraj] = Sc_ch if isUKS else Sc_ch[0]
