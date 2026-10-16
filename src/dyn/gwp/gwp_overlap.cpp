@@ -236,7 +236,9 @@ complex<double> gwp_overlap(MATRIX& q1, MATRIX& p1, MATRIX& gamma1, MATRIX& alp1
                             MATRIX& q2, MATRIX& p2, MATRIX& gamma2, MATRIX& alp2,
                             MATRIX& q3, MATRIX& p3, MATRIX& gamma3, MATRIX& alp3){
 /**
-  This function computes an overlap of two moving N-dimensional Gaussians  <G_1|G_2|G_3>, where:
+  This function computes the three-Gaussian overlap <G_1|G_2|G_3> = int conj(G_1) G_2 G_3 dr of moving N-dimensional
+  Gaussians - the ket product G_2 G_3 decomposed into one Gaussian (gwp_product_decomposition, a real prefactor),
+  then the two-Gaussian overlap <G_1|G_23> - where:
 
   G_a(r; r_a, p_a, alp_a, gamma_a) = \product_s^Ndof { (2*alp_a/pi)^(1/4) * exp(-alp_a*(r-r_a)^2 + i*(p_a/hbar)*(r-r_a) + i*gamma_a/hbar)}_s
 
@@ -257,9 +259,9 @@ complex<double> gwp_overlap(MATRIX& q1, MATRIX& p1, MATRIX& gamma1, MATRIX& alp1
   MATRIX gamma(ndof, 1);
   MATRIX alp(ndof, 1);
 
-  double scl = gwp_product_decomposition(q1, p1, gamma1, alp1, q2, p2, gamma2, alp2, q,  p,  gamma,  alp);
+  double scl = gwp_product_decomposition(q2, p2, gamma2, alp2, q3, p3, gamma3, alp3, q,  p,  gamma,  alp);
 
-  complex<double> res = scl * gwp_overlap(q, p, gamma, alp, q3, p3, gamma3, alp3);
+  complex<double> res = scl * gwp_overlap(q1, p1, gamma1, alp1, q, p, gamma, alp);
 
   return res;
 
