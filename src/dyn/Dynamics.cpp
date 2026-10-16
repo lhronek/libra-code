@@ -2326,7 +2326,18 @@ static void refresh_force_rows(dyn_control_params &prms, dyn_variables &dyn_var,
   try {
     ham.compute_adiabatic(py_funct, *dyn_var.q, params, 1);
   } catch (...) {
+    // the model's Python error is parked around the pop - a Python call made with an error set raises
+    // SystemError in its place
+#if PY_VERSION_HEX >= 0x030C0000
+    PyObject* exc = PyErr_GetRaisedException();
     params.attr("pop")("force_refresh");
+    PyErr_SetRaisedException(exc);
+#else
+    PyObject *etype, *evalue, *etrace;
+    PyErr_Fetch(&etype, &evalue, &etrace);
+    params.attr("pop")("force_refresh");
+    PyErr_Restore(etype, evalue, etrace);
+#endif
     throw;
   }
   params.attr("pop")("force_refresh");
