@@ -3113,16 +3113,23 @@ def _single_excitations(sd_lists):
     return gs, singles
 
 
-def sd_fragment_operators(sd_lists, P_frag):
+def sd_fragment_operators(sd_lists, P_frag, active_space=None, data_dim=None):
     """
     The fragment population operators of the hole and of the excited electron in an SD basis of single
     excitations, as matrices over the SD rows: between a+_a a_i |ref> and a+_b a_j |ref> the hole operator is
     delta_ab <i|P_F|j> and the electron operator delta_ij <a|P_F|b> (one-body operators, Slater-Condon), the
-    in-place parities tau of the rows attached. Rows that are the reference or not single excitations carry zeros.
+    in-place parities tau of the rows attached. Rows that are the reference or not single excitations carry zeros -
+    except that an open-shell reference (a doublet, the window given) joins the manifold of its singly-occupied
+    orbital as sd_diabatization_groups places it (a cation's hole, an anion's electron): that manifold's block takes
+    the group's convention, the states tau_j sigma_j |SD_row_j> of the varying orbitals, the reference row among them.
+    The closed-shell manifolds keep the in-place convention, which differs from the group's by the members' signs
+    alone - the localization is invariant to them.
 
     Args:
         sd_lists (list of lists of int): the SDs of one step in the signed reindexed spin-orbital notation
         P_frag (list of arrays): the fragment operators in the active-space 2-block layout (orthonormal orbitals)
+        active_space, data_dim: the 2-block window indices and dimension of the step - the spin-partner test of an
+            open-shell reference needs them (None: the reference is taken as closed-shell and carries zeros)
 
     Returns:
         O_hole, O_elec (lists of arrays (nsd, nsd)): one pair per fragment
@@ -3146,17 +3153,43 @@ def sd_fragment_operators(sd_lists, P_frag):
         Oe[np.ix_(rows, rows)] = block_e
         O_hole.append(Oh)
         O_elec.append(Oe)
+    if active_space is not None:
+        for kind, ops in (("hole", O_hole), ("electron", O_elec)):
+            _, groups, _ = sd_diabatization_groups(sd_lists, kind, active_space, data_dim)
+            for g in groups:
+                if gs not in g["rows"]:
+                    continue
+                idx = [_sd_block_index(o, nact) for o in g["orbs"]]
+                sign = np.array(g["tau"], dtype=float) * np.array(g["sigma"], dtype=float)
+                for P, O in zip(P_frag, ops):
+                    B = 0.5 * (np.asarray(P, dtype=float) + np.asarray(P, dtype=float).T)
+                    O[np.ix_(g["rows"], g["rows"])] = B[np.ix_(idx, idx)] * np.outer(sign, sign)
     return O_hole, O_elec
 
 
-def ci_diabatization_step(T, O_hole, O_elec, E_ci, kind, dia_index=None, tol=0.25):
+def _rows_block(O, rows):
+    """The SD-space operator restricted to a manifold's rows (zero elsewhere)."""
+    R = np.zeros_like(np.asarray(O, dtype=float))
+    R[np.ix_(rows, rows)] = np.asarray(O, dtype=float)[np.ix_(rows, rows)]
+    return R
+
+
+def ci_diabatization_step(T, O_hole, O_elec, E_ci, kind, dia_index=None, tol=0.25, E_gs=None, manifolds=None):
     """
     The CI -> diabatic coefficients V of one step, |Lambda_A> = sum_I |Psi_I> V_IA: the ground state (column 0 of
     T) maps onto itself, the excited CI states onto fragment-localized states of their own span - the hole and
     electron fragment operators carried into the CI space through T (O_ci = T_exc^T O_sd T_exc) and localized by
     the sequential projection of localize_fragment_block: "hole" localizes the hole, "electron" the electron,
     "both" the hole first and the electron within every hole-fragment block. Within a fragment (a fragment pair
-    for "both") the states diagonalize the CI energies and are ranked by increasing energy.
+    for "both") the states diagonalize the CI energies and are ranked by increasing energy. With manifolds (the
+    groups of sd_diabatization_groups for the step's SDs) the localization runs PER MANIFOLD, the SD route's own
+    grouping lifted into the CI space: every manifold's span within the CI states is the eigenvectors of its total
+    carrier operator near 1 (len(g) of them, a CI state mixing a manifold with other states is refused), the
+    carrier is localized inside that span and the columns labelled as the SD route labels them (("loc", key, f, rank),
+    ("joint", key, f_h, 0, f_p, rank)), the complement of all manifolds (the reference of a closed shell, the
+    one-member manifolds) keeps its energy eigenstates labelled ("ci", rank) - an open-shell reference is then one of
+    the localized states of its manifold (a cation's hole states are the ground state and the excitations into its
+    hole) and the index holds no ("gs",) entry. The energies [E_gs] + E_ci stand on one scale (E_gs required).
 
     Args:
         T (array (nsd, nci + 1)): the SD -> CI coefficients of the step, column 0 the ground state
@@ -3166,6 +3199,8 @@ def ci_diabatization_step(T, O_hole, O_elec, E_ci, kind, dia_index=None, tol=0.2
         dia_index (list, optional): the diabatic-state index of an earlier step - the columns keep its order,
             None builds it (the ground state first, then fragment-major - hole-major then electron for "both")
         tol (float): the integer-occupancy tolerance of localize_fragment_block
+        E_gs (float, optional): the ground-state energy on the scale of E_ci - required with manifolds
+        manifolds (list of dict, optional): the groups of sd_diabatization_groups - the per-manifold localization
 
     Returns:
         V (array (nci + 1, nci + 1)), dia_index (list), pops (array (nci + 1, nfrag)), pops_hole (array
@@ -3194,6 +3229,96 @@ def ci_diabatization_step(T, O_hole, O_elec, E_ci, kind, dia_index=None, tol=0.2
     H = np.diag(E_ci)
     hint = (" - the CI space must hold whole hole x particle manifolds, include the complete set of their "
             "excitations in number_of_states")
+    if manifolds is not None:
+        if E_gs is None:
+            raise ValueError("ci_diabatization_step: the per-manifold localization needs the ground-state energy E_gs "
+                             "on the scale of E_ci")
+        Hf = np.diag(np.concatenate([[float(E_gs)], E_ci]))
+        nall = nci + 1
+        cols, labels, taken = [], [], []
+        for g in manifolds:
+            rows = list(g["rows"])
+            m = len(rows)
+            # the manifold's carrier operators over its own rows, carried into the CI space
+            Of_h = [T.T @ _rows_block(O, rows) @ T for O in O_hole]
+            Of_e = [T.T @ _rows_block(O, rows) @ T for O in O_elec]
+            Of = Of_e if kind == "electron" else Of_h
+            Otot = sum(Of)
+            Otot = 0.5 * (Otot + Otot.T)
+            vals, vecs = np.linalg.eigh(Otot)
+            idx = np.argsort(-vals)
+            if abs(float(np.trace(Otot)) - m) > tol or vals[idx[:m]].min() < 1.0 - tol or \
+                    (nall > m and vals[idx[m:]].max() > tol):
+                raise ValueError(F"many-body diabatization: the manifold {g['key']} of {m} states carries "
+                                 F"{float(np.trace(Otot)):.3f} of the CI space with eigenvalues "
+                                 F"{np.round(np.sort(vals)[::-1][:m + 2], 3)} - it is not a whole subspace of the "
+                                 F"propagated states within {tol} (a CI state mixes it with other excitations){hint}")
+            wm = vecs[:, idx[:m]]
+            Hm = wm.T @ Hf @ wm
+            try:
+                if kind == "both":
+                    wh, frag_h, _, _ = localize_fragment_block([wm.T @ O @ wm for O in Of_h], list(range(m)), Hm, tol)
+                    for f_h in range(nfrag):
+                        block = [c for c in range(m) if frag_h[c] == f_h]
+                        if not block:
+                            continue
+                        wb = wh[:, block]
+                        wp, frag_p, _, _ = localize_fragment_block([wb.T @ (wm.T @ O @ wm) @ wb for O in Of_e],
+                                                                    list(range(len(block))), wb.T @ Hm @ wb, tol)
+                        ranks = {}
+                        for c, f_p in enumerate(frag_p):
+                            ranks[f_p] = ranks.get(f_p, -1) + 1
+                            cols.append(wm @ (wb @ wp[:, c]))
+                            labels.append(("joint", g["key"], f_h, 0, f_p, ranks[f_p]))
+                else:
+                    wl, frag, _, _ = localize_fragment_block([wm.T @ O @ wm for O in Of], list(range(m)), Hm, tol)
+                    for c, f in enumerate(frag):
+                        cols.append(wm @ wl[:, c])
+                        labels.append(("loc", g["key"], f, sum(1 for x in frag[:c] if x == f)))
+            except ValueError as err:
+                raise ValueError(F"many-body diabatization, the manifold {g['key']}: {err}{hint}") from err
+            taken.append(wm)
+        # the complement of every manifold: its energy eigenstates, ranked
+        if taken:
+            Wt = np.concatenate(taken, axis=1)
+            Q = np.eye(nall) - Wt @ Wt.T
+            qv, qvec = np.linalg.eigh(0.5 * (Q + Q.T))
+            rest = qvec[:, qv > 0.5]
+        else:
+            rest = np.eye(nall)
+        if rest.shape[1]:
+            _, vr = np.linalg.eigh(rest.T @ Hf @ rest)
+            for r in range(rest.shape[1]):
+                cols.append(rest @ vr[:, r])
+                labels.append(("ci", r))
+        w = np.stack(cols, axis=1)
+        if dia_index is None:
+            dia_index = labels
+            order = list(range(len(labels)))
+        else:
+            if len(dia_index) != nall or sorted(dia_index) != sorted(labels):
+                raise ValueError("the fragment counts of the many-body diabatization changed along the trajectory - "
+                                 F"{dia_index} indexed, {labels} at this step")
+            order = [labels.index(entry) for entry in dia_index]
+        V = w[:, order]
+        pops = np.full((nall, nfrag), np.nan)
+        pops_hole = np.full((nall, nfrag), np.nan)
+        energies = np.full((nall, 2), np.nan)
+        Oh_all = [T.T @ O @ T for O in O_hole]
+        Oe_all = [T.T @ O @ T for O in O_elec]
+        for a, entry in enumerate(dia_index):
+            if entry[0] == "ci":
+                continue
+            v = V[:, a]
+            if kind in ("hole", "both"):
+                pops_hole[a] = [v @ O @ v for O in Oh_all]
+            if kind in ("electron", "both"):
+                pops[a] = [v @ O @ v for O in Oe_all]
+            energies[a, 0] = v @ Hf @ v
+        dev = float(np.abs(V.T @ V - np.eye(nall)).max())
+        if not np.isfinite(dev) or dev > 1e-8:
+            raise ValueError(F"the many-body diabatic transformation is not orthogonal (|V^T V - 1| = {dev:.2e})")
+        return V, dia_index, pops, pops_hole, energies
     try:
         if kind in ("hole", "both"):
             Oh = [Te.T @ O @ Te for O in O_hole]
@@ -3274,10 +3399,17 @@ def _ci_diabatization_series(params, sd_sorted, SD2CI, ci_energies, active_space
             P_frag = fragment_operators[i]
         else:
             P_frag, _ = _fragment_operators_of_step(params, prefix, nfrag, step, active_space, with_energies=False)
-        O_hole, O_elec = sd_fragment_operators(sd_sorted[i], P_frag)
+        data_dim = params['data_dim']
+        O_hole, O_elec = sd_fragment_operators(sd_sorted[i], P_frag, active_space, data_dim)
+        # an open-shell reference joins the manifold of its singly-occupied orbital - the ground state is then one of
+        # the localized states (ci_energies are excitation energies, the ground state sits at 0 on that scale)
+        gs, groups, _ = sd_diabatization_groups(sd_sorted[i], kind, active_space, data_dim)
+        gs_joins = any(gs in g["rows"] for g in groups)
         V, dia_index, pops, pops_hole, energies = ci_diabatization_step(SD2CI[i], O_hole, O_elec, ci_energies[i],
                                                                         kind, dia_index,
-                                                                        tol=params['occupancy_tolerance'])
+                                                                        tol=params['occupancy_tolerance'],
+                                                                        E_gs=0.0 if gs_joins else None,
+                                                                        manifolds=groups if gs_joins else None)
         V_list.append(V)
         pops_list.append(pops)
         hole_list.append(pops_hole)
