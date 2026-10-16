@@ -1354,6 +1354,9 @@ void System::CREATE_BONDS(boost::python::list atoms_list,boost::python::dict val
 
 */
 
+  cout<<"Error in System::CREATE_BONDS(): not functional - its distance, element and linking steps are commented out "
+      <<"(the ObjectSpace API), so no bond is ever created - link the atoms explicitly\n";
+  std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   vector<int> at_indexes; // Indexes of the atoms in the list, not their IDs
   vector<int> at_valences;
   // Sorted
