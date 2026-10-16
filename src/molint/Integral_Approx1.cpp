@@ -335,6 +335,10 @@ double Jab(int m,int n,double alpha,double betha){
       K2 = K1 - K2;
 
   }// if alpha==betha
+  else{
+    std::cout<<"Error in Jab(): alpha = "<<alpha<<" and betha = "<<betha<<" differ - implemented for alpha == betha only\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
   double convert=1.0;
 
