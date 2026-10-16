@@ -3459,6 +3459,25 @@ def _tracking_groups(dia_index):
     return list(groups.values())
 
 
+def _check_selection_options(params):
+    """The keys of the active-space selection shared by the SD and the POD route: active_space_selection 'energy' or
+    'identity' (lower-cased), active_space_selection_algo 1 (Sato), 2 (Munkres-Kuhn by libra_py.hungarian) or 22
+    (the same assignment by scipy) and active_space_selection_alpha, a non-negative width in 1/Hartree - every
+    other value refused. Returns (selection, algo, alpha)."""
+    selection = str(params['active_space_selection']).lower()
+    if selection not in ('energy', 'identity'):
+        raise ValueError(F"active_space_selection = {params['active_space_selection']!r} is not a listed option - "
+                         F"'energy' (the energy positions of every frame) and 'identity' (the orbitals of start_time "
+                         F"followed through the window) are supported")
+    algo, alpha = params['active_space_selection_algo'], params['active_space_selection_alpha']
+    if algo not in (1, 2, 22):
+        raise ValueError(F"active_space_selection_algo = {algo!r} is not a listed option - 1 (Sato), 2 (Munkres-Kuhn, "
+                         F"libra_py.hungarian) and 22 (the same assignment by scipy) are supported")
+    if not (np.isreal(alpha) and alpha >= 0.0):
+        raise ValueError(F"active_space_selection_alpha = {alpha!r} - a non-negative width in 1/Hartree is needed")
+    return selection, algo, alpha
+
+
 def _assign_states(O, reordering, alpha=0.0, energies=None, col_energies=None):
     """The column of every row of a square time-overlap block that carries its state on, by the reordering of the SD
     states: 1 the Sato search of libra's get_reordering, 2 the Munkres-Kuhn assignment on |O|^2 exp(-(alpha dE)^2)
@@ -4126,13 +4145,13 @@ def run_step3_pod(params):
                 frames, with the vocabulary of do_state_reordering. 0 [default]: none - every block state of the
                 basis must continue itself (|<s(k)|s(k+1)>| >= 1/sqrt(2)), a swap of two block states is refused, the
                 ranks are the energy order of every frame. 1: Sato (get_reordering), 2: Munkres-Kuhn
-                (libra_py.hungarian), 22: the same assignment by scipy's linear_sum_assignment - the block states of
-                a block are reordered against the block's states of the next frame (the states the assignment runs
-                over are active_space_selection's) and every basis state follows the block state assigned to it, so
-                a state keeps the block state that carries it through a crossing of the block's levels - the labels
-                record swap_frames and frames_off_energy_order, the report the followed block states of the frames
-                off the starting order, and the ranks name the energy order at start_time only. 5: the reordering of
-                2 and then the
+                (libra_py.hungarian), 22: the same assignment by scipy's linear_sum_assignment - the basis states of
+                a block are reordered against the block's basis of the next frame (the window positions under
+                active_space_selection 'energy', the followed block states under 'identity') and every basis state
+                follows the block state assigned to it, so a state keeps the block state that carries it through a
+                crossing inside the basis - the labels record swap_frames and frames_off_energy_order, the report the
+                followed block states of the frames off the starting order, and the ranks name the energy order at
+                start_time only. 5: the reordering of 2 and then the
                 orthogonal alignment of every block's basis states to the previous frame (52: with the assignment of
                 22) - the polar factor of the block's time-overlap block combines the followed block states so that
                 the block is symmetric positive definite: the signs and the rotation within degenerate block states,
@@ -4159,14 +4178,21 @@ def run_step3_pod(params):
                 reordered_frames - the frames at which the labels changed - and frames_off_energy_order) [default:
                 1/sqrt(2) = 0.707, more than half of a state's weight on its own continuation]. In the energy order
                 (0) nothing is refused.
-            * **params['active_space_selection']** (string): the block states the assignment of
-                do_diabatic_state_reordering runs over, the counterpart of the SD route's key. 'energy' [default]: the
-                window positions of every block alone - the num_occ_states_per_block highest occupied block states of
-                the frame - so the assignment is per_block x per_block whatever the size of the block, and a basis
-                state whose continuation lies outside the window is an edge departure (recorded, as without a
-                reordering). 'identity': all block states of the block, so a basis state follows the block state
-                that carries it through the window edge (the report lists the followed block states) - it needs a
-                reordering (do_diabatic_state_reordering 1, 2, 22, 5 or 52), the following is that assignment.
+            * **params['active_space_selection']** (string): how the hole basis of every block is picked at every
+                frame, with the SD route's keys and meaning. 'energy' [default]: the window positions of the frame -
+                the num_occ_states_per_block highest occupied block states - so a basis state whose continuation lies
+                outside the window is an edge departure (recorded) and a reordering costs per_block x per_block
+                whatever the size of the block. 'identity': the block states that formed the basis at start_time,
+                followed through the whole block (the window edge included) by the assignment of
+                active_space_selection_algo with the penalty of active_space_selection_alpha on the block energies
+                of the earlier frame, as the SD route follows the orbitals of its active space - the report lists the
+                followed block states of the frames off the starting order - do_diabatic_state_reordering then
+                reorders within the followed basis as under 'energy' within the window.
+            * **params['active_space_selection_algo']** (int): the assignment that follows the block states under
+                'identity' - 1 the Sato search (get_reordering), 2 the Munkres-Kuhn assignment on the squared time
+                overlaps (libra_py.hungarian) [default], 22 the same assignment by scipy's linear_sum_assignment.
+            * **params['active_space_selection_alpha']** (float): the energy-penalty width of that assignment,
+                exp(-(alpha dE)^2) on the block energies of the earlier frame, in 1/Hartree [default: 0 - no penalty].
             * **params['nac_algo']** (int): 0 alone - the route writes the HST couplings (St^T - St) / 2 dt.
             Every key the route does not read is refused: the former option names with their present names, the
             keys of the SD route's Kohn-Sham basis (num_occ_states and its kin) with a pointer to
@@ -4187,7 +4213,7 @@ def run_step3_pod(params):
                       'diabatic_state_reordering_alpha': 0.0,
                       'diabatic_state_reordering_min_overlap': CONTINUITY_FLOOR,
                       'state_reordering_min_overlap': CONTINUITY_FLOOR, 'active_space_selection': 'energy',
-                      'nac_algo': 0}
+                      'active_space_selection_algo': 2, 'active_space_selection_alpha': 0.0, 'nac_algo': 0}
     _refuse_former_names(params)
     # the keys of the SD route's Kohn-Sham basis have no reading here - num_occ_states in place of
     # num_occ_states_per_block ran the whole occupied space without a word
@@ -4209,10 +4235,6 @@ def run_step3_pod(params):
                                ('isUKS', (0,), "closed-shell block states"),
                                ('localized_carrier', ('hole',), "the hole of the cation"),
                                ('diabatization_scheme', ('pod_cp2k',), "the POD prints of CP2K"),
-                               ('active_space_selection', ('energy', 'identity'), "the block states the assignment "
-                                                                                   "of do_diabatic_state_reordering "
-                                                                                   "runs over - the window positions "
-                                                                                   "or the whole block"),
                                ('nac_algo', (0,), "the POD route writes the HST couplings (St^T - St) / 2 dt, the NPI "
                                                   "of nac_algo 1 is not implemented on it")):
         if params[key] not in allowed:
@@ -4223,11 +4245,7 @@ def run_step3_pod(params):
     dia_reordering, dia_alpha = params['do_diabatic_state_reordering'], params['diabatic_state_reordering_alpha']
     dia_min_overlap, sd_min_overlap = (params['diabatic_state_reordering_min_overlap'],
                                        params['state_reordering_min_overlap'])
-    selection = params['active_space_selection']
-    if selection == 'identity' and not dia_reordering:
-        raise ValueError("run_step3_pod: active_space_selection 'identity' follows the basis states through the whole "
-                         "block by the assignment of do_diabatic_state_reordering - set 1, 2, 22, 5 or 52 (without a "
-                         "reordering every state keeps its window position, the meaning of 'energy')")
+    selection, sel_algo, sel_alpha = _check_selection_options(params)
     res_dir_1, res_dir_2 = params['path_to_npz_files'], params['path_to_save_sd_Hvibs']
     start_time, finish_time = int(params['start_time']), int(params['finish_time'])
     if finish_time - start_time < 2:
@@ -4308,20 +4326,28 @@ def run_step3_pod(params):
         St = St_k[:ntot, :ntot]
         cur = track[i]
         nxt = list(cur)
-        if dia_reordering:
-            # the block states of a block are reordered against the block's states of the next frame, as the SD
-            # states are (Sato or Munkres-Kuhn, the penalty on the block energies of the earlier frame) - every basis
-            # state follows the block state assigned to the one that carried it. 'identity' runs over all states of
-            # the block, 'energy' over the window positions alone (the basis of start_time), so the cost does not
-            # grow with the block and a continuation outside the window is an edge departure below
+        if selection == 'identity':
+            # the basis states follow their block states through the whole block, the window edge included, by the
+            # selection's assignment (Sato or Munkres-Kuhn on |O|^2, the penalty on the block energies of the earlier
+            # frame) - as the SD route follows the orbitals of its active space
             for f in range(nblk):
-                cols = (list(range(off[f], off[f + 1])) if selection == 'identity'
-                        else [idx[c] for c in range(n) if frag[c] == f])
-                assigned = _assign_states(St[np.ix_(cols, cols)], _assignment_of(dia_reordering), dia_alpha,
-                                          h_diag[i][cols])
+                cols = list(range(off[f], off[f + 1]))
+                assigned = _assign_states(St[np.ix_(cols, cols)], sel_algo, sel_alpha, h_diag[i][cols])
                 for c in range(n):
                     if frag[c] == f:
-                        nxt[c] = cols[assigned[cols.index(cur[c])]]
+                        nxt[c] = cols[assigned[cur[c] - off[f]]]
+        if dia_reordering:
+            # the basis states of a block are reordered against the block's basis of the next frame - the window
+            # positions under 'energy', the followed states under 'identity' - as the SD states are, so that a state
+            # keeps its identity through a crossing inside the basis (the cost is the basis size, not the block's), a
+            # continuation outside the window under 'energy' is an edge departure below
+            for f in range(nblk):
+                members = [c for c in range(n) if frag[c] == f]
+                rows, cols = [cur[c] for c in members], [nxt[c] for c in members]
+                assigned = _assign_states(St[np.ix_(rows, cols)], _assignment_of(dia_reordering), dia_alpha,
+                                          h_diag[i][rows], h_diag[i][cols])
+                for k, c in enumerate(members):
+                    nxt[c] = cols[assigned[k]]
         # the overlap of the aligned basis of frame i with the followed block states of frame i + 1, then the
         # transform of the next frame's basis: the signs of the diagonal (an exactly zero overlap keeps the sign -
         # np.sign would drop the state from every later frame), aligned the polar factor within every block
@@ -4343,10 +4369,10 @@ def run_step3_pod(params):
         rows = A[i].T @ St[cur, :]
         d = np.abs(np.diag(O))
         min_continuity = min(min_continuity, float(d.min()))
-        # the space of a basis state: the whole block under a reordering over all its states ('identity' - a low
-        # continuation the block carries is an internal mixing), the basis of its block otherwise (the window
-        # positions - a partner outside it is an edge departure, recorded)
-        space = [list(range(off[frag[c]], off[frag[c] + 1])) if (dia_reordering and selection == 'identity')
+        # the space of a basis state: the whole block under 'identity' (a low continuation the block carries is an
+        # internal mixing), the basis of its block under 'energy' (the window positions - a partner outside it is an
+        # edge departure, recorded)
+        space = [list(range(off[frag[c]], off[frag[c] + 1])) if selection == 'identity'
                  else [cur[b] for b in range(n) if frag[b] == frag[c]] for c in range(n)]
         inside = np.array([float(np.sqrt(np.sum(rows[c, space[c]] ** 2))) for c in range(n)])
         edge_idx, mixed_idx, unresolved_idx = _classify_continuations(d, inside, dia_min_overlap)
@@ -4357,12 +4383,13 @@ def run_step3_pod(params):
             row = np.abs(rows[c]).copy()
             row[nxt[c]] = -1.0
             partner = int(np.argmax(row))
-            if dia_reordering:
+            if dia_reordering or selection == 'identity':
                 raise ValueError(F"the POD block state {cur[c]} (block {frag[c]}, rank {rank[c]} of frame "
                                  F"{start_time}) carries |<s|s'>| = {d[c]:.3f} into frame {frames[i + 1]} even after "
-                                 F"the reordering{' and the alignment' if dia_reordering in (5, 52) else ''} of its "
-                                 F"{'block' if selection == 'identity' else 'window'} (the largest other overlap "
-                                 F"{row[partner]:.3f} into the "
+                                 F"the {'following through' if selection == 'identity' else 'reordering within'} its "
+                                 F"{'block' if selection == 'identity' else 'window'}"
+                                 F"{' and the alignment' if dia_reordering in (5, 52) else ''} (the largest other "
+                                 F"overlap {row[partner]:.3f} into the "
                                  F"block state {partner}, the threshold "
                                  F"{dia_min_overlap:.4g}) - the states mix by more "
                                  F"than the threshold's angle within one frame: the frame spacing does not resolve the "
@@ -4474,6 +4501,8 @@ def run_step3_pod(params):
                                         "diabatic_state_reordering_alpha": float(dia_alpha),
                                         "diabatic_state_reordering_min_overlap": float(dia_min_overlap),
                                         "active_space_selection": selection,
+                                        "active_space_selection_algo": int(sel_algo),
+                                        "active_space_selection_alpha": float(sel_alpha),
                                         "swap_frames": [int(k) for k in swaps], "frames_off_energy_order": off_order,
                                         "unresolved_frames": [int(k) for k in unresolved],
                                         "min_continuity": float(min_continuity), "edge_departures": edges,
@@ -4482,10 +4511,12 @@ def run_step3_pod(params):
                                                            F"starting frame {start_time}" + (
                                             " and every state keeps the block state that carries it through the "
                                             "crossings of swap_frames" + (
-                                                " (pod_route_report.json lists the followed block states of the frames "
-                                                "off that order)" if selection == 'identity' else
+                                                " (followed through the whole block by active_space_selection "
+                                                "'identity', pod_route_report.json lists the followed block states of "
+                                                "the frames off that order)" if selection == 'identity' else
                                                 " within the window of its block (active_space_selection 'energy' - a "
-                                                "state leaving the window is an edge departure)") if dia_reordering else
+                                                "state leaving the window is an edge departure)")
+                                            if (dia_reordering or selection == 'identity') else
                                             " and every state continues itself between the frames") + (
                                             " - the basis states of a block are aligned to the previous frame by the "
                                             "orthogonal transform of their largest overlap (the signs and the rotation "
@@ -4505,6 +4536,7 @@ def run_step3_pod(params):
               "reordered_frames": reordered, "block_gap_eV": block_gap,
               "do_diabatic_state_reordering": int(dia_reordering), "diabatic_state_reordering_alpha": float(dia_alpha),
               "diabatic_state_reordering_min_overlap": float(dia_min_overlap), "active_space_selection": selection,
+              "active_space_selection_algo": int(sel_algo), "active_space_selection_alpha": float(sel_alpha),
               "swap_frames": [int(k) for k in swaps], "frames_off_energy_order": off_order,
               "unresolved_frames": [int(k) for k in unresolved], "edge_departures": edges, "alignment": alignment,
               "adiabatic": {"do_state_reordering": int(params['do_state_reordering']),
@@ -4743,17 +4775,7 @@ def run_step3_sd_nacs_libint(params):
     dia_reordering, dia_alpha = params['do_diabatic_state_reordering'], params['diabatic_state_reordering_alpha']
     dia_min_overlap, sd_min_overlap = (params['diabatic_state_reordering_min_overlap'],
                                        params['state_reordering_min_overlap'])
-    selection = str(params['active_space_selection']).lower()
-    if selection not in ('energy', 'identity'):
-        raise ValueError(F"active_space_selection = {params['active_space_selection']!r} is not a listed option - "
-                         F"'energy' (the energy positions of every frame) and 'identity' (the orbitals of start_time "
-                         F"followed through the window) are supported")
-    algo, orb_alpha = params['active_space_selection_algo'], params['active_space_selection_alpha']
-    if algo not in (1, 2, 22):
-        raise ValueError(F"active_space_selection_algo = {algo!r} is not a listed option - 1 (Sato), 2 (Munkres-Kuhn, "
-                         F"libra_py.hungarian) and 22 (the same assignment by scipy) are supported")
-    if not (np.isreal(orb_alpha) and orb_alpha >= 0.0):
-        raise ValueError(F"active_space_selection_alpha = {orb_alpha!r} - a non-negative width in 1/Hartree is needed")
+    selection, algo, orb_alpha = _check_selection_options(params)
     res_dir_1 = params['path_to_npz_files']
     res_dir_2 = params['path_to_save_sd_Hvibs']
 
