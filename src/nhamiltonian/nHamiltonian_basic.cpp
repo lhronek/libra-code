@@ -277,155 +277,152 @@ nHamiltonian::~nHamiltonian() {
   /**
     Deallocate memory only if it was allocated internally
   */
-  if (this != nullptr) {
 
-    // cout<<"nHamiltonian destructor at level "<<level<<" address
-    // "<<this<<endl;
+  // cout<<"nHamiltonian destructor at level "<<level<<" address
+  // "<<this<<endl;
 
-    //  id = 0;
-    //  level = 0;
-    auto n = 0u;
+  //  id = 0;
+  //  level = 0;
+  auto n = 0u;
 
-    delete ordering_adi;
-    ordering_adi = nullptr;
+  delete ordering_adi;
+  ordering_adi = nullptr;
 
-    if (ovlp_dia_mem_status == 1) {
-      delete ovlp_dia;
-      ovlp_dia = nullptr;
-      ovlp_dia_mem_status = 0;
+  if (ovlp_dia_mem_status == 1) {
+    delete ovlp_dia;
+    ovlp_dia = nullptr;
+    ovlp_dia_mem_status = 0;
+  }
+
+  for (n = 0u; n < dc1_dia.size(); n++) {
+    if (dc1_dia_mem_status[n] == 1) {
+      delete dc1_dia[n];
+      dc1_dia[n] = nullptr;
+      dc1_dia_mem_status[n] = 0;
     }
+  }
+  dc1_dia.clear();
+  dc1_dia_mem_status.clear();
 
-    for (n = 0u; n < dc1_dia.size(); n++) {
-      if (dc1_dia_mem_status[n] == 1) {
-        delete dc1_dia[n];
-        dc1_dia[n] = nullptr;
-        dc1_dia_mem_status[n] = 0;
-      }
-    }
-    dc1_dia.clear();
-    dc1_dia_mem_status.clear();
+  if (ham_dia_mem_status == 1) {
+    delete ham_dia;
+    ham_dia = nullptr;
+    ham_dia_mem_status = 0;
+  }
+  if (nac_dia_mem_status == 1) {
+    delete nac_dia;
+    nac_dia = nullptr;
+    nac_dia_mem_status = 0;
+  }
+  if (hvib_dia_mem_status == 1) {
+    delete hvib_dia;
+    hvib_dia = nullptr;
+    hvib_dia_mem_status = 0;
+  }
 
-    if (ham_dia_mem_status == 1) {
-      delete ham_dia;
-      ham_dia = nullptr;
-      ham_dia_mem_status = 0;
+  for (n = 0u; n < d1ham_dia.size(); n++) {
+    if (d1ham_dia_mem_status[n] == 1) {
+      delete d1ham_dia[n];
+      d1ham_dia[n] = nullptr;
+      d1ham_dia_mem_status[n] = 0;
     }
-    if (nac_dia_mem_status == 1) {
-      delete nac_dia;
-      nac_dia = nullptr;
-      nac_dia_mem_status = 0;
-    }
-    if (hvib_dia_mem_status == 1) {
-      delete hvib_dia;
-      hvib_dia = nullptr;
-      hvib_dia_mem_status = 0;
-    }
+  }
+  d1ham_dia.clear();
+  d1ham_dia_mem_status.clear();
 
-    for (n = 0u; n < d1ham_dia.size(); n++) {
-      if (d1ham_dia_mem_status[n] == 1) {
-        delete d1ham_dia[n];
-        d1ham_dia[n] = nullptr;
-        d1ham_dia_mem_status[n] = 0;
-      }
+  for (n = 0u; n < d2ham_dia.size(); n++) {
+    if (d2ham_dia_mem_status[n] == 1) {
+      delete d2ham_dia[n];
+      d2ham_dia[n] = nullptr;
+      d2ham_dia_mem_status[n] = 0;
     }
-    d1ham_dia.clear();
-    d1ham_dia_mem_status.clear();
+  }
+  d2ham_dia.clear();
+  d2ham_dia_mem_status.clear();
 
-    for (n = 0u; n < d2ham_dia.size(); n++) {
-      if (d2ham_dia_mem_status[n] == 1) {
-        delete d2ham_dia[n];
-        d2ham_dia[n] = nullptr;
-        d2ham_dia_mem_status[n] = 0;
-      }
+  for (n = 0u; n < dc1_adi.size(); n++) {
+    if (dc1_adi_mem_status[n] == 1) {
+      delete dc1_adi[n];
+      dc1_adi[n] = nullptr;
+      dc1_adi_mem_status[n] = 0;
     }
-    d2ham_dia.clear();
-    d2ham_dia_mem_status.clear();
+  }
+  dc1_adi.clear();
+  dc1_adi_mem_status.clear();
 
-    for (n = 0u; n < dc1_adi.size(); n++) {
-      if (dc1_adi_mem_status[n] == 1) {
-        delete dc1_adi[n];
-        dc1_adi[n] = nullptr;
-        dc1_adi_mem_status[n] = 0;
-      }
-    }
-    dc1_adi.clear();
-    dc1_adi_mem_status.clear();
+  if (ham_adi_mem_status == 1) {
+    delete ham_adi;
+    ham_adi = nullptr;
+    ham_adi_mem_status = 0;
+  }
+  if (nac_adi_mem_status == 1) {
+    delete nac_adi;
+    nac_adi = nullptr;
+    nac_adi_mem_status = 0;
+  }
+  if (hvib_adi_mem_status == 1) {
+    delete hvib_adi;
+    hvib_adi = nullptr;
+    hvib_adi_mem_status = 0;
+  }
 
-    if (ham_adi_mem_status == 1) {
-      delete ham_adi;
-      ham_adi = nullptr;
-      ham_adi_mem_status = 0;
+  for (n = 0u; n < d1ham_adi.size(); n++) {
+    if (d1ham_adi_mem_status[n] == 1) {
+      delete d1ham_adi[n];
+      d1ham_adi[n] = nullptr;
+      d1ham_adi_mem_status[n] = 0;
     }
-    if (nac_adi_mem_status == 1) {
-      delete nac_adi;
-      nac_adi = nullptr;
-      nac_adi_mem_status = 0;
-    }
-    if (hvib_adi_mem_status == 1) {
-      delete hvib_adi;
-      hvib_adi = nullptr;
-      hvib_adi_mem_status = 0;
-    }
+  }
+  d1ham_adi.clear();
+  d1ham_adi_mem_status.clear();
 
-    for (n = 0u; n < d1ham_adi.size(); n++) {
-      if (d1ham_adi_mem_status[n] == 1) {
-        delete d1ham_adi[n];
-        d1ham_adi[n] = nullptr;
-        d1ham_adi_mem_status[n] = 0;
-      }
+  for (n = 0u; n < d2ham_adi.size(); n++) {
+    if (d2ham_adi_mem_status[n] == 1) {
+      delete d2ham_adi[n];
+      d2ham_adi[n] = nullptr;
+      d2ham_adi_mem_status[n] = 0;
     }
-    d1ham_adi.clear();
-    d1ham_adi_mem_status.clear();
+  }
+  d2ham_adi.clear();
+  d2ham_adi_mem_status.clear();
 
-    for (n = 0u; n < d2ham_adi.size(); n++) {
-      if (d2ham_adi_mem_status[n] == 1) {
-        delete d2ham_adi[n];
-        d2ham_adi[n] = nullptr;
-        d2ham_adi_mem_status[n] = 0;
-      }
+  if (basis_transform_mem_status == 1) {
+    delete basis_transform;
+    basis_transform = nullptr;
+    basis_transform_mem_status = 0;
+  }
+
+  if (time_overlap_adi_mem_status == 1) {
+    delete time_overlap_adi;
+    time_overlap_adi = nullptr;
+    time_overlap_adi_mem_status = 0;
+  }
+
+  if (time_overlap_dia_mem_status == 1) {
+    delete time_overlap_dia;
+    time_overlap_dia = nullptr;
+    time_overlap_dia_mem_status = 0;
+  }
+
+  if (cum_phase_corr_mem_status == 1) {
+    delete cum_phase_corr;
+    cum_phase_corr = nullptr;
+    cum_phase_corr_mem_status = 0;
+  }
+
+  /// The children this node allocated (add_new_children) are deleted - destroyed and freed (upstream called their
+  /// destructor explicitly and leaked the objects) - a child the caller handed over with add_child stays the
+  /// caller's and is only detached, so its parent pointer does not dangle and it is destroyed once
+  for (n = 0u; n < children.size(); n++) {
+    if (children[n] == nullptr) { continue; }
+    if (n < children_owned.size() && children_owned[n] == 0) {
+      children[n]->parent = nullptr;
+    } else {
+      delete children[n];
     }
-    d2ham_adi.clear();
-    d2ham_adi_mem_status.clear();
-
-    if (basis_transform_mem_status == 1) {
-      delete basis_transform;
-      basis_transform = nullptr;
-      basis_transform_mem_status = 0;
-    }
-
-    if (time_overlap_adi_mem_status == 1) {
-      delete time_overlap_adi;
-      time_overlap_adi = nullptr;
-      time_overlap_adi_mem_status = 0;
-    }
-
-    if (time_overlap_dia_mem_status == 1) {
-      delete time_overlap_dia;
-      time_overlap_dia = nullptr;
-      time_overlap_dia_mem_status = 0;
-    }
-
-    if (cum_phase_corr_mem_status == 1) {
-      delete cum_phase_corr;
-      cum_phase_corr = nullptr;
-      cum_phase_corr_mem_status = 0;
-    }
-
-    /// The children this node allocated (add_new_children) are deleted - destroyed and freed (upstream called their
-    /// destructor explicitly and leaked the objects) - a child the caller handed over with add_child stays the
-    /// caller's and is only detached, so its parent pointer does not dangle and it is destroyed once
-    for (n = 0u; n < children.size(); n++) {
-      if (children[n] == nullptr) { continue; }
-      if (n < children_owned.size() && children_owned[n] == 0) {
-        children[n]->parent = nullptr;
-      } else {
-        delete children[n];
-      }
-      children[n] = nullptr;
-    } // for n
-    children.clear();
-
-  } // if this!=NULL
+    children[n] = nullptr;
+  } // for n
+  children.clear();
 
   //  this = NULL;
 }
