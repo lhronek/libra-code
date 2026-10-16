@@ -188,8 +188,8 @@ void get_parameters_from_file(std::string filename, Control_Parameters& prms){
 
 
   cout<<"Echo tokenized file content\n";
-  for(int i=0;i<file.size();i++){
-    for(int j=0;j<file[i].size();j++){
+  for(int i=0;i<(int)file.size();i++){
+    for(int j=0;j<(int)file[i].size();j++){
       cout<<file[i][j]<<"  ";
     }
     cout<<endl;
@@ -407,7 +407,7 @@ void get_parameters_from_file(std::string filename, Control_Parameters& prms){
             else if(file[i1][0]=="nz_grid"){  prms.nz_grid = atoi(file[i1][2].c_str());  } 
             else if(file[i1][0]=="orbs"){  
               prms.orbs = vector<int>(file[i1].size()-2,0); 
-              for(int i2=2;i2<file[i1].size();i2++){ prms.orbs[i2-2] = atoi(file[i1][i2].c_str()); }
+              for(int i2=2;i2<(int)file[i1].size();i2++){ prms.orbs[i2-2] = atoi(file[i1][i2].c_str()); }
             } 
           }
         }// for i1

@@ -91,7 +91,7 @@ void Atom::copy_content(const Atom& at){
   // Explicit copy
   if(at.globAtom_Adjacent_Atoms.size()){
     if(globAtom_Adjacent_Atoms.size()>0){ globAtom_Adjacent_Atoms.clear(); }
-    for(int i=0;i<at.globAtom_Adjacent_Atoms.size();i++){ 
+    for(int i=0;i<(int)at.globAtom_Adjacent_Atoms.size();i++){
       globAtom_Adjacent_Atoms.push_back(at.globAtom_Adjacent_Atoms[i]);
     }
   }
@@ -308,7 +308,7 @@ void Atom::show_info(){
    if(is_Atom_coordination) {std::cout<<"Atom_coordination = "<<Atom_coordination<<std::endl;}
    if(is_Atom_functional_group) {std::cout<<"Atom_functional_group = "<<Atom_functional_group<<std::endl;}
    if(is_Atom_ring_sizes){ std::cout<<"Atom_ring_sizes = "; 
-       for(int i=0;i<Atom_ring_sizes.size();i++){ std::cout<<Atom_ring_sizes[i]<<"  "; }
+       for(int i=0;i<(int)Atom_ring_sizes.size();i++){ std::cout<<Atom_ring_sizes[i]<<"  "; }
        std::cout<<std::endl;
    }
    if(is_Atom_min_ring_size){ std::cout<<"Atom_min_ring_size = "<<Atom_min_ring_size<<std::endl;}

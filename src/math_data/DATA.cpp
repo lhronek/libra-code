@@ -277,7 +277,7 @@ int operator==(const DATA &d1, const DATA &d2) {
   int res = (d1.Data.size() == d2.Data.size());
 
   if (res) {
-    for (int i = 0; i < d1.Data.size(); i++) {
+    for (int i = 0; i < (int)d1.Data.size(); i++) {
       if (d1.Data[i] != d2.Data[i]) {
         res = 0;
       }

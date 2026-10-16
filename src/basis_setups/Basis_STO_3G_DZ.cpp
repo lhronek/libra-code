@@ -82,7 +82,7 @@ void set_basis_STO_3G_DZ(vector<std::string>& at_type, vector<VECTOR>& R,  Model
 
     // Set atom to AOs mapping
     vector<int> orbs_i; // orbitals of atom i
-    for(int o=Norb; o<basis_ao.size(); o++){   orbs_i.push_back(o);    }
+    for(int o=Norb; o<(int)basis_ao.size(); o++){   orbs_i.push_back(o);    }
     atom_to_ao_map.push_back(orbs_i);
 
     // Update total number of AO created so far

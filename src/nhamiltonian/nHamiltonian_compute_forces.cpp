@@ -49,7 +49,7 @@ CMATRIX nHamiltonian::forces_adi(vector<int>& act_states){
   int ntraj = act_states.size();   
   CMATRIX res(nnucl, ntraj);
  
-  if(children.size()==ntraj){
+  if((int)children.size()==ntraj){
 
     for(int traj=0; traj<ntraj; traj++){
       int st = act_states[traj];
@@ -89,7 +89,7 @@ CMATRIX nHamiltonian::forces_dia(vector<int>& act_states){
   int ntraj = act_states.size();   
   CMATRIX res(nnucl, ntraj);
  
-  if(children.size()==ntraj){
+  if((int)children.size()==ntraj){
 
     for(int traj=0; traj<ntraj; traj++){
       int st = act_states[traj];

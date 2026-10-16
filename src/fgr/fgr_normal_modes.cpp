@@ -145,7 +145,7 @@ double reorganization_energy(vector<double>& omega_nm, vector<double>& req_nm){
 */
   int sz = omega_nm.size();
 
-  if(req_nm.size()!=sz){
+  if((int)req_nm.size()!=sz){
     cout<<"ERROR in reorganization_energy: the dimensions of the input arguments do not match\n";
     cout<<"len(omega_nm) = "<<omega_nm.size()<<endl;
     cout<<"len(req_nm) = "<<req_nm.size()<<endl;

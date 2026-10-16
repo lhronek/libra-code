@@ -642,7 +642,7 @@ void add_basis_ao(std::string Atom_name, VECTOR& R, std::string Atom_shell, int 
   vector<AO> tmp;
   add_basis_ao(Atom_name,R,Atom_shell, Nzeta, Nquant, IP, exp1, exp2, coeff1, coeff2, tmp);
 
-  for(int i=0;i<tmp.size();i++){
+  for(int i=0;i<(int)tmp.size();i++){
     basis_ao.append(tmp[i]);
   }
 

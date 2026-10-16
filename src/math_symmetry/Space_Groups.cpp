@@ -69,7 +69,7 @@ void Apply_Symmetry(std::string space_group_name,VECTOR r,std::vector<VECTOR>& r
    // Add original point to list of equivalent positions
    r_equiv.push_back(r);
 
-   for(int i=0;i<sg.operators.size();i++){
+   for(int i=0;i<(int)sg.operators.size();i++){
 
        R = sg.operators[i]*mr;
        vR.x = R.M[0];
@@ -81,7 +81,7 @@ void Apply_Symmetry(std::string space_group_name,VECTOR r,std::vector<VECTOR>& r
         */
 
        int is_new = 1;
-       for(int j=0;j<r_equiv.size();j++){
+       for(int j=0;j<(int)r_equiv.size();j++){
            remx = std::fmod((vR.x - r_equiv[j].x),1.0);
            remy = std::fmod((vR.y - r_equiv[j].y),1.0);
            remz = std::fmod((vR.z - r_equiv[j].z),1.0);

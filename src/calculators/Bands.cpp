@@ -72,7 +72,7 @@ boost::python::list convert_2( vector< pair<int,double> >& bands){
 
   boost::python::list res;
 
-  for(int i=0;i<bands.size();i++){
+  for(int i=0;i<(int)bands.size();i++){
     boost::python::list bnd; 
  
     bnd.append(bands[i].first);

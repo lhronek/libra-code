@@ -63,7 +63,7 @@ vector<MATRIX> nHamiltonian::generate_m_matrices(double beta){
   }
   else{
     res = vector<MATRIX>(children.size(), MATRIX(2,2));
-    for(int traj=0; traj<children.size(); traj++){
+    for(int traj=0; traj<(int)children.size(); traj++){
       double V0 = (children[traj]->ham_dia->get(0,0)).real(); 
       double V1 = (children[traj]->ham_dia->get(1,1)).real(); 
       double K = abs(children[traj]->ham_dia->get(0,1));
@@ -158,7 +158,7 @@ double nHamiltonian::kcrpmd_effective_potential(vector<double>& y_aux_var, const
       VKP += (b * (2 * abs(y_aux_var[0]) - 1) - log(1 / (1 + exp(-b * (2 * abs(y_aux_var[0]) - 1))))) / beta;
     }
   }
-  else if(children.size()==ntraj){
+  else if((int)children.size()==ntraj){
     cout<<"Error in kcrpmd_effective_potential() not implemented for quantum nuclei\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   else{
@@ -301,7 +301,7 @@ the nuclear DOF "<<dof<<" is not allocated but is needed for the calculations \n
       VKP += (b * (2 * abs(y_aux_var[0]) - 1) - log(1 / (1 + exp(-b * (2 * abs(y_aux_var[0]) - 1))))) / beta;
     }
   }
-  else if(children.size()==ntraj){
+  else if((int)children.size()==ntraj){
     cout<<"Error in kcrpmd_effective_potential() not implemented for quantum nuclei\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   else{

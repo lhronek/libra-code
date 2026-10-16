@@ -220,7 +220,7 @@ void Cell::update_vlist(int sz,VECTOR* r,vector< vector<quartet> >& at_neib, vec
       vector<triple> res; triple ct; calculate(rij,res,ct);
 
       if(res.size()>0){
-        for(int k=0;k<res.size();k++){
+        for(int k=0;k<(int)res.size();k++){
           quartet q;
           q.j = j;
           q.n1 = res[k].n1;

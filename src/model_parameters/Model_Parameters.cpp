@@ -499,7 +499,7 @@ void mEHT_K::set_mapping1(EHT_K& k, int nat, vector<std::string>& mol_at_types){
 
     std::string at1 = it_type->first;
 
-    for(int i=0;i<k.pp_data.size();i++){
+    for(int i=0;i<(int)k.pp_data.size();i++){
 
       if(k.pp_data[i].elt1==at1){
 
@@ -515,7 +515,7 @@ void mEHT_K::set_mapping1(EHT_K& k, int nat, vector<std::string>& mol_at_types){
 
     cout<<"Atoms of "<<cnt<<" type at the atoms of "<<at1<<endl;
     cout<<"--- the pseudopotential consists of "<<orb_types[cnt].size()<<" orbital components"<<endl;
-    for(int i=0;i<orb_types[cnt].size();i++){
+    for(int i=0;i<(int)orb_types[cnt].size();i++){
     cout<<"--- --- orbital component "<<i<<" is of type "<<orb_types[cnt][i]<<" with parameters: alp(a.u.)= "
                                       <<ppa_vals[cnt][i]<<" PP0(a.u.)= "
                                       <<pp0_vals[cnt][i]<<" PP1(a.u.)= "

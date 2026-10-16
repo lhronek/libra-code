@@ -755,37 +755,37 @@ void System::LINK_ATOMS(Atom& at1,Atom& at2){
 
    //----------------- Angles --------------------
    // Angles of type at1.Atom_Index - at2.Atom_Index - atoms adjacent to at2
-   for(adj=0;adj<at2.globAtom_Adjacent_Atoms.size();adj++){
+   for(adj=0;adj<(int)at2.globAtom_Adjacent_Atoms.size();adj++){
      int adj_indx = at2.globAtom_Adjacent_Atoms[adj];
      create_angle(at1.globAtom_Index,at2.globAtom_Index,adj_indx,exclude13);
    }
    // Angles of type at2.Atom_Index - at1.Atom_Index - atoms adjacent to at1
-   for(adj=0;adj<at1.globAtom_Adjacent_Atoms.size();adj++){
+   for(adj=0;adj<(int)at1.globAtom_Adjacent_Atoms.size();adj++){
      int adj_indx = at1.globAtom_Adjacent_Atoms[adj];
      create_angle(adj_indx,at1.globAtom_Index,at2.globAtom_Index,exclude13);
    }
   
    //----------------- Dihedrals -------------------
    // Dihedrals of type adj1 - at1 - at2 - adj2
-   for(adj1=0;adj1<at1.globAtom_Adjacent_Atoms.size();adj1++){
-     for(adj2=0;adj2<at2.globAtom_Adjacent_Atoms.size();adj2++){
+   for(adj1=0;adj1<(int)at1.globAtom_Adjacent_Atoms.size();adj1++){
+     for(adj2=0;adj2<(int)at2.globAtom_Adjacent_Atoms.size();adj2++){
        int adj_indx1 = at1.globAtom_Adjacent_Atoms[adj1];
        int adj_indx2 = at2.globAtom_Adjacent_Atoms[adj2];
        create_dihedral(adj_indx1,at1.globAtom_Index,at2.globAtom_Index,adj_indx2,exclude14);
      }
    }
    // Dihedrals of type at1 - at2 - adj2 - adj22
-   for(adj2=0;adj2<at2.globAtom_Adjacent_Atoms.size();adj2++){
+   for(adj2=0;adj2<(int)at2.globAtom_Adjacent_Atoms.size();adj2++){
      Atom& at22 = Atoms[at2.globAtom_Adjacent_Atoms[adj2]];
-     for(int adj22=0;adj22<at22.globAtom_Adjacent_Atoms.size();adj22++){
+     for(int adj22=0;adj22<(int)at22.globAtom_Adjacent_Atoms.size();adj22++){
        int adj_indx2 = at22.globAtom_Adjacent_Atoms[adj22];
        create_dihedral(at1.globAtom_Index,at2.globAtom_Index,at22.globAtom_Index,adj_indx2,exclude14);
      }
    }
    // Dihedrals of type adj11 - adj1 - at1 - at2  (on the contrary - this one - adds two)
-   for(adj1=0;adj1<at1.globAtom_Adjacent_Atoms.size();adj1++){
+   for(adj1=0;adj1<(int)at1.globAtom_Adjacent_Atoms.size();adj1++){
      Atom& at11 = Atoms[at1.globAtom_Adjacent_Atoms[adj1]];
-     for(int adj11=0;adj11<at11.globAtom_Adjacent_Atoms.size();adj11++){
+     for(int adj11=0;adj11<(int)at11.globAtom_Adjacent_Atoms.size();adj11++){
        int adj_indx1 = at11.globAtom_Adjacent_Atoms[adj11];
        create_dihedral(adj_indx1,at11.globAtom_Index,at1.globAtom_Index,at2.globAtom_Index,exclude14);
      }
@@ -1296,7 +1296,7 @@ void System::GROUP_ATOMS(boost::python::list atoms_list,int Group_Id){
   fr.Group_id = Group_Id;  fr.is_Group_id = 1;
   max_fragment_id = (Group_Id>max_fragment_id)?Group_Id:max_fragment_id;
 
-  for(i=0;i<at_indxs.size();i++){
+  for(i=0;i<(int)at_indxs.size();i++){
     Atom& at = Atoms[at_indxs[i]];
 
     // Erase atoms to be grouped from the previous groups
@@ -1456,7 +1456,7 @@ void System::CREATE_BONDS(boost::python::list atoms_list,boost::python::dict val
 //--------- Third step: Sort valences and reindex at_indexes array ---------
    for(i=max_val;i>=1;i--){// The maximal valence is 8     
   
-      for(j=0;j<at_valences.size();j++){
+      for(j=0;j<(int)at_valences.size();j++){
 
           if(at_valences[j]==i){
              at_valences_sorted.push_back(at_valences[j]); 
@@ -1533,7 +1533,7 @@ void System::CREATE_BONDS(boost::python::list atoms_list,boost::python::dict val
  
      indx1 = all_pairs[i].self;
 
-     for(j=0;j<all_pairs[i].others.size();j++){
+     for(j=0;j<(int)all_pairs[i].others.size();j++){
 
          indx2 = all_pairs[i].others[j];
 
@@ -1596,7 +1596,7 @@ void System::CLONE_MOLECULE(int mol_id){
   for(i=0;i<init_size;i++){
     if(Atoms[i].globMolecule_Index==m){
       at_id1 = at_map[Atoms[i].globAtom_Index];
-      for(j=0;j<Atoms[i].globAtom_Adjacent_Atoms.size();j++){
+      for(j=0;j<(int)Atoms[i].globAtom_Adjacent_Atoms.size();j++){
         indx = Atoms[i].globAtom_Adjacent_Atoms[j];
         at_id2 = at_map[Atoms[indx].globAtom_Index];
         LINK_ATOMS(at_id1,at_id2);

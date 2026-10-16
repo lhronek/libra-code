@@ -33,10 +33,10 @@ void show_mapping(const vector<vector<int> >& at_orbitals){
   \param[in] at_orbital The mapping table: at_orbitals[n] is the list of the global indices of the AOs attached to the atom n
 */
 
-  for(int n=0;n<at_orbitals.size();n++){
+  for(int n=0;n<(int)at_orbitals.size();n++){
   
     cout<<"List n= "<<n<<" has following entries: ";
-    for(int i=0;i<at_orbitals[n].size();i++){  cout<<at_orbitals[n][i]<<"  ";   }
+    for(int i=0;i<(int)at_orbitals[n].size();i++){  cout<<at_orbitals[n][i]<<"  ";   }
     cout<<endl;
 
   }// for n

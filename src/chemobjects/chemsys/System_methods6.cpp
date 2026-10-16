@@ -184,7 +184,7 @@ void System::load_forces(vector<VECTOR>& frcs){
   current forces on fragments 
 */
 
-  if(frcs.size()==Number_of_fragments){
+  if((int)frcs.size()==Number_of_fragments){
     for(int i=0;i<Number_of_fragments;i++){  Fragments[i].Group_RB.rb_force = frcs[i]; }
   }
 }
@@ -197,7 +197,7 @@ void System::load_torques(vector<VECTOR>& trcs){
   current torques on fragments
 */
 
-  if(trcs.size()==Number_of_fragments){
+  if((int)trcs.size()==Number_of_fragments){
     for(int i=0;i<Number_of_fragments;i++){  Fragments[i].Group_RB.rb_torque_e = trcs[i]; }
   }
 }
@@ -273,12 +273,12 @@ void System::load_respa_state(std::string respa_type){
   std::vector<VECTOR> trcs(Number_of_fragments,x);
 
   if(respa_type=="fast"){
-    if(respa_f_fast.size()==Number_of_fragments){ frcs = respa_f_fast; }
-    if(respa_t_fast.size()==Number_of_fragments){ trcs = respa_t_fast; }
+    if((int)respa_f_fast.size()==Number_of_fragments){ frcs = respa_f_fast; }
+    if((int)respa_t_fast.size()==Number_of_fragments){ trcs = respa_t_fast; }
   }
   else if(respa_type=="medium"){
-    if(respa_f_medium.size()==Number_of_fragments){ frcs = respa_f_medium; }
-    if(respa_t_medium.size()==Number_of_fragments){ trcs = respa_t_medium; }
+    if((int)respa_f_medium.size()==Number_of_fragments){ frcs = respa_f_medium; }
+    if((int)respa_t_medium.size()==Number_of_fragments){ trcs = respa_t_medium; }
   }
 
   for(int i=0;i<Number_of_fragments;i++){

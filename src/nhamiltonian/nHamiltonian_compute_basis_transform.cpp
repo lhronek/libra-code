@@ -293,7 +293,7 @@ void nHamiltonian::ampl_dia2adi(CMATRIX *ampl_dia, CMATRIX *ampl_adi, int lvl,
       ampl_dia2adi(ampl_dia, ampl_adi);
     } else if (split == 1) {
       // Check whether we have enough sub-Hamiltonians
-      if (children.size() != ampl_dia->n_cols && children.size() != 1) {
+      if ((int)children.size() != ampl_dia->n_cols && children.size() != 1) {
         cout << "ERROR in void nHamiltonian::ampl_dia2adi(CMATRIX& ampl_dia, "
                 "CMATRIX& ampl_adi, int lvl, int split):\n";
         cout << "The number of columns of the ampl_dia (" << ampl_dia->n_cols
@@ -302,7 +302,7 @@ void nHamiltonian::ampl_dia2adi(CMATRIX *ampl_dia, CMATRIX *ampl_adi, int lvl,
              << children.size() << ")\n";
         std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
-      if (children.size() != ampl_adi->n_cols && children.size() != 1) {
+      if ((int)children.size() != ampl_adi->n_cols && children.size() != 1) {
         cout << "ERROR in void nHamiltonian::ampl_dia2adi(CMATRIX& ampl_dia, "
                 "CMATRIX& ampl_adi, int lvl, int split):\n";
         cout << "The number of columns of the ampl_adi (" << ampl_adi->n_cols
@@ -352,7 +352,7 @@ void nHamiltonian::ampl_dia2adi(CMATRIX *ampl_dia, CMATRIX *ampl_adi, int lvl,
   else if (lvl > level) { // Cases "c" and "d"
     require_children(lvl, __func__);
 
-    for (int i = 0; i < children.size(); i++) {
+    for (int i = 0; i < (int)children.size(); i++) {
       children[i]->ampl_dia2adi(ampl_dia, ampl_adi, lvl, split);
     }
 
@@ -496,7 +496,7 @@ void nHamiltonian::ampl_adi2dia(CMATRIX &ampl_dia, CMATRIX &ampl_adi, int lvl,
       ampl_adi2dia(ampl_dia, ampl_adi);
     } else if (split == 1) {
       // Check whether we have enough sub-Hamiltonians
-      if (children.size() != ampl_dia.n_cols && children.size() != 1) {
+      if ((int)children.size() != ampl_dia.n_cols && children.size() != 1) {
         cout << "ERROR in void nHamiltonian::ampl_adi2dia(CMATRIX& ampl_dia, "
                 "CMATRIX& ampl_adi, int lvl, int split):\n";
         cout << "The number of columns of the ampl_dia (" << ampl_dia.n_cols
@@ -505,7 +505,7 @@ void nHamiltonian::ampl_adi2dia(CMATRIX &ampl_dia, CMATRIX &ampl_adi, int lvl,
              << children.size() << ")\n";
         std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
-      if (children.size() != ampl_adi.n_cols && children.size() != 1) {
+      if ((int)children.size() != ampl_adi.n_cols && children.size() != 1) {
         cout << "ERROR in void nHamiltonian::ampl_adi2dia(CMATRIX& ampl_dia, "
                 "CMATRIX& ampl_adi, int lvl, int split):\n";
         cout << "The number of columns of the ampl_adi (" << ampl_adi.n_cols
@@ -555,7 +555,7 @@ void nHamiltonian::ampl_adi2dia(CMATRIX &ampl_dia, CMATRIX &ampl_adi, int lvl,
   else if (lvl > level) { // Cases "c" and "d"
     require_children(lvl, __func__);
 
-    for (int i = 0; i < children.size(); i++) {
+    for (int i = 0; i < (int)children.size(); i++) {
       children[i]->ampl_adi2dia(ampl_dia, ampl_adi, lvl, split);
     }
 
@@ -607,7 +607,7 @@ void nHamiltonian::ampl_adi2dia(CMATRIX *ampl_dia, CMATRIX *ampl_adi, int lvl,
       ampl_adi2dia(ampl_dia, ampl_adi);
     } else if (split == 1) {
       // Check whether we have enough sub-Hamiltonians
-      if (children.size() != ampl_dia->n_cols && children.size() != 1) {
+      if ((int)children.size() != ampl_dia->n_cols && children.size() != 1) {
         cout << "ERROR in void nHamiltonian::ampl_adi2dia(CMATRIX& ampl_dia, "
                 "CMATRIX& ampl_adi, int lvl, int split):\n";
         cout << "The number of columns of the ampl_dia (" << ampl_dia->n_cols
@@ -616,7 +616,7 @@ void nHamiltonian::ampl_adi2dia(CMATRIX *ampl_dia, CMATRIX *ampl_adi, int lvl,
              << children.size() << ")\n";
         std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
       }
-      if (children.size() != ampl_adi->n_cols && children.size() != 1) {
+      if ((int)children.size() != ampl_adi->n_cols && children.size() != 1) {
         cout << "ERROR in void nHamiltonian::ampl_adi2dia(CMATRIX& ampl_dia, "
                 "CMATRIX& ampl_adi, int lvl, int split):\n";
         cout << "The number of columns of the ampl_adi (" << ampl_adi->n_cols
@@ -666,7 +666,7 @@ void nHamiltonian::ampl_adi2dia(CMATRIX *ampl_dia, CMATRIX *ampl_adi, int lvl,
   else if (lvl > level) { // Cases "c" and "d"
     require_children(lvl, __func__);
 
-    for (int i = 0; i < children.size(); i++) {
+    for (int i = 0; i < (int)children.size(); i++) {
       children[i]->ampl_adi2dia(ampl_dia, ampl_adi, lvl, split);
     }
 

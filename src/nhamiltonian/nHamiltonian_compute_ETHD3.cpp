@@ -806,7 +806,7 @@ but is needed for the calculations \n";
       MATRIX ethd_frcs(q.n_rows, q.n_cols);
       ethd_frcs = ETHD3_forces(q, invM, alp);
 
-      for(int traj=0; traj<children.size(); traj++){
+      for(int traj=0; traj<(int)children.size(); traj++){
 
         for(int dof=0; dof<nnucl; dof++){
 
@@ -855,7 +855,7 @@ but is needed for the calculations \n";
       MATRIX ethd_frcs(q.n_rows, q.n_cols);
       ethd_frcs = ETHD3_forces(q, invM, alp);
 
-      for(int traj=0; traj<children.size(); traj++){
+      for(int traj=0; traj<(int)children.size(); traj++){
 
         for(int dof=0; dof<nnucl; dof++){
 
@@ -905,7 +905,7 @@ but is needed for the calculations \n";
       MATRIX ethd_frcs(q.n_rows, q.n_cols);
       ethd_frcs = ETHD3_forces(q, p, invM, alp, bet);
 
-      for(int traj=0; traj<children.size(); traj++){
+      for(int traj=0; traj<(int)children.size(); traj++){
 
         for(int dof=0; dof<nnucl; dof++){
 

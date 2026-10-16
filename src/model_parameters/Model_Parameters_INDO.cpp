@@ -61,7 +61,7 @@ void set_parameters_indo(Control_Parameters& prms, Model_Parameters& modprms){
   cout<<"Echo tokenized CNDO/CNDO2/INDO parameters file content\n";
   int sz = file.size();
   for(i=0;i<sz;i++){
-    for(j=0;j<file[i].size();j++){
+    for(j=0;j<(int)file[i].size();j++){
       cout<<file[i][j]<<"  ";
     }
     cout<<endl;
@@ -161,7 +161,7 @@ void set_parameters_indo(Control_Parameters& prms, Model_Parameters& modprms){
   
           if(modprms.PT[elt].Nzeta[sh]==1){    
   
-            if(file[i1+j].size()>=(8+n_extra_params)){ ;; } // all is fine
+            if((int)file[i1+j].size()>=(8+n_extra_params)){ ;; } // all is fine
             else{  cout<<"Error in parameters file: line \n"
                        <<file_raw[i1+j]
                        <<"\n is not complient with expected format which is = "
@@ -182,7 +182,7 @@ void set_parameters_indo(Control_Parameters& prms, Model_Parameters& modprms){
           }
           else if(modprms.PT[elt].Nzeta[sh]==2){
   
-            if(file[i1+j].size()>=(10+n_extra_params)){ ;; } // all is fine
+            if((int)file[i1+j].size()>=(10+n_extra_params)){ ;; } // all is fine
             else{  cout<<"Error in parameters file: line \n"
                        <<file_raw[i1+j]
                        <<"\n is not complient with expected format which is = "

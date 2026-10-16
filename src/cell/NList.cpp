@@ -423,7 +423,7 @@ boost::python::list form_neibc(int c, int Nx, int Ny, int Nz, double cellx,
   form_neibc(c, neibc, Nx, Ny, Nz, cellx, celly, cellz, Roff);
   boost::python::list res;
 
-  for (int i = 0; i < neibc.size(); i++) {
+  for (int i = 0; i < (int)neibc.size(); i++) {
     res.append(neibc[i]);
   }
 
@@ -704,10 +704,10 @@ void make_nlist(int Nat, VECTOR *r, MATRIX3x3 &H, int maxa, int maxb, int maxc,
     int i1 = Nat * cc + at_indx1; // complex index of real atom at_indx1
     int ci1 = at2cell_indx[i1]; // complex index of cell to which atom i belongs
 
-    for (c = 0; c < neibc[ci1].size(); c++) {
+    for (c = 0; c < (int)neibc[ci1].size(); c++) {
       int ci2 = neibc[ci1][c]; // one of the neighboring cell of cell l
 
-      for (a = 0; a < cell2at[ci2].size();
+      for (a = 0; a < (int)cell2at[ci2].size();
            a++) { // iterations over atoms in cell ci2
         int i2 = cell2at[ci2][a];
         int at_indx2 = i2 % Nat;

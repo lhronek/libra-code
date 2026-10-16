@@ -71,7 +71,7 @@ void nHamiltonian::compute_diabatic(int model, vector<double>& q, vector<double>
   else if(lvl>level){
     require_children(lvl, __func__);
   
-    for(int i=0;i<children.size();i++){
+    for(int i=0;i<(int)children.size();i++){
       children[i]->compute_diabatic(model, q, params, lvl);
     }
 
@@ -339,7 +339,7 @@ void nHamiltonian::compute_diabatic(bp::object py_funct, MATRIX& q, bp::object p
     #pragma omp parallel num_threads( nthreads )
     {
         #pragma omp for    
-        for(int i=0;i<children.size();i++){
+        for(int i=0;i<(int)children.size();i++){
           try { children[i]->compute_diabatic(py_funct,q,params,lvl); }
           catch (...) {
             #pragma omp critical

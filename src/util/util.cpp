@@ -383,7 +383,7 @@ int is_included(vector<int>& vec1, vector<vector<int> >& vec){
 ******************************************************************/
 
   int res = 0;
-  for(int i=0; i<vec.size(); i++){
+  for(int i=0; i<(int)vec.size(); i++){
     if(is_equal(vec1, vec[i])){ res = 1; break; }
   }
   return res;
