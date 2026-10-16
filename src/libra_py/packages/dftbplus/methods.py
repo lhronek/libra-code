@@ -3001,6 +3001,9 @@ def dftb_compute_adi(q, params, full_id):
             Path to ODIN executable.
         working_directory_prefix : str, default="wd"
             Prefix for trajectory-specific directories.
+        allow_negative_excitation_energy : int, default=0
+            An excitation energy at or below zero is refused (the reference breaks down at that geometry), 1 warns
+            at every such step and hands the energies over as they are.
         is_first_time : dict
             Dictionary keyed by trajectory index (`itraj`) with boolean values.
             True indicates that the current step is the first step of this trajectory.
@@ -3420,7 +3423,8 @@ def dftb_compute_adi(q, params, full_id):
                            "the real-part ingestion below would discard them")
 
     # ================= Populate Hamiltonian =================
-    check_excitation_energies(data_curr[0][:nstates - 1], F"{wd} step {params.get('timestep', '?')}")
+    check_excitation_energies(data_curr[0][:nstates - 1], F"{wd} step {params.get('timestep', '?')}",
+                              params.get("allow_negative_excitation_energy", 0))
     for i in range(nstates):
         #energy = 0.0 if i == 0 else 0.5 * (
         #    data_prev[0][i - 1] + data_curr[0][i - 1]

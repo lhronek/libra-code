@@ -7,17 +7,25 @@ from liblibra_core import CMATRIX, CMATRIXList
 from libra_py import data_conv, units
 
 
-def check_excitation_energies(omegas, where):
+def check_excitation_energies(omegas, where, allow=0):
     """A linear-response excited state below its reference (an excitation energy <= 0) is the reference breaking down -
     the two lowest states invert, the forces and the energies handed over jump from step to step - and is refused with
-    the states and the energies named (eV). `where` names the run (the working directory, the step)."""
+    the states and the energies named (eV), or, with allow (params['allow_negative_excitation_energy']) 1, warned about
+    at every such step and handed over as it is. `where` names the run (the working directory, the step)."""
+    if allow not in (0, 1):
+        raise ValueError(F"allow_negative_excitation_energy = {allow!r} is not a listed option - 0 (an excitation energy "
+                         F"at or below zero is refused) or 1 (warned about at every such step, the energies handed over)")
     omegas = np.asarray(omegas, dtype=float)
     bad = np.nonzero(omegas <= 0.0)[0]
     if len(bad):
         listed = ", ".join(F"state {k + 1}: {omegas[k] * units.au2ev:.3f} eV" for k in bad)
-        raise RuntimeError(F"{where}: excitation energies at or below zero ({listed}) - the reference breaks down at this "
-                           F"geometry and the propagation on these states is meaningless, an open-shell or multireference "
-                           F"treatment is needed here")
+        text = (F"{where}: excitation energies at or below zero ({listed}) - the reference breaks down at this geometry "
+                F"and the propagation on these states is meaningless, an open-shell or multireference treatment is needed "
+                F"here")
+        if allow:
+            print(F"WARNING: {text} (allow_negative_excitation_energy 1 - the energies are handed over as they are)")
+            return
+        raise RuntimeError(text)
 
 
 class ForceHandover:
