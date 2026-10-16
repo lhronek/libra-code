@@ -166,8 +166,12 @@ void export_ivr_objects(){
 
   ///============ Propagators  ===========================
   ///  In ivr_propagators.cpp
-  void (*expt_Integrator_v1)(MATRIX& q, MATRIX& p, vector<MATRIX>& M, double& action, MATRIX& mass, double dt) = &Integrator;
+  void (*expt_Integrator_v1)(MATRIX& q, MATRIX& p, vector<MATRIX>& M, double& action, MATRIX& mass, double dt,
+                             boost::python::object py_funct, boost::python::object params) = &Integrator;
+  double (*expt_Integrator_v2)(MATRIX& q, MATRIX& p, vector<MATRIX>& M, MATRIX& mass, double dt,
+                               boost::python::object py_funct, boost::python::object params) = &Integrator;
   def("Integrator", expt_Integrator_v1);
+  def("Integrator", expt_Integrator_v2);
 
 
 

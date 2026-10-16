@@ -56,7 +56,42 @@ MATRIX divm(MATRIX& M, MATRIX& mass){
 }
 
 
-void Integrator(MATRIX& q, MATRIX& p, vector<MATRIX>& M, double& action, MATRIX& mass, double dt){
+
+void ivr_potential(boost::python::object py_funct, MATRIX& q, boost::python::object params, double& v, MATRIX& dv, MATRIX& d2v){
+/**
+  The potential, its gradient and its Hessian of the single surface at q from a model function with libra's hand-over:
+  ham_dia (1 x 1), d1ham_dia (Ndof entries of 1 x 1) and d2ham_dia (Ndof x Ndof entries of 1 x 1, the row-major Hessian)
+*/
+  int Ndof = q.n_rows;
+  boost::python::list full_id;
+  full_id.append(0);
+  boost::python::object obj = py_funct(q, params, full_id);
+  for(const char* name : {"ham_dia", "d1ham_dia", "d2ham_dia"}){
+    if(!PyObject_HasAttrString(obj.ptr(), name)){
+      cout<<"Error in Integrator(): the model hands over no "<<name<<" - the potential, its gradient and its Hessian are needed\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+  }
+  CMATRIX h = boost::python::extract<CMATRIX>(obj.attr("ham_dia"));
+  if(h.n_rows!=1 || h.n_cols!=1){
+    cout<<"Error in Integrator(): ham_dia is "<<h.n_rows<<" x "<<h.n_cols<<" - one surface (1 x 1) is propagated\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  v = h.get(0,0).real();
+  CMATRIXList d1 = boost::python::extract<CMATRIXList>(obj.attr("d1ham_dia"));
+  CMATRIXList d2 = boost::python::extract<CMATRIXList>(obj.attr("d2ham_dia"));
+  if((int)d1.size()!=Ndof || (int)d2.size()!=Ndof*Ndof){
+    cout<<"Error in Integrator(): d1ham_dia has "<<d1.size()<<" entries and d2ham_dia "<<d2.size()<<" - "<<Ndof<<" and "<<Ndof*Ndof<<" are needed\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  for(int i=0;i<Ndof;i++){
+    dv.set(i,0, d1[i].get(0,0).real());
+    for(int k=0;k<Ndof;k++){ d2v.set(i,k, d2[i*Ndof+k].get(0,0).real()); }
+  }
+}
+
+void Integrator(MATRIX& q, MATRIX& p, vector<MATRIX>& M, double& action, MATRIX& mass, double dt,
+                boost::python::object py_funct, boost::python::object params){
 /**
   \brief Symplectic integrator
 
@@ -67,8 +102,8 @@ void Integrator(MATRIX& q, MATRIX& p, vector<MATRIX>& M, double& action, MATRIX&
   \param[in/out] action - action 
   \param[in] mass - massed associated with all DOFs, a Ndof x Ndof matrix
   \param[in] dt - integration timestep
-
-
+  \param[in] py_funct, params - the model function and its parameters: py_funct(q, params, full_id) hands over the
+             single surface's ham_dia, d1ham_dia and d2ham_dia (the potential, its gradient and its Hessian)
 */
   int Ndof = q.n_rows;
 
@@ -93,8 +128,7 @@ void Integrator(MATRIX& q, MATRIX& p, vector<MATRIX>& M, double& action, MATRIX&
   for(int j=0;j<4;j++){ 
 
    if(j>0){
-      ///   call vdv(q,v,dv,d2v)  !!! FIXME: Need to connect to the 
-      ///                         potential/derivative calculation                                 
+      ivr_potential(py_funct, q, params, v, dv, d2v);
 
       action   = action - b[j] * v;
       p   = p - b[j] * dv;
@@ -117,6 +151,16 @@ void Integrator(MATRIX& q, MATRIX& p, vector<MATRIX>& M, double& action, MATRIX&
 
   }// for j
 
+}
+
+double Integrator(MATRIX& q, MATRIX& p, vector<MATRIX>& M, MATRIX& mass, double dt,
+                  boost::python::object py_funct, boost::python::object params){
+/**
+  The form callable from Python - the step's action returned (boost cannot bind a Python number to the double&)
+*/
+  double action = 0.0;
+  Integrator(q, p, M, action, mass, dt, py_funct, params);
+  return action;
 }
 
 }/// namespace libivr

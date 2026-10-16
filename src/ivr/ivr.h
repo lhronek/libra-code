@@ -133,7 +133,11 @@ vector<complex<double> > DHK_prefactor
 
 ///============ Propagators  ===========================
 ///  In ivr_propagators.cpp
-void Integrator(MATRIX& q, MATRIX& p, vector<MATRIX>& M, double& action, MATRIX& mass, double dt);
+void ivr_potential(boost::python::object py_funct, MATRIX& q, boost::python::object params, double& v, MATRIX& dv, MATRIX& d2v);
+void Integrator(MATRIX& q, MATRIX& p, vector<MATRIX>& M, double& action, MATRIX& mass, double dt,
+                boost::python::object py_funct, boost::python::object params);
+double Integrator(MATRIX& q, MATRIX& p, vector<MATRIX>& M, MATRIX& mass, double dt,
+                  boost::python::object py_funct, boost::python::object params);
 
 
 
