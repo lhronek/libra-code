@@ -405,7 +405,7 @@ double sto_overlap(int na, int la, int ma, double alp_a, int nb, int lb, int mb,
                    double R, double R_cutoff){
 // Compute the overlap integral of two STO: (na, la, ma) and (nb, lb, mb) separated by distance R
 
-  double I;
+  double I = 0.0;
 
   if(ma == mb){
  
@@ -471,7 +471,7 @@ double sto_overlap_fast(int na, int la, int ma, double alp_a, int nb, int lb, in
                    double R, double R_cutoff){
 // Compute the overlap integral of two STO: (na, la, ma) and (nb, lb, mb) separated by distance R
 
-  double I;
+  double I = 0.0;
 
   if(ma == mb){
  
