@@ -69,11 +69,12 @@ int RigidBody::init(int sz,boost::python::list masses, boost::python::list posit
     vtmp[i] = boost::python::extract<VECTOR>(positions[i]);//    cout<<"v "<<i<<"  = "<<vtmp[i]<<endl;
   }
 
-  init(sz1,tmp,vtmp);
+  int res = init(sz1,tmp,vtmp);
 
   delete [] tmp;
   delete [] vtmp;
 
+  return res;
 }
 
 
