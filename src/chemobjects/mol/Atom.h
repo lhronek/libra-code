@@ -52,6 +52,8 @@ class Atom{
   void copy_content(const Atom&); // Copies the content which is defined
 
 public:
+
+  Universe* get_universe(){ return universe; }  ///< the Universe the atom belongs to - its periodic table
   //--------- Atom identification ----------------------------
   int         Atom_id;             int is_Atom_id;   ///< the atomic integer-valued ID - can be any number
 

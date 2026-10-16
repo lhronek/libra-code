@@ -22,6 +22,7 @@
 #endif
 
 #include "System.h"
+#include "../../Units.h"
 
 /// liblibra namespace
 namespace liblibra{
@@ -1356,24 +1357,22 @@ void System::CREATE_BONDS(boost::python::list atoms_list,boost::python::dict val
   Only atoms from the atom list will be considered.
   hyper_atoms dictionalry specifies some special cases of hypervalent atoms
   this dictionalry contains pairs: [ atom element : valence ]
+  The valence of an atom comes from valence_by_element or, for an element absent there, from the periodic table of
+  the atom's Universe (S and P blocks: the group up to 4, 8 minus the group above it, D: the group, F: 3), minus the
+  connections the atom already has. Two atoms are linked when their distance is at most the sum of their radii
+  (Atom_atomic_radius in Bohr where both carry one, else the Universe's Elt_radius in Angstrom converted to Bohr,
+  else 2 Bohr) plus a tolerance of 1 Bohr - the atoms of the largest valence pair first. The bond order stays 1.
 
 */
 
-  cout<<"Error in System::CREATE_BONDS(): not functional - its distance, element and linking steps are commented out "
-      <<"(the ObjectSpace API), so no bond is ever created - link the atoms explicitly\n";
-  std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   vector<int> at_indexes; // Indexes of the atoms in the list, not their IDs
   vector<int> at_valences;
   // Sorted
   vector<int> at_indexes_sorted;
   vector<int> at_valences_sorted;
   int i,j;
-  int id;
-  int grp;
   int sz;
-  std::string blk;
-  std::string elt;
-  int val,max_val;  
+  int val,max_val;
 
 //------- Zero step: Determine the maximal possible valence, determined by user
   max_val = 8;
@@ -1385,63 +1384,62 @@ void System::CREATE_BONDS(boost::python::list atoms_list,boost::python::dict val
 //-------- First step: Create array of atom indexes --------------
   sz = len(atoms_list);
   for(i=0;i<sz;i++){
-    id = extract<int>(atoms_list[i]);      
+    int id = extract<int>(atoms_list[i]);
     j = get_atom_index_by_atom_id(id);
-    if(j!=-1){ at_indexes.push_back(j); }
-    else{ cout<<"Error: Can not find atom with id = "<<id<<endl; }
+    if(j==-1){
+      cout<<"Error in System::CREATE_BONDS(): no atom with id = "<<id<<"\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    at_indexes.push_back(j);
   }
 
 //--------- Second step: Calculate valence of the atoms -------------
   sz = at_indexes.size();
   for(i=0;i<sz;i++){
-//    indx = at_indexes[i];
-       // Get the position of the atom in Periodic Table
-
-//       if(os.ObjectSpace_Atoms[indx].is_Atom_group){ grp = os.ObjectSpace_Atoms[indx].Atom_group; }
-//       else{ /* Alternative handling */    }
-
-//       if(os.ObjectSpace_Atoms[indx].is_Atom_period){ per = os.ObjectSpace_Atoms[indx].Atom_period; }
-//       else{ /* Alternative handling */    }
-     
-//       if(os.ObjectSpace_Atoms[indx].is_Atom_block){  blk = os.ObjectSpace_Atoms[indx].Atom_block;  }
-//       else{ /* Alternative handling */    }
-
-//       if(os.ObjectSpace_Atoms[indx].is_Atom_element){elt = os.ObjectSpace_Atoms[indx].Atom_element;  }
-//       else{ /* Alternative handling */    }
-
-
-
-       if(!valence_by_element.has_key(elt)){
-       // Now calculate maximal valence
-       if((blk == "S" )||(blk == "P")){
-          val = ((grp<=4)?grp:(8-grp));
-       }
-       else if(blk == "D"){
-          val = grp;
-       }
-       else if(blk == "F"){
-          val = 3;
-       }
-
-       // Also take into account some other connections
-//       val = val - os.ObjectSpace_Atoms[indx].globAtom_Adjacent_Atoms.size();
-
-       }else{
-       val = extract<int>(valence_by_element.get(elt));
-       } 
-
-
-       at_valences.push_back(val);
-
-   }// for i
+    int indx = at_indexes[i];
+    if(!Atoms[indx].is_Atom_element){
+      cout<<"Error in System::CREATE_BONDS(): atom with id = "<<Atoms[indx].Atom_id<<" has no element\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    std::string elt = Atoms[indx].Atom_element;
+    if(valence_by_element.has_key(elt)){
+      val = extract<int>(valence_by_element.get(elt));
+    }
+    else{
+      // the periodic table of the atom's Universe - Get_Element refuses an element it does not know
+      if(Atoms[indx].get_universe()==NULL){
+        cout<<"Error in System::CREATE_BONDS(): atom with id = "<<Atoms[indx].Atom_id<<" has no Universe - give the valence of "
+            <<elt<<" in valence_by_element\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
+      Element e = Atoms[indx].get_universe()->Get_Element(elt);
+      if(!(e.is_Elt_group && e.is_Elt_block)){
+        cout<<"Error in System::CREATE_BONDS(): element "<<elt<<" has no group or block in the periodic table - give its "
+            <<"valence in valence_by_element\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
+      int grp = e.Elt_group;
+      std::string blk = e.Elt_block;
+      if((blk == "S")||(blk == "P")){ val = ((grp<=4)?grp:(8-grp)); }
+      else if(blk == "D"){ val = grp; }
+      else if(blk == "F"){ val = 3; }
+      else{
+        cout<<"Error in System::CREATE_BONDS(): element "<<elt<<" has the block "<<blk<<" (implemented: S, P, D, F)\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
+    }
+    // the connections the atom already has
+    val -= (int)Atoms[indx].globAtom_Adjacent_Atoms.size();
+    at_valences.push_back(val);
+  }// for i
 
 //--------- Third step: Sort valences and reindex at_indexes array ---------
-   for(i=max_val;i>=1;i--){// The maximal valence is 8     
-  
+   for(i=max_val;i>=1;i--){// The maximal valence is 8
+
       for(j=0;j<(int)at_valences.size();j++){
 
           if(at_valences[j]==i){
-             at_valences_sorted.push_back(at_valences[j]); 
+             at_valences_sorted.push_back(at_valences[j]);
              at_indexes_sorted.push_back(at_indexes[j]);
 
              at_valences.erase(at_valences.begin()+j);
@@ -1452,13 +1450,13 @@ void System::CREATE_BONDS(boost::python::list atoms_list,boost::python::dict val
       }
 
    }// for i
- 
+
 //--------- Fourth step: make pairs of atoms based on the relation between distance
 //--------- and the sum of the atomic (covalent) radii of corresponding atoms
 
    vector<connect> all_pairs;
 
-   double tol = 1.0;
+   double tol = 1.0;   // Bohr
    int indx1,indx2;
    double dist_real, dist_exp;
 
@@ -1476,17 +1474,24 @@ void System::CREATE_BONDS(boost::python::list atoms_list,boost::python::dict val
 
           if((at_valences_sorted[i]>=1)&&(at_valences_sorted[j]>=1)){ // Valence criterion
 
-          dist_real = 100.0; // Default value - Very far away
-//          if(os.ObjectSpace_Atoms[indx1].is_Atom_coords_cart&&os.ObjectSpace_Atoms[indx2].is_Atom_coords_cart){
-//          dist_real = (os.ObjectSpace_Atoms[indx1].Atom_coords_cart - os.ObjectSpace_Atoms[indx2].Atom_coords_cart).length();
-//          }
+          Atom& at1 = Atoms[indx1];
+          Atom& at2 = Atoms[indx2];
+          if(!(at1.is_Atom_RB && at1.Atom_RB.is_rb_cm && at2.is_Atom_RB && at2.Atom_RB.is_rb_cm)){
+            cout<<"Error in System::CREATE_BONDS(): the atoms with ids "<<at1.Atom_id<<" and "<<at2.Atom_id<<" have no coordinates\n";
+            std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+          }
+          dist_real = (at1.Atom_RB.rb_cm - at2.Atom_RB.rb_cm).length();
 
-          dist_exp = 2.0;   // Default value - atoms which are separated by this much assumed to be connected
-//          if(os.ObjectSpace_Atoms[indx1].is_Atom_atomic_radius&&os.ObjectSpace_Atoms[indx2].is_Atom_atomic_radius){
-//          dist_exp = (os.ObjectSpace_Atoms[indx1].Atom_atomic_radius + os.ObjectSpace_Atoms[indx2].Atom_atomic_radius);
-//          }
+          // the atoms' own radii, else the periodic table's (Angstrom), else 2 Bohr
+          dist_exp = 2.0;
+          double r1 = -1.0, r2 = -1.0;
+          if(at1.is_Atom_atomic_radius){ r1 = at1.Atom_atomic_radius; }
+          else if(at1.get_universe()!=NULL && at1.is_Atom_element){ Element e1 = at1.get_universe()->Get_Element(at1.Atom_element); if(e1.is_Elt_radius){ r1 = e1.Elt_radius * Angst; } }
+          if(at2.is_Atom_atomic_radius){ r2 = at2.Atom_atomic_radius; }
+          else if(at2.get_universe()!=NULL && at2.is_Atom_element){ Element e2 = at2.get_universe()->Get_Element(at2.Atom_element); if(e2.is_Elt_radius){ r2 = e2.Elt_radius * Angst; } }
+          if(r1>0.0 && r2>0.0){ dist_exp = r1 + r2; }
 
-          if(dist_real<=(dist_exp + tol)){ // Distance criterion            
+          if(dist_real<=(dist_exp + tol)){ // Distance criterion
 
              pr.others.push_back(indx2);
              at_valences_sorted[i]--;
@@ -1494,43 +1499,27 @@ void System::CREATE_BONDS(boost::python::list atoms_list,boost::python::dict val
 
           }// distance criterion
 
-          }// valence criterion                 
+          }// valence criterion
 
       }// for j
 
       if(pr.others.size()>0){
          all_pairs.push_back(pr);
       }
-      
+
    }// for i
 
-//------- Fifth step: calculate bond orders (optional) ------------------
-
-
-//-------Sixth step: Link atoms -----------------
-   sz = all_pairs.size();
+//-------Fifth step: Link atoms -----------------
    int num_new_bonds = 0;
-   std::cout<<"In CREATE_BONDS function: "<<std::endl;
-   for(i=0;i<sz;i++){
- 
+   for(i=0;i<(int)all_pairs.size();i++){
      indx1 = all_pairs[i].self;
-
      for(j=0;j<(int)all_pairs[i].others.size();j++){
-
          indx2 = all_pairs[i].others[j];
-
-         std::cout<<"LINK atoms with indexes "<<indx1<<" and "<<indx2<<std::endl;
-
-//         LINK_ATOMS(os,os.ObjectSpace_Atoms[indx1],os.ObjectSpace_Atoms[indx2]);
+         LINK_ATOMS(Atoms[indx1],Atoms[indx2]);
          num_new_bonds++;
-
      }// for j
-
    }// for i
-
-//------------------------------------------------------
-  
-//   return num_new_bonds;
+   std::cout<<"In CREATE_BONDS function: "<<num_new_bonds<<" bonds created"<<std::endl;
 
 }
 
