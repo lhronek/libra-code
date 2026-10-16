@@ -108,7 +108,10 @@ class Context{
   */
 
     try{  return ctx_pt.get_value<X>();    }
-    catch(std::exception& e){ cout<<"Error in get_value()!\n"; }
+    catch(std::exception& e){
+      cout<<"Error in get_value(): "<<e.what()<<"\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
   }
 
 
