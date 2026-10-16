@@ -3408,6 +3408,56 @@ def _classify_continuations(d, inside, threshold):
     return edges, mixed, unresolved
 
 
+def _follow_diabatic_interval(W_curr, O, A_prev, groups, reordering, alpha=0.0, e_rows=None, e_cols=None):
+    """One interval of the diabatic following, shared by the step-3 series (_follow_diabatic_states) and the on-the-fly
+    driver: O = W_prev^T St W_curr is the time-overlap block of the followed states of the earlier frame (rows) with the
+    raw localized states of the later one (columns). Within every group the columns are assigned to the rows
+    (reordering 1 / 2 / 22 / 5 / 52 - 5 and 52 assign as 2 and 22, the energies e_rows / e_cols of the earlier frame
+    feed the penalty exp(-(alpha dE)^2)) and W_curr's columns permuted into the rows' order, the sign of every column
+    set by the sign of diag(O), and under 5 / 52 the aligned states of the earlier frame (A_prev the earlier frame's
+    orthogonal transform, the identity otherwise) are continued by the polar factor R of every group's block of
+    A_prev^T O - the transform of the later frame, applied to W_curr by the caller (W_curr @ rot).
+
+    Returns:
+        W_curr (array): the columns permuted and signed (not yet rotated)
+        O (array): the overlap of the aligned earlier states with the followed and rotated later ones
+        perm (array (n,)): the column of the raw later frame that carries every row's state
+        rot (array (n, n)): the later frame's transform (block-diagonal over the groups, the identity without 5 / 52)
+        angle (float): the largest turn of the eigensolver's orientation within a group between the frames in degrees
+        drift (float): the largest rotation of rot from the energy-ordered states in degrees
+    """
+    n = W_curr.shape[1]
+    perm = np.arange(n)
+    if reordering:
+        for g in groups:
+            if len(g) > 1:
+                perm[g] = np.array(g)[_assign_states(O[np.ix_(g, g)], _assignment_of(reordering), alpha,
+                                                     None if e_rows is None else e_rows[g],
+                                                     None if e_cols is None else e_cols[g])]
+        if np.any(perm != np.arange(n)):
+            W_curr = W_curr[:, perm]
+            O = O[:, perm]
+    # the sign of every followed state - an exactly zero overlap keeps the sign (np.sign would drop the state
+    # from every later frame)
+    sgn = np.where(np.diag(O) < 0.0, -1.0, 1.0)
+    W_curr = W_curr * sgn
+    O = O * sgn[None, :]
+    rot = np.eye(n)
+    angle, drift = 0.0, 0.0
+    if reordering in (5, 52):
+        # the aligned states of the earlier frame against the followed states of the later one, the polar factor of
+        # every group the transform of the later frame - the angles of the raw blocks and of the transform recorded
+        O_al = A_prev.T @ O
+        for g in groups:
+            if len(g) > 1:
+                R = _polar_factor(O_al[np.ix_(g, g)])
+                rot[np.ix_(g, g)] = R
+                angle = max(angle, _rotation_angle(_polar_factor(O[np.ix_(g, g)])))
+                drift = max(drift, _rotation_angle(R))
+        O = O_al @ rot
+    return W_curr, O, perm, rot, angle, drift
+
+
 def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=None, reordering=0, alpha=0.0,
                             energies=None, min_overlap=CONTINUITY_FLOOR):
     """The localization eigenvectors carry arbitrary signs: every diabatic state follows the trajectory through the
@@ -3457,37 +3507,12 @@ def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=N
     min_continuity = 1.0
     for i in range(len(St_list)):
         O = W_list[i].T @ np.asarray(St_list[i].todense()).real @ W_list[i + 1]
-        perm = np.arange(n)
-        if reordering:
-            # the frame's energies stand in its energy order (positions) - the rows are the followed states, whose
-            # positions at this frame are perms[i]
-            e = None if energies is None else np.asarray(energies[i], dtype=float)
-            for g in groups:
-                if len(g) > 1:
-                    perm[g] = np.array(g)[_assign_states(O[np.ix_(g, g)], _assignment_of(reordering), alpha,
-                                                         None if e is None else e[perms[i]][g],
-                                                         None if e is None else e[g])]
-            if np.any(perm != np.arange(n)):
-                W_list[i + 1] = W_list[i + 1][:, perm]
-                O = O[:, perm]
-        # the sign of every followed state - an exactly zero overlap keeps the sign (np.sign would drop the state
-        # from every later frame)
-        sgn = np.where(np.diag(O) < 0.0, -1.0, 1.0)
-        W_list[i + 1] = W_list[i + 1] * sgn
-        O = O * sgn[None, :]
-        rot = np.eye(n)
+        # the frame's energies stand in its energy order (positions) - the rows are the followed states, whose
+        # positions at this frame are perms[i]
+        e = None if energies is None else np.asarray(energies[i], dtype=float)
+        W_list[i + 1], O, perm, rot, angle, drift = _follow_diabatic_interval(
+            W_list[i + 1], O, rots[i], groups, reordering, alpha, None if e is None else e[perms[i]], e)
         if reordering in (5, 52):
-            # the aligned states of frame i against the followed states of frame i + 1, the polar factor of every
-            # group the transform of frame i + 1 - the angles of the raw blocks and of the transform recorded
-            O_al = rots[i].T @ O
-            angle, drift = 0.0, 0.0
-            for g in groups:
-                if len(g) > 1:
-                    R = _polar_factor(O_al[np.ix_(g, g)])
-                    rot[np.ix_(g, g)] = R
-                    angle = max(angle, _rotation_angle(_polar_factor(O[np.ix_(g, g)])))
-                    drift = max(drift, _rotation_angle(R))
-            O = O_al @ rot
             angles.append(angle)
             drifts.append(drift)
         d = np.abs(np.diag(O))
