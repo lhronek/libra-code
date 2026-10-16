@@ -18,6 +18,7 @@
 
 
 import os, sys, math, re, copy, time, glob, shlex, shutil, subprocess, threading
+import json
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import numpy as np
@@ -5831,6 +5832,206 @@ def _cp2k_force_refresh(params, itraj, coordinates, nat, nstates):
     return refreshed_rows(params, itraj, nat, force_of)
 
 
+# ======================= the fragment diabatic basis on the fly (dia_basis "fragment") =======================
+FRAGMENT_DIA_REORDERINGS = (0, 1, 2, 22, 5, 52)
+
+
+def fragment_options(params):
+    """The localization keys of dia_basis "fragment", step 3's vocabulary verbatim, validated: localized_carrier
+    ('hole', 'electron', 'both'), diabatization_scheme ('mulliken' [default] - the Mulliken operators of the step's AO
+    overlap over fragment_atom_lists, 'pod_cp2k' - the POD blocks of CP2K's projection prints of the step),
+    fragment_atom_lists (1-based atom indices of disjoint fragments, the Mulliken scheme), do_diabatic_state_reordering
+    (0 [default]: a swap of two localized states between steps is refused, 1 / 2 / 22: the states follow their identity
+    within a tracking group - Sato / Munkres-Kuhn / scipy's assignment, 5 / 52: followed by 2 / 22 and aligned by the
+    polar factor of every group), diabatic_state_reordering_alpha (the energy penalty of the assignment),
+    diabatic_state_reordering_min_overlap (the continuity threshold, step 3's floor when absent), occupancy_tolerance
+    (the integer test of a fragment's orbital count, 0.25 [default])."""
+    kind = params.get("localized_carrier", None)
+    if kind not in ("hole", "electron", "both"):
+        raise ValueError(F"dia_basis='fragment' needs localized_carrier 'hole', 'electron' or 'both', got {kind!r}")
+    scheme = params.get("diabatization_scheme", "mulliken")
+    if scheme not in ("mulliken", "pod_cp2k"):
+        raise ValueError(F"diabatization_scheme must be 'mulliken' or 'pod_cp2k', got {scheme!r}")
+    atoms = params.get("fragment_atom_lists", None)
+    if scheme == "mulliken":
+        if not atoms or len(atoms) < 2 or any(len(a) == 0 for a in atoms):
+            raise ValueError("diabatization_scheme 'mulliken' needs fragment_atom_lists - at least two non-empty lists of "
+                             "1-based atom indices")
+        flat = [int(a) for frag in atoms for a in frag]
+        if len(set(flat)) != len(flat) or min(flat) < 1:
+            raise ValueError(F"fragment_atom_lists must be disjoint 1-based atom indices, got {atoms}")
+    reordering = int(params.get("do_diabatic_state_reordering", 0))
+    if reordering not in FRAGMENT_DIA_REORDERINGS:
+        raise ValueError(F"do_diabatic_state_reordering = {reordering} is not a listed option - "
+                         F"{list(FRAGMENT_DIA_REORDERINGS)} are (3, 32, 33 the stochastic reorderings refused, 4 the "
+                         F"force-based one is the engine's)")
+    tol = float(params.get("occupancy_tolerance", 0.25))
+    min_overlap = params.get("diabatic_state_reordering_min_overlap", None)
+    return {"kind": kind, "scheme": scheme, "atoms": atoms, "reordering": reordering,
+            "alpha": float(params.get("diabatic_state_reordering_alpha", 0.0)),
+            "min_overlap": None if min_overlap is None else float(min_overlap), "tol": tol}
+
+
+def fragment_operators_2block(P_alpha, P_beta=None):
+    """The fragment operators of the two spin channels over the MO window in the 2-block active-space layout step 3's
+    localization reads (the alpha block first, the beta block second, a restricted run repeats the alpha block)."""
+    out = []
+    for f, Pa in enumerate(P_alpha):
+        Pa = np.asarray(Pa, dtype=float)
+        Pb = Pa if P_beta is None else np.asarray(P_beta[f], dtype=float)
+        n = Pa.shape[0]
+        P = np.zeros((2 * n, 2 * n))
+        P[:n, :n] = Pa
+        P[n:, n:] = Pb
+        out.append(P)
+    return out
+
+
+def _native_ao_order(C, resort_idx):
+    """MO coefficients (nmo, nao) in CP2K's native AO order: column j of a MOLog-ordered C is the AO resort_idx[j] of
+    the native order (None: C is native already)."""
+    if resort_idx is None:
+        return np.asarray(C)
+    out = np.empty_like(C)
+    out[:, np.asarray(resort_idx, dtype=int)] = C
+    return out
+
+
+def follow_fragment_states(V_raw, St_adi, groups, state, reordering=0, alpha=0.0, min_overlap=None, step=0):
+    """One step of the following of the localized states (the per-step form of step 3's _follow_diabatic_states, the
+    same interval helper): V_raw (nadi, ndia) the localized states of the step over the adiabatic states in the
+    diabatic index order, St_adi the adiabatic time overlap of the step, state the previous step's {V_followed, A, perm,
+    energies} or None at the first step. The states of the earlier step are continued within every group (the
+    assignment of reordering 1 / 2 / 22, the signs, the polar alignment of 5 / 52), a continuation below the threshold
+    is an edge departure (recorded) or an internal mixing (refused, as step 3 refuses it).
+
+    Returns:
+        V (array (nadi, ndia)): the followed and aligned states
+        state (dict): V_followed, A, perm, energies (the caller fills energies), step
+        record (dict): swap, angle, drift, min_continuity, edges, unresolved, O (the aligned diabatic time overlap of
+            the step, None at the first step)
+    """
+    from libra_py.workflows.nbra import step3
+    n = V_raw.shape[1]
+    record = {"step": step, "swap": False, "angle": 0.0, "drift": 0.0, "min_continuity": 1.0, "edges": [],
+              "unresolved": False, "O": None}
+    if state is None:
+        V_followed, A, perm = V_raw, np.eye(n), np.arange(n)
+    else:
+        O = state["V_followed"].T @ np.asarray(St_adi, dtype=float) @ V_raw
+        e_prev = state["energies"]
+        V_followed, O, perm, A, angle, drift = step3._follow_diabatic_interval(
+            V_raw, O, state["A"], groups, reordering, alpha,
+            None if e_prev is None else e_prev[state["perm"]], e_prev)
+        d = np.abs(np.diag(O))
+        inside = np.sqrt(np.sum(O ** 2, axis=1))
+        floor = step3.CONTINUITY_FLOOR if min_overlap is None else float(min_overlap)
+        edge_idx, mixed_idx, unresolved_idx = step3._classify_continuations(d, inside, floor)
+        for c in edge_idx:
+            record["edges"].append([step, int(c), round(float(d[c]), 4), round(float(inside[c]), 4),
+                                    step3._partner(O[c], c)])
+        if len(mixed_idx):
+            c = int(mixed_idx[0])
+            row = np.abs(O[c]).copy()
+            row[c] = -1.0
+            partner = int(np.argmax(row))
+            raise ValueError(F"the localized state {c} of step {step - 1} carries |<{c}|{c}>| = {d[c]:.3f} into step "
+                             F"{step}{' even after the reordering' if reordering else ''}"
+                             F"{' and the alignment' if reordering in (5, 52) else ''} (the largest other overlap "
+                             F"|<{c}|{partner}>| = {row[partner]:.3f}, the space carries {inside[c]:.3f} of the state, the "
+                             F"threshold {floor:.4g}) - the states mix by more than the threshold's angle within one "
+                             F"step: the time step does not resolve the crossing (a lower "
+                             F"diabatic_state_reordering_min_overlap lets the step through and records it"
+                             F"{', do_diabatic_state_reordering 2 / 5 follows the states within their group' if not reordering else ''})")
+        record.update(swap=bool(np.any(perm != np.arange(n))), angle=float(angle), drift=float(drift),
+                      min_continuity=float(d.min()), unresolved=bool(len(unresolved_idx)), O=O)
+    V = V_followed @ A
+    return V, {"V_followed": V_followed, "A": A, "perm": perm, "energies": None, "step": step}, record
+
+
+def fragment_diabatic_step(route, T, sd_lists, P_frag, E_adi, St_adi, kind, state, reordering=0, alpha=0.0,
+                           min_overlap=None, tol=0.25, E_orb=None, step=0):
+    """One step of the fragment diabatization on the fly: the localization of step 3 on the step's own data, then the
+    following of the localized states against the previous step (follow_fragment_states).
+
+    Args:
+        route (str): "ci" - the adiabatic states are CI states, T (nsd, nadi) the SD -> CI matrix of the propagated
+            states (column 0 the ground state), the localized states ci_diabatization_step's rotations of the CI states
+            per manifold (the SD route's grouping, a reference that joins a manifold - a cation's hole - among them).
+            "sd" - the adiabatic states are the energy-sorted SDs, T the sort permutation, the localized states
+            sd_diabatization_step's W over the SD basis (E_orb the orbital-energy operator in the 2-block layout)
+        sd_lists (list of lists of int): the SD basis of the step in the signed spin-orbital notation, the ground
+            state first (the driver's sd_states)
+        P_frag (list of arrays): the fragment operators in the 2-block window layout (fragment_operators_2block)
+        E_adi (array (nadi,)): the adiabatic energies of the propagated states
+        St_adi (array (nadi, nadi) or None): the adiabatic time overlap of the step (None at the first step)
+        kind, reordering, alpha, min_overlap, tol: the keys of fragment_options
+        state (dict or None): the previous step's state (follow_fragment_states), with dia_index
+        step (int): the step number, for the records
+
+    Returns:
+        U (array (ndia, nadi)): the basis transform of the engine, |adi_I> = sum_A |dia_A> U_AI - the transpose of the
+            followed and aligned V
+        labels (list of int): the tracking group of every diabatic state (-1 a singleton) - the engine's dia_groups
+        state (dict): for the next step (and the restart file)
+        record (dict): the step's following record, with pops / pops_hole / energies of the localization
+    """
+    from libra_py.workflows.nbra import step3
+    nact = P_frag[0].shape[0] // 2
+    active_space, data_dim = list(range(2 * nact)), 2 * nact
+    gs, manifolds, _ = step3.sd_diabatization_groups(sd_lists, kind, active_space, data_dim)
+    gs_joins = any(gs in g["rows"] for g in manifolds)
+    dia_prev = None if state is None else state["dia_index"]
+    E_adi = np.asarray(E_adi, dtype=float)
+    T = np.asarray(T, dtype=float)
+    if route == "ci":
+        O_hole, O_elec = step3.sd_fragment_operators(sd_lists, P_frag, active_space, data_dim)
+        V_raw, dia_index, pops, pops_hole, energies = step3.ci_diabatization_step(
+            T, O_hole, O_elec, E_adi[1:], kind, dia_prev, tol=tol, E_gs=float(E_adi[0]), manifolds=manifolds)
+    elif route == "sd":
+        if E_orb is None:
+            raise ValueError("fragment_diabatic_step: the 'sd' route needs the orbital-energy operator E_orb")
+        W, dia_index, pops, pops_hole, energies = step3.sd_diabatization_step(
+            sd_lists, P_frag, E_orb, kind, dia_prev, active_space, data_dim, tol)
+        V_raw = T.T @ W
+    else:
+        raise ValueError(F"fragment_diabatic_step: route {route!r} is not 'ci' or 'sd'")
+    n = V_raw.shape[1]
+    groups = step3._tracking_groups(dia_index) if reordering else [[c] for c in range(n)]
+    V, new_state, record = follow_fragment_states(V_raw, St_adi, groups, state, reordering, alpha, min_overlap, step)
+    new_state["energies"] = step3._state_energies([energies])[0]
+    new_state["dia_index"] = dia_index
+    labels = [-1] * n
+    for gi, g in enumerate([g for g in groups if len(g) > 1]):
+        for c in g:
+            labels[c] = gi
+    record.update(pops=pops, pops_hole=pops_hole, energies=energies, gs_joins=gs_joins, dia_index=dia_index)
+    return V.T, labels, new_state, record
+
+
+def _dia_index_json(dia_index):
+    return json.dumps([[{"fs": sorted(int(o) for o in x)} if isinstance(x, frozenset) else x for x in entry]
+                       for entry in dia_index])
+
+
+def _dia_index_from_json(text):
+    return [tuple(frozenset(x["fs"]) if isinstance(x, dict) else x for x in entry) for entry in json.loads(text)]
+
+
+def fragment_state_save(path, state):
+    """The following state of a trajectory written for a restart: the followed states, the alignment, the permutation,
+    the energies, the step and the diabatic index."""
+    np.savez(path, V_followed=state["V_followed"], A=state["A"], perm=state["perm"], energies=state["energies"],
+             step=int(state["step"]), dia_index=np.array(_dia_index_json(state["dia_index"])))
+
+
+def fragment_state_load(path):
+    """The state fragment_state_save wrote."""
+    with np.load(path) as f:
+        return {"V_followed": f["V_followed"], "A": f["A"], "perm": f["perm"], "energies": f["energies"],
+                "step": int(f["step"]), "dia_index": _dia_index_from_json(str(f["dia_index"]))}
+
+
 def _carried(params, key, itraj, current, is_first_time):
     """Per-trajectory carried state - a missing entry after the first step
     means the params dict was rebuilt between calls - substituting the
@@ -6021,7 +6222,34 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     with dia_basis="sd", also supply obj.hvib_dia =
                     H_SD - i D_SD (the SD-frame HST drift correction) -
                     consume with hvib_update_method 0 +
-                    ham_transform_method 3
+                    ham_transform_method 3 - with dia_basis="fragment" the
+                    same correction from the aligned diabatic time overlap
+                dia_basis = "fragment": the fragment-localized states as the
+                    DIABATIC basis, step 3's localization on the step's own
+                    data (fragment_diabatic_step): the Mulliken fragment
+                    operators of the OVERLAP_DELTAT overlap (or the POD
+                    blocks of CP2K's projection prints) over the MO window,
+                    the SD-space hole / electron operators, the CI states
+                    rotated into fragment-localized ones (time_dependent) or
+                    the SD basis localized (GS-SD mode), followed and aligned
+                    against the previous step - the hand-over is the square
+                    basis_transform U[dia, adi], the identity ovlp_dia and
+                    dia_groups (the tracking group of every diabatic state,
+                    -1 a singleton - the engine's dia_tracking_algo 5 aligns
+                    them in C++ when the driver does not). The keys are step
+                    3's: localized_carrier ('hole' / 'electron' / 'both'),
+                    diabatization_scheme ('mulliken' [default] / 'pod_cp2k'),
+                    fragment_atom_lists (1-based, disjoint - 'mulliken'),
+                    do_diabatic_state_reordering (0 [default] a swap refused,
+                    1 / 2 / 22 the states followed within their group,
+                    5 / 52 followed and aligned), diabatic_state_reordering_alpha,
+                    diabatic_state_reordering_min_overlap, occupancy_tolerance
+                    (0.25). The following's state persists per trajectory in
+                    <wd>/dia-state.npz (a restart resumes it - the time
+                    overlap of that call is the identity) and its record in
+                    <wd>/dia-record.txt. Requires overlap_backend="sd" and
+                    ao_overlap_method="cp2k" - an open-shell reference (a
+                    cation's hole) takes the ground state into its manifold
 
 
             Caches (auto-created): mo_prev, ci_prev, E_adi_last, force_rows, S_prev,
@@ -6082,8 +6310,14 @@ def cp2k_compute_adi_impl(q, params, full_id):
             'declared honestly as classical-path) or "none", or '
             'time_dependent=True for real state-dependent forces')
     dia_basis = params.get("dia_basis", "none")
-    if dia_basis not in ("none", "sd"):
-        raise ValueError(F"dia_basis must be 'none' or 'sd', got {dia_basis!r}")
+    if dia_basis not in ("none", "sd", "fragment"):
+        raise ValueError(F"dia_basis must be 'none', 'sd' or 'fragment', got {dia_basis!r}")
+    frag = fragment_options(params) if dia_basis == "fragment" else None
+    if frag is not None and params.get("ao_overlap_method", "cp2k") != "cp2k":
+        raise ValueError('dia_basis="fragment" reads the step\'s AO overlap of the OVERLAP_DELTAT run - it requires '
+                         'ao_overlap_method="cp2k"')
+    if frag is not None and params.get("overlap_backend", "sd") != "sd":
+        raise ValueError('dia_basis="fragment" localizes on the SD basis - it requires overlap_backend="sd"')
     if dia_basis == "sd" and params.get("overlap_backend", "sd") != "sd":
         raise ValueError('dia_basis="sd" declares the SD basis as the diabatic basis '
                          'via the sd2ci matrix - it requires overlap_backend="sd"')
@@ -6092,8 +6326,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
     dia_hvib = params.get("dia_basis_hvib", "none")
     if dia_hvib not in ("none", "corrected"):
         raise ValueError(F"dia_basis_hvib must be 'none' or 'corrected', got {dia_hvib!r}")
-    if dia_hvib == "corrected" and dia_basis != "sd":
-        raise ValueError('dia_basis_hvib="corrected" needs dia_basis="sd"')
+    if dia_hvib == "corrected" and dia_basis not in ("sd", "fragment"):
+        raise ValueError('dia_basis_hvib="corrected" needs dia_basis="sd" or "fragment"')
     st_sd = None
     if not 0.0 <= dia_max_drop <= 1.0:
         raise ValueError(F"dia_basis_max_drop must be in [0, 1], got {dia_max_drop}")
@@ -6227,8 +6461,19 @@ def cp2k_compute_adi_impl(q, params, full_id):
         parse_pool = _prefetch_parse_pool(params)
         if parse_pool is not None:
             odt["_parse_pool"] = parse_pool
-        St_mo, S_prev, S_curr = mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev,
-                                                     coordinates, LO, HI, odt)
+        # the Mulliken fragment operators of the step ride on the same AO overlap - they need the AO -> atom map, which
+        # the wfn loader carries and the other MO sources take from the step's wfn restart (the basis layout is the
+        # run's, read once)
+        frag_atoms = frag["atoms"] if (frag is not None and frag["scheme"] == "mulliken") else None
+        if frag_atoms is not None and mo_curr.get("ao_atom", None) is None:
+            if "_ao_atom_map" not in params:
+                basis_w, _, _, _ = read_wfn_file(f"{wd}/{project}-RESTART.wfn")
+                params["_ao_atom_map"] = _wfn_ao_atom_map(basis_w)
+            mo_curr["ao_atom"] = params["_ao_atom_map"]
+        _ovl = mo_overlaps_via_cp2k(mo_prev, mo_curr, coords_prev, coordinates, LO, HI, odt,
+                                    fragment_atom_lists=frag_atoms)
+        St_mo, S_prev, S_curr = _ovl[:3]
+        P_frag_win = _ovl[3] if frag_atoms is not None else None
     else:
         if isUKS:
             raise ValueError('ao_overlap_method="libint" is restricted-only in '
@@ -6236,6 +6481,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
         S_curr = mo_overlap(mo_curr, mo_curr, LO, HI)
         S_prev = _carried(params, "S_prev", itraj, S_curr, is_first_time)
         St_mo = mo_overlap(mo_prev, mo_curr, LO, HI)
+        P_frag_win = None
 
     # per-channel views (the overlap builders return [alpha, beta] lists for
     # UKS) - the restricted path is the one-channel special case
@@ -6530,6 +6776,62 @@ def cp2k_compute_adi_impl(q, params, full_id):
             H_sd = T_dia @ np.diag(np.asarray(E_adi_curr[:nstates], dtype=float)) @ T_dia.T
             D_sd = (np.asarray(st_sd) - np.asarray(st_sd).T) / (2.0 * dt_c)
             obj.hvib_dia = data_conv.nparray2CMATRIX(H_sd - 1j * D_sd)
+    elif dia_basis == "fragment":
+        # the fragment-localized states are the DIABATIC basis: step 3's localization on the step's own fragment
+        # operators and SD basis, followed and aligned against the previous step (fragment_diabatic_step), handed over
+        # as the square U[dia, adi] with the identity metric and the tracking groups the engine's dia_tracking_algo
+        # aligns (dia_groups) - the state of the following persists per trajectory for a restart
+        if P_frag_win is None:
+            # the POD blocks of the step's projection prints, written next to the wfn restart
+            hits = sorted(glob.glob(f"{wd}/{project}-POD-RESTART-*.hab"))
+            if not hits:
+                raise ValueError(f"diabatization_scheme 'pod_cp2k' needs CP2K's projection prints "
+                                 f"{wd}/{project}-POD-RESTART-*.hab - the &PROPERTIES &ET_COUPLING &PROJECTION section "
+                                 f"with the HAMILTONIAN, WAVEFUNCTION and TRANSF_MATRIX prints in the template")
+            pod = read_pod_cp2k_files(hits[0][:-4])
+            idx_nat = mo_curr.get("resort_idx", None)
+            P_a = pod_cp2k_fragment_operators(pod, _native_ao_order(mo_curr["C"], idx_nat)[LO - 1:HI], 0)
+            P_b = pod_cp2k_fragment_operators(pod, _native_ao_order(mo_curr["C_b"], idx_nat)[LO - 1:HI], 1) if isUKS else None
+            P2 = fragment_operators_2block(P_a, P_b)
+        elif isUKS:
+            P2 = fragment_operators_2block([P[0] for P in P_frag_win], [P[1] for P in P_frag_win])
+        else:
+            P2 = fragment_operators_2block(P_frag_win)
+        eps_a = np.asarray(mo_curr["E"], dtype=float)[LO - 1:HI]
+        eps_b = np.asarray(mo_curr["E_b"], dtype=float)[LO - 1:HI] if isUKS else eps_a
+        E_orb = np.diag(np.concatenate([eps_a, eps_b]))
+        timestep = int(params.get("timestep", 0))
+        dia_states = params.setdefault("dia_state", {})
+        state_file = f"{wd}/dia-state.npz"
+        if is_first_time and timestep > 0 and os.path.exists(state_file):
+            # a restart: the following continues from the persisted state (the adiabatic time overlap of this call is
+            # the identity, as the driver's own hand-over at a restart - the states align against the saved ones)
+            dia_states[itraj] = fragment_state_load(state_file)
+            print(f"dia_basis fragment: the following of trajectory {itraj} resumed from {state_file} "
+                  f"(saved at step {dia_states[itraj]['step']})")
+        elif is_first_time:
+            dia_states[itraj] = None
+        St_frag = None if dia_states.get(itraj) is None else np.asarray(st_ci, dtype=float)[:nstates, :nstates]
+        U_frag, dia_labels, dia_states[itraj], rec = fragment_diabatic_step(
+            "ci" if time_dependent else "sd", T_dia, sd_states, P2, E_adi_curr[:nstates], St_frag, frag["kind"],
+            dia_states.get(itraj), frag["reordering"], frag["alpha"], frag["min_overlap"], frag["tol"], E_orb, timestep)
+        fragment_state_save(state_file, dia_states[itraj])
+        with open(f"{wd}/dia-record.txt", "a") as rf:
+            if rec["O"] is None:
+                rf.write(f"# step perm swap angle drift min_continuity edges unresolved - the diabatic index {rec['dia_index']}"
+                         f"{', the reference joins its manifold' if rec['gs_joins'] else ''}\n")
+            rf.write(f"{timestep} {list(int(c) for c in dia_states[itraj]['perm'])} {int(rec['swap'])} {rec['angle']:.4f} "
+                     f"{rec['drift']:.4f} {rec['min_continuity']:.6f} {rec['edges']} {int(rec['unresolved'])}\n")
+        obj.basis_transform = data_conv.nparray2CMATRIX(np.asarray(U_frag, dtype=complex))
+        obj.ovlp_dia = _identity_cmatrix(nstates)
+        obj.dia_groups = [int(x) for x in dia_labels]
+        if dia_hvib == "corrected" and rec["O"] is not None:
+            # the frame-corrected diabatic vibronic Hamiltonian of the localized basis: H_dia - i D_dia with the HST
+            # drift D_dia = (O - O^T) / (2 dt) from the aligned diabatic time overlap of the step
+            dt_c = float(params.get("dt", 41.0))
+            H_dia = U_frag @ np.diag(np.asarray(E_adi_curr[:nstates], dtype=float)) @ U_frag.T
+            D_dia = (rec["O"] - rec["O"].T) / (2.0 * dt_c)
+            obj.hvib_dia = data_conv.nparray2CMATRIX(H_dia - 1j * D_dia)
     else:
         obj.basis_transform = _identity_cmatrix(nstates)
 
