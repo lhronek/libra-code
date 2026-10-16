@@ -148,7 +148,7 @@ double derivs1(MATRIX& x, MATRIX& y, MATRIX& A, MATRIX& gradA, double& L, double
     for(j=0;j<n;j++){ if (i!=j){  sum += A.get(i,j)* A.get(i,j); }   }
 
     diagA.set(i,i, A.get(i,i)); 
-    if(opt2==1){   for(i=0;i<n;i++){ sum += A.get(i,i)* A.get(i,i); }   }
+    if(opt2==1){   sum += A.get(i,i)* A.get(i,i);   }
   }
 
   if(opt2==0){   gradA = 2.0*(A - diagA).T(); }
