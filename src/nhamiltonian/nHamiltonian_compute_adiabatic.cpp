@@ -738,7 +738,6 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       }
       catch (bp::error_already_set const &) {
         std::cout << "Error extracting ham_adi\n";
-        PyErr_Print();
         throw;
       }
     }
@@ -756,7 +755,6 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       }
       catch (bp::error_already_set const &) {
         std::cout << "Error extracting nac_adi\n";
-        PyErr_Print();
         throw;
       }
       // an all-zero supply is the ecosystem's placeholder convention - not data
@@ -776,7 +774,6 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       }
       catch (bp::error_already_set const &) {
         std::cout << "Error extracting hvib_adi\n";
-        PyErr_Print();
         throw;
       }
       // an all-zero supply is the ecosystem's placeholder convention - not data
@@ -813,7 +810,6 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       }
       catch (bp::error_already_set const &) {
         std::cout << "Error extracting basis_transform\n";
-        PyErr_Print();
         throw;
       }
       // an all-zero supply is the ecosystem's placeholder convention - not data
@@ -836,7 +832,6 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       }
       catch (bp::error_already_set const &) {
         std::cout << "Error extracting ham_dia\n";
-        PyErr_Print();
         throw;
       }
       // an all-zero supply is the ecosystem's placeholder convention - not data
@@ -856,7 +851,6 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       }
       catch (bp::error_already_set const &) {
         std::cout << "Error extracting ovlp_dia\n";
-        PyErr_Print();
         throw;
       }
       ovlp_dia_supplied = 1;
@@ -875,7 +869,6 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       }
       catch (bp::error_already_set const &) {
         std::cout << "Error extracting time_overlap_adi\n";
-        PyErr_Print();
         throw;
       }
       // an all-zero supply is the ecosystem's placeholder convention - not data
@@ -920,7 +913,6 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       }
       catch (bp::error_already_set const &) {
         std::cout << "Error extracting dc1_adi\n";
-        PyErr_Print();
         throw;
       }
 
