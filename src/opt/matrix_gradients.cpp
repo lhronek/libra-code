@@ -153,9 +153,17 @@ double derivs1(MATRIX& x, MATRIX& y, MATRIX& A, MATRIX& gradA, double& L, double
 
   if(opt2==0){   gradA = 2.0*(A - diagA).T(); }
   else if(opt2==1){    gradA = 2.0*A.T();  }
+  else{
+    std::cout<<"Error in derivs1(): opt2 = "<<opt2<<" has no branch here (implemented: 0, 1)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
   if(opt==0){   Lagrangian = L * sum;  gradL = sum;  gradA *= L; }
   else if(opt==1){   Lagrangian = L*L * sum; gradL = 2.0*L*sum; gradA *= L*L; }
+  else{
+    std::cout<<"Error in derivs1(): opt = "<<opt<<" has no branch here (implemented: 0, 1)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
   return Lagrangian;
 
