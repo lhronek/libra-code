@@ -84,7 +84,7 @@ def Load_PT(U, pt_file, verbose=0):
             elem.Elt_block = a[m1.start('Element_block'):m1.end('Element_block')]
 #            elem.Atom_color       = int(float(a[m1.start('Element_color'):m1.end('Element_color')]))
             # put bond_length here
-            elem.Elt_atomic_radius = float(a[m1.start('Element_atomic_radius'):m1.end('Element_atomic_radius')])
+            elem.Elt_radius = float(a[m1.start('Element_atomic_radius'):m1.end('Element_atomic_radius')])  # Angstrom
 
             elt_record = Element()
             elt_record.set(elem)
