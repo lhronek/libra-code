@@ -334,10 +334,15 @@ void System::create_improper(int a1,int a2,int a3,int a4){
     if(impr_indx>=0){
       // Check if this improper is in frag_impropers list
       if(is_in_vector(Impropers[impr_indx].globGroup_Index, Frag_impropers)){
-        int impr_frag_indx;
+        int impr_frag_indx = -1;
         // Find an index of corresponding Frag_improper
         for(int s=0;s<Number_of_frag_impropers;s++){
           if(Impropers[impr_indx].globGroup_Index==Frag_impropers[s]) { impr_frag_indx = s; break; }
+        }
+        if(impr_frag_indx<0){
+          cout<<"Error in System::create_improper(): the improper of group "<<Impropers[impr_indx].globGroup_Index
+              <<" is listed in Frag_impropers beyond its first "<<Number_of_frag_impropers<<" entries\n";
+          std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
         }
 
         // Erase it from the Frag_impropers list:
