@@ -37,6 +37,22 @@ namespace libdyn{
 namespace libgwp{
 
 
+
+// the 1D form callable from Python: boost cannot bind a Python number to a double& output - the prefactor and the
+// parameters of the product Gaussian are returned in a list [prefactor, q, p, gamma, alp]
+boost::python::list expt_gwp_product_decomposition_1D(double q1, double p1, double gamma1, double alp1,
+                                                      double q2, double p2, double gamma2, double alp2){
+  double q = 0.0, p = 0.0, gamma = 0.0, alp = 0.0;
+  double prefactor = gwp_product_decomposition(q1, p1, gamma1, alp1, q2, p2, gamma2, alp2, q, p, gamma, alp);
+  boost::python::list res;
+  res.append(prefactor);
+  res.append(q);
+  res.append(p);
+  res.append(gamma);
+  res.append(alp);
+  return res;
+}
+
 void export_gwp_objects(){
 /** 
   \brief Exporter of libgwp classes and functions
@@ -70,6 +86,7 @@ void export_gwp_objects(){
    MATRIX& q,  MATRIX& p,  MATRIX& gamma,  MATRIX& alp) = &gwp_product_decomposition;
 
   def("gwp_product_decomposition",  expt_gwp_product_decomposition_v1);
+  def("gwp_product_decomposition",  expt_gwp_product_decomposition_1D);
   def("gwp_product_decomposition",  expt_gwp_product_decomposition_v2);
 
 
