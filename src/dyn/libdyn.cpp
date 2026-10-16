@@ -94,6 +94,7 @@ void export_dyn_control_params_objects(){
       .def_readwrite("phase_correction_tol", &dyn_control_params::phase_correction_tol)
       .def_readwrite("do_nac_phase_correction", &dyn_control_params::do_nac_phase_correction)
       .def_readwrite("state_tracking_algo", &dyn_control_params::state_tracking_algo)
+      .def_readwrite("dia_tracking_algo", &dyn_control_params::dia_tracking_algo)
       .def_readwrite("MK_alpha", &dyn_control_params::MK_alpha)
       .def_readwrite("MK_verbosity", &dyn_control_params::MK_verbosity)
       .def_readwrite("MK_scaling_function", &dyn_control_params::MK_scaling_function)

@@ -199,6 +199,7 @@ def _print_simulation_params(dyn_params, nadi, ntraj, init_params=None, model_pa
         row("electronic_integrator:", p["electronic_integrator"]),
         row("num_electronic_substeps:", p["num_electronic_substeps"]),
         row("state_tracking_algo:", p["state_tracking_algo"]),
+        row("dia_tracking_algo:", p.get("dia_tracking_algo", 0)),
         row("do_phase_correction:", p["do_phase_correction"]),
     ]
     if int(p.get("do_phase_correction", 0)) and "phase_correction_tol" in p:
@@ -434,6 +435,18 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 skipped: such a model never populates the diabatic Hamiltonian, so
                 there is nothing to transform from - the default 1 is therefore
                 safe for every model type
+
+
+            * **dyn_params["dia_tracking_algo"]** ( int ): the alignment of the model-supplied diabatic basis under
+                ham_transform_method 3 (the engine's side of the CP2K driver's dia_basis "fragment")
+
+                - 0: none - the supplied basis_transform is taken as handed over [ default ]
+                - 5: every group of the model's dia_groups (the same label, two or more states) is continued from
+                  the previous step by the polar factor of its block of the diabatic time overlap U_prev St U^H
+                  (the BDCSVD of state_tracking_algo 5 on the block), the rows of U rotated by R^H and stored back -
+                  the supplied time overlap (time_overlap_method 0), a square U and the model's dia_groups are
+                  required, a model-supplied hvib_dia and the driver's own alignment (do_diabatic_state_reordering
+                  5 / 52) are refused alongside: one side aligns
 
 
             * **dyn_params["rep_sh"]** ( int ): selects the representation which is
@@ -2056,6 +2069,13 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
 
     # Finally, start the dynamics calculations
     #sys.exit(0)
+    # the diabatic alignment runs on one side: the engine's dia_tracking_algo 5 (from the supplied U and St) or the
+    # driver's do_diabatic_state_reordering 5 / 52 (dia_basis 'fragment') - both would rotate a group twice
+    if int(dyn_params.get("dia_tracking_algo", 0)) == 5 and \
+            int(model_params.get("do_diabatic_state_reordering", 0)) in (5, 52):
+        raise ValueError("dia_tracking_algo 5 aligns the diabatic groups in the engine and the driver's "
+                         "do_diabatic_state_reordering 5 / 52 aligns them too - pick one side (2 / 22 in the "
+                         "driver with 5 in the engine, or 5 / 52 in the driver with 0)")
     res = run_dynamics(dyn_var, dyn_params, ham, compute_model, model_params, rnd,
                        init_params={"init_elec": init_elec, "init_nucl": init_nucl}, runner_params=runner_params)
     return res

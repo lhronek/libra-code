@@ -882,6 +882,28 @@ void nHamiltonian::compute_adiabatic(bp::object py_funct, MATRIX &q,
       time_overlap_adi_supplied = (abs(time_overlap_adi->max_elt()) != 0.0);
     }
 
+    // the tracking groups of the supplied diabatic basis - one integer label per diabatic state, fixed along the
+    // run (a change means the model's diabatic index changed under the engine)
+    dia_groups_supplied = 0;
+    if ((int)hasattr(obj, "dia_groups")) {
+      bp::list lst = extract<bp::list>(obj.attr("dia_groups"));
+      int n_lab = (int)len(lst);
+      if (n_lab != ndia) {
+        std::cout << "Error in nHamiltonian::compute_adiabatic(): the model's dia_groups has " << n_lab
+                  << " labels for " << ndia << " diabatic states\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
+      vector<int> lab(n_lab, -1);
+      for (int i = 0; i < n_lab; i++) { lab[i] = extract<int>(lst[i]); }
+      if (!dia_groups.empty() && lab != dia_groups) {
+        std::cout << "Error in nHamiltonian::compute_adiabatic(): the model's dia_groups changed along the run - the"
+                  << " diabatic index must be stable (the states the engine propagates keep their labels)\n";
+        std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+      }
+      dia_groups = lab;
+      dia_groups_supplied = 1;
+    }
+
     has_attr = (int)hasattr(obj, "dc1_adi");
     dc1_adi_present = has_attr;
     if (has_attr) {

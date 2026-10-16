@@ -216,6 +216,10 @@ public:
   ///< stored-U transforms (ham_transform_method 2) require it: the
   ///< square identity default must not silently alias dia == adi
   int basis_transform_supplied;
+  ///< the tracking group of every diabatic state the model handed over with its basis_transform (the same label =
+  ///< one group, a negative label a singleton) - the engine's dia_tracking_algo 5 aligns the groups, sized ndia
+  vector<int> dia_groups;
+  int dia_groups_supplied;
   ///< the model supplied obj.ham_dia (the diabatic-hop/LZ route) -
   ///< the adi->dia transforms would overwrite a DIFFERENT basis
   ///< (model diabats vs the transform frame): conflict, raise
@@ -478,6 +482,7 @@ public:
 
   // Transforms
   CMATRIX get_basis_transform();
+  vector<int> get_dia_groups();
   CMATRIX get_basis_transform(vector<int>& id_);
 
   CMATRIX get_time_overlap_adi();

@@ -231,6 +231,7 @@ void nHamiltonian::init_mem_status(int ndia_, int nadi_, int nnucl_) {
   lowdin_cache_state = -1;
   lowdin_cache_eig = 0;
   basis_transform_supplied = 0;
+  dia_groups_supplied = 0;
   ham_dia_supplied = 0;
   time_overlap_dia = nullptr;
   time_overlap_dia_mem_status = 0;
@@ -552,6 +553,8 @@ void nHamiltonian::copy_level_content(nHamiltonian *src) {
   lowdin_cache_state = -1;
   lowdin_cache_eig = 0;
   basis_transform_supplied = src->basis_transform_supplied;
+  dia_groups = src->dia_groups;
+  dia_groups_supplied = src->dia_groups_supplied;
   ham_dia_supplied = src->ham_dia_supplied;
   time_overlap_adi_supplied = src->time_overlap_adi_supplied;
 
@@ -2572,6 +2575,10 @@ CMATRIX nHamiltonian::get_d2ham_adi(int i, int j, vector<int> &id_) {
     vector<int> next(id_.begin() + 1, id_.end());
     return children[id_[1]]->get_d2ham_adi(i, j, next);
   }
+}
+
+vector<int> nHamiltonian::get_dia_groups() {
+  return dia_groups;
 }
 
 CMATRIX nHamiltonian::get_basis_transform() {

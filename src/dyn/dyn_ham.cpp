@@ -93,6 +93,72 @@ static void check_model_handover(dyn_control_params &prms, nHamiltonian &ham) {
   }
 }
 
+void align_dia_groups(dyn_control_params &prms, nHamiltonian &ham, nHamiltonian &ham_prev) {
+  /**
+    dia_tracking_algo 5: the model-supplied diabatic basis of every trajectory continued from the previous step
+    within the groups of its dia_groups - for a group g the block B = (U_prev St U^H)[g, g] of the diabatic time
+    overlap (U_prev the aligned transform stored last step, St the supplied adiabatic time overlap, U the transform
+    handed over now), R = V_s U_s^H its polar factor (B = U_s S V_s^H, the BDCSVD of state_tracking_algo 5), the
+    rows g of U become R^H U[g, :] - the aligned U is stored back into the child, so ham_dia, the diabatic amplitudes
+    and the next step's U_prev all see it. The singletons (a negative label) and the first step (no supplied U
+    before) are left as handed over. The step-3 twin: _follow_diabatic_interval of libra_py.workflows.nbra.step3
+  */
+  int ntraj = ham.children.size();
+  for (int traj = 0; traj < ntraj; traj++) {
+    nHamiltonian *child = ham.children[traj];
+    nHamiltonian *prev = ham_prev.children[traj];
+    if (!child->dia_groups_supplied) {
+      std::cout << "Error in align_dia_groups(): dia_tracking_algo = 5 needs the model's dia_groups (the tracking group"
+                << " of every diabatic state) - the CP2K driver hands them over under dia_basis 'fragment'\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if (!child->basis_transform_supplied) {
+      std::cout << "Error in align_dia_groups(): dia_tracking_algo = 5 aligns the model-supplied basis_transform - none"
+                << " was handed over this step\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if (child->ndia != child->nadi) {
+      std::cout << "Error in align_dia_groups(): dia_tracking_algo = 5 needs a square basis_transform (ndia = nadi) -"
+                << " the diabatic time overlap U_prev St U^H - got ndia = " << child->ndia << ", nadi = " << child->nadi << "\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if (!child->time_overlap_adi_supplied) {
+      std::cout << "Error in align_dia_groups(): dia_tracking_algo = 5 aligns by the model's time_overlap_adi - none was"
+                << " handed over this step\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if (child->hvib_dia_supplied) {
+      std::cout << "Error in align_dia_groups(): the model's hvib_dia is expressed in its own diabatic basis, which"
+                << " dia_tracking_algo = 5 rotates after the hand-over - align in the driver (do_diabatic_state_reordering"
+                << " 5 / 52 with dia_tracking_algo 0) or hand over no hvib_dia (hvib_update_method 1)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+    if (!prev->basis_transform_supplied) { continue; }   // the first step - nothing to align against
+    int n = child->ndia;
+    CMATRIX U(child->get_basis_transform());
+    CMATRIX O(n, n);
+    O = prev->get_basis_transform() * child->get_time_overlap_adi() * U.H();
+    vector<int> labels(child->dia_groups);
+    for (int lab = 0; lab < n; lab++) {
+      vector<int> g;
+      for (int i = 0; i < n; i++) { if (labels[i] == lab) { g.push_back(i); } }
+      int m = g.size();
+      if (m < 2) { continue; }
+      CMATRIX B(m, m), svd_u(m, m), svd_s(m, m), svd_v(m, m);
+      for (int a = 0; a < m; a++) { for (int b = 0; b < m; b++) { B.set(a, b, O.get(g[a], g[b])); } }
+      BDCSVD_decomposition(B, svd_u, svd_s, svd_v);
+      CMATRIX R(svd_v * svd_u.H());
+      // U[g, :] <- R^H U[g, :]
+      CMATRIX Ug(m, n);
+      for (int a = 0; a < m; a++) { for (int I = 0; I < n; I++) { Ug.set(a, I, U.get(g[a], I)); } }
+      CMATRIX Ug_new(R.H() * Ug);
+      for (int a = 0; a < m; a++) { for (int I = 0; I < n; I++) { U.set(g[a], I, Ug_new.get(a, I)); } }
+    }
+    child->set_basis_transform_by_val(U);
+  }
+}
+
+
 void update_Hamiltonian_variables(dyn_control_params &prms,
                                   dyn_variables &dyn_var, nHamiltonian &ham,
                                   nHamiltonian &ham_prev, bp::object py_funct,
@@ -305,7 +371,10 @@ void update_Hamiltonian_variables(dyn_control_params &prms,
       // adiabatic -> diabatic by the stored basis transformation:
       // ham_dia = S U ham_adi U^H S (transform_adi2dia) - runs before the
       // time-overlap/NAC/Hvib updates so every diabatic consumer of this
-      // step sees the rotated Hamiltonian
+      // step sees the rotated Hamiltonian - the engine-side alignment of the
+      // supplied basis (dia_tracking_algo 5) comes first, so the rotated basis
+      // is the aligned one
+      if (prms.dia_tracking_algo == 5) { align_dia_groups(prms, ham, ham_prev); }
       ham.transform_adi2dia(1);
     } else if (prms.ham_transform_method == 4) {
       // the adi->dia local-diabatization rotation itself lives in the

@@ -96,6 +96,7 @@ void export_nhamiltonian_objects(){
 
 
   CMATRIX (nHamiltonian::*expt_get_basis_transform_v1)() = &nHamiltonian::get_basis_transform;
+  vector<int> (nHamiltonian::*expt_get_dia_groups_v1)() = &nHamiltonian::get_dia_groups;
   CMATRIX (nHamiltonian::*expt_get_basis_transform_v2)(vector<int>&) = &nHamiltonian::get_basis_transform;
 
   CMATRIX (nHamiltonian::*expt_get_time_overlap_adi_v1)() = &nHamiltonian::get_time_overlap_adi;
@@ -528,6 +529,7 @@ void export_nhamiltonian_objects(){
       .def("get_d2ham_adi", expt_get_d2ham_adi_v22)
 
       .def("get_basis_transform", expt_get_basis_transform_v1)
+      .def("get_dia_groups", expt_get_dia_groups_v1)
       .def("get_basis_transform", expt_get_basis_transform_v2)
       .def("get_time_overlap_adi", expt_get_time_overlap_adi_v1)
       .def("get_time_overlap_adi", expt_get_time_overlap_adi_v2)

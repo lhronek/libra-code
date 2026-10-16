@@ -70,6 +70,7 @@ dyn_control_params::dyn_control_params(){
   do_nac_phase_correction = 0;
   phase_correction_tol = 1e-3; 
   state_tracking_algo = -1;
+  dia_tracking_algo = 0;
   MK_alpha = 0.0;
   MK_verbosity = 0;
   MK_scaling_function = 0;
@@ -197,6 +198,7 @@ dyn_control_params::dyn_control_params(const dyn_control_params& x){
   do_nac_phase_correction = x.do_nac_phase_correction;
   phase_correction_tol = x.phase_correction_tol; 
   state_tracking_algo = x.state_tracking_algo;
+  dia_tracking_algo = x.dia_tracking_algo;
   MK_alpha = x.MK_alpha;
   MK_verbosity = x.MK_verbosity;
   MK_scaling_function = x.MK_scaling_function;
@@ -387,6 +389,7 @@ void dyn_control_params::sanity_check(){
     {"do_phase_correction", do_phase_correction, {0, 1}},
     {"do_nac_phase_correction", do_nac_phase_correction, {0, 1}},
     {"state_tracking_algo", state_tracking_algo, {-12, -1, 0, 1, 2, 4, 5, 6, 21, 22, 52, 62}},
+    {"dia_tracking_algo", dia_tracking_algo, {0, 5}},
     {"MK_verbosity", MK_verbosity, {0, 1}},
     {"MK_scaling_function", MK_scaling_function, {-1, 0, 1, 2}},
     {"convergence", convergence, {0, 1}},
@@ -643,6 +646,19 @@ void dyn_control_params::sanity_check(){
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
+  /// the engine-side alignment of the supplied diabatic basis reads the stored U (transform 3) and the
+  /// supplied time overlap - without them there is nothing to align or no overlap to align by
+  if(dia_tracking_algo==5 && ham_transform_method!=3){
+    std::cout<<"Error in dyn_control_params::sanity_check: dia_tracking_algo = 5 aligns the model-supplied diabatic"
+        <<" basis (basis_transform) under ham_transform_method = 3 - got ham_transform_method = "<<ham_transform_method<<"\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+  if(dia_tracking_algo==5 && time_overlap_method!=0){
+    std::cout<<"Error in dyn_control_params::sanity_check: dia_tracking_algo = 5 aligns by the model-supplied time"
+        <<" overlap (time_overlap_method = 0) - got time_overlap_method = "<<time_overlap_method<<"\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
   ///============== Integrator vs projector family pairing ==============
   /// rep_tdse == 1: the bare-energy local-diabatization integrators carry
   /// the whole electronic coupling through the rotation projector
@@ -847,6 +863,7 @@ void dyn_control_params::set_parameters(bp::dict params){
     else if(key=="phase_correction_tol") { phase_correction_tol = bp::extract<double>(params.values()[i]);  }
     else if(key=="do_nac_phase_correction"){ do_nac_phase_correction = bp::extract<int>(params.values()[i]); }
     else if(key=="state_tracking_algo"){  state_tracking_algo = bp::extract<int>(params.values()[i]);  }
+    else if(key=="dia_tracking_algo"){  dia_tracking_algo = bp::extract<int>(params.values()[i]);  }
     else if(key=="MK_alpha") { MK_alpha = bp::extract<double>(params.values()[i]);  }
     else if(key=="MK_verbosity") { MK_verbosity = bp::extract<int>(params.values()[i]);  }
     else if(key=="MK_scaling_function") { MK_scaling_function = bp::extract<int>(params.values()[i]);  }

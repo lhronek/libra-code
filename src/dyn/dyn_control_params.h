@@ -363,6 +363,19 @@ class dyn_control_params{
   int state_tracking_algo;
 
 
+  /**
+    The alignment of the model-supplied diabatic basis under ham_transform_method 3 (the engine's side of the
+    fragment diabatization of the CP2K driver):
+      - 0: none - the supplied basis_transform is taken as handed over [ default ]
+      - 5: every group of the supplied dia_groups (the same label, two or more states) is continued from the
+           previous step by the polar factor of its block of the diabatic time overlap U_prev St U^H (the
+           BDCSVD of state_tracking_algo 5 on the block), the rows of U rotated by R^H and stored back - the
+           supplied time overlap (time_overlap_method 0) and a square U are required; the driver's own alignment
+           (do_diabatic_state_reordering 5 / 52) is then refused by the python layer, one side aligns
+  */
+  int dia_tracking_algo;
+
+
   /** 
     Munkres-Kuhn alpha (selects the range of orbitals included in reordering) [default: 0.0]
   */
