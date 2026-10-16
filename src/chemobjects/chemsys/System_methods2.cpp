@@ -397,43 +397,21 @@ void System::update_max_id(){
     will be 40 not 2(of 1 as index)
 */
 
-  int max_atom_id;
-  int max_frag_id;
-  int max_mol_id;
- 
-  // Atoms
-  if(Number_of_atoms>0){
-    if(Atoms[0].is_Atom_id){ max_atom_id = Atoms[0].Atom_id;}
-    for(int i=1;i<Number_of_atoms;i++){
-      if(Atoms[i].is_Atom_id){
-        max_atom_id = (max_atom_id>=Atoms[i].Atom_id)?max_atom_id:Atoms[i].Atom_id;
-      }        
-    }
+  // the largest id among the objects of a kind that carry one - a kind without any keeps its stored maximum
+  int max_at = 0, max_fr = 0, max_ml = 0;
+  int found_at = 0, found_fr = 0, found_ml = 0;
+  for(int i=0;i<Number_of_atoms;i++){
+    if(Atoms[i].is_Atom_id && (!found_at || Atoms[i].Atom_id > max_at)){ max_at = Atoms[i].Atom_id; found_at = 1; }
   }
-
-  // Fragments
-  if(Number_of_fragments>0){
-    if(Fragments[0].is_Group_id){ max_frag_id = Fragments[0].Group_id;}
-    for(int i=1;i<Number_of_fragments;i++){
-      if(Fragments[i].is_Group_id){
-        max_frag_id = (max_frag_id>=Fragments[i].Group_id)?max_frag_id:Fragments[i].Group_id;
-      }
-    }
+  for(int i=0;i<Number_of_fragments;i++){
+    if(Fragments[i].is_Group_id && (!found_fr || Fragments[i].Group_id > max_fr)){ max_fr = Fragments[i].Group_id; found_fr = 1; }
   }
-
-  // Molecules
-  if(Number_of_molecules>0){
-    if(Molecules[0].is_Molecule_id){ max_mol_id = Molecules[0].Molecule_id;}
-    for(int i=1;i<Number_of_molecules;i++){
-      if(Molecules[i].is_Molecule_id){
-        max_mol_id = (max_mol_id>=Molecules[i].Molecule_id)?max_mol_id:Molecules[i].Molecule_id;
-      }
-    }
+  for(int i=0;i<Number_of_molecules;i++){
+    if(Molecules[i].is_Molecule_id && (!found_ml || Molecules[i].Molecule_id > max_ml)){ max_ml = Molecules[i].Molecule_id; found_ml = 1; }
   }
-
-  max_atom_id     = max_atom_id;  is_max_atom_id     = 1;
-  max_fragment_id = max_frag_id;  is_max_fragment_id = 1;
-  max_molecule_id = max_atom_id;  is_max_molecule_id = 1;
+  if(found_at){ max_atom_id = max_at;     is_max_atom_id = 1; }
+  if(found_fr){ max_fragment_id = max_fr; is_max_fragment_id = 1; }
+  if(found_ml){ max_molecule_id = max_ml; is_max_molecule_id = 1; }
 
 }
 
