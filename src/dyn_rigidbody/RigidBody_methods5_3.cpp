@@ -36,6 +36,10 @@ void RigidBody::rotate_no_squish(int k,double dt){
   if(k==1) { P = *P1; rot_const = rb_A;}
   else if(k==2) { P = *P2; rot_const = rb_B;}
   else if(k==3) { P = *P3; rot_const = rb_C;}
+  else{
+    std::cout<<"Error in RigidBody::rotate_no_squish(): k = "<<k<<" has no branch here (implemented: 1, 2, 3)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
 
 
   zeta = 0.25*rot_const*dt*dot_prod(rb_p_r,P*rb_L);
