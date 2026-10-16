@@ -339,7 +339,7 @@ double BINOM(int i,int n) {
   }
 
 
-  double res;
+  double res = 0.0;
 
   if(n==0){ 
     if(i==0){ res = 1.0; }

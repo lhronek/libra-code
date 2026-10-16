@@ -106,7 +106,7 @@ double K2aa(int m,int n,double alpha,double betha,double R){
 
   double K1,K2;
   double r,t,f,sum;
-  double rel;
+  double rel = 1.0;
 
   r = alpha*R;
   r = pow(r,2*m);
