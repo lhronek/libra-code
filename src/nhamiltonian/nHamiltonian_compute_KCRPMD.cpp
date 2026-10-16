@@ -339,9 +339,9 @@ vector<double> nHamiltonian::kcrpmd_effective_auxiliary_force(vector<double>& y_
   double V1;
   double VKP;
 
-  double F0;
-  double F1;
-  double FKP;
+  double F0 = 0.0;
+  double F1 = 0.0;
+  double FKP = 0.0;
   vector<double> res;
 
   if(ntraj==1){ 
