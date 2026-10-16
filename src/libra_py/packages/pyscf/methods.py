@@ -107,7 +107,6 @@ def pyscf_compute_adi(q, params, full_id):
 
         
     #print(F"coords_prev = {coords_prev}")
-    print(F"coordinates = {coordinates}")
 
     # ================= Compute overlaps =================
     st_ci = pyscf_obj.time_overlap_matrix(nstates)
