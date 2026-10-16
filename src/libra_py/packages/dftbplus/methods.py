@@ -36,7 +36,7 @@ from libra_py import regexlib as rgl
 import libra_py.citools.ci as ci
 from libra_py import data_conv
 import libra_py.packages.cp2k.methods as CP2K_methods
-from libra_py.packages.driver_forces import fill_diagonal_forces, force_diagonals, refreshed_rows
+from libra_py.packages.driver_forces import check_excitation_energies, fill_diagonal_forces, force_diagonals, refreshed_rows
 import libra_py.orthogonalizations as ortho
 
 # import numpy as np
@@ -3420,6 +3420,7 @@ def dftb_compute_adi(q, params, full_id):
                            "the real-part ingestion below would discard them")
 
     # ================= Populate Hamiltonian =================
+    check_excitation_energies(data_curr[0][:nstates - 1], F"{wd} step {params.get('timestep', '?')}")
     for i in range(nstates):
         #energy = 0.0 if i == 0 else 0.5 * (
         #    data_prev[0][i - 1] + data_curr[0][i - 1]

@@ -37,7 +37,8 @@ elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
 from libra_py.params_check import refuse_unknown_keys, restrict
-from libra_py.packages.driver_forces import ForceHandover, fill_diagonal_forces, force_diagonals, refreshed_rows
+from libra_py.packages.driver_forces import (ForceHandover, check_excitation_energies, fill_diagonal_forces, force_diagonals,
+                                             refreshed_rows)
 
 from libra_py import data_outs, data_read, data_stat, data_conv
 from libra_py import units, molden_methods
@@ -4371,6 +4372,7 @@ def compute_state_energy_and_force(coords_bohr, params):
                              f"check the LIST line and keep THRESHOLD 0.0 "
                              f"(dark states are screened otherwise)")
         forces_all = np.stack([f_gs] + [f_ex[k] for k in range(1, nexc + 1)])
+        check_excitation_energies(omegas, F"{wd} step {params.get('timestep', '?')}")
         E_adi = np.concatenate(([E_gs], E_gs + omegas))
         return {"E_total": float(E_adi[act_state]), "E_gs": E_gs,
                 "forces": forces_all[act_state], "forces_all": forces_all,
@@ -4408,6 +4410,7 @@ def compute_state_energy_and_force(coords_bohr, params):
             # by the geometry-dependent omega_act
             E_gs = E_total
 
+    check_excitation_energies(omegas, F"{params.get('working_directory', 'wd')} step {params.get('timestep', '?')}")
     E_adi = np.concatenate(([E_gs], E_gs + omegas))
     return {"E_total": E_total, "E_gs": E_gs, "forces": forces,
             "omegas": omegas, "fosc": fosc, "E_adi": E_adi, "logfile": logfile}

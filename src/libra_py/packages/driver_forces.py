@@ -1,10 +1,23 @@
 """The force rows a driver hands to the engine: the diagonal force terms -dE_i/dx per degree of freedom and state
 (d1ham_adi), the rows of the states a driver does not compute NaN (the sentinel the engine's checks read - a zero
-force is a force), and the hand-over of the engine's call-back after a change of the active state (hop_force_refresh)
-shared by the CP2K and DFTB+ drivers."""
+force is a force), the hand-over of the engine's call-back after a change of the active state (hop_force_refresh)
+and the check of the excitation energies, shared by the CP2K and DFTB+ drivers."""
 import numpy as np
 from liblibra_core import CMATRIX, CMATRIXList
-from libra_py import data_conv
+from libra_py import data_conv, units
+
+
+def check_excitation_energies(omegas, where):
+    """A linear-response excited state below its reference (an excitation energy <= 0) is the reference breaking down -
+    the two lowest states invert, the forces and the energies handed over jump from step to step - and is refused with
+    the states and the energies named (eV). `where` names the run (the working directory, the step)."""
+    omegas = np.asarray(omegas, dtype=float)
+    bad = np.nonzero(omegas <= 0.0)[0]
+    if len(bad):
+        listed = ", ".join(F"state {k + 1}: {omegas[k] * units.au2ev:.3f} eV" for k in bad)
+        raise RuntimeError(F"{where}: excitation energies at or below zero ({listed}) - the reference breaks down at this "
+                           F"geometry and the propagation on these states is meaningless, an open-shell or multireference "
+                           F"treatment is needed here")
 
 
 class ForceHandover:
