@@ -37,7 +37,6 @@ double energy_nucl(vector<VECTOR>& R, vector<double>& Zeff){
 
 
 
-  int I,J;
   int sz = R.size();
   double en = 0.0;
 
@@ -66,7 +65,6 @@ double energy_nucl(vector<VECTOR>& R, vector<double>& Zeff, vector<VECTOR>& G){
 */
 
 
-  int I,J;
   int sz = R.size();
   double en = 0.0;
   //if(G.size()!=sz){  G = vector<VECTOR>(sz,VECTOR(0.0,0.0,0.0)); }

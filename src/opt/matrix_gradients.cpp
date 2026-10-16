@@ -138,7 +138,7 @@ double derivs1(MATRIX& x, MATRIX& y, MATRIX& A, MATRIX& gradA, double& L, double
 
 */
 
-  int i, j, k;
+  int i, j;
   int n = A.n_cols;
   double Lagrangian;
 
@@ -197,7 +197,7 @@ double derivs1_new(MATRIX& x, MATRIX& y, MATRIX& A, MATRIX& gradA, double& L, do
 
 */
 
-  int i, j, k, a, b;
+  int i, j, a, b;
   int n = A.n_cols;
   double Lagrangian = 0.0;
 
@@ -286,7 +286,7 @@ double derivs2(MATRIX& x, MATRIX& y, MATRIX& A, MATRIX& gradA, MATRIX& mu, MATRI
    dL2/dmu_i = 2 mu_i * B_i^2 (for quadratic)
 
 */
-    int i, j, k;
+    int i, j;
     int n = A.n_cols;
     double Lagrangian = 0.0;
 

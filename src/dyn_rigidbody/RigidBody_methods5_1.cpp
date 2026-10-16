@@ -152,15 +152,9 @@ void RigidBody::initialize_exact_rb(){
     sgny = -1.0*sgnx;
 
 
-    double L12 = L2 - 2.0*Er*I3;
     double L23 = L2 - 2.0*Er*I1;
-    double I13 = I1 - I3;
     double I23 = I2 - I3;
-    double omega1,omega2,omega3;
-    omega1 = top_w.x; omega2 = top_w.y; omega3 = top_w.z;
-    double omega1m = copysign(sqrt(L12/I1/I13),omega1);
-    double omega2m = -copysign(sqrt(omega2*omega2+I1*I13*omega1*omega1/I2/I23),omega1);
-    double omega3m = copysign(sqrt(-L23/I3/I13),omega3);
+    double omega3 = top_w.z;
     double omegap  = I23*copysign(sqrt(L23/(-I23)/I1/I2/I3), omega3);
 
 
@@ -272,7 +266,6 @@ void RigidBody::propagate_exact_rb(double dt){
   initialize_exact_rb();
 
   double t;
-  double t0 = -(eps/wp);
 
   double u, am, sn, cn, dn;
   VECTOR nz(0.0,0.0,1.0);
@@ -280,8 +273,8 @@ void RigidBody::propagate_exact_rb(double dt){
   MATRIX3x3 T1,T2,P,Rz,W;
   double psi,cos_psi,sin_psi;
   double Rev,Imv,Mod,Km_,arg,C,S;
-  double Lpn, Lmodn,L2;
-  double s1,s2,s3,c1,c2,c3;
+  double Lpn, Lmodn;
+  double s1, s2, c1, c2;
 
   double Lp; Lp = sqrt(top_l.x*top_l.x + top_l.y*top_l.y);
   double Lmod = top_l.length();
@@ -377,7 +370,6 @@ this case of the exact free-rotor propagation is not implemented\n";
     // Calculate transformation matrix T1 (with ordered variables)
     Lpn = sqrt(L.x*L.x + L.y*L.y);
     Lmodn = L.length();
-    L2 = Lmodn * Lmodn;
 
     MATRIX3x3 T1t0,T1t;
     s1 = (Lp/Lmod);    c1 = (top_l.z/Lmod);

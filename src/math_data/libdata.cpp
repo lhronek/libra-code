@@ -40,9 +40,6 @@ void export_Data_objects(){
   boost::python::list (DATA::*expt_Calculate_Distribution_v1)
   (boost::python::list Interval) = &DATA::Calculate_Distribution;
 
-  int (DATA::*expt_Calculate_Distribution_v2)
-  (vector<double>&,vector<double>&,vector<double>&) = &DATA::Calculate_Distribution;
-
   int (DATA::*expt_Calculate_Estimators_v1)() = &DATA::Calculate_Estimators;
   int (DATA::*expt_Calculate_MiniMax_v1)() = &DATA::Calculate_MiniMax;
 

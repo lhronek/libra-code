@@ -517,7 +517,6 @@ template <class VERTEX_DATA,class EDGE_DATA> int GRAPH<VERTEX_DATA,EDGE_DATA>::i
 template <class VERTEX_DATA,class EDGE_DATA> int GRAPH<VERTEX_DATA,EDGE_DATA>::ADD_EDGE(EDGE<EDGE_DATA> eg){
 
     int v1,v2;
-    int curr_num_nodes = _V_;
     EDGE<EDGE_DATA> e;   e = eg;    
     // Find indices of the corresponding vertices
     v1 = vertex_id_to_index(e.edge_vertex_id1);
@@ -891,11 +890,11 @@ template <class VERTEX_DATA,class EDGE_DATA> int GRAPH<VERTEX_DATA,EDGE_DATA>::F
 //    vector<Path> sssr;
     if(sssr.size()>0) { sssr.clear(); }
     int n_ringidx = 0;
-    int n_sssr; 
+//    int n_sssr;
     int is_odd;
     int is_in_sssr;
 
-    n_sssr = _E_ - _V_ + 1;
+//    n_sssr = _E_ - _V_ + 1;
 
 //    cout<<"Theoretical number of rings = "<<n_sssr<<endl;
     int max_cnum = 0;

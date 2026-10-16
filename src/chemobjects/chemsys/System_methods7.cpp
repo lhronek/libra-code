@@ -266,18 +266,11 @@ void System::print_xyz(std::string filename,int fold,std::string pbc_type,int fr
   }
 
   for(int i=0;i<Number_of_atoms;i++){
-    int at_ser_num = 1;
     std::string at_name = "H";
-    int grp_num;
     VECTOR r;
-    double occup = 1.0;
-    double b_fact = 0.0;
 
-    if(Atoms[i].is_Atom_id){at_ser_num = Atoms[i].Atom_id;}
     if(Atoms[i].is_Atom_element){at_name = Atoms[i].Atom_element;}
-    grp_num = Atoms[i].globGroup_Index;
     if(Atoms[i].is_Atom_RB){  if(Atoms[i].Atom_RB.is_rb_cm){   r = Atoms[i].Atom_RB.rb_cm;  }  }
-    if(Atoms[i].is_Atom_charge){ b_fact = Atoms[i].Atom_charge; }
 
     if(fold && is_Box){
       MATRIX3x3 invBox; invBox = Box.inverse();
@@ -351,18 +344,11 @@ std::string System::get_xyz(int fold,std::string pbc_type,int frame){
   }
 
   for(int i=0;i<Number_of_atoms;i++){
-    int at_ser_num = 1;
     std::string at_name = "H";
-    int grp_num;
     VECTOR r;
-    double occup = 1.0;
-    double b_fact = 0.0;
 
-    if(Atoms[i].is_Atom_id){at_ser_num = Atoms[i].Atom_id;}
     if(Atoms[i].is_Atom_element){at_name = Atoms[i].Atom_element;}
-    grp_num = Atoms[i].globGroup_Index;
     if(Atoms[i].is_Atom_RB){  if(Atoms[i].Atom_RB.is_rb_cm){   r = Atoms[i].Atom_RB.rb_cm;  }  }
-    if(Atoms[i].is_Atom_charge){ b_fact = Atoms[i].Atom_charge; }
 
     if(fold && is_Box){
       MATRIX3x3 invBox; invBox = Box.inverse();

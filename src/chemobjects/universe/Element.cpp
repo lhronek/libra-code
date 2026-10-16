@@ -201,7 +201,6 @@ void Element::load(boost::property_tree::ptree& pt,std::string path,int& status)
               given level of the property tree.
 */
 
-  int st;
   status = 0;
 
   libio::load(pt,path+".Elt_name",Elt_name,is_Elt_name); if(is_Elt_name==1) { status=1;}

@@ -48,10 +48,8 @@ void update_overlap_matrix(int x_period,int y_period,int z_period,const VECTOR& 
 */
 
 
-  int i,j,n,I,J;
+  int i, j;
   VECTOR dIdA,dIdB,TV, Rij,Rij0;
-  double dist, dist_min;  
-  int opt_x,opt_y,opt_z;
 
   int Norb = basis_ao.size();
 
@@ -192,8 +190,6 @@ void MO_overlap(MATRIX& Smo, vector<AO>& ao_i, vector<AO>& ao_j, MATRIX& Ci, MAT
 
   // Ci = Nbas_i x Norb_i 
   // Cj = Nbas_j x Norb_j
-  int Norb_i = Ci.n_cols;
-  int Norb_j = Cj.n_cols;
 
   int Norb_i_act = active_orb_i.size();  // the number of active orbitals in set i
   int Norb_j_act = active_orb_j.size();  // the number of active orbitals in set j
@@ -280,8 +276,6 @@ void MO_overlap(CMATRIX& Smo, vector<AO>& ao_i, vector<AO>& ao_j, CMATRIX& Ci, C
 
   // Ci = Nbas_i x Norb_i 
   // Cj = Nbas_j x Norb_j
-  int Norb_i = Ci.n_cols;
-  int Norb_j = Cj.n_cols;
 
   int Norb_i_act = active_orb_i.size();  // the number of active orbitals in set i
   int Norb_j_act = active_orb_j.size();  // the number of active orbitals in set j
@@ -375,8 +369,6 @@ void MO_overlap(MATRIX& Smo, MATRIX& Ci, MATRIX& Cj,
   }
 
 
-  int Norb_i = Ci.n_cols;
-  int Norb_j = Cj.n_cols;
 
   int Norb_i_act = active_orb_i.size();  // the number of active orbitals in set i
   int Norb_j_act = active_orb_j.size();  // the number of active orbitals in set j
@@ -435,8 +427,6 @@ void MO_overlap(CMATRIX& Smo, CMATRIX& Ci, CMATRIX& Cj,
   }
 
 
-  int Norb_i = Ci.n_cols;
-  int Norb_j = Cj.n_cols;
 
   int Norb_i_act = active_orb_i.size();  // the number of active orbitals in set i
   int Norb_j_act = active_orb_j.size();  // the number of active orbitals in set j
@@ -510,7 +500,6 @@ complex<double> SD_overlap(SD& sd_i, SD& sd_j){
   }// for i
 
   // Compute the determinant
-  double nrm = sd_i.normalization_factor();
   complex<double> res = libmeigen::det(*Smo); 
 
 

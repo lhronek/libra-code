@@ -66,7 +66,7 @@ double gaussian_moment(int nxa, double alp_a, double Xa,
 ****************************************************************************/
 
 
-  int i,k;
+  int k;
   double gamma_cb = alp_c + alp_b;
   double Xcb = (alp_c * Xc + alp_b * Xb )/gamma_cb;
   double dX = Xcb - Xc;

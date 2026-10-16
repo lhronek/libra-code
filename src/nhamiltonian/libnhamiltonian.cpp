@@ -53,7 +53,6 @@ void export_nhamiltonian_objects(){
   CMATRIX (nHamiltonian::*expt_get_ham_dia_v2)(vector<int>&) = &nHamiltonian::get_ham_dia;
 
   CMATRIX (nHamiltonian::*expt_get_nac_dia_v1)() = &nHamiltonian::get_nac_dia;
-  CMATRIX (nHamiltonian::*expt_get_nac_dia_v2)(vector<int>&) = &nHamiltonian::get_nac_dia;
 
   CMATRIX (nHamiltonian::*expt_get_hvib_dia_v1)() = &nHamiltonian::get_hvib_dia;
   CMATRIX (nHamiltonian::*expt_get_hvib_dia_v2)(vector<int>&) = &nHamiltonian::get_hvib_dia;
@@ -79,7 +78,6 @@ void export_nhamiltonian_objects(){
   CMATRIX (nHamiltonian::*expt_get_ham_adi_v2)(vector<int>&) = &nHamiltonian::get_ham_adi;
 
   CMATRIX (nHamiltonian::*expt_get_nac_adi_v1)() = &nHamiltonian::get_nac_adi;
-  CMATRIX (nHamiltonian::*expt_get_nac_adi_v2)(vector<int>&) = &nHamiltonian::get_nac_adi;
 
   CMATRIX (nHamiltonian::*expt_get_hvib_adi_v1)() = &nHamiltonian::get_hvib_adi;
   CMATRIX (nHamiltonian::*expt_get_hvib_adi_v2)(vector<int>&) = &nHamiltonian::get_hvib_adi;

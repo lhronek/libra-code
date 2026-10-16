@@ -101,8 +101,6 @@ void excite(int Norb, excitation& ex,
   cout<<"Excitation size = "<<ex.size<<endl;
   for(int i=0;i<ex.size;i++){
 
-    int source_indx = 0;
-    int target_indx = 0;
     double source_pop = 0.0;
     double target_pop = 0.0;
 

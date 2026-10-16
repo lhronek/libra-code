@@ -90,7 +90,7 @@ void grad_step(MATRIX& A, MATRIX& x, MATRIX& x_new, double dt, double& L, MATRIX
 
 
     */
-    int i, j, k;
+    int i, j;
     int n = A.n_cols;
 
     //*****************************************

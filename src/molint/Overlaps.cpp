@@ -147,8 +147,6 @@ double gaussian_overlap(int nxa,double alp_a, double Xa, int nxb,double alp_b, d
   double dXpb_dXa = ag;
   double dXpa_dXb = bg;
   double dXpb_dXb = bg - 1.0;
-  double dXp_dXa = ag;
-  double dXp_dXb = bg;
 
 
   // Aliaces
@@ -419,10 +417,6 @@ double sto_overlap(int na, int la, int ma, double alp_a, int nb, int lb, int mb,
       double sum = rhoA + rhoB;
       double dif = rhoA - rhoB;
     
-      double ra = 2.0*alp_a/(alp_a + alp_b); //(rhoA/sum);
-      double rb = 2.0*alp_b/(alp_a + alp_b); //(rhoB/sum);
-    
-      double pref = sqrt(ra*rb) * FAST_POW(ra,na) * FAST_POW(rb,nb);
     
       // Allocate memory for coefficients
       double* f;  f = new double[na+nb+1];
@@ -485,10 +479,6 @@ double sto_overlap_fast(int na, int la, int ma, double alp_a, int nb, int lb, in
       double sum = rhoA + rhoB;
       double dif = rhoA - rhoB;
     
-      double ra = 2.0*alp_a/(alp_a + alp_b); //(rhoA/sum);
-      double rb = 2.0*alp_b/(alp_a + alp_b); //(rhoB/sum);
-    
-      double pref = sqrt(ra*rb) * FAST_POW(ra,na) * FAST_POW(rb,nb);
     
       // Allocate memory for coefficients
       double** A_coeff; 

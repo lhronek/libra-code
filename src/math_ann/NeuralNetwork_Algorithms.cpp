@@ -140,7 +140,7 @@ vector<MATRIX> NeuralNetwork::derivatives(MATRIX& input){
 
 */
 
-  int i, j, p, L;  
+  int i, p, L;
 
   if(input.n_rows!=sz_x){
     std::cout<<"Error: Size of the input "<<input.n_rows<<" does not match the ANN architecture "<<sz_x<<std::endl;
@@ -310,7 +310,7 @@ double NeuralNetwork::error(MATRIX& inputs, MATRIX& target){
 
 */
 
-  int i, j, L;  
+  int i, j;
 
   if(target.n_cols!=inputs.n_cols){    
     std::cout<<"Error: The number of patterns is different for inputs "<<inputs.n_cols<<" and targets "<<target.n_cols<<std::endl;
@@ -367,7 +367,7 @@ vector<double> NeuralNetwork::train(Random& rnd, bp::dict params, MATRIX& inputs
 
 */
 
-  int i, j, epoch, L, a1, a2;
+  int i, epoch, L, a1, a2;
 
   ///============ Get the parameters ==================
   /**

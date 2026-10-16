@@ -23,12 +23,12 @@ namespace libcontext{
 
 void Context::set_path(std::string new_path){
   path = new_path;
-  int i= 0;
-  BOOST_FOREACH(ptree::value_type& v, ctx_pt){ 
+  //int i= 0;
+  //BOOST_FOREACH(ptree::value_type& v, ctx_pt){
   //BOOST_FOREACH(auto& v, ctx_pt){ 
   //for (auto& v : ctx_pt){  // C++11
    // if(i==0){ v.first = std::move(new_path); } i++;    AVA: Temporary comment it to be able to compile with C++11
-  } 
+  //}
 
 }
 std::string Context::get_path(){ 
@@ -78,7 +78,6 @@ void Context::show_children(std::string _path){
 */
 
 
-  int j = 0;
   cout<<"current path = "<<path<<endl;
 
   BOOST_FOREACH(ptree::value_type &v1, ctx_pt.get_child(boost::property_tree::ptree::path_type(_path, path_separator))){

@@ -310,7 +310,7 @@ double Jab(int m,int n,double alpha,double betha){
 // Idempotential for some particular atom
 
   double K1,K2;
-  double r,t,f,sum;
+  double t, f;
   double rel;
 
   if(alpha==betha){

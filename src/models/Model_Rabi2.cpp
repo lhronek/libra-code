@@ -30,7 +30,6 @@ void Rabi2_Ham(double x, MATRIX* H, MATRIX* dH, MATRIX* d2H, vector<double>& par
   if(d2H->n_elts!=4){ std::cout<<"Error in Rabi2_Ham: d2H matrix must be allocated\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");}
 
 
-  double e;
 
 
   // Default parameters

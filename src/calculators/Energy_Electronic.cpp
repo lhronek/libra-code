@@ -40,7 +40,7 @@ double energy_elec(MATRIX* Pao,MATRIX* Hao,MATRIX* Fao){
 
   int Norb = Pao->n_cols;
   
-  int i,ii,j;
+  int i, j;
   double Eelec = 0.0;
 
   for(i=0;i<Norb;i++){
@@ -111,7 +111,7 @@ double energy_elec(MATRIX* P_alp, MATRIX* P_bet,
 
   int Norb = P_alp->n_cols;
   
-  int i,ii,j;
+  int i, j;
   double Eelec_alp = 0.0;
   double Eelec_bet = 0.0;
   double Eelec_tot = 0.0;

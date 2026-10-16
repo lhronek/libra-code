@@ -444,8 +444,7 @@ MATRIX QE_read_acsii_grid(std::string filename, int verbose){
   // Find k-point sections
   int beg,end;
   int start = 0;
-  int status = 0;
-  status = find_section(A,"<grid","</grid>",start,filesize,beg,end);
+  find_section(A,"<grid","</grid>",start,filesize,beg,end);
   int sz = end-beg-1;
   if(verbose){  cout<<"Size of the grid = "<<sz<<endl; }
 

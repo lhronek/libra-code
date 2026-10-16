@@ -45,10 +45,8 @@ double RPMD_internal_potential(const MATRIX& q, const MATRIX& invM, double beta)
   beta - the inverse temperature Boltzmann factor in atomic units
 */
 
-  int ndof = q.n_rows;
   int ntraj = q.n_cols;
 
-  int dof, traj;
 
   double en;
 
@@ -77,7 +75,7 @@ MATRIX RPMD_internal_force(const MATRIX& q, const MATRIX& invM, double beta){
   int ndof = q.n_rows;
   int ntraj = q.n_cols;
 
-  int dof, traj;
+  int dof;
 
   MATRIX f(ndof, ntraj);
 

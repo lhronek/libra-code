@@ -436,7 +436,6 @@ void nHamiltonian::compute_adiabatic(int der_lvl, int lvl) {
 
   */
 
-  int i, j;
 
   if (level == lvl) {
 

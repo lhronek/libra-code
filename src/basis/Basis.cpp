@@ -240,7 +240,6 @@ void add_basis_ao(std::string Atom_name, VECTOR& R, std::string Atom_shell, int 
   int basis_size = 0;
 
 
-  double a1, a2, a3;
   PrimitiveG s;
   AO ao;  
   int Norb = 0;

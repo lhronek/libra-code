@@ -611,8 +611,6 @@ void System::LINK_ATOMS(Atom& at1,Atom& at2){
 
   // Check if this bond already exists in the object space
   int is_exist = 0;
-  int is_included;
-  int n_bonds = Number_of_bonds;
   is_exist = (Find_Bond(at1.globAtom_Index,at2.globAtom_Index)>-1);
 
   if(!is_exist){ // Create only if this bond is not yet defined 
@@ -628,7 +626,6 @@ void System::LINK_ATOMS(Atom& at1,Atom& at2){
      // First - look for biggest, smallest and the last indexes
      int max  = (at1.globMolecule_Index>at2.globMolecule_Index)?at1.globMolecule_Index:at2.globMolecule_Index;
      int min  = (at1.globMolecule_Index<at2.globMolecule_Index)?at1.globMolecule_Index:at2.globMolecule_Index;
-     int last_mol = Number_of_molecules-1;
  
      //###################### Step 1 ############################################
      // Merge max molecule to min one = Copy and Rename (Reindex)    
@@ -1385,8 +1382,8 @@ void System::CREATE_BONDS(boost::python::list atoms_list,boost::python::dict val
   vector<int> at_indexes_sorted;
   vector<int> at_valences_sorted;
   int i,j;
-  int id,indx;
-  int grp,per;
+  int id;
+  int grp;
   int sz;
   std::string blk;
   std::string elt;
@@ -1403,7 +1400,6 @@ void System::CREATE_BONDS(boost::python::list atoms_list,boost::python::dict val
   sz = len(atoms_list);
   for(i=0;i<sz;i++){
     id = extract<int>(atoms_list[i]);      
-    int is_found = 0;
     j = get_atom_index_by_atom_id(id);
     if(j!=-1){ at_indexes.push_back(j); }
     else{ cout<<"Error: Can not find atom with id = "<<id<<endl; }
@@ -1412,7 +1408,7 @@ void System::CREATE_BONDS(boost::python::list atoms_list,boost::python::dict val
 //--------- Second step: Calculate valence of the atoms -------------
   sz = at_indexes.size();
   for(i=0;i<sz;i++){
-    indx = at_indexes[i];
+//    indx = at_indexes[i];
        // Get the position of the atom in Periodic Table
 
 //       if(os.ObjectSpace_Atoms[indx].is_Atom_group){ grp = os.ObjectSpace_Atoms[indx].Atom_group; }
@@ -1563,8 +1559,7 @@ void System::CLONE_MOLECULE(int mol_id){
 
   // First - find indexes
   int m; // Index of the molecule with mol_id
-  int is_found = 0;
-  int i,j,sz,indx;
+  int i, j, indx;
 
   m = get_molecule_index_by_molecule_id(mol_id);
   if(m==-1){

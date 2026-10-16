@@ -132,9 +132,9 @@ VECTOR transition_dipole_moment
 ********************************************************************************************/
 
   // 1D overlaps
-  double dIx_dXa, dIx_dX, dIx_dXb;
-  double dIy_dYa, dIy_dY, dIy_dYb;
-  double dIz_dZa, dIz_dZ, dIz_dZb;
+  double dIx_dXa, dIx_dXb;
+  double dIy_dYa, dIy_dYb;
+  double dIz_dZa, dIz_dZb;
 
   double Ix = gaussian_overlap(nxa, alp_a, Ra.x, nxb, alp_b, Rb.x, is_normalize, is_derivs, dIx_dXa, dIx_dXb, auxd, n_aux);
   double Iy = gaussian_overlap(nya, alp_a, Ra.y, nyb, alp_b, Rb.y, is_normalize, is_derivs, dIy_dYa, dIy_dYb, auxd, n_aux);

@@ -95,7 +95,7 @@ void System::Assign_Rings(){
   g.FIND_SSSR(rings);
 
   // Now assign
-  int indx,i,j,nrings,sz;
+  int i, j, nrings, sz;
   nrings = rings.size();
 //  cout<<"nrings = "<<nrings<<endl;
   for(i=0;i<nrings;i++){

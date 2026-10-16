@@ -49,7 +49,6 @@ complex<double> Integrand_NE_exact(double tp, double tau, double omega_DA, doubl
 complex<double> Linear_NE_exact(double tp, double tau, double gamma, double omega, double req, double shift, double beta){
 /**
 */
-  double re, im;
   double wtp = omega*tp;
   double wt  = omega*tau;
   double wb  = omega*beta;

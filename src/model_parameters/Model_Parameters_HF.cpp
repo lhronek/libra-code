@@ -30,7 +30,7 @@ namespace libmodel_parameters{
 void set_parameters_hf(Control_Parameters& prms,Model_Parameters& modprms,vector<AO>& basis_ao){
 
 
-  int a,b,c,d,A,B,C,D;
+  int a, b, c, d;
   int Norb = basis_ao.size(); // total number of AOs 
 
 

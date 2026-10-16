@@ -96,7 +96,6 @@ double nHamiltonian::kcrpmd_effective_potential(vector<double>& y_aux_var, const
 
   if(ndia!=2){ cout<<"Error in kcrpmd_effective_potential(): implementation only for ndia=2\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
-  int ndof = q.n_rows;
   int ntraj = q.n_cols;
 
   double V0;

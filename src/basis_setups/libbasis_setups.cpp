@@ -35,10 +35,6 @@ void export_basis_setups_objects(){
 
   // Basis_STO_3G_DZ.cpp
 
-  void (*expt_set_basis_STO_3G_DZ_v1)(vector<std::string>& at_type, vector<VECTOR>& R,  Model_Parameters& modpar, int verb,
-  vector<AO>& basis_ao, int& Nelec, int& Norb, 
-  vector<vector<int> >& atom_to_ao_map, vector<int>& ao_to_atom_map) = &set_basis_STO_3G_DZ;
-
   boost::python::list (*expt_set_basis_STO_3G_DZ_v2)
   (vector<std::string>& at_type, vector<VECTOR>& R,  Model_Parameters& modpar, int verb) = &set_basis_STO_3G_DZ;
 

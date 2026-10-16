@@ -219,7 +219,6 @@ void propagate_electronic_rot(double dt, CMATRIX& Coeff, CMATRIX& Hvib){
 
 
   int i,j;
-  double ci, cj;
 
   double dt_half = 0.5*dt;
   complex<double> tau(0.0, -0.5*dt);  // this is actually -i*dt/2
@@ -318,7 +317,7 @@ void propagate_electronic_eig(double dt, CMATRIX& Coeff, CMATRIX& Hvib){
   This is the Python-friendly function
 */ 
 
-  int i,j;
+  int i;
  
   // Let us first diagonalize the overlap matrix S
   int sz = Hvib.n_cols;  
@@ -377,7 +376,7 @@ void propagate_electronic_nonHermitian(double dt, CMATRIX& Coeff, CMATRIX& Hvib)
 */ 
 
 
-  int i,j;
+  int i;
  
   // Let us first diagonalize the overlap matrix S
   int sz = Hvib.n_cols;  
@@ -441,7 +440,7 @@ void propagate_electronic_eig(double dt, CMATRIX& Coeff, CMATRIX& Hvib, CMATRIX&
 */ 
 
 
-  int i,j;
+  int i;
  
   // Let us first diagonalize the overlap matrix S
   int sz = S.n_cols;  

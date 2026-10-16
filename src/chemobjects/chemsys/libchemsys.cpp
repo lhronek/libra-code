@@ -43,7 +43,6 @@ void export_Chemsys_objects(){
 
 //void (System::*CREATE_ATOM1)()      = &System::CREATE_ATOM;
 void (System::*CREATE_ATOM2)(Atom)  = &System::CREATE_ATOM;
-void (System::*LINK_ATOMS1)(Atom&,Atom&) = &System::LINK_ATOMS;
 void (System::*LINK_ATOMS2)(int,int) = &System::LINK_ATOMS;
 
 void (System::*init_box1)()         = &System::init_box;

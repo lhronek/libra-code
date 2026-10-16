@@ -31,7 +31,6 @@ namespace libmol{
 void export_Mol_objects(){
 
 
-  void (Atom::*expt_save_v1)(boost::property_tree::ptree& pt,std::string path) = &Atom::save;
   void (Atom::*expt_save_v2)(std::string path) = &Atom::save;
 
 

@@ -355,7 +355,6 @@ void Fock_to_P(MATRIX* Fao, MATRIX* Sao, double Nel, double degen, double kT, do
 */
                                                                      
 
-  int Norb = Fao->n_cols;
     
   // Get electronic structure (wfc and energies) from given Fock matrix
   if(BM){ bench_t[0].start(); }
@@ -416,7 +415,6 @@ void Fock_to_P(CMATRIX* Fao, CMATRIX* Sao, double Nel, double degen, double kT, 
 */
                                                                      
 
-  int Norb = Fao->n_cols;
     
   // Get electronic structure (wfc and energies) from given Fock matrix
   if(BM){ bench_t[0].start(); }

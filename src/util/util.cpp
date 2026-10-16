@@ -169,8 +169,6 @@ int delta(vector<int>& A,vector<int>& B,int& a,int& b){
   int i;
   int res = 1;
   int sz = A.size();
-  int nA = 0; // number of elements in A which do not exist in B
-  int nB = 0; // number of elements in B which do not exist in A
   std::vector<int> aA, aB, aC; // modules of A and B and overlap C
 
   for(i=0;i<sz;i++){ // the size of A and B is assumed to be the same
@@ -563,7 +561,7 @@ void check_input(boost::python::dict params, boost::python::dict default_params,
 
 ******************************************************************/
 
-  int i,j, is_found;
+  int i;
   std::string key;
 
 

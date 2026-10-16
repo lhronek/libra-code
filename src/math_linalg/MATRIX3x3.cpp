@@ -144,7 +144,6 @@ void MATRIX3x3::eigen(MATRIX3x3& EVAL, MATRIX3x3& EVECT,double EPS) {
   // Define convergence criteria.
   eps = temp.xy*temp.xy + temp.xz*temp.xz + temp.yx*temp.yx + temp.yz*temp.yz + temp.zx*temp.zx + temp.zy*temp.zy;
 
-  int row,col;
   double  val, phi;
 
   while(eps>EPS){

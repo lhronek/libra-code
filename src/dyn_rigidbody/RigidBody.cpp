@@ -237,7 +237,6 @@ void RigidBody::copy_content(const RigidBody& rb){
   if(ci==NULL){  ci = new double[NT]; }
   for(int i=0;i<NT;i++){ cr[i] = rb.cr[i]; ci[i] = rb.ci[i]; }
   wp = rb.wp;   
-  int arr_sz = (SERIES_EXPANSION*(1+SERIES_EXPANSION)/2);
 
   orderflag = rb.orderflag;
 

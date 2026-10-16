@@ -185,7 +185,7 @@ double gamma_lower(double s,double x){
 */
 
   double res = 0.0;
-  double t1,term;
+  double term;
 
   if(x<0){ x = 0.0; }
 
@@ -645,7 +645,6 @@ void binomial_expansion(int n1,int n2,double x1,double x2,double* f,double* dfdx
     else if(n1==3 && n2==1){ 
       // Optimized version: 15 mults
       double x11 = x1*x1;
-      double x22 = x2*x2;
       double x12 = x1*x2;
       f[0] = x11*x12;           f[1] = x11*x1 + 3.0*x11*x2;   f[2] = 3.0*(x12 + x11);     f[3] = 3.0*x1+x2; f[4] = 1.0;     
 
@@ -664,7 +663,6 @@ void binomial_expansion(int n1,int n2,double x1,double x2,double* f,double* dfdx
 
     else if(n1==1 && n2==3){ 
       // Optimized version: 15 mults
-      double x11 = x1*x1;
       double x22 = x2*x2;
       double x12 = x1*x2;
       f[0] = x22*x12;           f[1] = 3.0*x22*x1 + x22*x2;   f[2] = 3.0*(x12 + x22);     f[3] = 3.0*x2+x1; f[4] = 1.0;     
@@ -877,17 +875,16 @@ void HERMITE(int n,double x,double& p,double& q){
 
         */
 
-        double r = 0, s = 0, t = 0;
+        double r = 0, t = 0;
 
         // r - value of polynomial one degree  less
         // t - value of polynomial two degrees less
-        // s - differential coefficient corresponding to r
 
         p = 1; q = 0;
 
         for(float m=0;m<n;m++){
 
-                r = p; s = q;
+                r = p;
                 p = 2.0*x*r - 2.0*m*t;
                 q = 2.0*(m+1)*r;
                 t = r;
@@ -938,8 +935,8 @@ double Ellipe(double phi0,double k,int N)  // Elliptic integral of first kind (J
 void Ellipe2(double u,double k,double& sn,double& cn,double& dn){
 
         double k2,k4,k6;
-        double u2,u4,u6,u8;
-        double f2,f3,f4,f5,f6,f7,f8;
+        double u2,u4,u6;
+        double f2,f3,f4,f5,f6,f7;
 
         f2 = 0.5;
         f3 = f2/3.0;
@@ -947,12 +944,10 @@ void Ellipe2(double u,double k,double& sn,double& cn,double& dn){
         f5 = f4/5.0;
         f6 = f5/6.0;
         f7 = f6/7.0;
-        f8 = f7/8.0;
 
         u2 = u*u;
         u4 = u2*u2;
         u6 = u2*u4;
-        u8 = u2*u6;
 
         k2 = k*k;
         k4 = k2*k2;
@@ -973,7 +968,6 @@ void Jacobi_Elliptic(double u,double m,double tol,double& am, double& sn, double
 
         double K,Kprime;
 
-        double k = sqrt(m);
 
         K      = Km(m,tol);
         Kprime = Km(1-m,tol);
@@ -983,10 +977,8 @@ void Jacobi_Elliptic(double u,double m,double tol,double& am, double& sn, double
 
         double v = (M_PI*u/(2.0*K));
 
-        double q_sqrt = sqrt(q);
         double q_n, q_2n;
-        double term,term1,term2,term3;
-        double mt1, mt2, mt3;
+        double term;
 
         am = v;
 
@@ -1021,7 +1013,6 @@ double Km(double m,double tol){
 
         double a0,b0,c0;
         double a1,b1,c1;
-        double k   = sqrt(m); // m = k*k;
 
 
         a1 = a0 = 1;
@@ -1218,7 +1209,7 @@ MATRIX exp_(MATRIX& x, double dt){
     cout<<"Error in libspecialfunctions::exp_ : the input matrix is not square\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); 
   }
 
-  int i,j;
+  int i;
  
   // Let us first diagonalize the input matrix x
   int sz = x.n_cols;  
