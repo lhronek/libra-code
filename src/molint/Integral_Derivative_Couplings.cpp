@@ -48,6 +48,7 @@ double derivative_coupling_integral(
 
   // Operator = (d/dx)
   double Ix,w,dIx_dXa,dIx_dXb; 
+  Ix = 0.0;
   dI_dXa = 0.0;
   dI_dXb = 0.0;
 
