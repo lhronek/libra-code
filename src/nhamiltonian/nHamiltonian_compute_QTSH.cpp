@@ -50,7 +50,7 @@ complex<double> nHamiltonian::QTSH_energy_dia(CMATRIX& ampl_dia){
   if(ham_dia_mem_status==0){ cout<<"Error in QTSH_energy_dia(): the diabatic Hamiltonian matrix is not allocated \
   but it is needed for the calculations\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
-//  if(ampl_dia_mem_status==0){ cout<<"Error in QTSH_energy_dia(): the amplitudes of the diabatic states are\
+//  if(ampl_dia_mem_status==0){ cout<<"Error in QTSH_energy_dia(): the amplitudes of the diabatic states are
 //  not allocated, but they are needed for the calculations\n"; exit(0); }
 
   // To obtain the off-diagonal part of the diabatic Hamiltonian matrix
@@ -132,7 +132,7 @@ complex<double> nHamiltonian::QTSH_energy_adi(CMATRIX& ampl_adi){
   if(ham_adi_mem_status==0){ cout<<"Error in QTSH_energy_adi(): the adiabatic Hamiltonian matrix is not allocated \
   but it is needed for the calculations\n"; std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above"); }
 
-//  if(ampl_adi_mem_status==0){ cout<<"Error in QTSH_energy_adi(): the amplitudes of the adiabatic states are\
+//  if(ampl_adi_mem_status==0){ cout<<"Error in QTSH_energy_adi(): the amplitudes of the adiabatic states are
 //  not allocated, but they are needed for the calculations\n"; exit(0); }
 
   // the amplitudes arrive in the basis of ham_adi - the step's projector moved them in the propagation, no transform here

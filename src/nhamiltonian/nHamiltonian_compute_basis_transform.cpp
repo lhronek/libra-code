@@ -61,10 +61,10 @@ void nHamiltonian::ampl_dia2adi(CMATRIX &ampl_dia, CMATRIX &ampl_adi) {
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
-  //  if(ampl_dia_mem_status==0){ cout<<"Error in ampl_dia2adi(): the amplitudes of the diabatic states are\
+  //  if(ampl_dia_mem_status==0){ cout<<"Error in ampl_dia2adi(): the amplitudes of the diabatic states are
 //  not allocated, but they are needed for the calculations\n"; exit(0); }
 
-  //  if(ampl_adi_mem_status==0){ cout<<"Error in ampl_dia2adi(): the amplitudes of the adiabatic states are\
+  //  if(ampl_adi_mem_status==0){ cout<<"Error in ampl_dia2adi(): the amplitudes of the adiabatic states are
 //  not allocated, but they are needed for the calculations\n"; exit(0); }
 
   ampl_adi = (*basis_transform).H() * (*ovlp_dia) * ampl_dia;
@@ -95,10 +95,10 @@ void nHamiltonian::ampl_dia2adi(CMATRIX *ampl_dia, CMATRIX *ampl_adi) {
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
-  //  if(ampl_dia_mem_status==0){ cout<<"Error in ampl_dia2adi(): the amplitudes of the diabatic states are\
+  //  if(ampl_dia_mem_status==0){ cout<<"Error in ampl_dia2adi(): the amplitudes of the diabatic states are
 //  not allocated, but they are needed for the calculations\n"; exit(0); }
 
-  //  if(ampl_adi_mem_status==0){ cout<<"Error in ampl_dia2adi(): the amplitudes of the adiabatic states are\
+  //  if(ampl_adi_mem_status==0){ cout<<"Error in ampl_dia2adi(): the amplitudes of the adiabatic states are
 //  not allocated, but they are needed for the calculations\n"; exit(0); }
 
   (*ampl_adi) = (*basis_transform).H() * (*ovlp_dia) * (*ampl_dia);
@@ -383,10 +383,10 @@ void nHamiltonian::ampl_adi2dia(CMATRIX &ampl_dia, CMATRIX &ampl_adi) {
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
-  //  if(ampl_dia_mem_status==0){ cout<<"Error in ampl_dia2adi(): the amplitudes of the diabatic states are\
+  //  if(ampl_dia_mem_status==0){ cout<<"Error in ampl_dia2adi(): the amplitudes of the diabatic states are
 //  not allocated, but they are needed for the calculations\n"; exit(0); }
 
-  //  if(ampl_adi_mem_status==0){ cout<<"Error in ampl_dia2adi(): the amplitudes of the adiabatic states are\
+  //  if(ampl_adi_mem_status==0){ cout<<"Error in ampl_dia2adi(): the amplitudes of the adiabatic states are
 //  not allocated, but they are needed for the calculations\n"; exit(0); }
 
   ampl_dia = (*basis_transform) * ampl_adi;
@@ -409,10 +409,10 @@ void nHamiltonian::ampl_adi2dia(CMATRIX *ampl_dia, CMATRIX *ampl_adi) {
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
-  //  if(ampl_dia_mem_status==0){ cout<<"Error in ampl_dia2adi(): the amplitudes of the diabatic states are\
+  //  if(ampl_dia_mem_status==0){ cout<<"Error in ampl_dia2adi(): the amplitudes of the diabatic states are
 //  not allocated, but they are needed for the calculations\n"; exit(0); }
 
-  //  if(ampl_adi_mem_status==0){ cout<<"Error in ampl_dia2adi(): the amplitudes of the adiabatic states are\
+  //  if(ampl_adi_mem_status==0){ cout<<"Error in ampl_dia2adi(): the amplitudes of the adiabatic states are
 //  not allocated, but they are needed for the calculations\n"; exit(0); }
 
   (*ampl_dia) = (*basis_transform) * (*ampl_adi);

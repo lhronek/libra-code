@@ -707,7 +707,7 @@ void nHamiltonian::init_all(int der_lvl, int target_lvl) {
   // else{
   //   cout<<"WARNING in nHamiltonian::init_all\n";
   //   c out<<"Can not run evaluation of function in the parent Hamiltonian from
-  //   the\
+  //   the
   //   child node\n";
   // }
 }
