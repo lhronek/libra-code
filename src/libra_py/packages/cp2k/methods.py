@@ -41,7 +41,7 @@ from libra_py.packages.driver_forces import (ForceHandover, check_excitation_ene
                                              refreshed_rows)
 from libra_py.packages.cp2k.spin_flip import (read_tdwfn, spin_flip_amplitudes, s2_spin_flip, classify_spin,
                                               spin_flip_sd_basis, spin_flip_sd2ci, spin_flip_densities,
-                                              spin_flip_carrier_operators)
+                                              spin_flip_carrier_operators, s_reference, s2_total, spin_name)
 
 from libra_py import data_outs, data_read, data_stat, data_conv
 from libra_py import units, molden_methods
@@ -6206,22 +6206,26 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     are read from the TDDFPT restart, expanded over the beta
                     virtual MOs of the wfn restart (ADDED_MOS must cover every
                     virtual, lowest_orbital 1 and highest_orbital the MO count),
-                    classified by <S^2>, and the lowest nstates SINGLETS are the
-                    adiabatic states - S0 the lowest singlet, the reference no
-                    state of the manifold, the energies E_ref + omega - with the
-                    active singlet's root in &EXCITED_STATES STATE (the previous
-                    step's root is assumed, the force is rerun on the right root
-                    when the classification moves it, the first call computes
-                    the energies first). Needs time_dependent, force_source
-                    "active_state" or "none", mo_source "wfn", ci_source
-                    "tddfpt_restart", ao_overlap_method "cp2k", overlap_backend
-                    "sd" and dia_basis "none" - the roots' omega, <S^2> and class
-                    of every step are appended to <wd>/spin-flip-record.txt
-                s2_singlet_max (float): a root with <S^2> below it is a singlet
-                    [default 0.5]
-                s2_triplet_min (float): a root with <S^2> at or above it is a
-                    triplet (the Ms = 0 component) [default 1.5] - between the
-                    two bounds a spin-incomplete mixture, in no manifold
+                    classified by their spin, and the lowest nstates LOW-SPIN
+                    roots (S = S_ref - 1: the singlets of a triplet reference,
+                    the doublets of a quartet) are the adiabatic states - the
+                    reference is no state of the manifold, the energies E_ref +
+                    omega - with the active root in &EXCITED_STATES STATE (the
+                    previous step's root is assumed, the force is rerun on the
+                    right root when the classification moves it, the first call
+                    computes the energies first). Needs time_dependent,
+                    force_source "active_state" or "none", mo_source "wfn",
+                    ci_source "tddfpt_restart", ao_overlap_method "cp2k",
+                    overlap_backend "sd" and dia_basis "none" or "fragment" - the
+                    roots' omega, <S^2> and class of every step are appended to
+                    <wd>/spin-flip-record.txt
+                s2_low_spin_max (float): a root whose excess ||S+ Psi||^2 = <S^2> -
+                    Ms (Ms + 1) lies below it is a low-spin partner of the
+                    reference [default 0.5]
+                s2_high_spin_min (float): a root whose excess lies at or above it
+                    carries the reference's own multiplicity (its exact Ms
+                    component has the excess 2 S_ref) [default 1.5] - between
+                    the two bounds a spin-incomplete mixture, in no manifold
                 UKS (open shell): detected from the CP2K output itself (two
                     spin channels) - no flag. The SD basis becomes per-channel
                     electron-only excitations around each spin's own HOMO,
@@ -6307,8 +6311,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     dia_groups (the tracking group of every diabatic state,
                     -1 a singleton - the engine's dia_tracking_algo 5 aligns
                     them in C++ when the driver does not). Under spin_flip 1
-                    the hole and the electron of every excited singlet are
-                    taken relative to the lowest singlet (its natural
+                    the hole and the electron of every excited root are
+                    taken relative to the lowest one (its natural
                     occupations split each spin's MO space at 0.5), as
                     operators over the states themselves from the spin-flip
                     transition densities and the fragment operators of both
@@ -6416,11 +6420,11 @@ def cp2k_compute_adi_impl(q, params, full_id):
         raise ValueError(F"spin_flip = {spin_flip!r} is not a listed option - 0 (the roots are excitations of the "
                          F"reference's own spin) or 1 (spin-flip roots of a high-spin reference)")
     if spin_flip:
-        s2_singlet_max = float(params.get("s2_singlet_max", 0.5))
-        s2_triplet_min = float(params.get("s2_triplet_min", 1.5))
-        if not 0.0 < s2_singlet_max <= s2_triplet_min:
-            raise ValueError(F"s2_singlet_max = {s2_singlet_max} and s2_triplet_min = {s2_triplet_min} - "
-                             F"0 < s2_singlet_max <= s2_triplet_min is needed")
+        s2_low_spin_max = float(params.get("s2_low_spin_max", 0.5))
+        s2_high_spin_min = float(params.get("s2_high_spin_min", 1.5))
+        if not 0.0 < s2_low_spin_max <= s2_high_spin_min:
+            raise ValueError(F"s2_low_spin_max = {s2_low_spin_max} and s2_high_spin_min = {s2_high_spin_min} - "
+                             F"0 < s2_low_spin_max <= s2_high_spin_min is needed")
         needs = (("time_dependent", True, (True,), "the spin-flip roots are TDDFPT states"),
                  ("force_source", "active_state", ("active_state", "none"), "CP2K gives the force of one root"),
                  ("mo_source", "wfn", ("wfn",), "the beta virtual MOs come from the wfn restart"),
@@ -6431,7 +6435,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
                  ("overlap_backend", "sd", ("sd",), "the flipped determinants go through the determinant kernels"),
                  ("dia_basis", "none", ("none", "fragment"), "the flipped determinants are no diabatic basis - "
                                                               "'fragment' localizes the hole and the electron of the "
-                                                              "excited singlets relative to the lowest one"))
+                                                              "excited roots relative to the lowest one"))
         for key, default, allowed, why in needs:
             if params.get(key, default) not in allowed:
                 raise ValueError(F"spin_flip 1 needs {key} in {list(allowed)} - {why} - got "
@@ -6669,9 +6673,11 @@ def cp2k_compute_adi_impl(q, params, full_id):
     if spin_flip:
         # ---------------- the spin-flip manifold ----------------
         # the roots of the high-spin reference read from the TDDFPT restart and expanded over the beta virtual MOs,
-        # every root classified by <S^2>, the lowest nstates singlets handed over as the states
+        # every root classified by its spin, the lowest nstates low-spin roots handed over as the states
         n_a_occ, n_b_occ = int(homos[0]), int(homos[1])
         nmo = mo_curr["C"].shape[0]
+        s_ref = s_reference(n_a_occ, n_b_occ)
+        low_name = spin_name(s_ref - 1.0)
         if LO != 1 or HI != nmo:
             raise ValueError(F"spin_flip needs the whole MO set in the orbital window - lowest_orbital 1 and "
                              F"highest_orbital {nmo} (the beta virtual expansion of the roots is complete over every "
@@ -6695,20 +6701,21 @@ def cp2k_compute_adi_impl(q, params, full_id):
                                  F"orbitals - not a spin-flip response of this reference")
             X = X * phases_ch[0][None, :n_a_occ]        # the aligned alpha occupied phases (the beta ones ride in C_b)
             X_all.append(X)
-            s2_all.append(s2_spin_flip(X, n_a_occ, n_b_occ, S_ab))
-            cls_all.append(classify_spin(s2_all[-1], s2_singlet_max, s2_triplet_min))
-        singlets = [int(k) for k in np.argsort(omegas[:nroots]) if cls_all[k] == "singlet"]
-        if len(singlets) < nstates:
-            raise ValueError(F"{wd} step {params.get('timestep', '?')}: {len(singlets)} singlet roots among the "
+            excess = s2_spin_flip(X, n_a_occ, n_b_occ, S_ab)
+            s2_all.append(s2_total(excess, n_a_occ, n_b_occ))
+            cls_all.append(classify_spin(excess, s2_low_spin_max, s2_high_spin_min, s_ref))
+        low_roots = [int(k) for k in np.argsort(omegas[:nroots]) if cls_all[k] == low_name]
+        if len(low_roots) < nstates:
+            raise ValueError(F"{wd} step {params.get('timestep', '?')}: {len(low_roots)} {low_name} roots among the "
                              F"{nroots} spin-flip roots (<S^2> {np.round(s2_all, 3).tolist()}) for {nstates} states "
                              F"- raise number_of_states")
-        roots = [k + 1 for k in singlets[:nstates]]              # CP2K's 1-based root of every state
+        roots = [k + 1 for k in low_roots[:nstates]]             # CP2K's 1-based root of every state
         E_ref = float(res["E_adi"][0])
         E_adi_curr = E_ref + omegas[np.array(roots) - 1]
         mixed_inside = [k + 1 for k in range(nroots) if cls_all[k] == "mixed" and omegas[k] < omegas[roots[-1] - 1]]
         rerun = force_source == "active_state" and roots[act_state] != sf_root_guess
         if rerun:
-            # the force of the active singlet on its root of this step
+            # the force of the active root of this step
             run_params = _cp2k_run_params(params, False, wd, roots[act_state], force_source, nexc)
             res_force = compute_state_energy_and_force(coordinates, run_params)
             w_force = np.asarray(res_force["omegas"], dtype=float)
@@ -7011,7 +7018,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
             dia_states[itraj] = None
         St_frag = None if dia_states.get(itraj) is None else np.asarray(st_ci, dtype=float)[:nstates, :nstates]
         if spin_flip:
-            # the hole and the electron of the excited singlets relative to the lowest one, over the states themselves
+            # the hole and the electron of the excited roots relative to the lowest one, over the states themselves
             # (the natural occupations of state 0 split the MO spaces), the localization and following on them
             if P_b is None:
                 raise ValueError("dia_basis 'fragment' under spin_flip needs the fragment operators of both spins")

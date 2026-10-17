@@ -4,13 +4,15 @@ alpha virtuals by CP2K and are not usable for a spin flip), their expansion over
 every root from S_+, and the determinant basis of the flipped states for the overlap kernels.
 
 A spin-flip root is Psi = sum_{i a} X[a, i] |Phi_0 with the alpha electron of occupied orbital i moved into the beta
-virtual orbital a> - an Ms = 0 state of a reference with Ms = 1 (n_alpha = n_beta + 2). Its spin is not fixed: the
-singlets, the Ms = 0 components of the triplets and quintets and, with a single excitation space, spin-incomplete
-mixtures all come out, and <S^2> tells them apart: <S^2> = ||S_+ Psi||^2 for Ms = 0, S_+ moving a beta electron in
-orbital b into every alpha orbital p the determinant leaves empty with the amplitude <alpha_p|beta_b> (the alpha MOs
-span the AO space, so the expansion is complete). The determinants S_+ Psi lands on carry alpha orbitals of the alpha
-set alone and beta orbitals of the beta set alone, so they are orthonormal and the norm is the sum of the squared
-coefficients over the distinct occupation patterns."""
+virtual orbital a> - a state of Ms = S_ref - 1 of a reference with S_ref = (n_alpha - n_beta) / 2 (Ms = 0 from a
+triplet, Ms = 1/2 from a quartet). Its spin is not fixed: the low-spin partners (S = S_ref - 1: the singlets of a
+triplet reference, the doublets of a quartet), the Ms components of the reference's own multiplicity and higher ones
+and, with a single excitation space, spin-incomplete mixtures all come out, and <S^2> tells them apart: <S^2> =
+||S_+ Psi||^2 + Ms (Ms + 1), S_+ moving a beta electron in orbital b into every alpha orbital p the determinant leaves
+empty with the amplitude <alpha_p|beta_b> (the alpha MOs span the AO space, so the expansion is complete). The
+determinants S_+ Psi lands on carry alpha orbitals of the alpha set alone and beta orbitals of the beta set alone, so
+they are orthonormal and the norm is the sum of the squared coefficients over the distinct occupation patterns. The
+excess ||S_+ Psi||^2 is zero for a low-spin partner and 2 S_ref for the reference's own component, whatever S_ref."""
 import struct
 
 import numpy as np
@@ -62,9 +64,10 @@ def spin_flip_amplitudes(evect, C_beta, S_ao, n_beta_occ):
 
 
 def s2_spin_flip(X, n_alpha_occ, n_beta_occ, S_ab):
-    """<S^2> of the Ms = 0 spin-flip state X[a, i] (beta virtual a, alpha occupied i - the orbitals 0-based, the alpha
+    """||S_+ Psi||^2 of the spin-flip state X[a, i] (beta virtual a, alpha occupied i - the orbitals 0-based, the alpha
     occupied the first n_alpha_occ of the alpha set, the beta occupied the first n_beta_occ of the beta set, the beta
-    virtual a the beta orbital n_beta_occ + a) with S_ab = C_alpha S C_beta^T over ALL MOs of both spins. The
+    virtual a the beta orbital n_beta_occ + a) with S_ab = C_alpha S C_beta^T over ALL MOs of both spins - the excess
+    <S^2> - Ms (Ms + 1), which is <S^2> itself for the Ms = 0 states of a triplet reference (s2_total adds the rest). The
     determinant of the term (i, a) lists the alpha orbitals first, then the beta ones, each sorted. S_+ takes the beta
     electron of orbital b into the empty alpha orbital p with the coefficient S_ab[p, b] and the parity of removing b
     from the sorted beta list and inserting p into the sorted alpha list. Four kinds of landing pattern: p = i and b
@@ -118,8 +121,8 @@ def s2_spin_flip(X, n_alpha_occ, n_beta_occ, S_ab):
 
 
 def s2_spin_flip_brute(X, n_alpha_occ, n_beta_occ, S_ab, threshold=1e-12):
-    """The same <S^2> by the explicit landing patterns of every term in a dictionary - the reference the closed form
-    is checked against."""
+    """The same ||S_+ Psi||^2 by the explicit landing patterns of every term in a dictionary - the reference the closed
+    form is checked against."""
     X = np.asarray(X, dtype=float)
     S_ab = np.asarray(S_ab, dtype=float)
     nvirt, nocc = X.shape
@@ -143,13 +146,42 @@ def s2_spin_flip_brute(X, n_alpha_occ, n_beta_occ, S_ab, threshold=1e-12):
     return float(sum(v * v for v in coeff.values()))
 
 
-def classify_spin(s2, singlet_max=0.5, triplet_min=1.5):
-    """'singlet' below singlet_max, 'triplet' from triplet_min on (the Ms = 0 component of a triplet, 2), 'mixed'
-    between - the spin-incomplete states of a single-excitation spin-flip space, which belong to no manifold."""
-    if s2 < singlet_max:
-        return "singlet"
-    if s2 >= triplet_min:
-        return "triplet"
+SPIN_NAMES = {0: "singlet", 1: "doublet", 2: "triplet", 3: "quartet", 4: "quintet", 5: "sextet", 6: "septet", 7: "octet"}
+
+
+def spin_name(S):
+    """The multiplicity name of the total spin S (0, 1/2, 1, ...): singlet, doublet, triplet, ..."""
+    twice = int(round(2.0 * float(S)))
+    if abs(2.0 * float(S) - twice) > 1e-6 or twice < 0:
+        raise ValueError(F"S = {S} is no total spin")
+    return SPIN_NAMES.get(twice, F"{twice + 1}-et")
+
+
+def s_reference(n_alpha_occ, n_beta_occ):
+    """The total spin of the high-spin reference, (n_alpha - n_beta) / 2 - at least 1 for a spin flip."""
+    if n_alpha_occ - n_beta_occ < 2:
+        raise ValueError(F"{n_alpha_occ} alpha and {n_beta_occ} beta electrons - a spin-flip reference has at least two "
+                         F"more alpha than beta electrons")
+    return 0.5 * (n_alpha_occ - n_beta_occ)
+
+
+def s2_total(excess, n_alpha_occ, n_beta_occ):
+    """<S^2> of a spin-flip state from its excess ||S_+ Psi||^2 (s2_spin_flip): the states have Ms = S_ref - 1 and
+    <S^2> = ||S_+ Psi||^2 + Ms (Ms + 1) - the excess itself for the Ms = 0 states of a triplet reference."""
+    ms = s_reference(n_alpha_occ, n_beta_occ) - 1.0
+    return float(excess) + ms * (ms + 1.0)
+
+
+def classify_spin(excess, low_spin_max=0.5, high_spin_min=1.5, s_ref=1.0):
+    """The class of a spin-flip root by its excess ||S_+ Psi||^2 (s2_spin_flip): below low_spin_max the low-spin partner of the
+    reference (S = s_ref - 1: 'singlet' from a triplet reference, 'doublet' from a quartet), from high_spin_min on the
+    reference's own multiplicity (S = s_ref, the excess of its exact Ms component is 2 s_ref: 'triplet', 'quartet'),
+    'mixed' between - the spin-incomplete states of a single-excitation spin-flip space, which belong to no
+    manifold. The thresholds are on the excess, so the same values serve every reference."""
+    if excess < low_spin_max:
+        return spin_name(s_ref - 1.0)
+    if excess >= high_spin_min:
+        return spin_name(s_ref)
     return "mixed"
 
 
@@ -308,3 +340,4 @@ def spin_flip_carrier_operators(gamma_a, gamma_b, P_a, P_b, occ_threshold=0.5):
     O_hole = [0.5 * (O + O.T) for O in O_hole]
     O_elec = [0.5 * (O + O.T) for O in O_elec]
     return O_hole, O_elec, occupations
+
