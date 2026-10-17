@@ -40,7 +40,8 @@ from libra_py.params_check import refuse_unknown_keys, restrict
 from libra_py.packages.driver_forces import (ForceHandover, check_excitation_energies, fill_diagonal_forces, force_diagonals,
                                              refreshed_rows)
 from libra_py.packages.cp2k.spin_flip import (read_tdwfn, spin_flip_amplitudes, s2_spin_flip, classify_spin,
-                                              spin_flip_sd_basis, spin_flip_sd2ci)
+                                              spin_flip_sd_basis, spin_flip_sd2ci, spin_flip_densities,
+                                              spin_flip_carrier_operators)
 
 from libra_py import data_outs, data_read, data_stat, data_conv
 from libra_py import units, molden_methods
@@ -5983,7 +5984,7 @@ def follow_fragment_states(V_raw, St_adi, groups, state, reordering=0, alpha=0.0
 
 
 def fragment_diabatic_step(route, T, sd_lists, P_frag, E_adi, St_adi, kind, state, reordering=0, alpha=0.0,
-                           min_overlap=None, tol=0.25, E_orb=None, step=0):
+                           min_overlap=None, tol=0.25, E_orb=None, step=0, ci_ops=None):
     """One step of the fragment diabatization on the fly: the localization of step 3 on the step's own data, then the
     following of the localized states against the previous step (follow_fragment_states).
 
@@ -5992,7 +5993,9 @@ def fragment_diabatic_step(route, T, sd_lists, P_frag, E_adi, St_adi, kind, stat
             states (column 0 the ground state), the localized states ci_diabatization_step's rotations of the CI states
             per manifold (the SD route's grouping, a reference that joins a manifold - a cation's hole - among them).
             "sd" - the adiabatic states are the energy-sorted SDs, T the sort permutation, the localized states
-            sd_diabatization_step's W over the SD basis (E_orb the orbital-energy operator in the 2-block layout)
+            sd_diabatization_step's W over the SD basis (E_orb the orbital-energy operator in the 2-block layout).
+            "ci_ops" - the hole and electron operators are given over the adiabatic states themselves (ci_ops, the
+            spin-flip manifold's spin_flip_carrier_operators), T the identity, sd_lists and P_frag unread, no manifolds
         sd_lists (list of lists of int): the SD basis of the step in the signed spin-orbital notation, the ground
             state first (the driver's sd_states)
         P_frag (list of arrays): the fragment operators in the 2-block window layout (fragment_operators_2block)
@@ -6010,14 +6013,23 @@ def fragment_diabatic_step(route, T, sd_lists, P_frag, E_adi, St_adi, kind, stat
         record (dict): the step's following record, with pops / pops_hole / energies of the localization
     """
     from libra_py.workflows.nbra import step3
-    nact = P_frag[0].shape[0] // 2
-    active_space, data_dim = list(range(2 * nact)), 2 * nact
-    gs, manifolds, _ = step3.sd_diabatization_groups(sd_lists, kind, active_space, data_dim)
-    gs_joins = any(gs in g["rows"] for g in manifolds)
     dia_prev = None if state is None else state["dia_index"]
     E_adi = np.asarray(E_adi, dtype=float)
     T = np.asarray(T, dtype=float)
-    if route == "ci":
+    if route == "ci_ops":
+        if ci_ops is None:
+            raise ValueError("fragment_diabatic_step: the 'ci_ops' route needs ci_ops = (O_hole, O_elec) over the states")
+        gs_joins = False
+        V_raw, dia_index, pops, pops_hole, energies = step3.ci_diabatization_step(
+            np.eye(len(E_adi)), list(ci_ops[0]), list(ci_ops[1]), E_adi[1:], kind, dia_prev, tol=tol)
+    else:
+        nact = P_frag[0].shape[0] // 2
+        active_space, data_dim = list(range(2 * nact)), 2 * nact
+        gs, manifolds, _ = step3.sd_diabatization_groups(sd_lists, kind, active_space, data_dim)
+        gs_joins = any(gs in g["rows"] for g in manifolds)
+    if route == "ci_ops":
+        pass
+    elif route == "ci":
         O_hole, O_elec = step3.sd_fragment_operators(sd_lists, P_frag, active_space, data_dim)
         V_raw, dia_index, pops, pops_hole, energies = step3.ci_diabatization_step(
             T, O_hole, O_elec, E_adi[1:], kind, dia_prev, tol=tol, E_gs=float(E_adi[0]), manifolds=manifolds)
@@ -6028,7 +6040,7 @@ def fragment_diabatic_step(route, T, sd_lists, P_frag, E_adi, St_adi, kind, stat
             sd_lists, P_frag, E_orb, kind, dia_prev, active_space, data_dim, tol)
         V_raw = T.T @ W
     else:
-        raise ValueError(F"fragment_diabatic_step: route {route!r} is not 'ci' or 'sd'")
+        raise ValueError(F"fragment_diabatic_step: route {route!r} is not 'ci', 'sd' or 'ci_ops'")
     n = V_raw.shape[1]
     groups = step3._tracking_groups(dia_index) if reordering else [[c] for c in range(n)]
     V, new_state, record = follow_fragment_states(V_raw, St_adi, groups, state, reordering, alpha, min_overlap, step)
@@ -6294,7 +6306,14 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     basis_transform U[dia, adi], the identity ovlp_dia and
                     dia_groups (the tracking group of every diabatic state,
                     -1 a singleton - the engine's dia_tracking_algo 5 aligns
-                    them in C++ when the driver does not). The keys are step
+                    them in C++ when the driver does not). Under spin_flip 1
+                    the hole and the electron of every excited singlet are
+                    taken relative to the lowest singlet (its natural
+                    occupations split each spin's MO space at 0.5), as
+                    operators over the states themselves from the spin-flip
+                    transition densities and the fragment operators of both
+                    spins over the whole MO set (spin_flip_carrier_operators),
+                    the localization and following unchanged. The keys are step
                     3's: localized_carrier ('hole' / 'electron' / 'both'),
                     diabatization_scheme ('mulliken' [default] / 'pod_cp2k'),
                     fragment_atom_lists (1-based, disjoint - 'mulliken'),
@@ -6410,7 +6429,9 @@ def cp2k_compute_adi_impl(q, params, full_id):
                  ("ao_overlap_method", "cp2k", ("cp2k",), "the AO overlap of the step comes from the OVERLAP_DELTAT "
                                                           "run"),
                  ("overlap_backend", "sd", ("sd",), "the flipped determinants go through the determinant kernels"),
-                 ("dia_basis", "none", ("none",), "no diabatic basis on the spin-flip manifold"))
+                 ("dia_basis", "none", ("none", "fragment"), "the flipped determinants are no diabatic basis - "
+                                                              "'fragment' localizes the hole and the electron of the "
+                                                              "excited singlets relative to the lowest one"))
         for key, default, allowed, why in needs:
             if params.get(key, default) not in allowed:
                 raise ValueError(F"spin_flip 1 needs {key} in {list(allowed)} - {why} - got "
@@ -6710,11 +6731,15 @@ def cp2k_compute_adi_impl(q, params, full_id):
         st_sd, _ = sd_overlaps(sd_states, St_in, Sp_in, Sc_in, orthonormalize=sd_orthon, kernel=sd_kernel,
                                cache=sd_cache)
         st_ci = T_prev.T @ st_sd @ T_curr
+        sf_signs = np.ones(nstates)
         for k in range(nstates):
             if st_ci[k, k] < 0.0:
                 st_ci[:, k] *= -1.0
                 T_curr[:, k] *= -1.0
+                sf_signs[k] = -1.0
         params["sf_prev"][itraj] = T_curr
+        # the states in the sign convention of the hand-over - the fragment operators of dia_basis "fragment" read them
+        X_states = [X_all[r - 1] * sf_signs[k] for k, r in enumerate(roots)]
         T_dia = None
         with open(f"{wd}/spin-flip-record.txt", "a") as rec:
             rec.write(F"step {params.get('timestep', '?')}  E_ref {E_ref:.8f} Ha  states -> roots {roots}  "
@@ -6965,11 +6990,11 @@ def cp2k_compute_adi_impl(q, params, full_id):
             idx_nat = mo_curr.get("resort_idx", None)
             P_a = pod_cp2k_fragment_operators(pod, _native_ao_order(mo_curr["C"], idx_nat)[LO - 1:HI], 0)
             P_b = pod_cp2k_fragment_operators(pod, _native_ao_order(mo_curr["C_b"], idx_nat)[LO - 1:HI], 1) if isUKS else None
-            P2 = fragment_operators_2block(P_a, P_b)
         elif isUKS:
-            P2 = fragment_operators_2block([P[0] for P in P_frag_win], [P[1] for P in P_frag_win])
+            P_a, P_b = [P[0] for P in P_frag_win], [P[1] for P in P_frag_win]
         else:
-            P2 = fragment_operators_2block(P_frag_win)
+            P_a, P_b = P_frag_win, None
+        P2 = fragment_operators_2block(P_a, P_b)
         eps_a = np.asarray(mo_curr["E"], dtype=float)[LO - 1:HI]
         eps_b = np.asarray(mo_curr["E_b"], dtype=float)[LO - 1:HI] if isUKS else eps_a
         E_orb = np.diag(np.concatenate([eps_a, eps_b]))
@@ -6985,9 +7010,25 @@ def cp2k_compute_adi_impl(q, params, full_id):
         elif is_first_time:
             dia_states[itraj] = None
         St_frag = None if dia_states.get(itraj) is None else np.asarray(st_ci, dtype=float)[:nstates, :nstates]
-        U_frag, dia_labels, dia_states[itraj], rec = fragment_diabatic_step(
-            "ci" if time_dependent else "sd", T_dia, sd_states, P2, E_adi_curr[:nstates], St_frag, frag["kind"],
-            dia_states.get(itraj), frag["reordering"], frag["alpha"], frag["min_overlap"], frag["tol"], E_orb, timestep)
+        if spin_flip:
+            # the hole and the electron of the excited singlets relative to the lowest one, over the states themselves
+            # (the natural occupations of state 0 split the MO spaces), the localization and following on them
+            if P_b is None:
+                raise ValueError("dia_basis 'fragment' under spin_flip needs the fragment operators of both spins")
+            gamma_a, gamma_b = spin_flip_densities(X_states, n_a_occ, n_b_occ, nmo)
+            O_hole_sf, O_elec_sf, _ = spin_flip_carrier_operators(gamma_a, gamma_b, P_a, P_b)
+            U_frag, dia_labels, dia_states[itraj], rec = fragment_diabatic_step(
+                "ci_ops", np.eye(nstates), None, None, E_adi_curr[:nstates], St_frag, frag["kind"],
+                dia_states.get(itraj), frag["reordering"], frag["alpha"], frag["min_overlap"], frag["tol"], None,
+                timestep, ci_ops=(O_hole_sf, O_elec_sf))
+            with open(f"{wd}/spin-flip-record.txt", "a") as rec_f:
+                for k in range(1, nstates):
+                    rec_f.write(F"  state {k}  hole on the fragments {np.round([O[k, k] for O in O_hole_sf], 3).tolist()}  "
+                                F"electron {np.round([O[k, k] for O in O_elec_sf], 3).tolist()}\n")
+        else:
+            U_frag, dia_labels, dia_states[itraj], rec = fragment_diabatic_step(
+                "ci" if time_dependent else "sd", T_dia, sd_states, P2, E_adi_curr[:nstates], St_frag, frag["kind"],
+                dia_states.get(itraj), frag["reordering"], frag["alpha"], frag["min_overlap"], frag["tol"], E_orb, timestep)
         fragment_state_save(state_file, dia_states[itraj])
         with open(f"{wd}/dia-record.txt", "a") as rf:
             if rec["O"] is None:

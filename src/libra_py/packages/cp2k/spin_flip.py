@@ -178,3 +178,133 @@ def spin_flip_sd2ci(X_list, index, nsd):
         for (a, i), row in index.items():
             T[row, k] = X[a, i]
     return T
+
+
+def spin_flip_densities(X_list, n_alpha_occ, n_beta_occ, nmo):
+    """The one-particle transition density matrices of the spin-flip states over the MO bases of the reference, per
+    spin: gamma_a[k, l] = delta_kl 1_occ - X_k^T X_l on the alpha occupied block (zero on the alpha virtuals), gamma_b[k, l]
+    = delta_kl 1_occ + X_l X_k^T on the beta virtual block (the beta occupied stay full), so that the matrix element of a
+    one-body operator O of spin sigma between the states is tr(gamma_sigma[k, l] O). The Slater-Condon elements of the
+    in-place determinants behind them: two flips with the same beta orbital differ in one alpha orbital and the swap that
+    puts the shared beta orbital at one position costs a sign (the hole part enters with the minus), two flips with the
+    same alpha orbital differ in the beta orbital at that position alone (the electron part enters with the plus) -
+    one_body_matrix_brute is the reference.
+
+    Args:
+        X_list (list of arrays (nmo - n_beta_occ, n_alpha_occ)): the amplitudes of the states over (beta virtual a, alpha
+            occupied i), the states orthonormal
+        n_alpha_occ, n_beta_occ, nmo (int): the occupied counts of the reference and the MO count of each spin
+
+    Returns:
+        gamma_a, gamma_b (arrays (nstates, nstates, nmo, nmo))
+    """
+    n = len(X_list)
+    X = [np.asarray(x, dtype=float) for x in X_list]
+    for k, x in enumerate(X):
+        if x.shape != (nmo - n_beta_occ, n_alpha_occ):
+            raise ValueError(F"state {k}: X has the shape {x.shape}, the reference ({nmo - n_beta_occ}, {n_alpha_occ})")
+    gamma_a = np.zeros((n, n, nmo, nmo))
+    gamma_b = np.zeros((n, n, nmo, nmo))
+    occ_a = np.arange(n_alpha_occ)
+    occ_b = np.arange(n_beta_occ)
+    virt_b = np.arange(n_beta_occ, nmo)
+    for k in range(n):
+        gamma_a[k, k, occ_a, occ_a] = 1.0
+        gamma_b[k, k, occ_b, occ_b] = 1.0
+        for l in range(n):
+            gamma_a[k, l][np.ix_(occ_a, occ_a)] -= X[k].T @ X[l]
+            gamma_b[k, l][np.ix_(virt_b, virt_b)] += X[l] @ X[k].T
+    return gamma_a, gamma_b
+
+
+def _listed_order_parity(det_from, det_to):
+    """The sign of the permutation that reorders the spin orbitals of det_from into the order of det_to (the same set)."""
+    pos = {m: j for j, m in enumerate(det_to)}
+    perm = [pos[m] for m in det_from]
+    sign = 1
+    seen = [False] * len(perm)
+    for start in range(len(perm)):
+        if seen[start]:
+            continue
+        length = 0
+        j = start
+        while not seen[j]:
+            seen[j] = True
+            j = perm[j]
+            length += 1
+        if length % 2 == 0:
+            sign = -sign
+    return sign
+
+
+def one_body_matrix_brute(sd_states, O_alpha, O_beta):
+    """The matrix of a one-body spin operator over determinants in the signed spin-orbital notation of the kernels (+n the
+    alpha orbital n, -n the beta orbital n, 1-based, listed order) by the Slater-Condon rules with the parity of the
+    listed orders: the same set gives the sum over the occupied spin orbitals, one differing spin orbital the element
+    between the two with the parity that aligns the lists, more differing orbitals zero. O_alpha / O_beta (nmo, nmo)
+    over the spatial MOs, 0-based. The reference spin_flip_densities is checked against."""
+    O_alpha = np.asarray(O_alpha, dtype=float)
+    O_beta = np.asarray(O_beta, dtype=float)
+
+    def elem(m1, m2):
+        if (m1 > 0) != (m2 > 0):
+            return 0.0
+        O = O_alpha if m1 > 0 else O_beta
+        return float(O[abs(m1) - 1, abs(m2) - 1])
+    n = len(sd_states)
+    sets = [frozenset(d) for d in sd_states]
+    diag = [sum(elem(m, m) for m in d) for d in sd_states]
+    M = np.zeros((n, n))
+    for p in range(n):
+        for q in range(n):
+            only_p = sets[p] - sets[q]
+            if len(only_p) == 0:
+                M[p, q] = _listed_order_parity(sd_states[p], sd_states[q]) * diag[p]
+            elif len(only_p) == 1:
+                m1 = next(iter(only_p))
+                m2 = next(iter(sets[q] - sets[p]))
+                aligned = [m2 if m == m1 else m for m in sd_states[p]]
+                M[p, q] = _listed_order_parity(aligned, sd_states[q]) * elem(m1, m2)
+    return M
+
+
+def spin_flip_carrier_operators(gamma_a, gamma_b, P_a, P_b, occ_threshold=0.5):
+    """The hole and electron fragment operators of the excited spin-flip states relative to the lowest one (state 0),
+    over the states: the natural orbitals of state 0 split every spin's MO space into its occupied part (occupation above
+    occ_threshold) and its virtual part, the transition densities less state 0's own (delta_kl gamma[0, 0]) are projected
+    on them - the occupied part with the sign reversed is the hole (a removed electron counts positive), the virtual part
+    the electron - and traced with the fragment operators P_a / P_b (lists over fragments of (nmo, nmo) in the respective
+    spin's MO basis: the POD projectors or the Mulliken operators of the step). The row and column of state 0 are zero,
+    the operators of a fragment are symmetric, and the hole operators of all fragments sum to the number of electrons an
+    excited state removes from the occupied space of state 0 (one for a single excitation relative to it).
+
+    Returns:
+        O_hole, O_elec (lists over fragments of arrays (nstates, nstates)), occupations (dict spin -> the natural
+        occupations of state 0, ascending)
+    """
+    n = gamma_a.shape[0]
+    if len(P_a) != len(P_b):
+        raise ValueError(F"{len(P_a)} alpha and {len(P_b)} beta fragment operators")
+    nfrag = len(P_a)
+    O_hole = [np.zeros((n, n)) for _ in range(nfrag)]
+    O_elec = [np.zeros((n, n)) for _ in range(nfrag)]
+    occupations = {}
+    for spin, gamma, P_list in (("alpha", gamma_a, P_a), ("beta", gamma_b, P_b)):
+        rho0 = 0.5 * (gamma[0, 0] + gamma[0, 0].T)
+        vals, vecs = np.linalg.eigh(rho0)
+        occupations[spin] = vals
+        occ = vecs[:, vals > occ_threshold]
+        virt = vecs[:, vals <= occ_threshold]
+        P_occ, P_virt = occ @ occ.T, virt @ virt.T
+        for f, P in enumerate(P_list):
+            P = 0.5 * (np.asarray(P, dtype=float) + np.asarray(P, dtype=float).T)
+            A_hole = P_occ @ P @ P_occ          # tr(P P_occ D P_occ) = tr(A_hole D)
+            A_elec = P_virt @ P @ P_virt
+            for k in range(1, n):
+                for l in range(1, n):
+                    D = gamma[k, l] - (rho0 if k == l else 0.0)
+                    O_hole[f][k, l] -= float(np.sum(A_hole * D.T))
+                    O_elec[f][k, l] += float(np.sum(A_elec * D.T))
+    O_hole = [0.5 * (O + O.T) for O in O_hole]
+    O_elec = [0.5 * (O + O.T) for O in O_elec]
+    return O_hole, O_elec, occupations
