@@ -145,65 +145,46 @@ class CASSCF(ElectronicStructureStrategy):
         return np.asarray(self._mc.nuc_grad_method().kernel())
 
     def time_overlap_matrix(self, nroots: int) -> np.ndarray:
+        """The overlaps <Psi_i(previous geometry)|Psi_j(this geometry)> of the SA-CASSCF states the dynamics runs on -
+        the CI vectors and active orbitals of the cached previous CASSCF and of this step's (not a CASCI re-solved on
+        the HF orbitals, whose states can reorder against the CASSCF ones), through the cross AO overlap of the two
+        geometries. The sign of every previous state is set so that the diagonal is positive (the continuation of the
+        states' phases)."""
         if self._mc is None:
             raise ValueError("CASSCF must be run before computing time-overlap matrix.")
-        if self._cache is None or self._cache.prev_mf is None or self._cache.prev_mol is None:
-            raise ValueError("Previous and current HF/molecule states are required for time-overlap computation.")
+        if self._cache is None or self._cache.prev_mc is None or self._cache.prev_mol is None:
+            raise ValueError("Previous and current CASSCF states are required for time-overlap computation.")
         if self._ao_overlap is None:
             raise ValueError("Cached AO overlap between consecutive geometries is not available.")
         if nroots <= 0:
             raise ValueError(f"nroots must be positive, got {nroots}")
-
         nroots = int(nroots)
-        if self._mf is None or self._mol is None:
-            raise ValueError("Current HF/molecule state is required for time-overlap computation.")
-
-        prev_casci = mcscf.CASCI(self._cache.prev_mf, self._norbcas, self._nelecas)
-        prev_casci.fcisolver = fci.direct_spin0.FCISolver(self._cache.prev_mol)
-        prev_casci.fcisolver.nroots = nroots
-        h1prev, _ = prev_casci.get_h1eff(prev_casci.mo_coeff)
-        h2prev = prev_casci.get_h2cas(prev_casci.mo_coeff)
-        _, prev_roots = prev_casci.fcisolver.kernel(h1prev, h2prev, prev_casci.ncas, prev_casci.nelecas, nroots=nroots)
-
-        curr_casci = mcscf.CASCI(self._mf, self._norbcas, self._nelecas)
-        curr_casci.fcisolver = fci.direct_spin0.FCISolver(self._mol)
-        curr_casci.fcisolver.nroots = nroots
-        h1curr, _ = curr_casci.get_h1eff(curr_casci.mo_coeff)
-        h2curr = curr_casci.get_h2cas(curr_casci.mo_coeff)
-        _, curr_roots = curr_casci.fcisolver.kernel(h1curr, h2curr, curr_casci.ncas, curr_casci.nelecas, nroots=nroots)
-
-        if len(prev_roots) < nroots or len(curr_roots) < nroots:
-            raise ValueError(
-                f"Requested {nroots} roots, but only {len(prev_roots)} previous and {len(curr_roots)} current roots are available."
-            )
-
-        prev_roots = [np.asarray(v) for v in prev_roots[:nroots]]
-        curr_roots = [np.asarray(v) for v in curr_roots[:nroots]]
-
-        mo_prev_act = np.asarray(prev_casci.mo_coeff)[:, prev_casci.ncore : prev_casci.ncore + prev_casci.ncas]
-        mo_curr_act = np.asarray(curr_casci.mo_coeff)[:, curr_casci.ncore : curr_casci.ncore + curr_casci.ncas]
+        prev_mc, curr_mc = self._cache.prev_mc, self._mc
+        prev_roots = self._ci_vectors(prev_mc, nroots)
+        curr_roots = self._ci_vectors(curr_mc, nroots)
+        mo_prev_act = np.asarray(prev_mc.mo_coeff)[:, prev_mc.ncore:prev_mc.ncore + prev_mc.ncas]
+        mo_curr_act = np.asarray(curr_mc.mo_coeff)[:, curr_mc.ncore:curr_mc.ncore + curr_mc.ncas]
         s12_mo = mo_prev_act.T @ self._ao_overlap @ mo_curr_act
-
         overlap = np.zeros((nroots, nroots), dtype=float)
-        nelecas = prev_casci.nelecas
         for i in range(nroots):
             for j in range(nroots):
-                overlap[i, j] = fci.addons.overlap(
-                    prev_roots[i],
-                    curr_roots[j],
-                    prev_casci.ncas,
-                    nelecas,
-                    s=s12_mo,
-                )
-
+                overlap[i, j] = fci.addons.overlap(prev_roots[i], curr_roots[j], curr_mc.ncas, curr_mc.nelecas, s=s12_mo)
         overlap = np.asarray(np.real_if_close(overlap))
-
         for i in range(nroots):
             if overlap[i, i] < 0:
                 overlap[i, :] = -overlap[i, :]
-
         return overlap
-    
+
+    @staticmethod
+    def _ci_vectors(mc, nroots: int) -> List[np.ndarray]:
+        """The CI vectors of a CASSCF object as a list of arrays - one vector for a single-state run."""
+        ci = mc.ci
+        if isinstance(ci, np.ndarray) and ci.ndim == 2 and nroots == 1:
+            ci = [ci]
+        if len(ci) < nroots:
+            raise ValueError(f"Requested {nroots} roots, but only {len(ci)} are available.")
+        return [np.asarray(v) for v in ci[:nroots]]
+
     def compute_nac_vectors(self, use_etfs: bool = True) -> np.ndarray:
         if self._mc is None:
             raise ValueError("CASSCF must be run before computing NAC vectors.")
