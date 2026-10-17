@@ -41,7 +41,8 @@ from libra_py.packages.driver_forces import (ForceHandover, check_excitation_ene
                                              refreshed_rows)
 from libra_py.packages.cp2k.spin_flip import (read_tdwfn, spin_flip_amplitudes, s2_spin_flip, classify_spin,
                                               spin_flip_sd_basis, spin_flip_sd2ci, spin_flip_densities,
-                                              spin_flip_carrier_operators, s_reference, s2_total, spin_name)
+                                              spin_flip_carrier_operators, spin_flip_carrier_operators_high_spin,
+                                              s_reference, s2_total, spin_name)
 
 from libra_py import data_outs, data_read, data_stat, data_conv
 from libra_py import units, molden_methods
@@ -5984,7 +5985,7 @@ def follow_fragment_states(V_raw, St_adi, groups, state, reordering=0, alpha=0.0
 
 
 def fragment_diabatic_step(route, T, sd_lists, P_frag, E_adi, St_adi, kind, state, reordering=0, alpha=0.0,
-                           min_overlap=None, tol=0.25, E_orb=None, step=0, ci_ops=None):
+                           min_overlap=None, tol=0.25, E_orb=None, step=0, ci_ops=None, ci_manifold=False):
     """One step of the fragment diabatization on the fly: the localization of step 3 on the step's own data, then the
     following of the localized states against the previous step (follow_fragment_states).
 
@@ -5995,7 +5996,9 @@ def fragment_diabatic_step(route, T, sd_lists, P_frag, E_adi, St_adi, kind, stat
             "sd" - the adiabatic states are the energy-sorted SDs, T the sort permutation, the localized states
             sd_diabatization_step's W over the SD basis (E_orb the orbital-energy operator in the 2-block layout).
             "ci_ops" - the hole and electron operators are given over the adiabatic states themselves (ci_ops, the
-            spin-flip manifold's spin_flip_carrier_operators), T the identity, sd_lists and P_frag unread, no manifolds
+            spin-flip manifold's spin_flip_carrier_operators), T the identity, sd_lists and P_frag unread - state 0
+            stays out of the localization, or with ci_manifold True every state is localized as one manifold (the
+            flipped electron relative to the spin-flip reference, a cation's hole states among them)
         sd_lists (list of lists of int): the SD basis of the step in the signed spin-orbital notation, the ground
             state first (the driver's sd_states)
         P_frag (list of arrays): the fragment operators in the 2-block window layout (fragment_operators_2block)
@@ -6019,9 +6022,12 @@ def fragment_diabatic_step(route, T, sd_lists, P_frag, E_adi, St_adi, kind, stat
     if route == "ci_ops":
         if ci_ops is None:
             raise ValueError("fragment_diabatic_step: the 'ci_ops' route needs ci_ops = (O_hole, O_elec) over the states")
-        gs_joins = False
+        n_all = len(E_adi)
+        gs_joins = bool(ci_manifold)
+        manifolds = [{"rows": list(range(n_all)), "key": 0}] if ci_manifold else None
         V_raw, dia_index, pops, pops_hole, energies = step3.ci_diabatization_step(
-            np.eye(len(E_adi)), list(ci_ops[0]), list(ci_ops[1]), E_adi[1:], kind, dia_prev, tol=tol)
+            np.eye(n_all), list(ci_ops[0]), list(ci_ops[1]), E_adi[1:], kind, dia_prev, tol=tol,
+            E_gs=float(E_adi[0]) if ci_manifold else None, manifolds=manifolds)
     else:
         nact = P_frag[0].shape[0] // 2
         active_space, data_dim = list(range(2 * nact)), 2 * nact
@@ -6216,9 +6222,9 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     computes the energies first). Needs time_dependent,
                     force_source "active_state" or "none", mo_source "wfn",
                     ci_source "tddfpt_restart", ao_overlap_method "cp2k",
-                    overlap_backend "sd" and dia_basis "none" or "fragment" - the
-                    roots' omega, <S^2> and class of every step are appended to
-                    <wd>/spin-flip-record.txt
+                    overlap_backend "sd" and dia_basis "none" or "fragment" (with
+                    carrier_reference) - the roots' omega, <S^2> and class of
+                    every step are appended to <wd>/spin-flip-record.txt
                 s2_low_spin_max (float): a root whose excess ||S+ Psi||^2 = <S^2> -
                     Ms (Ms + 1) lies below it is a low-spin partner of the
                     reference [default 0.5]
@@ -6226,6 +6232,16 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     carries the reference's own multiplicity (its exact Ms
                     component has the excess 2 S_ref) [default 1.5] - between
                     the two bounds a spin-incomplete mixture, in no manifold
+                carrier_reference (str): with spin_flip 1 and dia_basis
+                    "fragment", required - "ground": the hole and the electron
+                    of every excited root relative to the lowest one, which stays
+                    out of the localization (an exciton manifold over a closed
+                    shell), "high_spin": the flipped beta electron relative to
+                    the spin-flip reference and the hole as its complement within
+                    the manifold's orbital span, every root localized together (a
+                    cation's hole manifold from the quartet reference: the hole
+                    on one molecule or the other, the states of the hole-transfer
+                    experiment)
                 UKS (open shell): detected from the CP2K output itself (two
                     spin channels) - no flag. The SD basis becomes per-channel
                     electron-only excitations around each spin's own HOMO,
@@ -6311,13 +6327,16 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     dia_groups (the tracking group of every diabatic state,
                     -1 a singleton - the engine's dia_tracking_algo 5 aligns
                     them in C++ when the driver does not). Under spin_flip 1
-                    the hole and the electron of every excited root are
-                    taken relative to the lowest one (its natural
-                    occupations split each spin's MO space at 0.5), as
-                    operators over the states themselves from the spin-flip
-                    transition densities and the fragment operators of both
-                    spins over the whole MO set (spin_flip_carrier_operators),
-                    the localization and following unchanged. The keys are step
+                    the carriers are operators over the states themselves from
+                    the spin-flip transition densities and the fragment operators
+                    of both spins over the whole MO set, as carrier_reference
+                    says: "ground" - the hole and the electron of every excited
+                    root relative to the lowest one (its natural occupations
+                    split each spin's MO space at 0.5, spin_flip_carrier_operators),
+                    "high_spin" - the flipped beta electron and its complement
+                    within the manifold's span, every root in the localization
+                    (spin_flip_carrier_operators_high_spin) - the localization
+                    and following unchanged. The keys are step
                     3's: localized_carrier ('hole' / 'electron' / 'both'),
                     diabatization_scheme ('mulliken' [default] / 'pod_cp2k'),
                     fragment_atom_lists (1-based, disjoint - 'mulliken'),
@@ -6425,6 +6444,15 @@ def cp2k_compute_adi_impl(q, params, full_id):
         if not 0.0 < s2_low_spin_max <= s2_high_spin_min:
             raise ValueError(F"s2_low_spin_max = {s2_low_spin_max} and s2_high_spin_min = {s2_high_spin_min} - "
                              F"0 < s2_low_spin_max <= s2_high_spin_min is needed")
+        if dia_basis == "fragment":
+            carrier_reference = params.get("carrier_reference", None)
+            if carrier_reference not in ("ground", "high_spin"):
+                raise ValueError(F"spin_flip 1 with dia_basis 'fragment' needs carrier_reference 'ground' (the carriers "
+                                 F"of the excited roots relative to the lowest one, which stays out of the "
+                                 F"localization) or 'high_spin' (the flipped electron relative to the spin-flip "
+                                 F"reference and the hole as its complement, every root localized) - got "
+                                 F"{carrier_reference!r}")
+            frag["carrier_reference"] = carrier_reference
         needs = (("time_dependent", True, (True,), "the spin-flip roots are TDDFPT states"),
                  ("force_source", "active_state", ("active_state", "none"), "CP2K gives the force of one root"),
                  ("mo_source", "wfn", ("wfn",), "the beta virtual MOs come from the wfn restart"),
@@ -6434,8 +6462,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
                                                           "run"),
                  ("overlap_backend", "sd", ("sd",), "the flipped determinants go through the determinant kernels"),
                  ("dia_basis", "none", ("none", "fragment"), "the flipped determinants are no diabatic basis - "
-                                                              "'fragment' localizes the hole and the electron of the "
-                                                              "excited roots relative to the lowest one"))
+                                                              "'fragment' localizes the carriers of the roots as "
+                                                              "carrier_reference says"))
         for key, default, allowed, why in needs:
             if params.get(key, default) not in allowed:
                 raise ValueError(F"spin_flip 1 needs {key} in {list(allowed)} - {why} - got "
@@ -7018,18 +7046,24 @@ def cp2k_compute_adi_impl(q, params, full_id):
             dia_states[itraj] = None
         St_frag = None if dia_states.get(itraj) is None else np.asarray(st_ci, dtype=float)[:nstates, :nstates]
         if spin_flip:
-            # the hole and the electron of the excited roots relative to the lowest one, over the states themselves
-            # (the natural occupations of state 0 split the MO spaces), the localization and following on them
+            # the carriers as operators over the states themselves: "ground" - the hole and the electron of the excited
+            # roots relative to the lowest one (its natural occupations split the MO spaces, state 0 stays out),
+            # "high_spin" - the flipped beta electron relative to the reference and its complement, every root in the
+            # localization (one manifold) - the localization and following on them
             if P_b is None:
                 raise ValueError("dia_basis 'fragment' under spin_flip needs the fragment operators of both spins")
             gamma_a, gamma_b = spin_flip_densities(X_states, n_a_occ, n_b_occ, nmo)
-            O_hole_sf, O_elec_sf, _ = spin_flip_carrier_operators(gamma_a, gamma_b, P_a, P_b)
+            high_spin = frag["carrier_reference"] == "high_spin"
+            if high_spin:
+                O_hole_sf, O_elec_sf, _ = spin_flip_carrier_operators_high_spin(gamma_b, P_b, n_b_occ)
+            else:
+                O_hole_sf, O_elec_sf, _ = spin_flip_carrier_operators(gamma_a, gamma_b, P_a, P_b)
             U_frag, dia_labels, dia_states[itraj], rec = fragment_diabatic_step(
                 "ci_ops", np.eye(nstates), None, None, E_adi_curr[:nstates], St_frag, frag["kind"],
                 dia_states.get(itraj), frag["reordering"], frag["alpha"], frag["min_overlap"], frag["tol"], None,
-                timestep, ci_ops=(O_hole_sf, O_elec_sf))
+                timestep, ci_ops=(O_hole_sf, O_elec_sf), ci_manifold=high_spin)
             with open(f"{wd}/spin-flip-record.txt", "a") as rec_f:
-                for k in range(1, nstates):
+                for k in range(0 if high_spin else 1, nstates):
                     rec_f.write(F"  state {k}  hole on the fragments {np.round([O[k, k] for O in O_hole_sf], 3).tolist()}  "
                                 F"electron {np.round([O[k, k] for O in O_elec_sf], 3).tolist()}\n")
         else:

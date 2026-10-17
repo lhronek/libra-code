@@ -341,3 +341,46 @@ def spin_flip_carrier_operators(gamma_a, gamma_b, P_a, P_b, occ_threshold=0.5):
     O_elec = [0.5 * (O + O.T) for O in O_elec]
     return O_hole, O_elec, occupations
 
+
+def spin_flip_carrier_operators_high_spin(gamma_b, P_b, n_beta_occ, span_tol=0.25):
+    """The electron and hole fragment operators of a spin-flip manifold relative to the HIGH-SPIN REFERENCE, over all the
+    states (state 0 among them): the flipped beta electron is the carrier - its transition densities are the beta
+    virtual blocks of gamma_b (gamma_b[k, l] - delta_kl 1_occ), traced with the beta fragment operators P_b (lists over
+    fragments of (nmo, nmo) in the beta MO basis) - and the hole is its complement within the span of the manifold's
+    flipped electrons (the top n eigenvectors of sum_k E_kk, n the number of states - a cation's hole states fill
+    the pi manifold's beta orbitals one at a time, the hole is the one left empty): O_hole = delta_kl tr(P_F Pi) -
+    O_elec. The alpha channel carries no carrier here (every state of the manifold removed the same alpha electron).
+    The span must hold exactly n orbitals within span_tol (the eigenvalues above 1 - span_tol, the rest below span_tol)
+    or the manifold is not one of single flips into a common orbital set and the construction refuses.
+
+    Returns:
+        O_hole, O_elec (lists over fragments of arrays (nstates, nstates)), span_values (the eigenvalues of
+        sum_k E_kk, descending)
+    """
+    n = gamma_b.shape[0]
+    nmo = gamma_b.shape[2]
+    E = np.empty((n, n, nmo, nmo))
+    occ_b = np.arange(n_beta_occ)
+    for k in range(n):
+        for l in range(n):
+            E[k, l] = gamma_b[k, l]
+            if k == l:
+                E[k, l][occ_b, occ_b] -= 1.0
+    total = sum(E[k, k] for k in range(n))
+    vals, vecs = np.linalg.eigh(0.5 * (total + total.T))
+    order = np.argsort(-vals)
+    vals, vecs = vals[order], vecs[:, order]
+    if vals[:n].min() < 1.0 - span_tol or (n < nmo and vals[n:].max() > span_tol):
+        raise ValueError(F"the flipped electrons of the {n} states span no clean set of {n} beta orbitals - the eigenvalues "
+                         F"of their summed densities {np.round(vals[:n + 2], 3).tolist()} (1 - {span_tol} .. 1 and below "
+                         F"{span_tol} expected): the manifold is not one of single flips into a common orbital set")
+    Pi = vecs[:, :n] @ vecs[:, :n].T
+    O_hole, O_elec = [], []
+    for P in P_b:
+        P = 0.5 * (np.asarray(P, dtype=float) + np.asarray(P, dtype=float).T)
+        Oe = np.array([[float(np.sum(P * E[k, l].T)) for l in range(n)] for k in range(n)])
+        Oe = 0.5 * (Oe + Oe.T)
+        Oh = np.eye(n) * float(np.sum(P * Pi.T)) - Oe
+        O_elec.append(Oe)
+        O_hole.append(Oh)
+    return O_hole, O_elec, vals
