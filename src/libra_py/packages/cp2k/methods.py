@@ -5261,7 +5261,9 @@ def read_pod_cp2k_files(prefix, need_tmf=False):
     """
     The binary files of CP2K's projection-operator diabatization (Z. Futera's &PROPERTIES
     &ET_COUPLING &PROJECTION with the HAMILTONIAN, WAVEFUNCTION and TRANSF_MATRIX_R/F prints):
-    gfortran unformatted sequential records, matrices as one record per column.
+    gfortran unformatted sequential records, matrices as one record per column, the spins one
+    after the other (an unrestricted run: the alpha blocks' energies, the alpha couplings, then the
+    beta ones - the coefficients likewise).
 
     Args:
         prefix (str): the files' path without extension, e.g. "Diag_50-POD-RESTART-1_0"
@@ -5282,16 +5284,19 @@ def read_pod_cp2k_files(prefix, need_tmf=False):
     n_ao_blk = np.frombuffer(hab[2], "<i4").tolist()
     if np.frombuffer(wfn[2], "<i4").tolist() != n_ao_blk:
         raise ValueError(F"{prefix}: the .hab and .wfn headers disagree on the block sizes")
+    # the records are SPIN-MAJOR: for every spin the block energies (one record per block) and then the coupling
+    # blocks (one record per column), the .wfn the blocks' coefficients spin after spin - a restricted run has one
+    # spin and either order reads it, an unrestricted run read block-major took molecule B's alpha states as the
+    # beta ones of molecule A
     k = 3
     energies = {}
-    for ib in range(n_blocks):
-        for sp in range(n_spins):
+    couplings = {}
+    for sp in range(n_spins):
+        for ib in range(n_blocks):
             energies[(ib, sp)] = np.frombuffer(hab[k], "<f8").copy()
             k += 1
-    couplings = {}
-    for i in range(n_blocks):
-        for j in range(i + 1, n_blocks):
-            for sp in range(n_spins):
+        for i in range(n_blocks):
+            for j in range(i + 1, n_blocks):
                 nmo_j = len(energies[(j, sp)])
                 couplings[(i, j, sp)] = _records_to_matrix(hab[k:k + nmo_j])
                 k += nmo_j
@@ -5299,8 +5304,8 @@ def read_pod_cp2k_files(prefix, need_tmf=False):
         raise ValueError(F"{prefix}.hab: {len(hab)} records, {k} expected from the header")
     k = 3
     coeffs = {}
-    for ib in range(n_blocks):
-        for sp in range(n_spins):
+    for sp in range(n_spins):
+        for ib in range(n_blocks):
             nmo = len(energies[(ib, sp)])
             coeffs[(ib, sp)] = _records_to_matrix(wfn[k:k + nmo])
             k += nmo
