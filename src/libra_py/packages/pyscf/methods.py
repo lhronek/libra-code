@@ -32,7 +32,7 @@ from libra_py.packages.cp2k import methods as cp2k
 from libra_py import data_conv
 from libra_py import units
 from libra_py.packages.driver_forces import fill_diagonal_forces, force_diagonals, refreshed_rows
-from libra_py.packages.driver_fragments import carrier_operators_from_densities, single_excitation_rows, single_excitation_manifold
+from libra_py.packages.driver_fragments import carrier_operators_from_densities, single_excitation_rows, single_excitation_manifold, double_excitation_manifold
 
 class tmp:
     pass
@@ -67,7 +67,12 @@ def pyscf_compute_adi(q, params, full_id):
             space) whose hole count lies nearest one, each within occupancy_tolerance of one hole and every other
             state farther from it (single_excitation_manifold: a single the correlation mixes with a double is
             un-mixed) - is localized, the ground state and the complement (the doubles) stay energy eigenstates
-            labelled ("ci", rank). The method must be 'casscf' (the CISD implementation has no transition densities).
+            labelled ("ci", rank). With localized_excitations "doubles" the double excitations among the states - the
+            complement states within occupancy_tolerance of two holes (double_excitation_manifold) - are localized as well, by
+            the integer hole and electron counts of every fragment (the local double excitations A** and B**, the pair
+            states with one hole and one electron on each molecule, the double charge transfers), the states of one
+            class energy eigenstates ranked, labelled ("multi", 1, 2, h_A, h_B, e_A, e_B, rank). The method must be
+            'casscf' (the CISD implementation has no transition densities).
             The diabatic index of the first step is written to <working_directory_prefix>_itraj{i}/dia-record.txt (the
             localized states first, hole-major then electron for 'both', then the complement) and the following
             state to dia-state.npz there. The hand-over is the square basis_transform U[dia, adi], the identity
@@ -203,6 +208,13 @@ def pyscf_compute_adi(q, params, full_id):
         n_occ_act = (sum(_nelecas) if isinstance(_nelecas, (tuple, list)) else int(_nelecas)) // 2
         n_single = n_occ_act * (int(_norbcas) - n_occ_act)
         W_single, hole_in, hole_out = single_excitation_manifold(O_hole, n_single, frag["tol"])
+        manifold = W_single
+        if frag["excitations"] == "doubles":
+            W_double, hole_double, hole_out = double_excitation_manifold(O_hole, W_single, frag["tol"])
+            if W_double.shape[1] == 0:
+                raise ValueError(F"localized_excitations 'doubles': no state of the window lies within {frag['tol']} of two "
+                                 F"holes - the complement's hole counts are {np.round(hole_out, 3).tolist()}")
+            manifold = [{"span": W_single, "counts": 1}, {"span": W_double, "counts": 2}]
         timestep = int(params.get("timestep", 0))
         state_file = F"{wd}/dia-state.npz"
         if is_first_time and timestep > 0 and os.path.exists(state_file):
@@ -216,18 +228,20 @@ def pyscf_compute_adi(q, params, full_id):
         U_frag, dia_labels, params["dia_state"][itraj], rec = cp2k.fragment_diabatic_step(
             "ci_ops", np.eye(nstates), None, None, E_adi, St_frag, frag["kind"], params["dia_state"].get(itraj),
             frag["reordering"], frag["alpha"], frag["min_overlap"], frag["tol"], None, timestep,
-            ci_ops=(O_hole, O_elec), ci_manifold=W_single)
+            ci_ops=(O_hole, O_elec), ci_manifold=manifold)
         cp2k.fragment_state_save(state_file, params["dia_state"][itraj])
         with open(F"{wd}/dia-record.txt", "a") as rf:
             if rec["O"] is None:
                 rf.write(F"# step perm swap angle drift min_continuity edges unresolved - the diabatic index {rec['dia_index']}"
-                         F" - the ground state and the {hole_out.size} complement states stay energy eigenstates\n")
+                         F" - the ground state{' and the ' + str(hole_out.size) + ' complement states stay' if hole_out.size else ' stays the'}"
+                         F" energy eigenstate{'s' if hole_out.size else ''}\n")
             rf.write(F"{timestep} {list(int(c) for c in params['dia_state'][itraj]['perm'])} {int(rec['swap'])} {rec['angle']:.4f} "
                      F"{rec['drift']:.4f} {rec['min_continuity']:.6f} {rec['edges']} {int(rec['unresolved'])}\n")
         with open(F"{wd}/cas-record.txt", "a") as rf:
             rf.write(F"step {timestep}  E (Ha) {np.round(E_adi, 6).tolist()}  holes relative to S0 {np.round(holes, 3).tolist()}  "
-                     F"the manifold's hole counts {np.round(np.sort(hole_in), 3).tolist()}  the complement's "
-                     F"{np.round(np.sort(hole_out), 3).tolist()}\n")
+                     F"the manifold's hole counts {np.round(np.sort(hole_in), 3).tolist()}"
+                     F"{'  the doubles manifold ' + str(np.round(np.sort(hole_double), 3).tolist()) if frag['excitations'] == 'doubles' else ''}"
+                     F"  the complement's {np.round(np.sort(hole_out), 3).tolist()}\n")
             for k in range(1, nstates):
                 rf.write(F"  state {k}  hole on the fragments {np.round([O[k, k] for O in O_hole], 3).tolist()}  "
                          F"electron {np.round([O[k, k] for O in O_elec], 3).tolist()}\n")

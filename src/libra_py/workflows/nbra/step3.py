@@ -2900,6 +2900,70 @@ def localize_fragment_block(P_frag, rows, energy, tol=0.25):
     return w, frag, pops, e
 
 
+def _cluster_by_counts(Q, blocks, total, tol, what):
+    """The orthonormal columns Q (m, k) of one class split by the integer carrier counts of every fragment: the
+    eigenvectors of fragment 0's operator within Q cluster at integers (|eigenvalue - integer| <= tol, refused
+    otherwise), within every cluster those of fragment 1, ..., the last fragment's count is the remainder of total
+    (checked on the class's columns). Returns [(counts tuple, columns (m, k_class))]."""
+    nfrag = len(blocks)
+
+    def split(cols, f, counts):
+        if f == nfrag - 1:
+            r = total - sum(counts)
+            diag = np.einsum("jc,jk,kc->c", cols, blocks[f], cols)
+            if r < 0 or np.abs(diag - r).max() > tol:
+                raise ValueError(F"the {what} counts of a class do not add up to {total} within {tol} - fragment {f} carries "
+                                 F"{np.round(diag, 3).tolist()} against the remainder {r}")
+            return [(counts + (r,), cols)]
+        M = cols.T @ blocks[f] @ cols
+        vals, vecs = np.linalg.eigh(0.5 * (M + M.T))
+        ints = np.round(vals).astype(int)
+        if np.abs(vals - ints).max() > tol or ints.min() < 0 or ints.max() > total:
+            raise ValueError(F"the {what} count on fragment {f} is not an integer within {tol} for every state of the "
+                             F"class - eigenvalues {np.round(vals, 3).tolist()}")
+        out = []
+        for k in sorted(set(ints.tolist())):
+            out += split(cols @ vecs[:, ints == k], f + 1, counts + (k,))
+        return out
+
+    return split(Q, 0, ())
+
+
+def localize_by_integer_counts(blocks_h, blocks_e, H, tol, kind="both"):
+    """The states of a span localized by the integer carrier counts of every fragment - the general form of the
+    sequential projection for states carrying several holes and electrons (the double excitations): the hole classes
+    by _cluster_by_counts over the hole operators (kind "hole" / "both"), the electron classes within each of them over
+    the electron operators (kind "electron" / "both"), and within every class the energy eigenstates ranked by
+    increasing energy. blocks_h / blocks_e are the fragment operators within the span (lists of (m, m)), H the energy
+    operator there (m, m). Returns w (m, m), classes (one tuple per column: the hole counts per fragment followed by
+    the electron counts per fragment, the carrier not localized left out), energies (m,)."""
+    m = H.shape[0]
+    H = 0.5 * (np.asarray(H, dtype=float) + np.asarray(H, dtype=float).T)
+    ref = blocks_h if kind in ("hole", "both") else blocks_e
+    total = int(round(float(np.trace(sum(ref))) / m))
+    if total < 1:
+        raise ValueError(F"the span carries {float(np.trace(sum(ref))) / m:.3f} carriers per state - no manifold to localize")
+    classes = [((), np.eye(m))]
+    if kind in ("hole", "both"):
+        classes = _cluster_by_counts(np.eye(m), [0.5 * (B + B.T) for B in blocks_h], total, tol, "hole")
+    if kind in ("electron", "both"):
+        total_e = int(round(float(np.trace(sum(blocks_e))) / m))
+        refined = []
+        for counts, cols in classes:
+            for counts_e, cols_e in _cluster_by_counts(cols, [0.5 * (B + B.T) for B in blocks_e], total_e, tol, "electron"):
+                refined.append((counts + counts_e, cols_e))
+        classes = refined
+    cols_out, class_out = [], []
+    for counts, cols in classes:
+        e, v = np.linalg.eigh(cols.T @ H @ cols)
+        for c in range(cols.shape[1]):
+            cols_out.append(cols @ v[:, c])
+            class_out.append(tuple(int(x) for x in counts))
+    w = np.stack(cols_out, axis=1)
+    energies = np.einsum("jc,jk,kc->c", w, H, w)
+    return w, class_out, energies
+
+
 def sd_diabatization_step(sd_lists, P_frag, E_orb, kind, dia_index=None, active_space=None, data_dim=None,
                           tol=0.25):
     """
@@ -3203,7 +3267,8 @@ def ci_diabatization_step(T, O_hole, O_elec, E_ci, kind, dia_index=None, tol=0.2
         tol (float): the integer-occupancy tolerance of localize_fragment_block
         E_gs (float, optional): the ground-state energy on the scale of E_ci - required with manifolds
         manifolds (list of dict, optional): the groups of sd_diabatization_groups ("rows", "key") or a given span
-            ("span", "key") - the per-manifold localization
+            ("span", "key", and "counts" >= 2 for a manifold of several carriers per state, localized by the
+            integer carrier counts of every fragment - localize_by_integer_counts) - the per-manifold localization
 
     Returns:
         V (array (nci + 1, nci + 1)), dia_index (list), pops (array (nci + 1, nfrag)), pops_hole (array
@@ -3247,6 +3312,22 @@ def ci_diabatization_step(T, O_hole, O_elec, E_ci, kind, dia_index=None, tol=0.2
                 m = wm.shape[1]
                 Of_h = [T.T @ O @ T for O in O_hole]
                 Of_e = [T.T @ O @ T for O in O_elec]
+                if int(g.get("counts", 1)) >= 2:
+                    # several carriers per state (the double excitations): the classes by the integer counts of every
+                    # fragment, the energy eigenstates within a class, labelled ("multi", key, counts, h..., e..., rank)
+                    Hm = wm.T @ Hf @ wm
+                    try:
+                        w_c, classes_c, _ = localize_by_integer_counts([wm.T @ O @ wm for O in Of_h],
+                                                                       [wm.T @ O @ wm for O in Of_e], Hm, tol, kind)
+                    except ValueError as err:
+                        raise ValueError(F"many-body diabatization, the manifold {g['key']}: {err}{hint}") from err
+                    ranks = {}
+                    for c, cls in enumerate(classes_c):
+                        ranks[cls] = ranks.get(cls, -1) + 1
+                        cols.append(wm @ w_c[:, c])
+                        labels.append(("multi", g["key"], int(g["counts"])) + cls + (ranks[cls],))
+                    taken.append(wm)
+                    continue
             else:
                 rows = list(g["rows"])
                 m = len(rows)
@@ -3464,6 +3545,8 @@ def _tracking_groups(dia_index):
             key = ("loc", entry[1], entry[2])
         elif entry[0] == "joint":
             key = ("joint", entry[1], entry[2], entry[4])
+        elif entry[0] == "multi":
+            key = ("multi",) + tuple(entry[1:-1])
         else:
             key = ("single", col)
         groups.setdefault(key, []).append(col)

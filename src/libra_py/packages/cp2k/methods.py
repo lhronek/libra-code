@@ -5881,7 +5881,10 @@ def fragment_options(params):
     within a tracking group - Sato / Munkres-Kuhn / scipy's assignment, 5 / 52: followed by 2 / 22 and aligned by the
     polar factor of every group), diabatic_state_reordering_alpha (the energy penalty of the assignment),
     diabatic_state_reordering_min_overlap (the continuity threshold, step 3's floor when absent), occupancy_tolerance
-    (the integer test of a fragment's orbital count, 0.25 [default])."""
+    (the integer test of a fragment's orbital count, 0.25 [default]), localized_excitations ('singles' [default]: the
+    single excitations localized, the double excitations among the states energy eigenstates, 'doubles': the doubles
+    localized as well, by the integer carrier counts of every fragment - the PySCF driver's CASSCF states, refused by
+    the CP2K driver whose roots are single excitations)."""
     kind = params.get("localized_carrier", None)
     if kind not in ("hole", "electron", "both"):
         raise ValueError(F"dia_basis='fragment' needs localized_carrier 'hole', 'electron' or 'both', got {kind!r}")
@@ -5904,9 +5907,15 @@ def fragment_options(params):
                          F"force-based one is the engine's)")
     tol = float(params.get("occupancy_tolerance", 0.25))
     min_overlap = params.get("diabatic_state_reordering_min_overlap", None)
+    excitations = params.get("localized_excitations", "singles")
+    if excitations not in ("singles", "doubles"):
+        raise ValueError(F"localized_excitations = {excitations!r} is not a listed option - 'singles' (the single excitations "
+                         F"localized, the double excitations energy eigenstates of the complement) or 'doubles' (the doubles "
+                         F"localized as well, by the integer carrier counts of every fragment - the PySCF driver's CASSCF states)")
     return {"kind": kind, "scheme": scheme, "atoms": atoms, "reordering": reordering,
             "alpha": float(params.get("diabatic_state_reordering_alpha", 0.0)),
-            "min_overlap": None if min_overlap is None else float(min_overlap), "tol": tol}
+            "min_overlap": None if min_overlap is None else float(min_overlap), "tol": tol,
+            "excitations": excitations}
 
 
 def fragment_operators_2block(P_alpha, P_beta=None):
@@ -6004,7 +6013,9 @@ def fragment_diabatic_step(route, T, sd_lists, P_frag, E_adi, St_adi, kind, stat
             ci_manifold a list of rows those states as one manifold and the others (state 0, the doubles) as the
             energy eigenstates of the complement ("ci", rank), or with ci_manifold an array (nadi, m) that orthonormal
             span of the excited states (single_excitation_manifold's, row 0 zero) as the one manifold and the
-            complement as its energy eigenstates
+            complement as its energy eigenstates, or with ci_manifold a list of dicts {"span", "counts"} several
+            manifolds - the singles (counts 1) and the doubles (counts 2, localized by the integer carrier counts of
+            every fragment, double_excitation_manifold's span)
         sd_lists (list of lists of int): the SD basis of the step in the signed spin-orbital notation, the ground
             state first (the driver's sd_states)
         P_frag (list of arrays): the fragment operators in the 2-block window layout (fragment_operators_2block)
@@ -6029,8 +6040,16 @@ def fragment_diabatic_step(route, T, sd_lists, P_frag, E_adi, St_adi, kind, stat
         if ci_ops is None:
             raise ValueError("fragment_diabatic_step: the 'ci_ops' route needs ci_ops = (O_hole, O_elec) over the states")
         n_all = len(E_adi)
-        span, rows = None, None
-        if isinstance(ci_manifold, np.ndarray):
+        span, rows, spans = None, None, None
+        if isinstance(ci_manifold, list) and ci_manifold and isinstance(ci_manifold[0], dict):
+            spans = []
+            for i, d in enumerate(ci_manifold):
+                W = np.asarray(d["span"], dtype=float)
+                if W.ndim != 2 or W.shape[0] != n_all or np.abs(W[0]).max() > 1e-12:
+                    raise ValueError(F"fragment_diabatic_step: the manifold span {i} must be ({n_all}, m) over the states "
+                                     F"with a zero row for state 0, got {W.shape}")
+                spans.append({"span": W, "key": i, "counts": int(d.get("counts", 1))})
+        elif isinstance(ci_manifold, np.ndarray):
             span = np.asarray(ci_manifold, dtype=float)
             if span.ndim != 2 or span.shape[0] != n_all or np.abs(span[0]).max() > 1e-12:
                 raise ValueError(F"fragment_diabatic_step: the manifold span must be ({n_all}, m) over the states with a "
@@ -6040,7 +6059,9 @@ def fragment_diabatic_step(route, T, sd_lists, P_frag, E_adi, St_adi, kind, stat
         elif ci_manifold:
             rows = sorted(int(r) for r in ci_manifold)
         gs_joins = rows is not None and 0 in rows
-        if span is not None:
+        if spans is not None:
+            manifolds = spans
+        elif span is not None:
             manifolds = [{"span": span, "key": 0}]
         else:
             manifolds = [{"rows": rows, "key": 0}] if rows is not None else None
@@ -6433,6 +6454,9 @@ def cp2k_compute_adi_impl(q, params, full_id):
     if dia_basis not in ("none", "sd", "fragment"):
         raise ValueError(F"dia_basis must be 'none', 'sd' or 'fragment', got {dia_basis!r}")
     frag = fragment_options(params) if dia_basis == "fragment" else None
+    if frag is not None and frag["excitations"] == "doubles":
+        raise ValueError("localized_excitations 'doubles' localizes double excitations - the CP2K driver's TDDFPT and spin-flip "
+                         "roots are single excitations of their reference, the PySCF driver's CASSCF states hold doubles")
     if frag is not None and params.get("ao_overlap_method", "cp2k") != "cp2k":
         raise ValueError('dia_basis="fragment" reads the step\'s AO overlap of the OVERLAP_DELTAT run - it requires '
                          'ao_overlap_method="cp2k"')

@@ -104,3 +104,37 @@ def single_excitation_manifold(O_hole, n_single, tol=0.25):
     W = np.zeros((n, n_single))
     W[1:, :] = vecs[:, chosen]
     return W, vals[chosen], vals[rest]
+
+
+def double_excitation_manifold(O_hole, W_single, tol=0.25):
+    """The double-excitation manifold of the excited states: the eigenvectors of the summed hole operator N_h within the
+    orthogonal complement of the single-excitation manifold W_single (over the excited states, rows 1..) whose
+    eigenvalues lie within tol of two - the combinations that remove two electrons from state 0's occupied space,
+    whichever adiabatic states the correlation mixes them into. The other complement states (triples and higher, a
+    state between the integers) are not part of it and stay energy eigenstates of the complement.
+
+    Args:
+        O_hole (list over fragments of arrays (nstates, nstates)): the hole operators of carrier_operators_from_densities
+        W_single (array (nstates, n_single)): the single-excitation manifold (single_excitation_manifold)
+        tol (float): the allowed distance of a manifold state's hole count from two (occupancy_tolerance)
+
+    Returns:
+        W (array (nstates, n_double)): the orthonormal manifold over the states, row 0 zero, hole_in (array
+        (n_double,)): the hole counts of its states, hole_out (array): the hole counts of the remaining complement states
+    """
+    n = np.asarray(O_hole[0]).shape[0]
+    W_single = np.asarray(W_single, dtype=float)
+    Nh = sum(np.asarray(O, dtype=float) for O in O_hole)
+    Nh = 0.5 * (Nh + Nh.T)
+    # the complement of the singles among the excited states: the eigenvectors of the projector with eigenvalue one
+    Q = np.eye(n) - W_single @ W_single.T
+    Q[0, :] = 0.0
+    Q[:, 0] = 0.0
+    qv, qvec = np.linalg.eigh(0.5 * (Q + Q.T))
+    C = qvec[:, qv > 0.5]
+    if C.shape[1] == 0:
+        return np.zeros((n, 0)), np.zeros(0), np.zeros(0)
+    vals, vecs = np.linalg.eigh(C.T @ Nh @ C)
+    chosen = np.abs(vals - 2.0) <= tol
+    W = C @ vecs[:, chosen]
+    return W, vals[chosen], vals[~chosen]
