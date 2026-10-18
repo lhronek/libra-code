@@ -58,7 +58,9 @@ def pyscf_compute_adi(q, params, full_id):
         dia_basis (str): "none" [default] - the identity as basis_transform. "fragment" - the fragment-localized states
             of the step as the diabatic basis (step 3's vocabulary, as the CP2K driver): localized_carrier ('hole' /
             'electron' / 'both'), diabatization_scheme ('mulliken' - the Mulliken operators of the step's AO overlap,
-            'pod' - libra's own POD block projectors of the step's Fock matrix) over fragment_atom_lists (1-based,
+            'pod' - libra's own POD block projectors of the step's Fock matrix, 'pod2l' / 'pod2gs' - libra's
+            second-generation POD, the fragments orthogonalized first and the fragment states orthonormalized by Lowdin
+            or by Gram-Schmidt keeping pod2gs_kept_block's) over fragment_atom_lists (1-based,
             disjoint, every atom assigned), do_diabatic_state_reordering (0 / 1 / 2 / 22 / 5 / 52), the thresholds
             diabatic_state_reordering_alpha / _min_overlap, occupancy_tolerance. The carriers are the hole and the
             electron of every excited state relative to the ground state (state 0) from the one-particle transition
@@ -202,7 +204,7 @@ def pyscf_compute_adi(q, params, full_id):
         wd = F"{params.get('working_directory_prefix', 'wd')}_itraj{itraj}"
         os.makedirs(wd, exist_ok=True)
         gamma_a, gamma_b = pyscf_obj.transition_densities(nstates)
-        P = pyscf_obj.fragment_operators(frag["scheme"], frag["atoms"])
+        P = pyscf_obj.fragment_operators(frag["scheme"], frag["atoms"], frag["kept_block"])
         O_hole, O_elec, _ = carrier_operators_from_densities(gamma_a, gamma_b, P, P)
         _, _, holes = single_excitation_rows(O_hole)
         n_occ_act = (sum(_nelecas) if isinstance(_nelecas, (tuple, list)) else int(_nelecas)) // 2

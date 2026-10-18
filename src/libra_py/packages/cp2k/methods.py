@@ -5875,6 +5875,8 @@ def fragment_options(params):
     """The localization keys of dia_basis "fragment", step 3's vocabulary verbatim, validated: localized_carrier
     ('hole', 'electron', 'both'), diabatization_scheme ('mulliken' [default] - the Mulliken operators of the step's AO
     overlap over fragment_atom_lists, 'pod' - libra's own POD of the step's Fock matrix over fragment_atom_lists (the
+    PySCF driver), 'pod2l' / 'pod2gs' - libra's second-generation POD, the fragments orthogonalized first and the
+    fragment states orthonormalized by Lowdin or by Gram-Schmidt keeping pod2gs_kept_block's (0 [default]) (the
     PySCF driver), 'pod_cp2k' - the POD blocks of CP2K's projection prints of the step (the CP2K driver)),
     fragment_atom_lists (1-based atom indices of disjoint fragments, the Mulliken scheme), do_diabatic_state_reordering
     (0 [default]: a swap of two localized states between steps is refused, 1 / 2 / 22: the states follow their identity
@@ -5889,11 +5891,13 @@ def fragment_options(params):
     if kind not in ("hole", "electron", "both"):
         raise ValueError(F"dia_basis='fragment' needs localized_carrier 'hole', 'electron' or 'both', got {kind!r}")
     scheme = params.get("diabatization_scheme", "mulliken")
-    if scheme not in ("mulliken", "pod", "pod_cp2k"):
-        raise ValueError(F"diabatization_scheme must be 'mulliken', 'pod' (libra's own POD of the step's Fock matrix) or "
-                         F"'pod_cp2k' (CP2K's projection prints), got {scheme!r}")
+    if scheme not in ("mulliken", "pod", "pod2l", "pod2gs", "pod_cp2k"):
+        raise ValueError(F"diabatization_scheme must be 'mulliken', 'pod' (libra's own POD of the step's Fock matrix), "
+                         F"'pod2l' / 'pod2gs' (libra's second-generation POD) or 'pod_cp2k' (CP2K's projection prints), got "
+                         F"{scheme!r}")
     atoms = params.get("fragment_atom_lists", None)
-    if scheme in ("mulliken", "pod"):
+    kept_block = int(params.get("pod2gs_kept_block", 0))
+    if scheme in ("mulliken", "pod", "pod2l", "pod2gs"):
         if not atoms or len(atoms) < 2 or any(len(a) == 0 for a in atoms):
             raise ValueError(F"diabatization_scheme '{scheme}' needs fragment_atom_lists - at least two non-empty lists of "
                              "1-based atom indices")
@@ -5915,7 +5919,7 @@ def fragment_options(params):
     return {"kind": kind, "scheme": scheme, "atoms": atoms, "reordering": reordering,
             "alpha": float(params.get("diabatic_state_reordering_alpha", 0.0)),
             "min_overlap": None if min_overlap is None else float(min_overlap), "tol": tol,
-            "excitations": excitations}
+            "excitations": excitations, "kept_block": kept_block}
 
 
 def fragment_operators_2block(P_alpha, P_beta=None):
@@ -7057,10 +7061,10 @@ def cp2k_compute_adi_impl(q, params, full_id):
         # operators and SD basis, followed and aligned against the previous step (fragment_diabatic_step), handed over
         # as the square U[dia, adi] with the identity metric and the tracking groups the engine's dia_tracking_algo
         # aligns (dia_groups) - the state of the following persists per trajectory for a restart
-        if frag["scheme"] == "pod":
-            raise ValueError("diabatization_scheme 'pod' (libra's own POD of the Fock matrix) is the PySCF driver's - the "
-                             "CP2K driver reads CP2K's projection prints with 'pod_cp2k', or the Mulliken operators with "
-                             "'mulliken'")
+        if frag["scheme"] in ("pod", "pod2l", "pod2gs"):
+            raise ValueError(F"diabatization_scheme {frag['scheme']!r} (libra's own POD of the Fock matrix) is the PySCF "
+                             F"driver's - the CP2K driver reads CP2K's projection prints with 'pod_cp2k', or the Mulliken "
+                             F"operators with 'mulliken'")
         if P_frag_win is None:
             # the POD blocks of the step's projection prints, written next to the wfn restart
             hits = sorted(glob.glob(f"{wd}/{project}-POD-RESTART-*.hab"))

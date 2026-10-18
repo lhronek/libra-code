@@ -209,9 +209,11 @@ class CASSCF(ElectronicStructureStrategy):
         return np.array([mol.bas_atom(b) for b in range(mol.nbas)
                          for _ in range((2 * mol.bas_angular(b) + 1) * mol.bas_nctr(b))], dtype=int)
 
-    def fragment_operators(self, scheme: str, fragment_atom_lists) -> List[np.ndarray]:
+    def fragment_operators(self, scheme: str, fragment_atom_lists, kept_block: int = 0) -> List[np.ndarray]:
         """The fragment operators of this step in the MO basis of the CASSCF orbitals (one per fragment, (nmo, nmo)):
-        'mulliken' - the Mulliken operators of the AO overlap over the fragments' AOs, 'pod' - libra's own POD block
+        'mulliken' - the Mulliken operators of the AO overlap over the fragments' AOs, 'pod2l' / 'pod2gs' - libra's
+        second-generation POD of the HF Fock matrix (the fragments orthogonalized first, the fragment states then
+        orthonormalized as a whole by Lowdin or by Gram-Schmidt keeping kept_block's), 'pod' - libra's own POD block
         projectors of the HF Fock matrix in the Lowdin-orthogonalized AO basis (the projector of a block is its Lowdin
         projector whatever the Fock matrix)."""
         if self._mc is None or self._mf is None:
@@ -227,7 +229,13 @@ class CASSCF(ElectronicStructureStrategy):
         if scheme == "pod":
             pod = _pod.pod_block_states([np.asarray(self._mf.get_fock())], S, ao_atom, fragment_atom_lists)
             return _pod.pod_fragment_operators(pod, C.T, 0)
-        raise ValueError(f"diabatization_scheme {scheme!r} - the PySCF driver builds 'mulliken' or 'pod' operators")
+        if scheme in ("pod2l", "pod2gs"):
+            pod = _pod.pod2_block_states([np.asarray(self._mf.get_fock())], S, ao_atom, fragment_atom_lists,
+                                         orthogonalization="lowdin" if scheme == "pod2l" else "gram_schmidt",
+                                         kept_block=int(kept_block))
+            return _pod.pod_fragment_operators(pod, C.T, 0)
+        raise ValueError(f"diabatization_scheme {scheme!r} - the PySCF driver builds 'mulliken', 'pod', 'pod2l' or 'pod2gs' "
+                         f"operators")
 
     def compute_nac_vectors(self, use_etfs: bool = True) -> np.ndarray:
         if self._mc is None:
