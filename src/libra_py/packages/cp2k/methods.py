@@ -6002,7 +6002,9 @@ def fragment_diabatic_step(route, T, sd_lists, P_frag, E_adi, St_adi, kind, stat
             stays out of the localization, or with ci_manifold True every state is localized as one manifold (the
             flipped electron relative to the spin-flip reference, a cation's hole states among them), or with
             ci_manifold a list of rows those states as one manifold and the others (state 0, the doubles) as the
-            energy eigenstates of the complement ("ci", rank)
+            energy eigenstates of the complement ("ci", rank), or with ci_manifold an array (nadi, m) that orthonormal
+            span of the excited states (single_excitation_manifold's, row 0 zero) as the one manifold and the
+            complement as its energy eigenstates
         sd_lists (list of lists of int): the SD basis of the step in the signed spin-orbital notation, the ground
             state first (the driver's sd_states)
         P_frag (list of arrays): the fragment operators in the 2-block window layout (fragment_operators_2block)
@@ -6027,17 +6029,24 @@ def fragment_diabatic_step(route, T, sd_lists, P_frag, E_adi, St_adi, kind, stat
         if ci_ops is None:
             raise ValueError("fragment_diabatic_step: the 'ci_ops' route needs ci_ops = (O_hole, O_elec) over the states")
         n_all = len(E_adi)
-        if ci_manifold is True:
+        span, rows = None, None
+        if isinstance(ci_manifold, np.ndarray):
+            span = np.asarray(ci_manifold, dtype=float)
+            if span.ndim != 2 or span.shape[0] != n_all or np.abs(span[0]).max() > 1e-12:
+                raise ValueError(F"fragment_diabatic_step: the manifold span must be ({n_all}, m) over the states with a "
+                                 F"zero row for state 0, got {span.shape}")
+        elif ci_manifold is True:
             rows = list(range(n_all))
         elif ci_manifold:
             rows = sorted(int(r) for r in ci_manifold)
-        else:
-            rows = None
         gs_joins = rows is not None and 0 in rows
-        manifolds = [{"rows": rows, "key": 0}] if rows is not None else None
+        if span is not None:
+            manifolds = [{"span": span, "key": 0}]
+        else:
+            manifolds = [{"rows": rows, "key": 0}] if rows is not None else None
         V_raw, dia_index, pops, pops_hole, energies = step3.ci_diabatization_step(
             np.eye(n_all), list(ci_ops[0]), list(ci_ops[1]), E_adi[1:], kind, dia_prev, tol=tol,
-            E_gs=float(E_adi[0]) if rows is not None else None, manifolds=manifolds)
+            E_gs=float(E_adi[0]) if manifolds is not None else None, manifolds=manifolds)
     else:
         nact = P_frag[0].shape[0] // 2
         active_space, data_dim = list(range(2 * nact)), 2 * nact

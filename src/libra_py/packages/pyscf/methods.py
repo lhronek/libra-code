@@ -32,7 +32,7 @@ from libra_py.packages.cp2k import methods as cp2k
 from libra_py import data_conv
 from libra_py import units
 from libra_py.packages.driver_forces import fill_diagonal_forces, force_diagonals
-from libra_py.packages.driver_fragments import carrier_operators_from_densities, single_excitation_rows
+from libra_py.packages.driver_fragments import carrier_operators_from_densities, single_excitation_rows, single_excitation_manifold
 
 class tmp:
     pass
@@ -51,12 +51,13 @@ def pyscf_compute_adi(q, params, full_id):
             disjoint, every atom assigned), do_diabatic_state_reordering (0 / 1 / 2 / 22 / 5 / 52), the thresholds
             diabatic_state_reordering_alpha / _min_overlap, occupancy_tolerance. The carriers are the hole and the
             electron of every excited state relative to the ground state (state 0) from the one-particle transition
-            densities of the CASSCF states (carrier_operators_from_densities). The SINGLE excitations - the states that
-            remove fewer than 1.5 electrons from the ground state's occupied space - form the localized manifold, the
-            doubles and the ground state stay energy eigenstates labelled ("ci", rank) when a double is among the
-            states, otherwise the ground state keeps the ("gs",) label and every excited state is localized. The
-            method must be 'casscf' (the CISD implementation has no transition densities). The
-            diabatic index of the first step is written to <working_directory_prefix>_itraj{i}/dia-record.txt (the
+            densities of the CASSCF states (carrier_operators_from_densities). The single-excitation manifold - the
+            n_occ x n_virt combinations of the excited states (the occupied times the virtual orbitals of the active
+            space) whose hole count lies nearest one, each within occupancy_tolerance of one hole and every other
+            state farther from it (single_excitation_manifold: a single the correlation mixes with a double is
+            un-mixed) - is localized, the ground state and the complement (the doubles) stay energy eigenstates
+            labelled ("ci", rank). The method must be 'casscf' (the CISD implementation has no transition densities).
+            The diabatic index of the first step is written to <working_directory_prefix>_itraj{i}/dia-record.txt (the
             localized states first, hole-major then electron for 'both', then the complement) and the following
             state to dia-state.npz there. The hand-over is the square basis_transform U[dia, adi], the identity
             ovlp_dia and dia_groups, as the CP2K driver's.
@@ -167,7 +168,10 @@ def pyscf_compute_adi(q, params, full_id):
         gamma_a, gamma_b = pyscf_obj.transition_densities(nstates)
         P = pyscf_obj.fragment_operators(frag["scheme"], frag["atoms"])
         O_hole, O_elec, _ = carrier_operators_from_densities(gamma_a, gamma_b, P, P)
-        singles, doubles, holes = single_excitation_rows(O_hole)
+        _, _, holes = single_excitation_rows(O_hole)
+        n_occ_act = (sum(_nelecas) if isinstance(_nelecas, (tuple, list)) else int(_nelecas)) // 2
+        n_single = n_occ_act * (int(_norbcas) - n_occ_act)
+        W_single, hole_in, hole_out = single_excitation_manifold(O_hole, n_single, frag["tol"])
         timestep = int(params.get("timestep", 0))
         state_file = F"{wd}/dia-state.npz"
         if is_first_time and timestep > 0 and os.path.exists(state_file):
@@ -181,17 +185,18 @@ def pyscf_compute_adi(q, params, full_id):
         U_frag, dia_labels, params["dia_state"][itraj], rec = cp2k.fragment_diabatic_step(
             "ci_ops", np.eye(nstates), None, None, E_adi, St_frag, frag["kind"], params["dia_state"].get(itraj),
             frag["reordering"], frag["alpha"], frag["min_overlap"], frag["tol"], None, timestep,
-            ci_ops=(O_hole, O_elec), ci_manifold=singles if doubles else False)
+            ci_ops=(O_hole, O_elec), ci_manifold=W_single)
         cp2k.fragment_state_save(state_file, params["dia_state"][itraj])
         with open(F"{wd}/dia-record.txt", "a") as rf:
             if rec["O"] is None:
                 rf.write(F"# step perm swap angle drift min_continuity edges unresolved - the diabatic index {rec['dia_index']}"
-                         F"{' - the doubles ' + str(doubles) + ' stay energy eigenstates' if doubles else ''}\n")
+                         F" - the ground state and the {hole_out.size} complement states stay energy eigenstates\n")
             rf.write(F"{timestep} {list(int(c) for c in params['dia_state'][itraj]['perm'])} {int(rec['swap'])} {rec['angle']:.4f} "
                      F"{rec['drift']:.4f} {rec['min_continuity']:.6f} {rec['edges']} {int(rec['unresolved'])}\n")
         with open(F"{wd}/cas-record.txt", "a") as rf:
             rf.write(F"step {timestep}  E (Ha) {np.round(E_adi, 6).tolist()}  holes relative to S0 {np.round(holes, 3).tolist()}  "
-                     F"singles {singles}  doubles {doubles}\n")
+                     F"the manifold's hole counts {np.round(np.sort(hole_in), 3).tolist()}  the complement's "
+                     F"{np.round(np.sort(hole_out), 3).tolist()}\n")
             for k in range(1, nstates):
                 rf.write(F"  state {k}  hole on the fragments {np.round([O[k, k] for O in O_hole], 3).tolist()}  "
                          F"electron {np.round([O[k, k] for O in O_elec], 3).tolist()}\n")

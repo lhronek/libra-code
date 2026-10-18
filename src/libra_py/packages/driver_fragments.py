@@ -65,3 +65,42 @@ def single_excitation_rows(O_hole, double_threshold=1.5):
     singles = [k for k in range(1, holes.size) if holes[k] < double_threshold]
     doubles = [k for k in range(1, holes.size) if holes[k] >= double_threshold]
     return singles, doubles, holes
+
+
+def single_excitation_manifold(O_hole, n_single, tol=0.25):
+    """The single-excitation manifold of the excited states (rows 1..): the n_single eigenvectors of the summed hole
+    operator N_h over the excited states whose eigenvalues lie nearest one - the combinations of the states that remove
+    one electron from state 0's occupied space, whichever adiabatic states the correlation mixes them into (a single
+    mixed with a double counts 1.3 - 1.4 holes by row and the pair un-mixes here). The manifold is refused unless every
+    chosen eigenvalue lies within tol of one and every other eigenvalue farther than tol from one - the gap that makes
+    it a definite subspace.
+
+    Args:
+        O_hole (list over fragments of arrays (nstates, nstates)): the hole operators of carrier_operators_from_densities
+        n_single (int): the number of single excitations - the occupied times the virtual orbitals of the active space
+        tol (float): the allowed distance of a manifold state's hole count from one (occupancy_tolerance)
+
+    Returns:
+        W (array (nstates, n_single)): the orthonormal manifold over the states, row 0 zero, hole_in (array (n_single,)):
+        the hole counts of its states, hole_out (array): the hole counts of the complement's excited states
+    """
+    n = np.asarray(O_hole[0]).shape[0]
+    exc = np.arange(1, n)
+    if not 0 < n_single <= exc.size:
+        raise ValueError(F"single_excitation_manifold: {n_single} single excitations among {exc.size} excited states")
+    Nh = sum(np.asarray(O, dtype=float)[np.ix_(exc, exc)] for O in O_hole)
+    Nh = 0.5 * (Nh + Nh.T)
+    vals, vecs = np.linalg.eigh(Nh)
+    order = np.argsort(np.abs(vals - 1.0))
+    chosen, rest = order[:n_single], order[n_single:]
+    dev_in = float(np.abs(vals[chosen] - 1.0).max())
+    dev_out = float(np.abs(vals[rest] - 1.0).min()) if rest.size else np.inf
+    if dev_in > tol or dev_out <= tol:
+        raise ValueError(F"the single-excitation manifold of {n_single} states is not definite within {tol}: the hole counts "
+                         F"nearest one are {np.round(np.sort(vals[chosen]), 3).tolist()}, the next "
+                         F"{np.round(vals[rest][np.argsort(np.abs(vals[rest] - 1.0))][:2], 3).tolist()} - a manifold state "
+                         F"farther than {tol} from one hole or a complement state within it (occupancy_tolerance up to 0.5, "
+                         F"or a state average that holds the whole manifold)")
+    W = np.zeros((n, n_single))
+    W[1:, :] = vecs[:, chosen]
+    return W, vals[chosen], vals[rest]

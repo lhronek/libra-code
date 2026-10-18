@@ -3186,7 +3186,9 @@ def ci_diabatization_step(T, O_hole, O_elec, E_ci, kind, dia_index=None, tol=0.2
     grouping lifted into the CI space: every manifold's span within the CI states is the eigenvectors of its total
     carrier operator near 1 (len(g) of them, a CI state mixing a manifold with other states is refused), the
     carrier is localized inside that span and the columns labelled as the SD route labels them (("loc", key, f, rank),
-    ("joint", key, f_h, 0, f_p, rank)), the complement of all manifolds (the reference of a closed shell, the
+    ("joint", key, f_h, 0, f_p, rank)) - a manifold given as a "span" (an orthonormal (nci + 1, m) array over the CI
+    states, driver_fragments.single_excitation_manifold's, its gap test done) is taken as it is - the complement of all
+    manifolds (the reference of a closed shell, the
     one-member manifolds) keeps its energy eigenstates labelled ("ci", rank) - an open-shell reference is then one of
     the localized states of its manifold (a cation's hole states are the ground state and the excitations into its
     hole) and the index holds no ("gs",) entry. The energies [E_gs] + E_ci stand on one scale (E_gs required).
@@ -3200,7 +3202,8 @@ def ci_diabatization_step(T, O_hole, O_elec, E_ci, kind, dia_index=None, tol=0.2
             None builds it (the ground state first, then fragment-major - hole-major then electron for "both")
         tol (float): the integer-occupancy tolerance of localize_fragment_block
         E_gs (float, optional): the ground-state energy on the scale of E_ci - required with manifolds
-        manifolds (list of dict, optional): the groups of sd_diabatization_groups - the per-manifold localization
+        manifolds (list of dict, optional): the groups of sd_diabatization_groups ("rows", "key") or a given span
+            ("span", "key") - the per-manifold localization
 
     Returns:
         V (array (nci + 1, nci + 1)), dia_index (list), pops (array (nci + 1, nfrag)), pops_hole (array
@@ -3237,23 +3240,31 @@ def ci_diabatization_step(T, O_hole, O_elec, E_ci, kind, dia_index=None, tol=0.2
         nall = nci + 1
         cols, labels, taken = [], [], []
         for g in manifolds:
-            rows = list(g["rows"])
-            m = len(rows)
-            # the manifold's carrier operators over its own rows, carried into the CI space
-            Of_h = [T.T @ _rows_block(O, rows) @ T for O in O_hole]
-            Of_e = [T.T @ _rows_block(O, rows) @ T for O in O_elec]
-            Of = Of_e if kind == "electron" else Of_h
-            Otot = sum(Of)
-            Otot = 0.5 * (Otot + Otot.T)
-            vals, vecs = np.linalg.eigh(Otot)
-            idx = np.argsort(-vals)
-            if abs(float(np.trace(Otot)) - m) > tol or vals[idx[:m]].min() < 1.0 - tol or \
-                    (nall > m and vals[idx[m:]].max() > tol):
-                raise ValueError(F"many-body diabatization: the manifold {g['key']} of {m} states carries "
-                                 F"{float(np.trace(Otot)):.3f} of the CI space with eigenvalues "
-                                 F"{np.round(np.sort(vals)[::-1][:m + 2], 3)} - it is not a whole subspace of the "
-                                 F"propagated states within {tol} (a CI state mixes it with other excitations){hint}")
-            wm = vecs[:, idx[:m]]
+            if g.get("span") is not None:
+                # a manifold given as its orthonormal span over the CI states (the gap test is the caller's), the
+                # carriers read inside it
+                wm = np.asarray(g["span"], dtype=float)
+                m = wm.shape[1]
+                Of_h = [T.T @ O @ T for O in O_hole]
+                Of_e = [T.T @ O @ T for O in O_elec]
+            else:
+                rows = list(g["rows"])
+                m = len(rows)
+                # the manifold's carrier operators over its own rows, carried into the CI space
+                Of_h = [T.T @ _rows_block(O, rows) @ T for O in O_hole]
+                Of_e = [T.T @ _rows_block(O, rows) @ T for O in O_elec]
+                Of = Of_e if kind == "electron" else Of_h
+                Otot = sum(Of)
+                Otot = 0.5 * (Otot + Otot.T)
+                vals, vecs = np.linalg.eigh(Otot)
+                idx = np.argsort(-vals)
+                if abs(float(np.trace(Otot)) - m) > tol or vals[idx[:m]].min() < 1.0 - tol or \
+                        (nall > m and vals[idx[m:]].max() > tol):
+                    raise ValueError(F"many-body diabatization: the manifold {g['key']} of {m} states carries "
+                                     F"{float(np.trace(Otot)):.3f} of the CI space with eigenvalues "
+                                     F"{np.round(np.sort(vals)[::-1][:m + 2], 3)} - it is not a whole subspace of the "
+                                     F"propagated states within {tol} (a CI state mixes it with other excitations){hint}")
+                wm = vecs[:, idx[:m]]
             Hm = wm.T @ Hf @ wm
             try:
                 if kind == "both":
