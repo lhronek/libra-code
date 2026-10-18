@@ -31,11 +31,22 @@ from libra_py.packages.pyscf.interfaces import ElectronicStructureStrategy, Mole
 from libra_py.packages.cp2k import methods as cp2k
 from libra_py import data_conv
 from libra_py import units
-from libra_py.packages.driver_forces import fill_diagonal_forces, force_diagonals
+from libra_py.packages.driver_forces import fill_diagonal_forces, force_diagonals, refreshed_rows
 from libra_py.packages.driver_fragments import carrier_operators_from_densities, single_excitation_rows, single_excitation_manifold
 
 class tmp:
     pass
+
+
+def _pyscf_force_refresh(params, itraj, nat):
+    """The hand-over of the engine's call-back after a change of the active state (hop_force_refresh): the rows of the
+    regular call of this step with the new state's row - the gradient of that root on the step's CASSCF solution, no new
+    solve - where it is NaN (driver_forces.refreshed_rows), nothing else: the cached solution stays as the regular call
+    left it."""
+    if itraj in params["force_refresh"] and itraj not in params.get("pyscf_obj", {}):
+        raise RuntimeError(F"force_refresh for trajectory {itraj} before its regular call of the step")
+    pyscf_obj = params["pyscf_obj"][itraj]
+    return refreshed_rows(params, itraj, nat, lambda new_state: -np.asarray(pyscf_obj.compute_gradient(int(new_state))))
 
 
 def pyscf_compute_adi(q, params, full_id):
@@ -62,6 +73,11 @@ def pyscf_compute_adi(q, params, full_id):
             state to dia-state.npz there. The hand-over is the square basis_transform U[dia, adi], the identity
             ovlp_dia and dia_groups, as the CP2K driver's.
         working_directory_prefix (str): the records' folder stem [default "wd"]
+        force_source (str): "all_states" [default] - every root's gradient handed over as its state's force row.
+            "active_state" - the active root's gradient alone (params["act_state"]), the other rows NaN (the engine's
+            sentinel of a row not handed over), and the engine's call-back after a hop or a relabel (hop_force_refresh
+            1, params["force_refresh"] = {trajectory: new state}) answered with the new root's gradient on the step's
+            CASSCF solution - no new solve, the caches untouched (driver_forces.refreshed_rows).
     """
 
     # ================= Decode trajectory index =================
@@ -81,6 +97,7 @@ def pyscf_compute_adi(q, params, full_id):
     params.setdefault("pyscf_obj", {})
     params.setdefault("coords_prev", {})
     params.setdefault("dia_state", {})
+    params.setdefault("force_rows", {})
     dia_basis = params.get("dia_basis", "none")
     if dia_basis not in ("none", "fragment"):
         raise ValueError(F"dia_basis must be 'none' or 'fragment', got {dia_basis!r}")
@@ -102,6 +119,14 @@ def pyscf_compute_adi(q, params, full_id):
     if frag is not None and method != "casscf":
         raise ValueError(F"dia_basis 'fragment' needs method 'casscf' - the {method!r} implementation has no transition "
                          F"densities or fragment operators")
+    force_source = params.get("force_source", "all_states")
+    if force_source not in ("all_states", "active_state"):
+        raise ValueError(F"force_source = {force_source!r} is not a listed option of the PySCF driver - 'all_states' (every "
+                         F"root's gradient) or 'active_state' (the active root's gradient alone, hop_force_refresh 1 for the "
+                         F"new state's after a hop)")
+    if "force_refresh" in params:
+        # the engine's call-back after a change of the active state - the forces alone, on this step's solution
+        return _pyscf_force_refresh(params, itraj, nat)
 
     # ================= Read parameters =================
     #dt = float(params.get("dt", 41.0)) # no coupling is derived here, the time step is the engine's
@@ -133,7 +158,13 @@ def pyscf_compute_adi(q, params, full_id):
 
     pyscf_obj.set_geom_and_run_hf(geom)
     energies = [pyscf_obj.compute_energy(root) for root in range(nstates)]
-    grad = [pyscf_obj.compute_gradient(root) for root in range(nstates)]
+    if force_source == "all_states":
+        grad = [pyscf_obj.compute_gradient(root) for root in range(nstates)]
+    else:
+        act_state = int(act_state)
+        if not 0 <= act_state < nstates:
+            raise ValueError(F"act_state {act_state} of trajectory {itraj} is not among the {nstates} propagated roots")
+        grad_active = pyscf_obj.compute_gradient(act_state)
     if is_first_time:
         # the first step has no previous geometry: its own solution is the previous one, the time overlap the identity
         pyscf_obj.cache_current_as_previous()
@@ -208,7 +239,13 @@ def pyscf_compute_adi(q, params, full_id):
 
     # ================== Forces ===============================
     # the gradients (nstates, nat, 3) are minus the forces the shared helper takes
-    fill_diagonal_forces(obj, force_diagonals(nstates, ndof, nat, None, forces_all=-np.asarray(grad[:nstates])))
+    if force_source == "all_states":
+        rows = force_diagonals(nstates, ndof, nat, None, forces_all=-np.asarray(grad[:nstates]))
+    else:
+        # the active root's row alone, the others NaN (the engine's sentinel) - the call-back fills a new state's row
+        rows = force_diagonals(nstates, ndof, nat, -np.asarray(grad_active), active_state=act_state)
+    fill_diagonal_forces(obj, rows)
+    params["force_rows"][itraj] = rows                  # for the engine's call-back after a hop
 
     # no coupling is handed over: the engine derives the couplings of the followed states from time_overlap_adi
     # with its own projector (nac_update_method 2) and builds hvib_adi = H - i D (hvib_update_method 1) - a
