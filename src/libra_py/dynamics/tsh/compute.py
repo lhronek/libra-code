@@ -1747,6 +1747,58 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
 
 # def generic_recipe(q, p, iM, _dyn_params, compute_model, _model_params, _init_elec, rnd):
 @_with_blas_cap(0)
+def refresh_init_force_rows(dyn_params, dyn_var, ham, compute_model, model_params):
+    """The force rows of the sampled initial active states, as the engine's refresh_force_rows fills them within a step:
+    a start in the other representation (rep 0 under rep_sh 1) samples the adiabatic active state from the amplitudes
+    after the model's first call, which computed its forces for the runner's act_state - a model handing over the
+    active state's force alone (the on-the-fly drivers under force_source active_state) then holds NaN in the sampled
+    state's row and the first half kick would stop the run. For every trajectory whose sampled state differs from the
+    model's act_state, whose new row is NaN and whose old row carries a force, the model is called back once with
+    params["force_refresh"] = {trajectory: state} and act_state updated (hop_force_refresh 1) - without the option the
+    start is refused, naming the remedy. Rows every model fills (force_source all_states, a model Hamiltonian) are left
+    alone."""
+    if int(dyn_params.get("rep_sh", 1)) != 1 or int(dyn_params.get("force_method", 1)) != 1:
+        return
+    ntraj, ndof = dyn_var.ntraj, dyn_var.ndof
+    act_prev = dict(model_params.get("act_state", {}))
+    act_now = {itraj: int(dyn_var.act_states[itraj]) for itraj in range(ntraj)}
+    refresh = {}
+    for itraj in range(ntraj):
+        new = act_now[itraj]
+        old = int(act_prev.get(itraj, new))
+        if old == new:
+            continue
+        child = Py2Cpp_int([0, itraj])
+        missing = old_carries = False
+        for idof in range(ndof):
+            d1 = ham.get_d1ham_adi(idof, child)
+            if np.isnan(d1.get(new, new).real):
+                missing = True
+            if not np.isnan(d1.get(old, old).real):
+                old_carries = True
+        if missing and old_carries:
+            refresh[itraj] = new
+    model_params["act_state"] = act_now
+    if not refresh:
+        return
+    if int(dyn_params.get("hop_force_refresh", 0)) != 1:
+        raise ValueError(F"generic_recipe: the initial active states {refresh} sampled from the start's amplitudes differ "
+                         F"from the model's act_state {dict((t, act_prev.get(t)) for t in refresh)} and the model handed over "
+                         F"the force of its act_state alone (the sampled state's row is NaN) - the first half kick would run "
+                         F"force-free: set hop_force_refresh = 1 (the model is called back at the start geometry for the "
+                         F"sampled state's force) or hand over every state's force (force_source all_states)")
+    model_params["force_refresh"] = refresh
+    try:
+        ham.compute_adiabatic(compute_model, dyn_var.get_coords(), model_params, 1)
+    finally:
+        model_params.pop("force_refresh", None)
+    for itraj, new in refresh.items():
+        child = Py2Cpp_int([0, itraj])
+        if any(np.isnan(ham.get_d1ham_adi(idof, child).get(new, new).real) for idof in range(ndof)):
+            raise RuntimeError(F"generic_recipe: the call-back for the initial active state {new} of trajectory {itraj} "
+                               F"returned no force (the row stays NaN)")
+
+
 def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_nucl, rnd, runner_params=None):
     """
     This function initializes electronic variables and Hamiltonians for a given set of
@@ -2038,6 +2090,10 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
     prms0.set_parameters(dyn_params)
     if need_active_states_diff_rep(prms0) == 1:
         dyn_var.set_active_states_diff_rep(int(dyn_params["rep_sh"]), rnd)
+
+    # the sampled initial active state may differ from the model's act_state of its first call - a model handing over
+    # the active state's force alone is called back for the sampled state's row (hop_force_refresh), as after a hop
+    refresh_init_force_rows(dyn_params, dyn_var, ham, compute_model, model_params)
 
     # print("Initial adiabatic amplitudes")
     # dyn_var.get_ampl_adi().show_matrix()
