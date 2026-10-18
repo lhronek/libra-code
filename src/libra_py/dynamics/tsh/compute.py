@@ -352,7 +352,8 @@ def _sync_nbra_flag(dyn_params):
 
 
 @_with_blas_cap(1)
-def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, init_params=None, runner_params=None):
+def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, init_params=None, runner_params=None,
+                 ham_initialized=False):
     """
 
     Args:
@@ -361,6 +362,11 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
 
         init_params ( dictionary ): the init_elec / init_nucl dictionaries of generic_recipe, for the printout and
             the simulation-params.json dump [ default: None ]
+
+        ham_initialized ( bool ): True when the caller evaluated the model at the initial geometry with these very
+            dyn_params and model_params (generic_recipe's start of an adiabatic-native model in the other
+            representation) - the initial evaluation here is skipped, the model is called once at the start
+            [ default: False ]
 
         runner_params ( dictionary ): the runner's own keys (the init values nstates / istate / x0 / p0 / masses / k,
             the plot lists which_adi_states / which_dia_states, istep, seed, rep_ham, the step-4 selectors) - not read
@@ -1610,8 +1616,9 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
     # init path, where it is the correct file)
     model_params.update({"timestep": icond, "timestep_st": icond})
 
-    update_Hamiltonian_variables(dyn_params, dyn_var, ham, ham, compute_model, model_params, 0)
-    update_Hamiltonian_variables(dyn_params, dyn_var, ham, ham, compute_model, model_params, 1)
+    if not ham_initialized:
+        update_Hamiltonian_variables(dyn_params, dyn_var, ham, ham, compute_model, model_params, 0)
+        update_Hamiltonian_variables(dyn_params, dyn_var, ham, ham, compute_model, model_params, 1)
 
     # the diabatic-representation hop proposals (tsh_method 3 with rep_lz 0/1,
     # tsh_method 4) detect crossings in ham_dia and index it by adiabatic
@@ -1955,6 +1962,7 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
     # followed by the transformation to the adiabatic one - this is what we need to get
     # the transformation matrices to convert amplitudes between the representations
     dyn_params1 = dict(dyn_params)
+    ham_initialized = False
 
     #sys.exit(0)
     if dyn_params.get("ham_update_method", 1) == 2:
@@ -2007,6 +2015,10 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
         if init_elec.get("rep", 1) == 0 or dia_consumed:
             update_Hamiltonian_variables(dyn_params1, dyn_var, ham, ham, compute_model, model_params1, 0)
             update_Hamiltonian_variables(dyn_params1, dyn_var, ham, ham, compute_model, model_params1, 1)
+            # the same dyn_params, timestep icond and geometry as run_dynamics' start evaluation, and the same model
+            # when model0 is the run's model - that evaluation is skipped then (a driver's step is a full
+            # electronic-structure run)
+            ham_initialized = _init_saved.get("model", model_params["model0"]) == model_params["model0"]
             # the model call above fills the CHILDREN Hamiltonians. A square
             # basis_transform defaults to identity (diabats = adiabats), but a
             # rectangular one (ndia != nadi) has no canonical default - it stays
@@ -2133,7 +2145,8 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
                          "do_diabatic_state_reordering 5 / 52 aligns them too - pick one side (2 / 22 in the "
                          "driver with 5 in the engine, or 5 / 52 in the driver with 0)")
     res = run_dynamics(dyn_var, dyn_params, ham, compute_model, model_params, rnd,
-                       init_params={"init_elec": init_elec, "init_nucl": init_nucl}, runner_params=runner_params)
+                       init_params={"init_elec": init_elec, "init_nucl": init_nucl}, runner_params=runner_params,
+                       ham_initialized=ham_initialized)
     return res
 
 
