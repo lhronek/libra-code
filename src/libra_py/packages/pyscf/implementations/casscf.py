@@ -182,6 +182,53 @@ class CASSCF(ElectronicStructureStrategy):
             raise ValueError(f"Requested {nroots} roots, but only {len(ci)} are available.")
         return [np.asarray(v) for v in ci[:nroots]]
 
+    def transition_densities(self, nroots: int) -> Tuple[np.ndarray, np.ndarray]:
+        """The one-particle transition densities of the CASSCF states per spin over the MO basis of this step
+        (mo_coeff): the core orbitals carry one electron per spin in every diagonal block, the active block half the
+        spin-summed transition density of the FCI solver (the states are singlets), the virtuals nothing - so that
+        tr(gamma[k, l] O) is the matrix element of a one-body operator O between the states. Returns (gamma_a, gamma_b),
+        equal arrays (nroots, nroots, nmo, nmo)."""
+        if self._mc is None:
+            raise ValueError("CASSCF must be run before computing the transition densities.")
+        mc = self._mc
+        ci = self._ci_vectors(mc, nroots)
+        nmo = np.asarray(mc.mo_coeff).shape[1]
+        ncore, ncas = mc.ncore, mc.ncas
+        gamma = np.zeros((nroots, nroots, nmo, nmo))
+        core = np.arange(ncore)
+        for k in range(nroots):
+            gamma[k, k, core, core] = 2.0
+            for l in range(nroots):
+                gamma[k, l, ncore:ncore + ncas, ncore:ncore + ncas] = mc.fcisolver.trans_rdm1(ci[k], ci[l], ncas, mc.nelecas)
+        gamma_a = 0.5 * gamma
+        return gamma_a, gamma_a.copy()
+
+    def ao_atom_map(self) -> np.ndarray:
+        """The 0-based atom of every AO of this step's molecule (the spherical AO order of PySCF)."""
+        mol = self._mol
+        return np.array([mol.bas_atom(b) for b in range(mol.nbas)
+                         for _ in range((2 * mol.bas_angular(b) + 1) * mol.bas_nctr(b))], dtype=int)
+
+    def fragment_operators(self, scheme: str, fragment_atom_lists) -> List[np.ndarray]:
+        """The fragment operators of this step in the MO basis of the CASSCF orbitals (one per fragment, (nmo, nmo)):
+        'mulliken' - the Mulliken operators of the AO overlap over the fragments' AOs, 'pod' - libra's own POD block
+        projectors of the HF Fock matrix in the Lowdin-orthogonalized AO basis (the projector of a block is its Lowdin
+        projector whatever the Fock matrix)."""
+        if self._mc is None or self._mf is None:
+            raise ValueError("CASSCF must be run before building the fragment operators.")
+        from libra_py import pod as _pod
+        from libra_py.packages.cp2k.methods import mulliken_fragment_operators
+        S = self._mol.intor("int1e_ovlp")
+        C = np.asarray(self._mc.mo_coeff)                          # (nao, nmo)
+        ao_atom = self.ao_atom_map()
+        if scheme == "mulliken":
+            frag_cols = [np.asarray(b, dtype=int) for b in _pod.ao_blocks(ao_atom, fragment_atom_lists)]
+            return mulliken_fragment_operators(C.T, S, frag_cols)
+        if scheme == "pod":
+            pod = _pod.pod_block_states([np.asarray(self._mf.get_fock())], S, ao_atom, fragment_atom_lists)
+            return _pod.pod_fragment_operators(pod, C.T, 0)
+        raise ValueError(f"diabatization_scheme {scheme!r} - the PySCF driver builds 'mulliken' or 'pod' operators")
+
     def compute_nac_vectors(self, use_etfs: bool = True) -> np.ndarray:
         if self._mc is None:
             raise ValueError("CASSCF must be run before computing NAC vectors.")

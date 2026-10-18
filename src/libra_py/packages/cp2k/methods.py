@@ -5874,7 +5874,8 @@ FRAGMENT_DIA_REORDERINGS = (0, 1, 2, 22, 5, 52)
 def fragment_options(params):
     """The localization keys of dia_basis "fragment", step 3's vocabulary verbatim, validated: localized_carrier
     ('hole', 'electron', 'both'), diabatization_scheme ('mulliken' [default] - the Mulliken operators of the step's AO
-    overlap over fragment_atom_lists, 'pod_cp2k' - the POD blocks of CP2K's projection prints of the step),
+    overlap over fragment_atom_lists, 'pod' - libra's own POD of the step's Fock matrix over fragment_atom_lists (the
+    PySCF driver), 'pod_cp2k' - the POD blocks of CP2K's projection prints of the step (the CP2K driver)),
     fragment_atom_lists (1-based atom indices of disjoint fragments, the Mulliken scheme), do_diabatic_state_reordering
     (0 [default]: a swap of two localized states between steps is refused, 1 / 2 / 22: the states follow their identity
     within a tracking group - Sato / Munkres-Kuhn / scipy's assignment, 5 / 52: followed by 2 / 22 and aligned by the
@@ -5885,12 +5886,13 @@ def fragment_options(params):
     if kind not in ("hole", "electron", "both"):
         raise ValueError(F"dia_basis='fragment' needs localized_carrier 'hole', 'electron' or 'both', got {kind!r}")
     scheme = params.get("diabatization_scheme", "mulliken")
-    if scheme not in ("mulliken", "pod_cp2k"):
-        raise ValueError(F"diabatization_scheme must be 'mulliken' or 'pod_cp2k', got {scheme!r}")
+    if scheme not in ("mulliken", "pod", "pod_cp2k"):
+        raise ValueError(F"diabatization_scheme must be 'mulliken', 'pod' (libra's own POD of the step's Fock matrix) or "
+                         F"'pod_cp2k' (CP2K's projection prints), got {scheme!r}")
     atoms = params.get("fragment_atom_lists", None)
-    if scheme == "mulliken":
+    if scheme in ("mulliken", "pod"):
         if not atoms or len(atoms) < 2 or any(len(a) == 0 for a in atoms):
-            raise ValueError("diabatization_scheme 'mulliken' needs fragment_atom_lists - at least two non-empty lists of "
+            raise ValueError(F"diabatization_scheme '{scheme}' needs fragment_atom_lists - at least two non-empty lists of "
                              "1-based atom indices")
         flat = [int(a) for frag in atoms for a in frag]
         if len(set(flat)) != len(flat) or min(flat) < 1:
@@ -5998,7 +6000,9 @@ def fragment_diabatic_step(route, T, sd_lists, P_frag, E_adi, St_adi, kind, stat
             "ci_ops" - the hole and electron operators are given over the adiabatic states themselves (ci_ops, the
             spin-flip manifold's spin_flip_carrier_operators), T the identity, sd_lists and P_frag unread - state 0
             stays out of the localization, or with ci_manifold True every state is localized as one manifold (the
-            flipped electron relative to the spin-flip reference, a cation's hole states among them)
+            flipped electron relative to the spin-flip reference, a cation's hole states among them), or with
+            ci_manifold a list of rows those states as one manifold and the others (state 0, the doubles) as the
+            energy eigenstates of the complement ("ci", rank)
         sd_lists (list of lists of int): the SD basis of the step in the signed spin-orbital notation, the ground
             state first (the driver's sd_states)
         P_frag (list of arrays): the fragment operators in the 2-block window layout (fragment_operators_2block)
@@ -6023,11 +6027,17 @@ def fragment_diabatic_step(route, T, sd_lists, P_frag, E_adi, St_adi, kind, stat
         if ci_ops is None:
             raise ValueError("fragment_diabatic_step: the 'ci_ops' route needs ci_ops = (O_hole, O_elec) over the states")
         n_all = len(E_adi)
-        gs_joins = bool(ci_manifold)
-        manifolds = [{"rows": list(range(n_all)), "key": 0}] if ci_manifold else None
+        if ci_manifold is True:
+            rows = list(range(n_all))
+        elif ci_manifold:
+            rows = sorted(int(r) for r in ci_manifold)
+        else:
+            rows = None
+        gs_joins = rows is not None and 0 in rows
+        manifolds = [{"rows": rows, "key": 0}] if rows is not None else None
         V_raw, dia_index, pops, pops_hole, energies = step3.ci_diabatization_step(
             np.eye(n_all), list(ci_ops[0]), list(ci_ops[1]), E_adi[1:], kind, dia_prev, tol=tol,
-            E_gs=float(E_adi[0]) if ci_manifold else None, manifolds=manifolds)
+            E_gs=float(E_adi[0]) if rows is not None else None, manifolds=manifolds)
     else:
         nact = P_frag[0].shape[0] // 2
         active_space, data_dim = list(range(2 * nact)), 2 * nact
@@ -7014,6 +7024,10 @@ def cp2k_compute_adi_impl(q, params, full_id):
         # operators and SD basis, followed and aligned against the previous step (fragment_diabatic_step), handed over
         # as the square U[dia, adi] with the identity metric and the tracking groups the engine's dia_tracking_algo
         # aligns (dia_groups) - the state of the following persists per trajectory for a restart
+        if frag["scheme"] == "pod":
+            raise ValueError("diabatization_scheme 'pod' (libra's own POD of the Fock matrix) is the PySCF driver's - the "
+                             "CP2K driver reads CP2K's projection prints with 'pod_cp2k', or the Mulliken operators with "
+                             "'mulliken'")
         if P_frag_win is None:
             # the POD blocks of the step's projection prints, written next to the wfn restart
             hits = sorted(glob.glob(f"{wd}/{project}-POD-RESTART-*.hab"))

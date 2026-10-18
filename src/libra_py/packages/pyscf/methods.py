@@ -32,12 +32,35 @@ from libra_py.packages.cp2k import methods as cp2k
 from libra_py import data_conv
 from libra_py import units
 from libra_py.packages.driver_forces import fill_diagonal_forces, force_diagonals
+from libra_py.packages.driver_fragments import carrier_operators_from_densities, single_excitation_rows
 
 class tmp:
     pass
 
 
 def pyscf_compute_adi(q, params, full_id):
+    """
+    The PySCF model function of generic_recipe: the SA-CASSCF (or CISD) states of every trajectory's geometry, their
+    energies, every root's gradient and the time overlaps between consecutive geometries - the engine derives the
+    couplings (nac_update_method 2). Optional keys of params:
+
+        dia_basis (str): "none" [default] - the identity as basis_transform. "fragment" - the fragment-localized states
+            of the step as the diabatic basis (step 3's vocabulary, as the CP2K driver): localized_carrier ('hole' /
+            'electron' / 'both'), diabatization_scheme ('mulliken' - the Mulliken operators of the step's AO overlap,
+            'pod' - libra's own POD block projectors of the step's Fock matrix) over fragment_atom_lists (1-based,
+            disjoint, every atom assigned), do_diabatic_state_reordering (0 / 1 / 2 / 22 / 5 / 52), the thresholds
+            diabatic_state_reordering_alpha / _min_overlap, occupancy_tolerance. The carriers are the hole and the
+            electron of every excited state relative to the ground state (state 0) from the one-particle transition
+            densities of the CASSCF states (carrier_operators_from_densities). The SINGLE excitations - the states that
+            remove fewer than 1.5 electrons from the ground state's occupied space - form the localized manifold, the
+            doubles and the ground state stay energy eigenstates labelled ("ci", rank) when a double is among the
+            states, otherwise the ground state keeps the ("gs",) label and every excited state is localized. The
+            diabatic index of the first step is written to <working_directory_prefix>_itraj{i}/dia-record.txt (the
+            localized states first, hole-major then electron for 'both', then the complement) and the following
+            state to dia-state.npz there. The hand-over is the square basis_transform U[dia, adi], the identity
+            ovlp_dia and dia_groups, as the CP2K driver's.
+        working_directory_prefix (str): the records' folder stem [default "wd"]
+    """
 
     # ================= Decode trajectory index =================
     Id = Cpp2Py(full_id)
@@ -55,6 +78,14 @@ def pyscf_compute_adi(q, params, full_id):
     params.setdefault("act_state", {})
     params.setdefault("pyscf_obj", {})
     params.setdefault("coords_prev", {})
+    params.setdefault("dia_state", {})
+    dia_basis = params.get("dia_basis", "none")
+    if dia_basis not in ("none", "fragment"):
+        raise ValueError(F"dia_basis must be 'none' or 'fragment', got {dia_basis!r}")
+    frag = cp2k.fragment_options(params) if dia_basis == "fragment" else None
+    if frag is not None and frag["scheme"] == "pod_cp2k":
+        raise ValueError("diabatization_scheme 'pod_cp2k' reads CP2K's projection prints - the PySCF driver builds the "
+                         "'mulliken' operators of the step's AO overlap or libra's own 'pod' projectors of its Fock matrix")
 
     is_first_time = params["is_first_time"].get(itraj, True)
     act_state = params["act_state"].get(itraj, 0)
@@ -121,6 +152,50 @@ def pyscf_compute_adi(q, params, full_id):
 
         for j in range(nstates):
             obj.time_overlap_adi.set(i, j, complex(float(st_ci[i, j])) )
+
+    if frag is not None:
+        # the fragment-localized states as the DIABATIC basis: the hole and the electron of every excited CASSCF state
+        # relative to the ground state over the states themselves, the single excitations localized (the doubles and
+        # the ground state energy eigenstates of the complement), followed and aligned against the previous step, the
+        # state of the following persisted per trajectory - the CP2K driver's hand-over
+        wd = F"{params.get('working_directory_prefix', 'wd')}_itraj{itraj}"
+        os.makedirs(wd, exist_ok=True)
+        gamma_a, gamma_b = pyscf_obj.transition_densities(nstates)
+        P = pyscf_obj.fragment_operators(frag["scheme"], frag["atoms"])
+        O_hole, O_elec, _ = carrier_operators_from_densities(gamma_a, gamma_b, P, P)
+        singles, doubles, holes = single_excitation_rows(O_hole)
+        timestep = int(params.get("timestep", 0))
+        state_file = F"{wd}/dia-state.npz"
+        if is_first_time and timestep > 0 and os.path.exists(state_file):
+            params["dia_state"][itraj] = cp2k.fragment_state_load(state_file)
+            print(F"dia_basis fragment: the following of trajectory {itraj} resumed from {state_file} "
+                  F"(saved at step {params['dia_state'][itraj]['step']})")
+        elif is_first_time:
+            params["dia_state"][itraj] = None
+        St_frag = None if params["dia_state"].get(itraj) is None else np.asarray(st_ci, dtype=float)
+        E_adi = np.asarray(energies, dtype=float)
+        U_frag, dia_labels, params["dia_state"][itraj], rec = cp2k.fragment_diabatic_step(
+            "ci_ops", np.eye(nstates), None, None, E_adi, St_frag, frag["kind"], params["dia_state"].get(itraj),
+            frag["reordering"], frag["alpha"], frag["min_overlap"], frag["tol"], None, timestep,
+            ci_ops=(O_hole, O_elec), ci_manifold=singles if doubles else False)
+        cp2k.fragment_state_save(state_file, params["dia_state"][itraj])
+        with open(F"{wd}/dia-record.txt", "a") as rf:
+            if rec["O"] is None:
+                rf.write(F"# step perm swap angle drift min_continuity edges unresolved - the diabatic index {rec['dia_index']}"
+                         F"{' - the doubles ' + str(doubles) + ' stay energy eigenstates' if doubles else ''}\n")
+            rf.write(F"{timestep} {list(int(c) for c in params['dia_state'][itraj]['perm'])} {int(rec['swap'])} {rec['angle']:.4f} "
+                     F"{rec['drift']:.4f} {rec['min_continuity']:.6f} {rec['edges']} {int(rec['unresolved'])}\n")
+        with open(F"{wd}/cas-record.txt", "a") as rf:
+            rf.write(F"step {timestep}  E (Ha) {np.round(E_adi, 6).tolist()}  holes relative to S0 {np.round(holes, 3).tolist()}  "
+                     F"singles {singles}  doubles {doubles}\n")
+            for k in range(1, nstates):
+                rf.write(F"  state {k}  hole on the fragments {np.round([O[k, k] for O in O_hole], 3).tolist()}  "
+                         F"electron {np.round([O[k, k] for O in O_elec], 3).tolist()}\n")
+        obj.basis_transform = data_conv.nparray2CMATRIX(np.asarray(U_frag, dtype=complex))
+        obj.ovlp_dia = CMATRIX(nstates, nstates)
+        for i in range(nstates):
+            obj.ovlp_dia.set(i, i, 1.0 + 0.0j)
+        obj.dia_groups = [int(x) for x in dia_labels]
 
     # ================== Forces ===============================
     # the gradients (nstates, nat, 3) are minus the forces the shared helper takes

@@ -302,44 +302,11 @@ def one_body_matrix_brute(sd_states, O_alpha, O_beta):
 
 def spin_flip_carrier_operators(gamma_a, gamma_b, P_a, P_b, occ_threshold=0.5):
     """The hole and electron fragment operators of the excited spin-flip states relative to the lowest one (state 0),
-    over the states: the natural orbitals of state 0 split every spin's MO space into its occupied part (occupation above
-    occ_threshold) and its virtual part, the transition densities less state 0's own (delta_kl gamma[0, 0]) are projected
-    on them - the occupied part with the sign reversed is the hole (a removed electron counts positive), the virtual part
-    the electron - and traced with the fragment operators P_a / P_b (lists over fragments of (nmo, nmo) in the respective
-    spin's MO basis: the POD projectors or the Mulliken operators of the step). The row and column of state 0 are zero,
-    the operators of a fragment are symmetric, and the hole operators of all fragments sum to the number of electrons an
-    excited state removes from the occupied space of state 0 (one for a single excitation relative to it).
-
-    Returns:
-        O_hole, O_elec (lists over fragments of arrays (nstates, nstates)), occupations (dict spin -> the natural
-        occupations of state 0, ascending)
-    """
-    n = gamma_a.shape[0]
-    if len(P_a) != len(P_b):
-        raise ValueError(F"{len(P_a)} alpha and {len(P_b)} beta fragment operators")
-    nfrag = len(P_a)
-    O_hole = [np.zeros((n, n)) for _ in range(nfrag)]
-    O_elec = [np.zeros((n, n)) for _ in range(nfrag)]
-    occupations = {}
-    for spin, gamma, P_list in (("alpha", gamma_a, P_a), ("beta", gamma_b, P_b)):
-        rho0 = 0.5 * (gamma[0, 0] + gamma[0, 0].T)
-        vals, vecs = np.linalg.eigh(rho0)
-        occupations[spin] = vals
-        occ = vecs[:, vals > occ_threshold]
-        virt = vecs[:, vals <= occ_threshold]
-        P_occ, P_virt = occ @ occ.T, virt @ virt.T
-        for f, P in enumerate(P_list):
-            P = 0.5 * (np.asarray(P, dtype=float) + np.asarray(P, dtype=float).T)
-            A_hole = P_occ @ P @ P_occ          # tr(P P_occ D P_occ) = tr(A_hole D)
-            A_elec = P_virt @ P @ P_virt
-            for k in range(1, n):
-                for l in range(1, n):
-                    D = gamma[k, l] - (rho0 if k == l else 0.0)
-                    O_hole[f][k, l] -= float(np.sum(A_hole * D.T))
-                    O_elec[f][k, l] += float(np.sum(A_elec * D.T))
-    O_hole = [0.5 * (O + O.T) for O in O_hole]
-    O_elec = [0.5 * (O + O.T) for O in O_elec]
-    return O_hole, O_elec, occupations
+    over the states - driver_fragments.carrier_operators_from_densities on the spin-flip transition densities
+    (spin_flip_densities) and the fragment operators of both spins over the whole MO set. Returns O_hole, O_elec (lists
+    over fragments of (nstates, nstates)) and the natural occupations of state 0 per spin."""
+    from libra_py.packages.driver_fragments import carrier_operators_from_densities
+    return carrier_operators_from_densities(gamma_a, gamma_b, P_a, P_b, occ_threshold)
 
 
 def spin_flip_carrier_operators_high_spin(gamma_b, P_b, n_beta_occ, span_tol=0.25):
