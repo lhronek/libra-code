@@ -148,8 +148,9 @@ class CASSCF(ElectronicStructureStrategy):
         """The overlaps <Psi_i(previous geometry)|Psi_j(this geometry)> of the SA-CASSCF states the dynamics runs on -
         the CI vectors and active orbitals of the cached previous CASSCF and of this step's (not a CASCI re-solved on
         the HF orbitals, whose states can reorder against the CASSCF ones), through the cross AO overlap of the two
-        geometries. The sign of every previous state is set so that the diagonal is positive (the continuation of the
-        states' phases)."""
+        geometries. The signs are the CI vectors' own: a negative diagonal element marks a state whose vector changed
+        sign between the geometries - the engine's phase correction and the fragment basis read it, a row flipped to a
+        positive diagonal would hide it from both."""
         if self._mc is None:
             raise ValueError("CASSCF must be run before computing time-overlap matrix.")
         if self._cache is None or self._cache.prev_mc is None or self._cache.prev_mol is None:
@@ -169,11 +170,7 @@ class CASSCF(ElectronicStructureStrategy):
         for i in range(nroots):
             for j in range(nroots):
                 overlap[i, j] = fci.addons.overlap(prev_roots[i], curr_roots[j], curr_mc.ncas, curr_mc.nelecas, s=s12_mo)
-        overlap = np.asarray(np.real_if_close(overlap))
-        for i in range(nroots):
-            if overlap[i, i] < 0:
-                overlap[i, :] = -overlap[i, :]
-        return overlap
+        return np.asarray(np.real_if_close(overlap))
 
     @staticmethod
     def _ci_vectors(mc, nroots: int) -> List[np.ndarray]:
