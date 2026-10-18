@@ -6263,7 +6263,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     omega - with the active root in &EXCITED_STATES STATE (the
                     previous step's root is assumed, the force is rerun on the
                     right root when the classification moves it, the first call
-                    computes the energies first). Needs time_dependent,
+                    computes the energies first - a rerun's energies are handed
+                    over with its force). Needs time_dependent,
                     force_source "active_state" or "none", mo_source "wfn",
                     ci_source "tddfpt_restart", ao_overlap_method "cp2k",
                     overlap_backend "sd" and dia_basis "none" or "fragment" (with
@@ -6794,12 +6795,19 @@ def cp2k_compute_adi_impl(q, params, full_id):
             run_params = _cp2k_run_params(params, False, wd, roots[act_state], force_source, nexc)
             res_force = compute_state_energy_and_force(coordinates, run_params)
             w_force = np.asarray(res_force["omegas"], dtype=float)
-            m = min(w_force.size, nroots)
-            dev = max(abs(float(res_force["E_adi"][0]) - E_ref), float(np.abs(w_force[:m] - omegas[:m]).max()))
+            if w_force.size < nroots:
+                raise RuntimeError(F"{wd} step {params.get('timestep', '?')}: the force run on root {roots[act_state]} "
+                                   F"returned {w_force.size} roots for the step's {nroots}")
+            dev = max(abs(float(res_force["E_adi"][0]) - E_ref), float(np.abs(w_force[:nroots] - omegas[:nroots]).max()))
             if dev > 1e-5:
                 raise RuntimeError(F"{wd} step {params.get('timestep', '?')}: the force run on root "
                                    F"{roots[act_state]} gives roots {dev:.1e} Ha away from the step's")
             forces = res_force["forces"]
+            # the energies of the solution that gave the force - the first run's differ from it by the SCF and
+            # TDDFPT convergence noise (up to the 1e-5 Ha tolerated above), which entered the total energy at every rerun
+            E_ref = float(res_force["E_adi"][0])
+            omegas = w_force
+            E_adi_curr = E_ref + omegas[np.array(roots) - 1]
         params["sf_roots"][itraj] = roots
         params["sf_omegas"][itraj] = omegas
         params["sf_eref"][itraj] = E_ref
@@ -6825,7 +6833,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
         T_dia = None
         with open(f"{wd}/spin-flip-record.txt", "a") as rec:
             rec.write(F"step {params.get('timestep', '?')}  E_ref {E_ref:.8f} Ha  states -> roots {roots}  "
-                      F"active {act_state}" + (F"  force rerun on root {roots[act_state]}" if rerun else "")
+                      F"active {act_state}" + (F"  force rerun on root {roots[act_state]}, its energies handed over" if rerun else "")
                       + (F"  mixed roots inside the manifold's range {mixed_inside}" if mixed_inside else "") + "\n")
             for k in range(nroots):
                 st = roots.index(k + 1) if (k + 1) in roots else "-"
