@@ -55,6 +55,7 @@ def pyscf_compute_adi(q, params, full_id):
             remove fewer than 1.5 electrons from the ground state's occupied space - form the localized manifold, the
             doubles and the ground state stay energy eigenstates labelled ("ci", rank) when a double is among the
             states, otherwise the ground state keeps the ("gs",) label and every excited state is localized. The
+            method must be 'casscf' (the CISD implementation has no transition densities). The
             diabatic index of the first step is written to <working_directory_prefix>_itraj{i}/dia-record.txt (the
             localized states first, hole-major then electron for 'both', then the complement) and the following
             state to dia-state.npz there. The hand-over is the square basis_transform U[dia, adi], the identity
@@ -97,6 +98,9 @@ def pyscf_compute_adi(q, params, full_id):
     # The default is CAS(2,2) 
     _norbcas = params.get("norbcas", 2)
     _nelecas = params.get("nelecas", 2)
+    if frag is not None and method != "casscf":
+        raise ValueError(F"dia_basis 'fragment' needs method 'casscf' - the {method!r} implementation has no transition "
+                         F"densities or fragment operators")
 
     # ================= Read parameters =================
     #dt = float(params.get("dt", 41.0)) # no coupling is derived here, the time step is the engine's
