@@ -97,6 +97,13 @@ class ElectronicStructureStrategy(ABC):
         self.set_geom(geom)
         self.run_hf()
 
+    def cache_current_as_previous(self) -> None:
+        """The current solution cached as the previous step's, with the AO overlap of the geometry with itself: the time
+        overlap of a step without a previous geometry (the first) is then exactly the identity - one solve, no second run
+        at the same geometry."""
+        self.save_cache()
+        self._ao_overlap = self._mol.intor("int1e_ovlp")
+
     @abstractmethod
     def compute_energy(self, root: int) -> float:
         """Return the total energy (Hartree) for *root*."""

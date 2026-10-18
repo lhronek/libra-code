@@ -95,15 +95,12 @@ def pyscf_compute_adi(q, params, full_id):
     #_ = [pyscf_obj.compute_energy(root) for root in range(nstates)]
     #_ = [pyscf_obj.compute_gradient(root) for root in range(nstates)]
 
-    if is_first_time:
-        # Run an extra-time
-        pyscf_obj.set_geom_and_run_hf(geom)
-        energies = [pyscf_obj.compute_energy(root) for root in range(nstates)]
-        grad = [pyscf_obj.compute_gradient(root) for root in range(nstates)]
-
     pyscf_obj.set_geom_and_run_hf(geom)
     energies = [pyscf_obj.compute_energy(root) for root in range(nstates)]
     grad = [pyscf_obj.compute_gradient(root) for root in range(nstates)]
+    if is_first_time:
+        # the first step has no previous geometry: its own solution is the previous one, the time overlap the identity
+        pyscf_obj.cache_current_as_previous()
 
         
     #print(F"coords_prev = {coords_prev}")
