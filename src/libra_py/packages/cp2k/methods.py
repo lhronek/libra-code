@@ -6763,19 +6763,26 @@ def cp2k_compute_adi_impl(q, params, full_id):
             raise ValueError(F"{wd}: the TDDFPT restart carries {td['nspins']} spin block(s) of {td['nmo_active']} "
                              F"active orbitals over {td['nao']} AOs - a spin-flip run writes one block of the "
                              F"{n_a_occ} alpha occupied responses over {mo_curr['C'].shape[1]} AOs")
+        if "E" in mo_curr:
+            gaps = np.diff(np.sort(np.asarray(mo_curr["E"][:n_a_occ], dtype=float)))
+            if gaps.size and gaps.min() < 1e-5:
+                raise ValueError(F"{wd}: two alpha occupied orbitals lie {gaps.min():.1e} Ha apart - the TDDFPT restart "
+                                 F"stores the responses for its own orbitals, whose rotation within a degenerate pair "
+                                 F"the wfn cannot recover")
         omegas = np.asarray(res["omegas"], dtype=float)
         nroots = min(td["nstates"], len(omegas))
         S_ab = mo_curr["C"] @ S_ao_curr @ mo_curr["C_b"].T
         X_all, s2_all, cls_all = [], [], []
         for k in range(nroots):
-            X, left, total = spin_flip_amplitudes(td["evects"][k][0], mo_curr["C_b"], S_ao_curr, n_b_occ)
+            # the amplitudes for the aligned alpha occupied orbitals - their CP2K phases restore the stored columns
+            X, left, total = spin_flip_amplitudes(td["evects"][k][0], mo_curr["C_b"], S_ao_curr, n_b_occ,
+                                                  mo_curr["C"][:n_a_occ])
             if abs(total - 1.0) > 1e-4:
                 raise ValueError(F"spin-flip root {k + 1}: the beta MOs of the wfn carry {total:.6f} of the "
                                  F"response - ADDED_MOS must cover every virtual of both spins")
             if left > 1e-6:
                 raise ValueError(F"spin-flip root {k + 1}: {left:.1e} of the response lies on the beta occupied "
                                  F"orbitals - not a spin-flip response of this reference")
-            X = X * phases_ch[0][None, :n_a_occ]        # the aligned alpha occupied phases (the beta ones ride in C_b)
             X_all.append(X)
             excess = s2_spin_flip(X, n_a_occ, n_b_occ, S_ab)
             s2_all.append(s2_total(excess, n_a_occ, n_b_occ))

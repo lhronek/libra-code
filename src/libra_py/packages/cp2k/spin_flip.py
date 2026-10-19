@@ -53,13 +53,47 @@ def read_tdwfn(path):
     return {"nstates": nstates, "nspins": nspins, "nao": nao, "nmo_active": nmo, "evals": evals, "evects": evects}
 
 
-def spin_flip_amplitudes(evect, C_beta, S_ao, n_beta_occ):
+def cp2k_mo_phases(C):
+    """CP2K's phase of every MO row of C (nmo, nao) in its own AO order, as tddfpt_init_ground_state_mos defines it
+    for the TDDFPT restart: +1 when more expansion coefficients are positive than negative (|c| at or above the
+    machine epsilon), -1 when more are negative, and for a tie +1 when the first positive coefficient precedes the
+    first negative one. The restart writer scales every response column by the phase of its alpha occupied orbital,
+    so the stored responses refer to orbitals of phase +1."""
+    C = np.asarray(C, dtype=float)
+    eps = np.finfo(float).eps
+    phases = np.ones(C.shape[0])
+    for i, row in enumerate(C):
+        signs = np.where(row >= eps, 1, np.where(row <= -eps, -1, 0))
+        total = int(signs.sum())
+        if total > 0:
+            continue
+        if total < 0:
+            phases[i] = -1.0
+            continue
+        pos, neg = np.flatnonzero(signs > 0), np.flatnonzero(signs < 0)
+        first_pos = pos[0] if pos.size else C.shape[1]
+        first_neg = neg[0] if neg.size else C.shape[1]
+        phases[i] = 1.0 if first_pos <= first_neg else -1.0
+    return phases
+
+
+def spin_flip_amplitudes(evect, C_beta, S_ao, n_beta_occ, C_alpha_occ):
     """The amplitudes X[a, i] of one spin-flip root over the beta virtual MOs (a) and the alpha occupied orbitals (i)
     from its AO-basis response evect (nao, n_alpha_occ): the projection onto the beta MOs C_beta (nmo, nao) through the
-    AO overlap S_ao, every matrix in one AO order. Also returned: the weight the projection leaves on the beta occupied
-    orbitals (zero for a response that lives in the beta virtual space, as CP2K's does) and the weight the beta MOs
-    carry in all (1 when they span the AO space - ADDED_MOS must cover every virtual)."""
+    AO overlap S_ao, every matrix in one AO order. Two signs per column i turn CP2K's response into the amplitude of
+    the determinants of spin_flip_sd_basis: the restart stores the response of every alpha occupied orbital for the
+    orbital's phase +1 (cp2k_mo_phases), so the column takes the phase of the given alpha occupied orbital
+    C_alpha_occ[i] (the orbitals the determinants are built from), and the determinant keeps the beta orbital in the
+    alpha orbital's slot where a^+_{a beta} a_{i alpha} |0> puts it after the alpha block, (-1)^(n_alpha_occ - i)
+    apart - without the two signs the spin of a root is read right only where the wfn's phases happen to compensate
+    the parity (the triplet component of a planar ethylene did, a twisted one did not). Also returned: the weight the
+    projection leaves on the beta occupied orbitals (zero for a response that lives in the beta virtual space, as
+    CP2K's does) and the weight the beta MOs carry in all (1 when they span the AO space - ADDED_MOS must cover every
+    virtual)."""
     proj = np.asarray(C_beta, dtype=float) @ np.asarray(S_ao, dtype=float) @ np.asarray(evect, dtype=float)
+    n_alpha_occ = np.asarray(C_alpha_occ).shape[0]
+    parity = (-1.0) ** (n_alpha_occ - 1 - np.arange(n_alpha_occ))
+    proj = proj * (cp2k_mo_phases(C_alpha_occ) * parity)[np.newaxis, :]
     return proj[n_beta_occ:], float(np.sum(proj[:n_beta_occ] ** 2)), float(np.sum(proj ** 2))
 
 
