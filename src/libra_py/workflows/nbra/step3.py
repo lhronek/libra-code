@@ -4195,6 +4195,7 @@ def run_step3_pod(params):
     plots read it unchanged, the 'sd' states here being the ADIABATIC hole states, the eigenstates of H_hole of every
     frame by increasing energy (identity-followed under do_state_reordering 2):
         Hvib_sd_{k}_re.npz  the adiabatic energies at the midpoint of the frames k and k+1 (as the SD route),
+        E_sd_{k}.npz        the adiabatic energies at frame k (the midpoint is degenerate where the labels swap),
         Hvib_sd_{k}_im.npz  Im(Hvib) = -d of the interval [k, k+1], (St^T - St) / (2 dt) of St_sd_{k},
         St_sd_{k}_re.npz    the time overlaps of the adiabatic states, V(k)^T St_hole(k) V(k+1),
         U_sd_{k}.npz        rows the diabatic (block) states, columns the adiabatic ones - V(k), U H_sd U^T = H_hole,
@@ -4574,6 +4575,7 @@ def run_step3_pod(params):
         sp.save_npz(F'{res_dir_2}/Hvib_sd_{frames[k]}_im.npz', sp.csc_matrix((St_adi.T - St_adi) / (2.0 * dt)))
     for k in range(len(frames)):
         sp.save_npz(F'{res_dir_2}/U_sd_{frames[k]}.npz', sp.csc_matrix(V[k]))
+        sp.save_npz(F'{res_dir_2}/E_sd_{frames[k]}.npz', sp.csc_matrix(np.diag(E_adi[k])))
     with open(marker_file, 'w') as f:
         json.dump({'im_file_contains': 'Im(Hvib) = -d', 'isUKS': 0, 'sd_charge': 1, 'route': 'pod_hamiltonian'}, f)
     dia_index = [("loc", None, frag[c], rank[c]) for c in range(n)]
@@ -5159,6 +5161,8 @@ def run_step3_sd_nacs_libint(params):
             E_midpoint = 0.5 * (E_sd_step + E_sd_step_plus)
             # print('Flag E_midpoint.shape:', E_midpoint.shape)
             sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/Hvib_sd_{step-1}_re.npz', E_midpoint)
+        # the energies at the frame itself - the midpoint of [k, k+1] above is degenerate where the labels swap
+        sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/E_sd_{step}.npz', sp.csc_matrix(E_sd_step))
         E_sd_step_plus = E_sd_step
     print('Done with sorting and computing the SDs energies. Elapsed time:', time.time() - t2)
 
@@ -5257,6 +5261,7 @@ def run_step3_sd_nacs_libint(params):
             St_sds[i] = data_conv.MATRIX2scipynpz(St_sds_cmatrix[i].real())
         for i in range(len(E_sds)):
             E_sds[i] = data_conv.MATRIX2nparray(E_sds_cmatrix[i].real(), np.float64)
+            sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/E_sd_{start_time+i}.npz', sp.csc_matrix(E_sds[i]))
             if i > 0:
                 sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/Hvib_sd_{start_time+i-1}_re.npz',
                             sp.csc_matrix(0.5 * (E_sds[i] + E_sds[i - 1])))
@@ -5283,6 +5288,7 @@ def run_step3_sd_nacs_libint(params):
             if step > start_time:
                 E_midpoint = np.diag(0.5 * (E_ci_step + E_ci_step_plus) * units.ev2Ha)
                 sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/Hvib_ci_{step-1}_re.npz', sp.csc_matrix(E_midpoint))
+            sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/E_ci_{step}.npz', sp.csc_matrix(np.diag(E_ci_step * units.ev2Ha)))
             E_ci_step_plus = E_ci_step
 
         if params['do_state_reordering'] in (1, 2, 22):
@@ -5327,11 +5333,13 @@ def run_step3_sd_nacs_libint(params):
                 # the relabeled CI states are the rows of V
                 V_dia = [_permute_rows(V_dia[i], perms_ci[i]) for i in range(len(V_dia))]
             # the relabeled CI energies replace the midpoints saved above
-            for i in range(1, len(E_cis_cmatrix)):
-                E_ci_prev = data_conv.MATRIX2nparray(E_cis_cmatrix[i - 1].real(), np.float64)
+            for i in range(len(E_cis_cmatrix)):
                 E_ci_curr = data_conv.MATRIX2nparray(E_cis_cmatrix[i].real(), np.float64)
-                sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/Hvib_ci_{start_time+i-1}_re.npz',
-                            sp.csc_matrix(0.5 * (E_ci_prev + E_ci_curr) * units.ev2Ha))
+                sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/E_ci_{start_time+i}.npz', sp.csc_matrix(E_ci_curr * units.ev2Ha))
+                if i > 0:
+                    E_ci_prev = data_conv.MATRIX2nparray(E_cis_cmatrix[i - 1].real(), np.float64)
+                    sp.save_npz(F'{params["path_to_save_sd_Hvibs"]}/Hvib_ci_{start_time+i-1}_re.npz',
+                                sp.csc_matrix(0.5 * (E_ci_prev + E_ci_curr) * units.ev2Ha))
             print('Done with state-reordering to St_cis. Elapsed time:', time.time() - t2)
 
             # Now convert back to scipy npz
