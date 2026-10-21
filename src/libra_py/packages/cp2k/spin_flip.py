@@ -53,6 +53,20 @@ def read_tdwfn(path):
     return {"nstates": nstates, "nspins": nspins, "nao": nao, "nmo_active": nmo, "evals": evals, "evects": evects}
 
 
+def check_restart_orbitals(E_alpha_occ, nmo, nao, wd, gap_min=1e-5):
+    """
+    The TDDFPT restart stores the responses for the TDDFPT's own occupied orbitals. With every MO in the wfn (nmo = nao)
+    tddfpt_init_ground_state_mos keeps the SCF orbitals (its do_eigen is false), so a degenerate pair keeps the wfn's
+    rotation and the restart's columns are the wfn's. With fewer MOs it re-diagonalizes the Kohn-Sham matrix, and the
+    rotation within a degenerate alpha occupied pair is lost - refused.
+    """
+    gaps = np.diff(np.sort(np.asarray(E_alpha_occ, dtype=float)))
+    if nmo < nao and gaps.size and gaps.min() < gap_min:
+        raise ValueError(F"{wd}: the wfn holds {nmo} of {nao} MOs, so the TDDFPT re-diagonalized its orbitals, and two alpha "
+                         F"occupied orbitals lie {gaps.min():.1e} Ha apart - the responses' rotation within that pair is not "
+                         F"the wfn's")
+
+
 def cp2k_mo_phases(C):
     """CP2K's phase of every MO row of C (nmo, nao) in its own AO order, as tddfpt_init_ground_state_mos defines it
     for the TDDFPT restart: +1 when more expansion coefficients are positive than negative (|c| at or above the

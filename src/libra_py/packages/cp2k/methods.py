@@ -39,7 +39,7 @@ import util.libutil as comn
 from libra_py.params_check import refuse_unknown_keys, restrict
 from libra_py.packages.driver_forces import (ForceHandover, check_excitation_energies, fill_diagonal_forces, force_diagonals,
                                              refreshed_rows)
-from libra_py.packages.cp2k.spin_flip import (read_tdwfn, spin_flip_amplitudes, s2_spin_flip, classify_spin,
+from libra_py.packages.cp2k.spin_flip import (read_tdwfn, check_restart_orbitals, spin_flip_amplitudes, s2_spin_flip, classify_spin,
                                               spin_flip_sd_basis, spin_flip_sd2ci, spin_flip_densities,
                                               spin_flip_carrier_operators, spin_flip_carrier_operators_high_spin,
                                               s_reference, s2_total, spin_name)
@@ -6764,11 +6764,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
                              F"active orbitals over {td['nao']} AOs - a spin-flip run writes one block of the "
                              F"{n_a_occ} alpha occupied responses over {mo_curr['C'].shape[1]} AOs")
         if "E" in mo_curr:
-            gaps = np.diff(np.sort(np.asarray(mo_curr["E"][:n_a_occ], dtype=float)))
-            if gaps.size and gaps.min() < 1e-5:
-                raise ValueError(F"{wd}: two alpha occupied orbitals lie {gaps.min():.1e} Ha apart - the TDDFPT restart "
-                                 F"stores the responses for its own orbitals, whose rotation within a degenerate pair "
-                                 F"the wfn cannot recover")
+            # with every MO in the wfn the TDDFPT keeps the SCF orbitals, so a degenerate alpha pair keeps its rotation
+            check_restart_orbitals(mo_curr["E"][:n_a_occ], nmo, mo_curr["C"].shape[1], wd)
         omegas = np.asarray(res["omegas"], dtype=float)
         nroots = min(td["nstates"], len(omegas))
         S_ab = mo_curr["C"] @ S_ao_curr @ mo_curr["C_b"].T
