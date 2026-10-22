@@ -8,12 +8,12 @@ def Load_PT(ObjSpc,pt_file):
 #------- Here are some basic patterns -------------
     INT    = '([1-9]([0-9]*))'
     NINT   = '([0-9]+)'
-    SP     = '\s+'
-    #DOUBLE = '([-+]?(\d*\.\d*)([eE][-+]?\d+)?)'
-    DOUBLE = '([-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?)'
+    SP     = r'\s+'
+    #DOUBLE = r'([-+]?(\d*\.\d*)([eE][-+]?\d+)?)'
+    DOUBLE = r'([-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?)'
     WORD   = '([a-zA-Z]+)'
-    ID     = '(([a-zA-Z]+)([a-zA-Z]+|\d+)*)'
-    PHRASE = '"((\w|\W)+)"'
+    ID     = r'(([a-zA-Z]+)([a-zA-Z]+|\d+)*)'
+    PHRASE = r'"((\w|\W)+)"'
 
 #------- Here we define a format of file ----------
     pElement_name                = '(?P<Element_name>'+WORD+')'+SP

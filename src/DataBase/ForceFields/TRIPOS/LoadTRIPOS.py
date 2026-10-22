@@ -14,13 +14,13 @@ def Load_TRIPOS(force_field):
 #------- Here are some basic patterns -------------
     INT    = '([1-9]([0-9]*))'
     NINT   = '([0-9]+)'
-    SP     = '\s+'
-    #DOUBLE = '([-+]?(\d*\.\d*)([eE][-+]?\d+)?)'
-    DOUBLE = '([-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?)'
+    SP     = r'\s+'
+    #DOUBLE = r'([-+]?(\d*\.\d*)([eE][-+]?\d+)?)'
+    DOUBLE = r'([-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?)'
     WORD   = '([a-zA-Z]+)'
-    ID     = '(([a-zA-Z]+)([a-zA-Z]+|\d+|\.|\*)*)'
-    PHRASE = '"((\w|\W)+)"'
-    CONNECTOR = '\s*[-]\s*'
+    ID     = r'(([a-zA-Z]+)([a-zA-Z]+|\d+|\.|\*)*)'
+    PHRASE = r'"((\w|\W)+)"'
+    CONNECTOR = r'\s*[-]\s*'
 
 #------- Here we define a format of file ----------
 # p - means 'Pattern'
