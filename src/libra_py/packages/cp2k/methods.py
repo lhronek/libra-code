@@ -2601,8 +2601,10 @@ def collect_pdos_files(destination):
     """Move the DOS prints of the working directory into `destination`: the .pdos files, the .pdos_raw files
     (CP2K 2026 writes the per-MO projections there and broadened curves to .pdos) and the .dos files."""
     os.makedirs(destination, exist_ok=True)
-    for f in sorted(glob.glob("*pdos") + glob.glob("*pdos_raw") + glob.glob("*.dos")):
-        shutil.move(f, os.path.join(destination, os.path.basename(f)))
+    # files by extension - "*pdos" also matched a destination folder named like data-pdos and moved it into itself
+    for f in sorted(glob.glob("*.pdos") + glob.glob("*.pdos_raw") + glob.glob("*.dos")):
+        if os.path.isfile(f):
+            shutil.move(f, os.path.join(destination, os.path.basename(f)))
 
 
 def aux_pdos(

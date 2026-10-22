@@ -1456,7 +1456,7 @@ def run_cp2k_libint_step2(params):
         # Move all the pdos files to all_pdosfiles for the step that is done!
         CP2K_methods.collect_pdos_files(params["all_pdosfiles"])
     # Move all the logfiles after the job is done. This is important in case one requires to restart the calculations
-    os.system(F'mv *log {params["all_logfiles"]}/.')
+    os.system(F'mv *.log {params["all_logfiles"]}/.')
     os.system(F'mv *{params["image_format"].lower()} {params["all_images"]}/.')
     os.system('rm *.wfn* *.tdwfn*')
     if params["remove_cube"]:
