@@ -1701,6 +1701,9 @@ def read_nacv(filename):
 
 
 
+ODIN_KEYS = frozenset(("ODIN_EXE", "filename", "max_ang_mom", "slakos_prefix", "working_directory"))
+
+
 def create_odin_inp(params):
     """
     Generate the input string for the ODIN overlap program in a thread-safe manner.
@@ -1795,6 +1798,7 @@ def create_odin_inp(params):
 
     """
 
+    refuse_unknown_keys(params, ODIN_KEYS, "dftbplus.methods.create_odin_inp", "params", "the odin runs do not read")
     filename = params.get("filename", "x1.gen")   # keep relative for ODIN
     slakos_prefix = params.get("slakos_prefix", "./")
     max_l = params.get("max_ang_mom", {"H": 1, "C": 2})
@@ -1827,6 +1831,7 @@ def create_odin_inp(params):
             )
 
     return res
+
 
 
 
@@ -1932,6 +1937,7 @@ def run_odin(params):
 
     """
 
+    refuse_unknown_keys(params, ODIN_KEYS, "dftbplus.methods.run_odin", "params", "the odin runs do not read")
     exe = params.get("ODIN_EXE", "odin")
     wd = params.get("working_directory", ".")
     gen_file = params.get("filename", "x1.gen")
@@ -2065,6 +2071,13 @@ def _with_newline(text):
     """the text terminated by a newline when it has content - an appended line or the closing brace must not land on
     its last line"""
     return text + "\n" if text and not text.endswith("\n") else text
+
+
+MAKE_DFTB_INPUT_KEYS = frozenset(("Driver", "EigenvectorsAsText", "Filling", "HamiltonianExtras",
+                                  "MaxAngularMomentum", "NrOfExcitations", "PrintForces", "StateCouplings",
+                                  "StateOfInterest", "Symmetry", "WriteAutotestTag", "WriteEigenvectors",
+                                  "WriteHS", "WriteSPTransitions", "WriteXplusY", "WriteXplusYAscii", "gen_file",
+                                  "sk_prefix"))
 
 
 def make_dftb_input(params, ground_state=True, working_directory="."):
@@ -2240,6 +2253,7 @@ def make_dftb_input(params, ground_state=True, working_directory="."):
 
     """
 
+    refuse_unknown_keys(params, MAKE_DFTB_INPUT_KEYS, "dftbplus.methods.make_dftb_input", "params", "make_dftb_input writes no such HSD keyword")
     # -------- Parameters --------
     gen_file = params.get("gen_file", "x1.gen")
     sk_prefix = params.get("sk_prefix", "mio/FinalSK/")
@@ -2372,6 +2386,9 @@ Analysis {{
             f.write(scf_template_excited)
 
 
+RUN_DFTB_KEYS = frozenset(("dftb_run_params", "exe", "gen_file", "labels", "what_calculation", "working_directory"))
+
+
 def run_dftb(coords, params):
     """
     Execute a DFTB+ calculation in a thread-safe manner within a specified working directory.
@@ -2489,6 +2506,7 @@ def run_dftb(coords, params):
 
     """
 
+    refuse_unknown_keys(params, RUN_DFTB_KEYS, "dftbplus.methods.run_dftb", "params", "run_dftb does not read")
     labels = params["labels"]
     exe = params.get("exe", "dftb+")
     dftb_run_params = params.get("dftb_run_params", {})
@@ -2554,6 +2572,9 @@ def read_band_occupations(filename):
                 except ValueError:
                     pass
     return counts
+
+
+READ_DFTB_ORBITAL_INFO_KEYS = frozenset(("ci_threshold", "nstates", "orbital_space", "source_directory"))
 
 
 def read_dftb_orbital_info(params_):
@@ -2677,6 +2698,7 @@ def read_dftb_orbital_info(params_):
 
     """
 
+    refuse_unknown_keys(params_, READ_DFTB_ORBITAL_INFO_KEYS, "dftbplus.methods.read_dftb_orbital_info", "params_", "read_dftb_orbital_info does not read")
     # Copy parameters to avoid modifying input dictionary
     params = dict(params_)
 
