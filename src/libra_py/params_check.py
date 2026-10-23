@@ -58,7 +58,8 @@ def unknown_keys(params, allowed, skip=()):
 
 def refuse_unknown_keys(params, allowed, where, carrier, nobody_reads, skip=()):
     """Raise ValueError when `params` carries a key outside `allowed` (and outside `skip`), naming the keys and their
-    nearest known keys
+    nearest known keys. Without the check a key nobody reads would be ignored silently and a misspelling would pass
+    unnoticed.
 
     Args:
         params ( dict ): the dictionary given by the caller
@@ -77,8 +78,7 @@ def refuse_unknown_keys(params, allowed, where, carrier, nobody_reads, skip=()):
         _passed.add(signature)
         return
     raise ValueError(F"{where}: {carrier} carries keys that {nobody_reads}: {unknown}"
-                     + (F" (did you mean {hints}?)" if hints else "")
-                     + " - an unknown key is ignored silently, so a misspelled key must not pass")
+                     + (F" (did you mean {hints}?)" if hints else ""))
 
 
 def warn_unknown_keys(params, allowed, where, carrier, nobody_reads, skip=()):
