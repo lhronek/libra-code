@@ -19,6 +19,7 @@
 
 import json
 import os
+import shutil
 import glob
 import sys
 # The sparse matrix library for storing the MO overlaps
@@ -422,6 +423,10 @@ def cp2k_libint_step2_defaults():
         "/all_pdosfiles",
         "all_images": os.getcwd() +
         "/all_images",
+        "all_inpfiles": os.getcwd() +
+        "/all_inpfiles",
+        "all_xyzfiles": os.getcwd() +
+        "/all_xyzfiles",
         "image_format": 'bmp',
         "istep": 0,
         "fstep": 2,
@@ -500,6 +505,13 @@ def run_cp2k_libint_step2(params):
                              all_logfiles (string): The directory to save all log files.
 
                              all_pdosfiles (string): The directory to save all pdos files.
+
+                             all_inpfiles (string): The directory to save the CP2K inputs generated per step
+                                                    (xtb_ot_step_N.inp, xtb_diag_step_N.inp, Diag_libra-N.inp) and,
+                                                    at the end, overlap_deltat_auto.inp.
+
+                             all_xyzfiles (string): The directory to save the coordinate files extracted per step
+                                                    (coord-N.xyz).
 
                              istep (integer): The initial step.
 
@@ -676,6 +688,10 @@ def run_cp2k_libint_step2(params):
         os.system(F"mkdir {params['all_pdosfiles']}")
     if not os.path.exists(params['all_images']):
         os.system(F"mkdir {params['all_images']}")
+    if not os.path.exists(params['all_inpfiles']):
+        os.system(F"mkdir {params['all_inpfiles']}")
+    if not os.path.exists(params['all_xyzfiles']):
+        os.system(F"mkdir {params['all_xyzfiles']}")
 
     # setting up the initial step and final step
     istep = params['istep']
@@ -976,6 +992,8 @@ def run_cp2k_libint_step2(params):
             print(F'Done with step {step}.', 'Elapsed time:', time.time() - t1_all)
             counter += 1
             CP2K_methods.collect_pdos_files(params["all_pdosfiles"])
+            CP2K_methods.collect_inp_files(step, params["all_inpfiles"])
+            CP2K_methods.collect_xyz_files(step, params["all_xyzfiles"])
             continue
 
         # now if the counter is equal to zero
@@ -1455,8 +1473,12 @@ def run_cp2k_libint_step2(params):
         counter += 1
         # Move all the pdos files to all_pdosfiles for the step that is done!
         CP2K_methods.collect_pdos_files(params["all_pdosfiles"])
+        CP2K_methods.collect_inp_files(step, params["all_inpfiles"])
+        CP2K_methods.collect_xyz_files(step, params["all_xyzfiles"])
     # Move all the logfiles after the job is done. This is important in case one requires to restart the calculations
     os.system(F'mv *.log {params["all_logfiles"]}/.')
+    if os.path.isfile("overlap_deltat_auto.inp"):
+        shutil.move("overlap_deltat_auto.inp", os.path.join(params["all_inpfiles"], "overlap_deltat_auto.inp"))
     os.system(F'mv *{params["image_format"].lower()} {params["all_images"]}/.')
     os.system('rm *.wfn* *.tdwfn*')
     if params["remove_cube"]:

@@ -2607,6 +2607,23 @@ def collect_pdos_files(destination):
             shutil.move(f, os.path.join(destination, os.path.basename(f)))
 
 
+def collect_inp_files(step, destination):
+    """Move the CP2K inputs step 2 generated for `step` into `destination`: the xTB OT and diagonalization inputs and the
+    DFT diagonalization input, whichever exist."""
+    os.makedirs(destination, exist_ok=True)
+    for f in (F"xtb_ot_step_{step}.inp", F"xtb_diag_step_{step}.inp", F"Diag_libra-{step}.inp"):
+        if os.path.isfile(f):
+            shutil.move(f, os.path.join(destination, f))
+
+
+def collect_xyz_files(step, destination):
+    """Move the coordinate file step 2 extracted for `step` (coord-{step}.xyz) into `destination`."""
+    os.makedirs(destination, exist_ok=True)
+    f = F"coord-{step}.xyz"
+    if os.path.isfile(f):
+        shutil.move(f, os.path.join(destination, f))
+
+
 def aux_pdos(
         c1,
         atoms,
