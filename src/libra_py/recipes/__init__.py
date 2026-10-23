@@ -6,7 +6,6 @@
 # * License, or (at your option) any later version.
 # * http://www.gnu.org/copyleft/gpl.txt
 # ***********************************************************/
-from . import fssh_g_minus
 
 __all__ = [ "step2_recipes"
           ]
