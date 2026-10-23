@@ -34,10 +34,14 @@ __url__ = "https://github.com/Quantum-Dynamics-Hub/libra-code"
 import torch
 import torch.fft
 import numpy as np
+from libra_py.params_check import refuse_unknown_keys
 
 
 def sech(x):
   return 1 / torch.cosh(x)
+
+MARTENS_MODEL_KEYS = frozenset(("Va", "Vb", "Vc"))
+
 
 def Martens_model(q, params):
     """
@@ -46,10 +50,14 @@ def Martens_model(q, params):
     Martens_model1 is just this one but with Vc = 0.0
     """
     #params = {"Va": 0.00625, "Vb": 0.0106}
+    refuse_unknown_keys(params, MARTENS_MODEL_KEYS, "exact_torch.Martens_model", "params", "Martens_model does not read")
     Va = params.get("Va", 0.00625)
     Vb = params.get("Vb", 0.0106)
     Vc = params.get("Vc", 0.0)
     return Va * (sech(2.0*q[0]))**2 + 0.5 * Vb * (q[1] + Vc * (q[0]**2 - 1.0 ) )**2
+
+
+GAUSSIAN_WAVEPACKET_KEYS = frozenset(("mass", "omega", "p0", "q0"))
 
 
 def gaussian_wavepacket(q, params):
@@ -57,6 +65,7 @@ def gaussian_wavepacket(q, params):
     q = tensor( [ndof, N_1, N_2, ... N_ndof] )
     
     """
+    refuse_unknown_keys(params, GAUSSIAN_WAVEPACKET_KEYS, "exact_torch.gaussian_wavepacket", "params", "gaussian_wavepacket does not read")
     hbar = 1.0
     ndof = q.shape[0]
     sz = len(q.shape)
@@ -81,8 +90,12 @@ def gaussian_wavepacket(q, params):
 
 
 
+EXACT_TDSE_SOLVER_KEYS = frozenset(("device", "dt", "grid_size", "mass", "nsteps", "potential_fn", "potential_fn_params", "prefix", "psi0_fn", "psi0_fn_params", "q_max", "q_min", "save_every_n_steps"))
+
+
 class exact_tdse_solver:
     def __init__(self, params):
+        refuse_unknown_keys(params, EXACT_TDSE_SOLVER_KEYS, "exact_torch.exact_tdse_solver", "params", "the solver does not read")
         self.prefix = params.get("prefix", "exact-solution")
         self.grid_size = torch.tensor(params.get("grid_size", [4, 4]))
         self.ndim = len(self.grid_size)
@@ -211,6 +224,9 @@ class exact_tdse_solver:
 
 
 
+EXACT_TDSE_SOLVER_MULTISTATE_KEYS = frozenset(("Nstates", "device", "dt", "grid_size", "initial_state_index", "mass", "method", "nsteps", "potential_fn", "potential_fn_params", "prefix", "psi0_fn", "psi0_fn_params", "q_max", "q_min", "representation", "save_every_n_steps"))
+
+
 class exact_tdse_solver_multistate:
     def __init__(self, params):
         """
@@ -234,6 +250,7 @@ class exact_tdse_solver_multistate:
                 - method (str): Propagation scheme ('miller-colton', 'split-operator', 'crank-nicolson')
         """
 
+        refuse_unknown_keys(params, EXACT_TDSE_SOLVER_MULTISTATE_KEYS, "exact_torch.exact_tdse_solver_multistate", "params", "the multistate solver does not read")
         self.prefix = params.get("prefix", "exact-solution")
         self.grid_size = torch.tensor(params.get("grid_size", [64, 64]))
         self.ndim = len(self.grid_size)

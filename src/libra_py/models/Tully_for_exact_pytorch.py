@@ -18,13 +18,18 @@
 """
 
 import torch
+from libra_py.params_check import refuse_unknown_keys
 
 # Define Tully's simple avoided crossing diabatic potential matrix
+TULLY_MODEL1_KEYS = frozenset(("A", "B", "C", "D"))
+
+
 def tully_model1_simple_avoided_crossing(Q, params):
     """
     Q:tensor( [ndof, N_1, N_2, ... N_ndof] )
     Returns diabatic potential matrix [N_1, N_2, ... N_ndof, 2, 2]
     """
+    refuse_unknown_keys(params, TULLY_MODEL1_KEYS, "Tully_for_exact_pytorch.tully_model1_simple_avoided_crossing", "params", "the model does not read")
     x = Q[0]  # Assume 1D nuclear coordinate
 
     A = params.get("A", 0.01)
@@ -51,6 +56,9 @@ def tully_model1_simple_avoided_crossing(Q, params):
 
     return Vmat
 
+TULLY_MODEL2_KEYS = frozenset(("A", "B", "C", "D", "E0"))
+
+
 def tully_model2_dual_avoided_crossing(Q, params):
     """
     Tully Model 2: Dual Avoided Crossing (diabatic representation)
@@ -59,6 +67,7 @@ def tully_model2_dual_avoided_crossing(Q, params):
     Returns: diabatic potential matrix with shape [Ngrid, 2, 2]
              (same trailing [2,2] convention as in your model-1 function)
     """
+    refuse_unknown_keys(params, TULLY_MODEL2_KEYS, "Tully_for_exact_pytorch.tully_model2_dual_avoided_crossing", "params", "the model does not read")
     x = Q[0]  # Assume 1D nuclear coordinate
 
     # Standard parameter set used in Tully's paper
@@ -82,6 +91,9 @@ def tully_model2_dual_avoided_crossing(Q, params):
 
     return Vmat
 
+TULLY_MODEL3_KEYS = frozenset(("A", "B", "C"))
+
+
 def tully_model3_extended_coupling(Q, params):
     """
     Tully Model 3: Extended Coupling with Reflection (diabatic representation)
@@ -89,6 +101,7 @@ def tully_model3_extended_coupling(Q, params):
     Q: Tensor with shape [ndof, Ngrid]
     Returns: diabatic potential matrix with shape [Ngrid, 2, 2]
     """
+    refuse_unknown_keys(params, TULLY_MODEL3_KEYS, "Tully_for_exact_pytorch.tully_model3_extended_coupling", "params", "the model does not read")
     x = Q[0]  # 1D nuclear coordinate
 
     # Canonical parameters from Tully (1990)

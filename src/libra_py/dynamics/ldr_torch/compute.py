@@ -34,10 +34,15 @@ __url__ = "https://github.com/Quantum-Dynamics-Hub/libra-code"
 
 
 import torch
+from libra_py.params_check import refuse_unknown_keys
+
+
+LDR_SOLVER_KEYS = frozenset(("E", "alpha", "device", "dt", "elec_ampl", "istate", "k", "mass", "nstates", "nsteps", "p0", "prefix", "properties_to_save", "q0", "qgrid", "s_elec", "save_every_n_steps"))
 
 
 class ldr_solver:
     def __init__(self, params):
+        refuse_unknown_keys(params, LDR_SOLVER_KEYS, "ldr_torch.ldr_solver", "params", "the LDR solver does not read")
         self.prefix = params.get("prefix", "ldr-solution")
         self.device = params.get("device", torch.device("cuda" if torch.cuda.is_available() else "cpu"))
         self.hbar = 1.0
