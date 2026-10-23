@@ -5825,7 +5825,8 @@ def _cp2k_run_params(params, is_first_time, wd, act_state, force_source, nexc, n
                   ("atom_labels", "input_template", "ot_template", "time_dependent",
                    "force_source", "cp2k_exe", "cp2k_data_dir",
                    "omp_num_threads", "mpi_executable", "nprocs", "project",
-                   "retry_templates", "allow_unconverged_scf", "spin_flip")
+                   "retry_templates", "allow_unconverged_scf", "spin_flip",
+                   "allow_negative_excitation_energy")
                   if k in params}
     if params.get("ot_first_call_only", False) and not is_first_time:
         run_params.pop("ot_template", None)
