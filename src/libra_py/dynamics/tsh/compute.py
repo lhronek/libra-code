@@ -102,6 +102,13 @@ RUNNER_KEYS = ("nstates", "istate", "istep", "seed", "x0", "p0", "masses", "k", 
                "rep_ham", "elec_init_type", "nucl_init_type", "wait_time")
 # the keys generic_recipe adds to dyn_params for itself before calling run_dynamics
 LIBRA_LAYER_KEYS = ("direct_init", "ntraj")
+# the keys of the electronic initialization dict: dyn_variables_electronic.cpp's readers (init_electronic_dyn_var, init_amplitudes,
+# init_density_matrix, init_active_states, init_auxiliary_variables) plus generic_recipe's ndia / nadi - the C++ ignores an
+# unknown key silently
+INIT_ELEC_KEYS = frozenset(("extern_dm", "init_dm_type", "init_type", "is_nbra", "istate", "istates", "m_aux_var", "nadi", "ndia", "nstates", "ntraj",
+                            "p_aux_var", "rep", "sqc_gamma", "sqc_window", "verbosity", "y_aux_var"))
+# the keys of the nuclear initialization dict: dyn_variables_nuclear.cpp's init_nuclear_dyn_var plus generic_recipe's ndof
+INIT_NUCL_KEYS = frozenset(("force_constant", "init_type", "mass", "ndof", "ntraj", "p", "p_init", "p_width", "q", "q_init", "q_width"))
 
 
 def check_dyn_params_keys(dyn_params, known):
@@ -1861,6 +1868,8 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
     dyn_params = dict(_dyn_params)
     init_elec = dict(_init_elec)
     init_nucl = dict(_init_nucl)
+    refuse_unknown_keys(init_elec, INIT_ELEC_KEYS, "generic_recipe", "init_elec", "neither the electronic initializers nor generic_recipe reads")
+    refuse_unknown_keys(init_nucl, INIT_NUCL_KEYS, "generic_recipe", "init_nucl", "neither the nuclear initializer nor generic_recipe reads")
 
     # ========== Model params ==========
     comn.check_input(model_params, {}, ["model0"])
