@@ -30,7 +30,7 @@ from . import decoherence_times as dectim
 import libra_py.data_conv as data_conv
 import libra_py.data_read as data_read
 import util.libutil as comn
-from libra_py.params_check import refuse_unknown_keys, restrict, DISPATCH_KEYS
+from libra_py.params_check import refuse_unknown_keys, restrict, MODEL_CALL_KEYS
 import matplotlib.pyplot as plt
 import sys
 import cmath
@@ -647,7 +647,7 @@ def compute_model_nbra_ann(q, params, full_id):
 
 
     """
-    refuse_unknown_keys(params, COMPUTE_MODEL_NBRA_ANN_KEYS, "ann.compute_model_nbra_ann", "params", "compute_model_nbra_ann does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, COMPUTE_MODEL_NBRA_ANN_KEYS, "ann.compute_model_nbra_ann", "params", "compute_model_nbra_ann does not read", skip=MODEL_CALL_KEYS)
 
     hvib_adi, basis_transform, time_overlap_adi = None, None, None
 

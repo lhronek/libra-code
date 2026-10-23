@@ -26,7 +26,7 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
-from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
+from libra_py.params_check import refuse_unknown_keys, MODEL_CALL_KEYS
 import libra_py.units as units
 
 
@@ -80,7 +80,7 @@ def model1(q, params):
             * obj.dc1_dia ( list of 1 CMATRIX(2,2) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
-    refuse_unknown_keys(params, MODEL1_KEYS, "Granucci_Persico.model1", "params", "model1 does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, MODEL1_KEYS, "Granucci_Persico.model1", "params", "model1 does not read", skip=MODEL_CALL_KEYS)
 
     critical_params = []
     default_params = {"a1": 0.006, "a2": 0.5, "alp1": 0.2, "alp2": 0.5,
@@ -189,7 +189,7 @@ def model2(q, params):
             * obj.dc1_dia ( list of 2 CMATRIX(2,2) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
-    refuse_unknown_keys(params, MODEL2_KEYS, "Granucci_Persico.model2", "params", "model2 does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, MODEL2_KEYS, "Granucci_Persico.model2", "params", "model2 does not read", skip=MODEL_CALL_KEYS)
 
     critical_params = []
     default_params = {"D1": 0.015, "D2": 0.11, "delta1": 0.05, "delta2": 0.11,

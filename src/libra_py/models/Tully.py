@@ -24,7 +24,7 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
-from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
+from libra_py.params_check import refuse_unknown_keys, MODEL_CALL_KEYS
 import libra_py.units as units
 
 
@@ -87,7 +87,7 @@ def Tully1_py(q, params, full_id):
             * obj.dc1_dia ( list of 1 CMATRIX(2,2) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
-    refuse_unknown_keys(params, TULLY1_PY_KEYS, "Tully.Tully1_py", "params", "Tully1_py does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, TULLY1_PY_KEYS, "Tully.Tully1_py", "params", "Tully1_py does not read", skip=MODEL_CALL_KEYS)
 
     critical_params = []
     default_params = {"A": 0.010, "B": 1.600, "C": 0.005, "D": 1.000}
@@ -185,7 +185,7 @@ def Tully1(q, params, full_id):
             * obj.dc1_dia ( list of 1 CMATRIX(2,2) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
-    refuse_unknown_keys(params, TULLY1_KEYS, "Tully.Tully1", "params", "Tully1 does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, TULLY1_KEYS, "Tully.Tully1", "params", "Tully1 does not read", skip=MODEL_CALL_KEYS)
 
     critical_params = []
     default_params = {"A": 0.010, "B": 1.600, "C": 0.005, "D": 1.000}
@@ -251,7 +251,7 @@ def Tully2(q, params, full_id):
             * obj.dc1_dia ( list of 1 CMATRIX(2,2) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
-    refuse_unknown_keys(params, TULLY2_KEYS, "Tully.Tully2", "params", "Tully2 does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, TULLY2_KEYS, "Tully.Tully2", "params", "Tully2 does not read", skip=MODEL_CALL_KEYS)
 
     critical_params = []
     default_params = {"A": 0.10, "B": 0.28, "C": 0.015, "D": 0.060, "E": 0.050}
@@ -320,7 +320,7 @@ def Tully3(q, params, full_id):
 
 
     """
-    refuse_unknown_keys(params, TULLY3_KEYS, "Tully.Tully3", "params", "Tully3 does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, TULLY3_KEYS, "Tully.Tully3", "params", "Tully3 does not read", skip=MODEL_CALL_KEYS)
 
     critical_params = []
     default_params = {"A": 0.0006, "B": 0.1000, "C": 0.9000}
@@ -386,7 +386,7 @@ def chain_potential(q, params, full_id):
                 derivatives of the diabatic Hamiltonian w.r.t. the nuclear coordinate
             * obj.dc1_dia ( list of 1 CMATRIX(n, n) objects ): derivative coupling in the diabatic basis [ zero ]
     """
-    refuse_unknown_keys(params, CHAIN_POTENTIAL_KEYS, "Tully.chain_potential", "params", "chain_potential does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, CHAIN_POTENTIAL_KEYS, "Tully.chain_potential", "params", "chain_potential does not read", skip=MODEL_CALL_KEYS)
 
     Id = Cpp2Py(full_id)
     indx = Id[-1]

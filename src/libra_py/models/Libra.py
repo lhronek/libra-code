@@ -27,7 +27,7 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
-from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
+from libra_py.params_check import refuse_unknown_keys, MODEL_CALL_KEYS
 import libra_py.units as units
 
 
@@ -120,7 +120,7 @@ def model1(q, params):
 
 
     """
-    refuse_unknown_keys(params, MODEL1_KEYS, "Libra.model1", "params", "model1 does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, MODEL1_KEYS, "Libra.model1", "params", "model1 does not read", skip=MODEL_CALL_KEYS)
 
     critical_params = []
     default_params = {"x0": 1.0, "k": 0.01, "D": 0.0, "V": 0.005}
@@ -412,7 +412,7 @@ def model2(q, params):
             * obj.dc1_dia ( list of 1 CMATRIX(2,2) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
-    refuse_unknown_keys(params, MODEL2_KEYS, "Libra.model2", "params", "model2 does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, MODEL2_KEYS, "Libra.model2", "params", "model2 does not read", skip=MODEL_CALL_KEYS)
 
     critical_params = []
     default_params = {"x0": 1.0, "k": 0.01, "D": 0.0, "V": 0.005, "NAC": -0.1}
@@ -496,7 +496,7 @@ def model2a(Hdia, Sdia, d1ham_dia, dc1_dia, q, params):
 
 
     """
-    refuse_unknown_keys(params, MODEL2A_KEYS, "Libra.model2a", "params", "model2a does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, MODEL2A_KEYS, "Libra.model2a", "params", "model2a does not read", skip=MODEL_CALL_KEYS)
 
     critical_params = []
     default_params = {"x0": 1.0, "k": 0.01, "D": 0.0, "V": 0.005, "NAC": -0.1}
@@ -568,7 +568,7 @@ def model3(q, params):
 
 
     """
-    refuse_unknown_keys(params, MODEL3_KEYS, "Libra.model3", "params", "model3 does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, MODEL3_KEYS, "Libra.model3", "params", "model3 does not read", skip=MODEL_CALL_KEYS)
     critical_params = []
     default_params = {"x0": 1.0, "k": 0.01, "D": 0.0, "V": 0.005, "B": 0.05}
     comn.check_input(params, default_params, critical_params)
@@ -655,7 +655,7 @@ def model3a(Hdia, Sdia, d1ham_dia, dc1_dia, q, params):
         None
 
     """
-    refuse_unknown_keys(params, MODEL3A_KEYS, "Libra.model3a", "params", "model3a does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, MODEL3A_KEYS, "Libra.model3a", "params", "model3a does not read", skip=MODEL_CALL_KEYS)
     critical_params = []
     default_params = {"x0": 1.0, "k": 0.01, "D": 0.0, "V": 0.005, "B": 0.05}
     comn.check_input(params, default_params, critical_params)
@@ -723,7 +723,7 @@ def model4(q, params):
             * obj.dc1_dia ( list of 1 CMATRIX(2,2) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
-    refuse_unknown_keys(params, MODEL4_KEYS, "Libra.model4", "params", "model4 does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, MODEL4_KEYS, "Libra.model4", "params", "model4 does not read", skip=MODEL_CALL_KEYS)
 
     critical_params = []
     default_params = {"k": 0.01, "D": 0.0, "V": 0.005, "w": 0.1}
@@ -803,7 +803,7 @@ def model4a(Hdia, Sdia, d1ham_dia, dc1_dia, q, params):
         None
 
     """
-    refuse_unknown_keys(params, MODEL4A_KEYS, "Libra.model4a", "params", "model4a does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, MODEL4A_KEYS, "Libra.model4a", "params", "model4a does not read", skip=MODEL_CALL_KEYS)
     critical_params = []
     default_params = {"k": 0.01, "D": 0.0, "V": 0.005, "w": 0.1}
     comn.check_input(params, default_params, critical_params)
@@ -860,7 +860,7 @@ def model5(q, params):
             * obj.dc1_dia ( list of 2 CMATRIX(1,1) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
-    refuse_unknown_keys(params, MODEL5_KEYS, "Libra.model5", "params", "model5 does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, MODEL5_KEYS, "Libra.model5", "params", "model5 does not read", skip=MODEL_CALL_KEYS)
 
     # Hdia and Sdia are ndia x ndia in dimension
     Hdia = CMATRIX(1, 1)
@@ -935,7 +935,7 @@ def model6(q, params):
             * obj.dc1_dia ( list of 1 CMATRIX(2,2) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
-    refuse_unknown_keys(params, MODEL6_KEYS, "Libra.model6", "params", "model6 does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, MODEL6_KEYS, "Libra.model6", "params", "model6 does not read", skip=MODEL_CALL_KEYS)
 
     critical_params = []
     default_params = {"A0": 0.01, "w0": 0.1, "delta0": 0.0, "B0": 0.0,
@@ -1033,7 +1033,7 @@ def model7(q, params):
             * obj.dc1_dia ( list of 1 CMATRIX(3,3) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
-    refuse_unknown_keys(params, MODEL7_KEYS, "Libra.model7", "params", "model7 does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, MODEL7_KEYS, "Libra.model7", "params", "model7 does not read", skip=MODEL_CALL_KEYS)
 
     critical_params = []
     default_params = {"A0": 0.01, "w0": 0.1, "delta0": 0.0, "B0": 0.0,

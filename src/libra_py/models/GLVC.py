@@ -26,7 +26,7 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
-from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
+from libra_py.params_check import refuse_unknown_keys, MODEL_CALL_KEYS
 import libra_py.units as units
 
 
@@ -75,7 +75,7 @@ def gen_bath_params(_params):
             * coupl ( list of `num_osc` doubles ): coupling strengths [ units: Ha/Bohr ]
             * mass ( list of `num_osc` doubles): masses of oscillators [ units: a.u. ]
     """
-    refuse_unknown_keys(_params, GEN_BATH_PARAMS_KEYS, "GLVC.gen_bath_params", "params", "gen_bath_params does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(_params, GEN_BATH_PARAMS_KEYS, "GLVC.gen_bath_params", "params", "gen_bath_params does not read", skip=MODEL_CALL_KEYS)
 
     params = dict(_params)
 
@@ -182,7 +182,7 @@ def GLVC(q, _params, full_id=None):
             * obj.dc1_dia ( list of ndof CMATRIX(nstates,nstates) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
-    refuse_unknown_keys(_params, GLVC_KEYS, "GLVC.GLVC", "params", "GLVC does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(_params, GLVC_KEYS, "GLVC.GLVC", "params", "GLVC does not read", skip=MODEL_CALL_KEYS)
 
     params = dict(_params)
 

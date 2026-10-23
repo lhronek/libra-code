@@ -25,7 +25,7 @@ from functools import reduce
 from liblibra_core import *
 from libra_py.hdf5_io import open_hdf5
 import util.libutil as comn
-from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
+from libra_py.params_check import refuse_unknown_keys, MODEL_CALL_KEYS
 
 # constants
 from dataclasses import dataclass
@@ -371,7 +371,7 @@ def compute_model(q, params, full_id):
           and the nonadiabatic coupling matrix in the adiabatic basis.
         - Overlap matrix `S_adia` is set to the identity matrix in this implementation.
     """
-    refuse_unknown_keys(params, COMPUTE_MODEL_KEYS, "Shin_Metiu.polariton.compute_model", "params", "compute_model does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, COMPUTE_MODEL_KEYS, "Shin_Metiu.polariton.compute_model", "params", "compute_model does not read", skip=MODEL_CALL_KEYS)
 
     critical_params = []
     default_params = {"g_c": 0.005, "omega_c": 0.1, "epsilon": 1.0, "nstates": 4}

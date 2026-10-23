@@ -28,7 +28,7 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
-from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
+from libra_py.params_check import refuse_unknown_keys, MODEL_CALL_KEYS
 import libra_py.units as units
 
 
@@ -84,7 +84,7 @@ def dual_RZD(q, params, full_id):
             * obj.dc1_dia ( list of 1 CMATRIX(2,2) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
-    refuse_unknown_keys(params, DUAL_RZD_KEYS, "Zhu.dual_RZD", "params", "dual_RZD does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, DUAL_RZD_KEYS, "Zhu.dual_RZD", "params", "dual_RZD does not read", skip=MODEL_CALL_KEYS)
 
     critical_params = []
     default_params = {"A": 0.025, "B": 0.025, "C": 0.7, "Z": 3.0}
@@ -179,7 +179,7 @@ def dual_LZS(q, params, full_id):
             * obj.dc1_dia ( list of 1 CMATRIX(2,2) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
-    refuse_unknown_keys(params, DUAL_LZS_KEYS, "Zhu.dual_LZS", "params", "dual_LZS does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, DUAL_LZS_KEYS, "Zhu.dual_LZS", "params", "dual_LZS does not read", skip=MODEL_CALL_KEYS)
 
     critical_params = []
     default_params = {"A": 0.1, "B": 0.28, "C": 0.01, "D": 0.06, "E0": 0.03}
@@ -274,7 +274,7 @@ def Renner_Teller(q, params, full_id):
             * obj.dc1_dia ( list of 1 CMATRIX(2,2) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
-    refuse_unknown_keys(params, RENNER_TELLER_KEYS, "Zhu.Renner_Teller", "params", "Renner_Teller does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, RENNER_TELLER_KEYS, "Zhu.Renner_Teller", "params", "Renner_Teller does not read", skip=MODEL_CALL_KEYS)
 
     critical_params = []
     default_params = {"A": 0.010, "B": 1.600, "C": 0.005, "D": 1.000}

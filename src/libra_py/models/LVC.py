@@ -25,7 +25,7 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
-from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
+from libra_py.params_check import refuse_unknown_keys, MODEL_CALL_KEYS
 import libra_py.units as units
 
 
@@ -78,7 +78,7 @@ def LVC(q, params, full_id=None):
     In the present formulation, the regular coordinates (not mass-transformed) are used.
 
     """
-    refuse_unknown_keys(params, LVC_KEYS, "LVC.LVC", "params", "LVC does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, LVC_KEYS, "LVC.LVC", "params", "LVC does not read", skip=MODEL_CALL_KEYS)
 
     # Define potential specific constants
     critical_params = ["omega", "d1", "d2", "coup", "mass", "Delta1", "Delta2"]

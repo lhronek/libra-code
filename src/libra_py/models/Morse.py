@@ -27,7 +27,7 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
-from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
+from libra_py.params_check import refuse_unknown_keys, MODEL_CALL_KEYS
 import libra_py.units as units
 
 
@@ -143,7 +143,7 @@ def general(q, params, full_id):
             * obj.dc1_dia ( list of 1 CMATRIX(3,3) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
-    refuse_unknown_keys(params, GENERAL_KEYS, "Morse.general", "params", "general does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, GENERAL_KEYS, "Morse.general", "params", "general does not read", skip=MODEL_CALL_KEYS)
 
     critical_params = ["E"]
     default_params = {"D": [0.00, 0.00, 0.00],

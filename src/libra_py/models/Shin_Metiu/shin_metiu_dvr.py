@@ -4,7 +4,7 @@ from scipy.special import erf
 from functools import reduce
 from liblibra_core import *
 from libra_py.hdf5_io import open_hdf5
-from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
+from libra_py.params_check import refuse_unknown_keys, MODEL_CALL_KEYS
 
 """
 .. module:: models_shin_meitu and dvr calculations
@@ -223,7 +223,7 @@ def compute_model(q, params, full_id=None):
         Contains DVR results including adiabatic Hamiltonian,
         nonadiabatic couplings, and transformation matrices.
     """
-    refuse_unknown_keys(params, COMPUTE_MODEL_KEYS, "Shin_Metiu.shin_metiu_dvr.compute_model", "params", "compute_model does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, COMPUTE_MODEL_KEYS, "Shin_Metiu.shin_metiu_dvr.compute_model", "params", "compute_model does not read", skip=MODEL_CALL_KEYS)
     # --- Extract grid parameters --- 
     N = params["N"]
     nstates = params["nstates"]

@@ -24,7 +24,7 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
-from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
+from libra_py.params_check import refuse_unknown_keys, MODEL_CALL_KEYS
 import libra_py.units as units
 
 
@@ -66,7 +66,7 @@ def SSY(q, params, full_id):
             * obj.dc1_dia ( list of 2 CMATRIX(2,2) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
-    refuse_unknown_keys(params, SSY_KEYS, "SSY.SSY", "params", "SSY does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, SSY_KEYS, "SSY.SSY", "params", "SSY does not read", skip=MODEL_CALL_KEYS)
 
     critical_params = []
     default_params = {"E0": 0.05, "A": 0.15, "B": 0.14, "C": 0.015, "D": 0.06}

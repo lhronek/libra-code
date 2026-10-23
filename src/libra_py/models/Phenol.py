@@ -25,7 +25,7 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
-from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
+from libra_py.params_check import refuse_unknown_keys, MODEL_CALL_KEYS
 import libra_py.units as units
 
 
@@ -63,7 +63,7 @@ def Pollien_Arribas_Agostini(q, _params, full_id=None):
             * obj.dc1_dia ( list of 2 CMATRIX(nstates,nstates) objects ): derivative coupling in the diabatic basis [ zero ]
 
     """
-    refuse_unknown_keys(_params, POLLIEN_ARRIBAS_AGOSTINI_KEYS, "Phenol.Pollien_Arribas_Agostini", "params", "Pollien_Arribas_Agostini does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(_params, POLLIEN_ARRIBAS_AGOSTINI_KEYS, "Phenol.Pollien_Arribas_Agostini", "params", "Pollien_Arribas_Agostini does not read", skip=MODEL_CALL_KEYS)
 
     params = dict(_params)
 

@@ -27,7 +27,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 
 from libra_py.units import Angst
 from libra_py.units import ev2au
-from libra_py.params_check import refuse_unknown_keys, DISPATCH_KEYS
+from libra_py.params_check import refuse_unknown_keys, MODEL_CALL_KEYS
 
 
 class tmp:
@@ -183,7 +183,7 @@ def Faist_Levine(q, params, full_id=None):
 
 
     """
-    refuse_unknown_keys(params, FAIST_LEVINE_KEYS, "Faist_Levine.Faist_Levine", "params", "Faist_Levine does not read", skip=DISPATCH_KEYS)
+    refuse_unknown_keys(params, FAIST_LEVINE_KEYS, "Faist_Levine.Faist_Levine", "params", "Faist_Levine does not read", skip=MODEL_CALL_KEYS)
 
     ndof = q.num_of_rows  # the number of nuclear DOFs
 
