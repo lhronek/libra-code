@@ -46,13 +46,13 @@ def nearest_key(key, allowed, within=2):
 
 
 def unknown_keys(params, allowed, skip=()):
-    """The keys of `params` outside `allowed` and `skip`, sorted, and the hints "key -> nearest?" for those within two edits"""
+    """The keys of `params` outside `allowed` and `skip`, sorted, and the hints "key -> nearest" for those within two edits"""
     unknown = sorted(k for k in params if k not in allowed and k not in skip)
     hints = []
     for k in unknown:
         best = nearest_key(k, allowed)
         if best is not None:
-            hints.append(F"{k} -> {best}?")
+            hints.append(F"{k} -> {best}")
     return unknown, hints
 
 
@@ -78,7 +78,7 @@ def refuse_unknown_keys(params, allowed, where, carrier, nobody_reads, skip=()):
         _passed.add(signature)
         return
     raise ValueError(F"{where}: {carrier} carries keys that {nobody_reads}: {unknown}"
-                     + (F" (did you mean {hints}?)" if hints else ""))
+                     + (F" (did you mean {', '.join(hints)}?)" if hints else ""))
 
 
 def warn_unknown_keys(params, allowed, where, carrier, nobody_reads, skip=()):
@@ -91,7 +91,7 @@ def warn_unknown_keys(params, allowed, where, carrier, nobody_reads, skip=()):
     unknown, hints = unknown_keys(params, allowed, skip)
     if unknown:
         print(F"WARNING in {where}(): {carrier} carries keys that {nobody_reads}: {unknown}"
-              + (F" (did you mean {hints}?)" if hints else ""))
+              + (F" (did you mean {', '.join(hints)}?)" if hints else ""))
     return unknown
 
 
