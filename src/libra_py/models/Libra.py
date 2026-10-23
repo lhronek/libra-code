@@ -40,6 +40,11 @@ MODEL1_KEYS = frozenset((
     "D", "V", "k", "x0"
 ))
 
+# the keys model1a reads from its params dict - refused at the entry, the dispatch layer's keys skipped
+MODEL1A_KEYS = frozenset((
+    "D", "V", "k", "x0"
+))
+
 # the keys model2 reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
 MODEL2_KEYS = frozenset((
     "D", "NAC", "V", "k", "x0"
@@ -203,6 +208,8 @@ def model1a(Hdia, Sdia, d1ham_dia, dc1_dia, q, params):
         None
 
     """
+
+    refuse_unknown_keys(params, MODEL1A_KEYS, "Libra.model1a", "params", "model1a does not read", skip=MODEL_CALL_KEYS)
 
     x = q
     x0, k, D, V = params["x0"], params["k"], params["D"], params["V"]
