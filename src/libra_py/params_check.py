@@ -18,8 +18,9 @@
 
 
 # the keys of a model call beyond the model's own parameters - the dispatcher's model / model0 / nstates / deriv_lvl and the
-# engine's timestep / timestep_st / act_state - which a model function skips when it refuses the keys it does not read
-MODEL_CALL_KEYS = frozenset(("model", "model0", "nstates", "deriv_lvl", "timestep", "timestep_st", "act_state"))
+# engine's timestep / timestep_st / act_state / force_refresh - which a model function skips when it refuses the keys it does
+# not read
+MODEL_CALL_KEYS = frozenset(("model", "model0", "nstates", "deriv_lvl", "timestep", "timestep_st", "act_state", "force_refresh"))
 
 # the (entry, carrier, key set) triples that passed refuse_unknown_keys - an entry's vocabulary is a constant, so a key set that
 # passed once passes again and the model functions on the hot path pay one lookup per call
