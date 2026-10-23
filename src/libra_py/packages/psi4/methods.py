@@ -36,6 +36,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 import util.libutil as comn
 
 from libra_py import units
+from libra_py.params_check import refuse_unknown_keys, MODEL_CALL_KEYS
 from libra_py import scan
 from libra_py.packages.driver_forces import fill_diagonal_forces, force_diagonals
 
@@ -44,6 +45,8 @@ class tmp:
     pass
 
 
+RUN_PSI4_ADI_KEYS = frozenset(("charge", "grad_method_ex", "grad_method_gs", "labels", "nstates", "options",
+                               "spin_multiplicity", "verbosity"))
 def run_psi4_adi(q, params_, full_id):
     """
 
@@ -93,6 +96,8 @@ def run_psi4_adi(q, params_, full_id):
 
     """
 
+    refuse_unknown_keys(params_, RUN_PSI4_ADI_KEYS, "psi4.methods.run_psi4_adi", "params_", "the Psi4 driver does not read",
+                        skip=MODEL_CALL_KEYS)
     # Make a copy of the input parameters dictionary
     params = dict(params_)
 

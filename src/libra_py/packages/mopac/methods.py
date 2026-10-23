@@ -24,7 +24,7 @@ import numpy as np
 
 from liblibra_core import *
 import util.libutil as comn
-from libra_py.params_check import refuse_unknown_keys
+from libra_py.params_check import refuse_unknown_keys, MODEL_CALL_KEYS
 
 from libra_py import units
 from libra_py import scan
@@ -542,6 +542,10 @@ def read_mopac_orbital_info(params_):
 
 
 
+MOPAC_COMPUTE_ADI_KEYS = frozenset(("MO_prev", "act_state", "atom_labels", "data_prev", "do_Lowdin", "energy_zero",
+                                    "exe", "is_first_time", "mopac_input_prefix", "mopac_output_prefix",
+                                    "mopac_run_params", "nelec_act_space", "nstates", "orbital_space",
+                                    "s_ci_inv_prev", "timestep", "working_directory_prefix"))
 def mopac_compute_adi(q, params, full_id):
     """
     Compute adiabatic-state energies, overlaps, time-overlaps, and vibronic
@@ -726,6 +730,8 @@ def mopac_compute_adi(q, params, full_id):
     >>> St = obj.time_overlap_adi
     """
 
+    refuse_unknown_keys(params, MOPAC_COMPUTE_ADI_KEYS, "mopac.methods.mopac_compute_adi", "params", "the MOPAC driver does not read",
+                        skip=MODEL_CALL_KEYS)
     # ================= Decode trajectory index =================
     Id = Cpp2Py(full_id)
     itraj = Id[-1]

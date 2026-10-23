@@ -36,7 +36,7 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
-from libra_py.params_check import refuse_unknown_keys, restrict
+from libra_py.params_check import refuse_unknown_keys, restrict, MODEL_CALL_KEYS
 from libra_py.packages.driver_forces import (ForceHandover, check_excitation_energies, fill_diagonal_forces, force_diagonals,
                                              refreshed_rows)
 from libra_py.packages.cp2k.spin_flip import (read_tdwfn, check_restart_orbitals, spin_flip_amplitudes, s2_spin_flip, classify_spin,
@@ -5469,6 +5469,10 @@ def fill_adiabatic_hamiltonians(obj, E, st_ci, s_ci=None):
         obj.overlap_adi = data_conv.nparray2CMATRIX(np.asarray(s_ci, dtype=np.float64)[:n, :n].astype(np.complex128))
 
 
+CP2K_COMPUTE_ADI_NBRA_KEYS = frozenset(("MO_prev", "_nbra_last_input", "act_state", "atom_labels", "ci_threshold",
+                                        "coordinates_prev", "data_prev", "is_first_time", "lowest_orbital",
+                                        "nelec_act_space", "nstates", "s_ci_inv_prev", "timestep", "timestep_st",
+                                        "working_directory_prefix"))
 def cp2k_compute_adi_nbra(q, params, full_id):
     """
     Compute adiabatic electronic properties and derivative couplings
@@ -5611,6 +5615,9 @@ def cp2k_compute_adi_nbra(q, params, full_id):
     >>> print(obj.ham_adi)
     >>> print(obj.time_overlap_adi)
     """
+    refuse_tolerance_key(params)
+    refuse_unknown_keys(params, CP2K_COMPUTE_ADI_NBRA_KEYS, "cp2k.methods.cp2k_compute_adi_nbra", "params", "the CP2K NBRA driver does not read",
+                        skip=MODEL_CALL_KEYS)
     # ================= Decode trajectory index =================
     Id = Cpp2Py(full_id)
     itraj = Id[-1]
@@ -7442,11 +7449,35 @@ def _step_cached(params, itraj, key):
     return hit[1] if hit is not None and hit[0] == key else None
 
 
+CP2K_COMPUTE_ADI_KEYS = frozenset(("E_adi_last", "S_prev", "_ao_atom_map", "_step_results", "act_state",
+                                   "align_mo_phases", "allow_negative_excitation_energy", "allow_unconverged_scf",
+                                   "ao_overlap_method", "apply_orthonormalization", "atom_labels",
+                                   "carrier_reference", "ci_prev", "ci_source", "ci_threshold", "coordinates_prev",
+                                   "cp2k_data_dir", "cp2k_exe", "csr_chunk_rows", "dia_basis", "dia_basis_hvib",
+                                   "dia_basis_max_drop", "dia_state", "diabatic_state_reordering_alpha",
+                                   "diabatic_state_reordering_min_overlap", "diabatization_scheme",
+                                   "do_diabatic_state_reordering", "dt", "force_refresh", "force_rows",
+                                   "force_source", "fragment_atom_lists", "highest_orbital", "homo",
+                                   "input_template", "is_first_time", "localized_carrier", "localized_excitations",
+                                   "lowest_orbital", "max_concurrent_chains", "mo_prev", "mo_source",
+                                   "mpi_executable", "nelec", "nprocs", "nstates", "num_occ_alpha", "num_occ_beta",
+                                   "num_occ_states", "num_unocc_alpha", "num_unocc_beta", "num_unocc_states",
+                                   "number_of_states", "occupancy_tolerance", "occupation_threshold",
+                                   "omp_num_threads", "ot_first_call_only", "ot_template", "overlap_backend",
+                                   "overlap_csr_write", "overlap_template", "parse_pool_workers",
+                                   "pod2gs_kept_block", "prefetch_trajectories", "project", "retry_templates",
+                                   "s2_high_spin_min", "s2_low_spin_max", "s_ihalf_prev", "sd_basis",
+                                   "sd_capture_max_drop", "sd_overlap_kernel", "sd_prev", "sd_state_ordering",
+                                   "sf_basis", "sf_eref", "sf_omegas", "sf_prev", "sf_roots", "spin_flip",
+                                   "time_dependent", "timestep", "working_directory_prefix"))
 def cp2k_compute_adi(q, params, full_id):
     """Traceback-printing wrapper: C++ callers swallow Python exceptions. A repeated call for the same step, active
     state and geometry (the recipe's init call and the first dynamics step both evaluate t0) is served from the
     step's result instead of a second CP2K evaluation."""
     try:
+        refuse_tolerance_key(params)
+        refuse_unknown_keys(params, CP2K_COMPUTE_ADI_KEYS, "cp2k.methods.cp2k_compute_adi", "params", "the CP2K driver does not read",
+                            skip=MODEL_CALL_KEYS)
         # the engine's call-back after the hops (hop_force_refresh) is a batch of its own on the step's pool
         if "force_refresh" in params:
             if int(params.get("prefetch_trajectories", 0)):

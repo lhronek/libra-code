@@ -31,6 +31,7 @@ from libra_py.packages.pyscf.interfaces import ElectronicStructureStrategy, Mole
 from libra_py.packages.cp2k import methods as cp2k
 from libra_py import data_conv
 from libra_py import units
+from libra_py.params_check import refuse_unknown_keys, MODEL_CALL_KEYS
 from libra_py.packages.driver_forces import fill_diagonal_forces, force_diagonals, refreshed_rows
 from libra_py.packages.driver_fragments import carrier_operators_from_densities, single_excitation_rows, single_excitation_manifold, double_excitation_manifold
 
@@ -49,6 +50,14 @@ def _pyscf_force_refresh(params, itraj, nat):
     return refreshed_rows(params, itraj, nat, lambda new_state: -np.asarray(pyscf_obj.compute_gradient(int(new_state))))
 
 
+PYSCF_COMPUTE_ADI_KEYS = frozenset(("act_state", "atom_labels", "basis", "charge", "coords_prev", "dia_basis",
+                                    "dia_state", "diabatic_state_reordering_alpha",
+                                    "diabatic_state_reordering_min_overlap", "diabatization_scheme",
+                                    "do_diabatic_state_reordering", "force_refresh", "force_rows", "force_source",
+                                    "fragment_atom_lists", "is_first_time", "localized_carrier",
+                                    "localized_excitations", "method", "nelecas", "norbcas", "nstates",
+                                    "occupancy_tolerance", "pod2gs_kept_block", "pyscf_obj", "timestep",
+                                    "working_directory_prefix"))
 def pyscf_compute_adi(q, params, full_id):
     """
     The PySCF model function of generic_recipe: the SA-CASSCF (or CISD) states of every trajectory's geometry, their
@@ -87,6 +96,8 @@ def pyscf_compute_adi(q, params, full_id):
             CASSCF solution - no new solve, the caches untouched (driver_forces.refreshed_rows).
     """
 
+    refuse_unknown_keys(params, PYSCF_COMPUTE_ADI_KEYS, "pyscf.methods.pyscf_compute_adi", "params", "the PySCF driver does not read",
+                        skip=MODEL_CALL_KEYS)
     # ================= Decode trajectory index =================
     Id = Cpp2Py(full_id)
     itraj = Id[-1]

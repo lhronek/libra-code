@@ -27,6 +27,7 @@ from liblibra_core import *
 import util.libutil as comn
 
 from libra_py import units
+from libra_py.params_check import refuse_unknown_keys, MODEL_CALL_KEYS
 from libra_py import scan
 from libra_py import data_conv
 from libra_py.citools.sd_basis import (make_sd_basis, sd2ci_matrix, check_read_capture,
@@ -2942,6 +2943,14 @@ def _dftb_force_refresh(params, itraj, coordinates, nat, ndof, dftb_params, prms
     return refreshed_rows(params, itraj, nat, force_of)
 
 
+DFTB_COMPUTE_ADI_KEYS = frozenset(("MO_prev", "_soi_excluded_by_couplings", "act_state",
+                                   "allow_negative_excitation_energy", "atom_labels", "ci_threshold",
+                                   "coordinates_prev", "data_prev", "dftb_exe", "dftb_run_params", "dia_basis",
+                                   "dia_basis_hvib", "dia_basis_max_drop", "energy_zero", "force_refresh",
+                                   "force_rows", "force_source", "is_first_time", "num_occ_alpha", "num_occ_beta",
+                                   "num_occ_states", "num_unocc_alpha", "num_unocc_beta", "num_unocc_states",
+                                   "odin_exe", "odin_max_ang_mom", "orbital_space", "read_forces", "s_ci_inv_prev",
+                                   "sd_capture_max_drop", "timestep", "working_directory_prefix"))
 def dftb_compute_adi(q, params, full_id):
     """
     Compute adiabatic electronic properties and derivative couplings for one trajectory
@@ -3110,6 +3119,8 @@ def dftb_compute_adi(q, params, full_id):
     >>> print(obj.dc1_adi[0])
     """
     refuse_tolerance_key(params)
+    refuse_unknown_keys(params, DFTB_COMPUTE_ADI_KEYS, "dftbplus.methods.dftb_compute_adi", "params", "the DFTB+ driver does not read",
+                        skip=MODEL_CALL_KEYS)
     # ================= Decode trajectory index =================
     Id = Cpp2Py(full_id)
     itraj = Id[-1]
