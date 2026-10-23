@@ -1118,6 +1118,10 @@ def _check_orbital_window(params, data_dim, where):
             F"(the physics window is chosen by the num_occ/num_unocc counts)")
 
 
+LIMIT_ACTIVE_SPACE_KEYS = frozenset(("highest_orbital", "logfile_directory", "lowest_orbital", "num_occ_orbitals",
+                                     "num_unocc_orbitals", "path_to_npz_files", "path_to_save_npz_files"))
+
+
 def limit_active_space(params):
     """
     This function limits the active space of Kohn-Sham matrices
@@ -1136,6 +1140,7 @@ def limit_active_space(params):
         l2 (integer): The new value of lowest_orbital
         h2 (integer): the new value of highest_orbital
     """
+    refuse_unknown_keys(params, LIMIT_ACTIVE_SPACE_KEYS, "step3.limit_active_space", "params", "limit_active_space does not read")
     nocc = params['num_occ_orbitals']
     nunocc = params['num_unocc_orbitals']
     l1 = params['lowest_orbital']

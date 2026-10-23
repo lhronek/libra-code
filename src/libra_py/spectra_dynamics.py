@@ -30,6 +30,7 @@ from libra_py.hdf5_io import open_hdf5
 from libra_py.units import au2ev, au2fs
 from libra_py.workflows.nbra import lz, step4
 from libra_py import data_outs, data_conv
+from libra_py.params_check import refuse_unknown_keys
 
 
 
@@ -136,6 +137,10 @@ def calculate_bl_results(Hvib_params, BLLZ_params):
     res, _ = lz.run(Hvibs, BLLZ_params)
     return data_conv.MATRIX2nparray(res, _dtype=float)
 
+DENSITY_OF_STATES_KEYS = frozenset(("Hvib_im_prefix", "Hvib_im_suffix", "Hvib_re_prefix", "Hvib_re_suffix",
+                                    "data_set_paths", "init_times", "nfiles", "nstates"))
+
+
 def density_of_states(Hvib_params, BLLZ_params):
     """Calculate density of states.
 
@@ -146,6 +151,7 @@ def density_of_states(Hvib_params, BLLZ_params):
     Returns:
         np.ndarray: Energy levels for density of states.
     """
+    refuse_unknown_keys(Hvib_params, DENSITY_OF_STATES_KEYS, "spectra_dynamics.density_of_states", "Hvib_params", "density_of_states does not read")
     res0 = calculate_bl_results(Hvib_params, BLLZ_params)
     energy_levels = []
     for i in range(Hvib_params["nstates"]):
@@ -193,6 +199,10 @@ def process_spectra(log_file_pattern, output_folder, fwhm=0.1, num_points=1000):
     else:
         return None, None
 
+SPECTRA_PLOT_KEYS = frozenset(("colors", "end_step", "icond_end", "icond_start", "icond_step", "method_dir_prefix",
+                               "method_dir_suffix", "methods", "path_template", "start_step"))
+
+
 def plot(params, Hvib_params, BLLZ_params, log_file_pattern, output_folder):
     """Create plots for excess energy, density of states, and UV-VIS spectrum.
 
@@ -216,6 +226,7 @@ def plot(params, Hvib_params, BLLZ_params, log_file_pattern, output_folder):
     Returns:
         None
     """
+    refuse_unknown_keys(params, SPECTRA_PLOT_KEYS, "spectra_dynamics.plot", "params", "plot does not read")
     plt.figure(figsize=(30, 22))
     gs = plt.GridSpec(2, 3, width_ratios=[4, 1, 2], height_ratios=[1, 4], wspace=0.05, hspace=0.05)
     ax0 = plt.subplot(gs[1, 0])

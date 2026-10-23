@@ -27,6 +27,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 
 from . import LoadMolecule
 from . import LoadPT
+from libra_py.params_check import refuse_unknown_keys
 
 
 def init_ext_hamiltonians(ntraj, nnucl, nel, verbose=0):
@@ -278,6 +279,9 @@ def init_mols(syst, ntraj, nnucl, verbose=0):
     return mol
 
 
+INIT_THERMS_KEYS = frozenset(("NHC_size", "Temperature", "nu_therm", "thermostat_type"))
+
+
 def init_therms(ntraj, nnucl, params, verbose=0):
     """
 
@@ -296,6 +300,7 @@ def init_therms(ntraj, nnucl, params, verbose=0):
 
     """
 
+    refuse_unknown_keys(params, INIT_THERMS_KEYS, "init_ensembles.init_therms", "params", "init_therms does not read")
     # Initialize Thermostat object
     therm = []
     for i in range(0, ntraj):

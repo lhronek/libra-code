@@ -30,9 +30,15 @@ import torch
 import matplotlib.pyplot as plt
 import libra_py.dynamics.tsh.plot as tsh_plot
 import libra_py.units as units
+from libra_py.params_check import refuse_unknown_keys
+
+BOHMIAN_PLOT_KEYS = frozenset(("axes_fontsize", "axes_label_fontsize", "clrs_index", "colors", "legend_fontsize",
+                               "linewidth", "title_fontsize", "which_energies", "which_timesteps", "xlim", "ylim"))
+
 
 def plot_scatter(_plt, t, q_traj, plot_params):
 
+    refuse_unknown_keys(plot_params, BOHMIAN_PLOT_KEYS, "bohmian.plot.plot_scatter", "plot_params", "the Bohmian plots do not read")
     axes_fontsize = plot_params["axes_fontsize"]
     axes_label_fontsize = plot_params["axes_label_fontsize"]
     legend_fontsize = plot_params["legend_fontsize"]
@@ -69,6 +75,7 @@ def plot_scatter(_plt, t, q_traj, plot_params):
 def plot_pop(_plt, t, P, plot_params):
     #plot_params = tsh_plot.common_defaults(plot_params_)
 
+    refuse_unknown_keys(plot_params, BOHMIAN_PLOT_KEYS, "bohmian.plot.plot_pop", "plot_params", "the Bohmian plots do not read")
     axes_fontsize = plot_params["axes_fontsize"]
     axes_label_fontsize = plot_params["axes_label_fontsize"]
     legend_fontsize = plot_params["legend_fontsize"]
@@ -100,6 +107,7 @@ def plot_pop(_plt, t, P, plot_params):
 def plot_energies(_plt, t, E, plot_params):
     #plot_params = tsh_plot.common_defaults(plot_params_)
 
+    refuse_unknown_keys(plot_params, BOHMIAN_PLOT_KEYS, "bohmian.plot.plot_energies", "plot_params", "the Bohmian plots do not read")
     axes_fontsize = plot_params["axes_fontsize"]
     axes_label_fontsize = plot_params["axes_label_fontsize"]
     legend_fontsize = plot_params["legend_fontsize"]

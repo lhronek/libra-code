@@ -695,6 +695,18 @@ def rebuild_matrix_from_partitions(params, partitions, output_shape):
     return matrix
 
 
+COMPUTE_PROPERTIES_KEYS = frozenset(("A_cell_vector", "B_cell_vector", "C_cell_vector", "compute_ml_total_energy",
+                                     "compute_overlap", "cp2k_ml_input_template", "do_error_analysis", "fstep",
+                                     "highest_orbital", "input_partition", "input_property", "is_periodic",
+                                     "istep", "lowest_orbital", "npartition", "nprocs", "output_property",
+                                     "partitioning_method", "path_to_input_mats", "path_to_output_mats",
+                                     "path_to_sample_files", "path_to_save_ref_mos", "path_to_save_wfn_files",
+                                     "path_to_trajectory_xyz_file", "prefix", "res_dir", "sample_molden_file",
+                                     "sample_wfn_file", "save_ao_overlap", "save_ml_ham", "save_ml_mos",
+                                     "save_ref_eigenvalues", "save_ref_eigenvectors", "translational_vectors",
+                                     "write_wfn_file"))
+
+
 def compute_properties(params, models, input_scalers, output_scalers):
     """
     This function computes the molecular orbitals and their energy levels
@@ -714,6 +726,7 @@ def compute_properties(params, models, input_scalers, output_scalers):
     Returns:
         None
     """
+    refuse_unknown_keys(params, COMPUTE_PROPERTIES_KEYS, "ml_map.compute_properties", "params", "no function of the ml_map properties workflow reads")
     # First find the indices of the input data
     # indices = find_indices_inputs(params)
     istep = params["istep"]

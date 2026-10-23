@@ -49,6 +49,7 @@ from . import md_align
 
 
 import numpy as np
+from libra_py.params_check import refuse_unknown_keys
 
 
 
@@ -627,6 +628,9 @@ def write_nmd(
 
 
 
+VISUALIZE_MODES_KEYS = frozenset(("nperiods", "nsteps", "prefix", "print_modes", "scale"))
+
+
 def visualize_modes(E, R, eta, M, frequencies, params):
     """
     Visualize selected normal modes by generating XYZ trajectories.
@@ -670,6 +674,7 @@ def visualize_modes(E, R, eta, M, frequencies, params):
             ω (a.u.) = ν (cm^{-1}) × units.inv_cm2Ha
     """
 
+    refuse_unknown_keys(params, VISUALIZE_MODES_KEYS, "normal_modes.visualize_modes", "params", "visualize_modes does not read")
     R = np.asarray(R)
     eta = np.asarray(eta)
     M = np.asarray(M)
@@ -717,6 +722,9 @@ def visualize_modes(E, R, eta, M, frequencies, params):
                     )
 
 
+COMPUTE_DYNMAT_KEYS = frozenset(("nperiods", "nsteps", "prefix", "print_modes", "scale", "verbosity", "visualize"))
+
+
 def compute_dynmat(R, D, M, E, params):
     """
 
@@ -751,6 +759,7 @@ def compute_dynmat(R, D, M, E, params):
 
     """
 
+    refuse_unknown_keys(params, COMPUTE_DYNMAT_KEYS, "normal_modes.compute_dynmat", "params", "compute_dynmat does not read")
     verbosity = params["verbosity"]
 
     if verbosity > 0:

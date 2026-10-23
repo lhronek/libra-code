@@ -37,6 +37,7 @@ import torch
 import numpy as np
 import math
 from scipy.special import gamma
+from libra_py.params_check import refuse_unknown_keys
 
 def rho_gaussian(q, Q, sigma):
     """
@@ -395,6 +396,10 @@ def init_variables(ntraj, mass=2000.0, omega=0.004, Q=[-1.0, 0.0], P=[3.0, 0.0])
 
 
 
+BOHMIAN_MD_KEYS = frozenset(("do_bohmian", "dt", "ham", "ham_params", "nsteps", "prefix", "print_period",
+                             "qpot_sigmas", "tbf_type"))
+
+
 def md( q, p, mass_mat, params ):
     """
     Args:
@@ -417,6 +422,7 @@ def md( q, p, mass_mat, params ):
     None, but saves the key variable in a ".pt" file
     """
     
+    refuse_unknown_keys(params, BOHMIAN_MD_KEYS, "bohmian.compute.md", "params", "md does not read")
     nsteps = params["nsteps"]
     dt = params["dt"]
     do_bohmian = params["do_bohmian"]
