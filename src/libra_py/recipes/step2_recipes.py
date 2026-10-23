@@ -21,6 +21,7 @@ import libra_py.packages.cp2k.methods as CP2K_methods
 import libra_py.packages.gaussian.methods as Gaussian_methods
 import libra_py.packages.dftbplus.methods as DFTB_methods
 from libra_py.workflows.nbra import step2_many_body
+from libra_py.params_check import refuse_unknown_keys
 
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,14 @@ file_handler.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
+
+
+MAKE_STEP2_SUBMIT_TEMPLATE_KEYS = frozenset(("clusters", "constraint", "cpus_per_task", "do_cube_visualization",
+                                             "email", "es_software", "es_software_exe",
+                                             "es_software_input_template", "homo_index", "isUKS", "max_band",
+                                             "memory", "min_band", "modules", "ncores", "nnodes", "partition",
+                                             "project_name", "results_path", "states_to_be_plotted", "time",
+                                             "trajectory_xyz_filename", "waveplot_exe"))
 
 
 def make_step2_submit_template(params):
@@ -54,6 +63,7 @@ def make_step2_submit_template(params):
 
     """
 
+    refuse_unknown_keys(params, MAKE_STEP2_SUBMIT_TEMPLATE_KEYS, "step2_recipes.make_step2_submit_template", "params", "make_step2_submit_template does not read")
     logger.debug("Entered into generate_step2_submit_template function")
 
     critical_params = []
@@ -206,6 +216,10 @@ step2_many_body.run_step2_many_body( params )
     f.close()
 
 
+RUN_STEP2_JOBS_KEYS = frozenset(("es_software", "es_software_input_template", "fstep", "istep", "njobs",
+                                 "trajectory_xyz_filename", "waveplot_input_template"))
+
+
 def run_step2_jobs(params):
     """ Prepares and runs job folders needed for running step2
 
@@ -219,6 +233,7 @@ def run_step2_jobs(params):
             those jobs.
     """
 
+    refuse_unknown_keys(params, RUN_STEP2_JOBS_KEYS, "step2_recipes.run_step2_jobs", "params", "run_step2_jobs does not read")
     logger.debug("Entered into the function initialize_step2_jobs")
 
     critical_params = []

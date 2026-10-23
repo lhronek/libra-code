@@ -29,6 +29,7 @@ if sys.platform == "cygwin":
 elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 
 
 def takeFirst(elem):
@@ -37,6 +38,9 @@ def takeFirst(elem):
 
 def takeSecond(elem):
     return elem[1]
+
+
+COMPUTE_OSCILLATOR_STRENGTHS_KEYS = frozenset(("HOMO",))
 
 
 def compute_oscillator_strengths(Hvib, Hprime_x, Hprime_y, Hprime_z, params):
@@ -61,6 +65,7 @@ def compute_oscillator_strengths(Hvib, Hprime_x, Hprime_y, Hprime_z, params):
 
     """
 
+    refuse_unknown_keys(params, COMPUTE_OSCILLATOR_STRENGTHS_KEYS, "step2_analysis.compute_oscillator_strengths", "params", "compute_oscillator_strengths does not read")
     homo = params["HOMO"]
 
     nsteps = len(Hvib)
@@ -92,6 +97,9 @@ def compute_oscillator_strengths(Hvib, Hprime_x, Hprime_y, Hprime_z, params):
     return res
 
 
+COMPUTE_SPECTRUM_KEYS = frozenset(("HOMO", "opt"))
+
+
 def compute_spectrum(Hvib, Hprime_x, Hprime_y, Hprime_z, params):
     """Auxiliary function for the computation of the absorption/emission spectrum of the system
 
@@ -114,6 +122,7 @@ def compute_spectrum(Hvib, Hprime_x, Hprime_y, Hprime_z, params):
 
     """
 
+    refuse_unknown_keys(params, COMPUTE_SPECTRUM_KEYS, "step2_analysis.compute_spectrum", "params", "compute_spectrum does not read")
     opt = params["opt"]
 
     res = compute_oscillator_strengths(Hvib, Hprime_x, Hprime_y, Hprime_z, params)
@@ -137,6 +146,11 @@ def compute_spectrum(Hvib, Hprime_x, Hprime_y, Hprime_z, params):
         fin_st.append(it[4])
 
     return E, osc_str, istep, init_st, fin_st
+
+
+GET_STEP2_MB_SP_PROPERTIES_KEYS = frozenset(("ci_read_drops", "ci_threshold", "curr_step", "es_software",
+                                             "finish_time", "isUKS", "logfile_directory", "logfile_name",
+                                             "number_of_states", "orbital_space", "start_time"))
 
 
 def get_step2_mb_sp_properties(params):
@@ -172,6 +186,7 @@ def get_step2_mb_sp_properties(params):
                    [ ['alp'] ]
     """
 
+    refuse_unknown_keys(params, GET_STEP2_MB_SP_PROPERTIES_KEYS, "step2_analysis.get_step2_mb_sp_properties", "params", "get_step2_mb_sp_properties does not read")
     critical_params = ["logfile_directory", "es_software", "number_of_states", "start_time", "finish_time"]
     default_params = {"isUKS": 0, "ci_threshold": 0.01}
     comn.check_input(params, default_params, critical_params)

@@ -28,6 +28,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 import util.libutil as comn
 import libra_py.packages.ergo.methods as ERGO_methods
 from libra_py import units
+from libra_py.params_check import refuse_unknown_keys
 
 
 def do_step(i, params, run):
@@ -318,6 +319,10 @@ def clean():
     os.system("rm F_matrix_*.mtx")
 
 
+RUN_STEP2_KEYS = frozenset(("EXE", "direct_MO", "dt", "fsnap", "isnap", "md_file", "mo_active_space",
+                            "mo_indexing_convention", "out_dir", "spinpolarized"))
+
+
 def run_step2(params, run1, run2):
     """
 
@@ -358,6 +363,7 @@ def run_step2(params, run1, run2):
 
     """
 
+    refuse_unknown_keys(params, RUN_STEP2_KEYS, "step2_ergoscf.run_step2", "params", "no function of the ErgoSCF step-2 workflow reads")
     critical_params = []
     default_params = {"dt": 1.0 * units.fs2au, "isnap": 0, "fsnap": 1, "out_dir": "res",
                       "EXE": "ergo", "md_file": "md.xyz",

@@ -44,6 +44,7 @@ from libra_py import units
 
 import util.libutil as comn
 from libra_py.params_check import restrict
+from libra_py.params_check import refuse_unknown_keys
 
 
 def curr_and_final_step_job(istep, fstep, njobs, njob):
@@ -639,6 +640,14 @@ def form_Hvib_real(params):
     return Hvib_ks_re, total_energy
 
 
+RUN_STEP2_MANY_BODY_KEYS = frozenset(("MO_images_directory", "curr_step", "do_cube_visualization", "es_software",
+                                      "es_software_exe", "es_software_input_template", "isUKS", "istep",
+                                      "ks_orbital_homo_index", "ks_orbital_indicies", "logfile_directory",
+                                      "logfile_name", "max_band", "min_band", "njob", "nprocs", "nsteps_this_job",
+                                      "path_to_tcl_file", "phase_factor_visual", "project_name", "res_dir", "spin",
+                                      "states_to_be_plotted", "time", "trajectory_xyz_filename", "waveplot_exe"))
+
+
 def run_step2_many_body(params):
     """
     This function is the main function which runs the following calculations:
@@ -689,6 +698,7 @@ def run_step2_many_body(params):
         None
 
     """
+    refuse_unknown_keys(params, RUN_STEP2_MANY_BODY_KEYS, "step2_many_body.run_step2_many_body", "params", "no function of the many-body step-2 workflow reads")
     # Current working directory
     pwd = os.getcwd()
     # Critical variables

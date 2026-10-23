@@ -33,6 +33,7 @@ import libra_py.packages.dftbplus.methods as DFTB_methods
 from libra_py import units
 from libra_py import data_io, eigensolvers, data_conv
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 
 
 def create_odin_inp(params):
@@ -453,6 +454,12 @@ def do_ovlp(snap, params):
     return S, S00, S11
 
 
+RUN_STEP2_KEYS = frozenset(("EXE", "ODIN_EXE", "ODIN_PARAMS", "do_tddftb", "dt", "eigensolver", "fsnap",
+                            "get_dominant_sd_transitions", "hs_in_file", "isnap", "md_file", "mo_active_space",
+                            "out_dir", "ovlp_gen_file", "ovlp_in_file", "scf_in_file", "sp_gen_file", "syst_spec",
+                            "tol", "use_single_sd_energy"))
+
+
 def run_step2(params):
     """
 
@@ -479,6 +486,7 @@ def run_step2(params):
 
     """
 
+    refuse_unknown_keys(params, RUN_STEP2_KEYS, "step2_dftb.run_step2", "params", "no function of the DFTB+ step-2 workflow reads")
     critical_params = []
     default_params = {"dt": 1.0 * units.fs2au, "isnap": 0, "fsnap": 1, "out_dir": "res"}
     comn.check_input(params, default_params, critical_params)
@@ -547,6 +555,12 @@ def run_step2(params):
         Sao_prev[0] = CMATRIX(Sao_curr[0])
 
 
+RUN_STEP2_LZ_KEYS = frozenset(("EXE", "ODIN_PARAMS", "do_tddftb", "dt", "eigensolver", "fsnap",
+                               "get_dominant_sd_transitions", "get_midpoint_energy", "hs_in_file", "isnap",
+                               "md_file", "mo_active_space", "out_dir", "scf_in_file", "sp_gen_file", "syst_spec",
+                               "use_single_sd_energy"))
+
+
 def run_step2_lz(params):
     """
 
@@ -572,6 +586,7 @@ def run_step2_lz(params):
 
     """
 
+    refuse_unknown_keys(params, RUN_STEP2_LZ_KEYS, "step2_dftb.run_step2_lz", "params", "no function of the DFTB+ step-2 workflow reads")
     critical_params = []
     default_params = {"dt": 1.0 * units.fs2au, "isnap": 0, "fsnap": 1, "out_dir": "res", "get_midpoint_energy": True}
     comn.check_input(params, default_params, critical_params)
