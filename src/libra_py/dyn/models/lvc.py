@@ -25,6 +25,9 @@ class LVCModel(AnalyticalHamiltonianModel):
 
     nstates: int = 2
 
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("Delta1", "Delta2", "coup", "d1", "d2", "mass", "omega"))
+
     def diabatic_with_derivatives(self, Q, params):
         xp = self.xp
         omega = params["omega"]

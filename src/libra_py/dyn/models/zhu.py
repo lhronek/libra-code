@@ -21,6 +21,9 @@ class ZhuDualRZDModel(AnalyticalHamiltonianModel):
     Legacy source: ``libra_py.models.Zhu.dual_RZD``.
     """
 
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("A", "B", "C", "Z"))
+
     def diabatic_with_derivatives(self, Q, params):
         xp = self.xp
         p = merged_params(params, {"A": 0.025, "B": 0.025, "C": 0.7, "Z": 3.0})
@@ -47,6 +50,9 @@ class ZhuDualLZSModel(AnalyticalHamiltonianModel):
     J. Xu and L. Wang, J. Chem. Phys. 2019, 150, 164101.
     Legacy source: ``libra_py.models.Zhu.dual_LZS``.
     """
+
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("A", "B", "C", "D", "E0"))
 
     def diabatic_with_derivatives(self, Q, params):
         xp = self.xp

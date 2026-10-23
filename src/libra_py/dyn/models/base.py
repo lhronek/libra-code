@@ -5,6 +5,8 @@ from typing import Any
 
 import numpy as np
 
+from libra_py.params_check import refuse_unknown_keys
+
 
 @dataclass
 class AnalyticalHamiltonianModel:
@@ -137,6 +139,9 @@ class AnalyticalHamiltonianModel:
         merged = dict(self.params)
         if params:
             merged.update(params)
+        keys = getattr(type(self), "KEYS", None)
+        if keys is not None:                                # a model declares the keys it reads, an unknown one is refused
+            refuse_unknown_keys(merged, keys, F"dyn.models.{type(self).__name__}", "params", "the model does not read")
         return merged
 
     def _trajectory_to_exact_q(self, R):

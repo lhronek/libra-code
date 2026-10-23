@@ -56,6 +56,9 @@ class PhenolModel(AnalyticalHamiltonianModel):
     ndof: int = 2
     nstates: int = 3
 
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset()
+
     def diabatic_with_derivatives(self, Q, params):
         xp = self.xp
         r, theta = Q[0], Q[1]

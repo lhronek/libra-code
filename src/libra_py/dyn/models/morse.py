@@ -29,6 +29,9 @@ class MorseModel(AnalyticalHamiltonianModel):
 
     ndof: int = 1
 
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("D", "E", "V", "alpha", "beta", "x_n", "x_nm"))
+
     def diabatic_with_derivatives(self, Q, params):
         xp = self.xp
         p = merged_params(

@@ -39,6 +39,9 @@ class GranucciPersicoModel1(AnalyticalHamiltonianModel):
     ndof: int = 1
     nstates: int = 2
 
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("a1", "a2", "alp1", "alp2", "b", "beta", "dE", "gamma", "x_c"))
+
     def diabatic_with_derivatives(self, Q, params):
         xp = self.xp
         p = merged_params(
@@ -105,6 +108,9 @@ class GranucciPersicoModel2(AnalyticalHamiltonianModel):
 
     ndof: int = 2
     nstates: int = 2
+
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("D1", "D2", "K", "alp1", "alp2", "beta1", "beta2", "delta1", "delta2", "gamma", "x1", "x2", "x3"))
 
     def diabatic_with_derivatives(self, Q, params):
         xp = self.xp

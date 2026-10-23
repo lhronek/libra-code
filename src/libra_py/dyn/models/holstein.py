@@ -22,6 +22,9 @@ class Holstein2Model(AnalyticalHamiltonianModel):
 
     ndof: int = 1
 
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("E_n", "V", "V_n", "k_n", "x_n"))
+
     def diabatic_with_derivatives(self, Q, params):
         p = merged_params(params, {"V": 0.001})
         return _holstein_parabolic(Q[0], self, p, coupling="nearest")
@@ -39,6 +42,9 @@ class Holstein3Model(AnalyticalHamiltonianModel):
     """
 
     ndof: int = 1
+
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("E_n", "V", "V_n", "k_n", "x_n"))
 
     def diabatic_with_derivatives(self, Q, params):
         p = merged_params(params, {"V_n": [0.001, 0.0, 0.0]})
@@ -59,6 +65,9 @@ class Holstein4Model(AnalyticalHamiltonianModel):
 
     ndof: int = 1
 
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("E_n", "V", "V_n", "k_n", "x_n"))
+
     def diabatic_with_derivatives(self, Q, params):
         p = merged_params(params, {})
         return _holstein_parabolic(Q[0], self, p, coupling="matrix")
@@ -77,6 +86,9 @@ class Holstein5Model(AnalyticalHamiltonianModel):
     """
 
     ndof: int = 1
+
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("E_n", "V", "alpha", "k_n", "x_n", "x_nm"))
 
     def diabatic_with_derivatives(self, Q, params):
         xp = self.xp

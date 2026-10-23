@@ -21,6 +21,9 @@ class TullyModel1(AnalyticalHamiltonianModel):
     Legacy source: ``libra_py.models.Tully.Tully1_py``.
     """
 
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("A", "B", "C", "D"))
+
     def diabatic_with_derivatives(self, Q, params):
         xp = self.xp
         x = Q[0]
@@ -53,6 +56,9 @@ class TullyModel2(AnalyticalHamiltonianModel):
     Reference: J. C. Tully, J. Chem. Phys. 1990, 93, 1061.
     Legacy source: ``libra_py.models.Tully.Tully2``.
     """
+
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("A", "B", "C", "D", "E", "E0"))
 
     def diabatic_with_derivatives(self, Q, params):
         xp = self.xp
@@ -88,6 +94,9 @@ class TullyModel3(AnalyticalHamiltonianModel):
     Reference: J. C. Tully, J. Chem. Phys. 1990, 93, 1061.
     Legacy source: ``libra_py.models.Tully.Tully3``.
     """
+
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("A", "B", "C"))
 
     def diabatic_with_derivatives(self, Q, params):
         xp = self.xp

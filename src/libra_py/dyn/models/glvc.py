@@ -29,6 +29,9 @@ class GLVCModel(AnalyticalHamiltonianModel):
     in the legacy helper functions.
     """
 
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("Ham", "coupl", "coupling_scaling", "mass", "nstates", "num_osc", "omega"))
+
     def diabatic_with_derivatives(self, Q, params):
         p = merged_params(params, {"Ham": [[0.0, 0.0], [0.0, 0.0]], "nstates": 2, "num_osc": 2, "coupling_scaling": [1.0, -1.0], "mass": [1.0, 1.0]})
         w = p["omega"]

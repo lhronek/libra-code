@@ -26,6 +26,9 @@ class FerrettiModel(AnalyticalHamiltonianModel):
     ndof: int = 2
     nstates: int = 2
 
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("Delta", "Kx", "Ky", "X1", "X2", "X3", "alpha", "beta", "gamma"))
+
     def diabatic_with_derivatives(self, Q, params):
         xp = self.xp
         p = merged_params(

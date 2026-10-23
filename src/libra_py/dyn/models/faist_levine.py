@@ -27,6 +27,9 @@ class FaistLevineModel(AnalyticalHamiltonianModel):
     Legacy source: ``libra_py.models.Faist_Levine``.
     """
 
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("A", "A_cov", "A_ion", "B_cov", "B_ion", "C_cov", "C_ion", "E_th", "alp_M+", "alp_X-", "rho", "rho_cov", "rho_ion"))
+
     def diabatic_with_derivatives(self, Q, params):
         xp = self.xp
         R = Q[0]

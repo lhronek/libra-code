@@ -29,6 +29,9 @@ class SSYModel(AnalyticalHamiltonianModel):
     ndof: int = 2
     nstates: int = 2
 
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("A", "B", "C", "D", "E0"))
+
     def diabatic_with_derivatives(self, Q, params):
         xp = self.xp
         p = merged_params(params, {"E0": 0.05, "A": 0.15, "B": 0.14, "C": 0.015, "D": 0.06})

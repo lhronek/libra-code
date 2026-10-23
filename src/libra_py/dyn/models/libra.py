@@ -20,6 +20,9 @@ class LibraModel1(AnalyticalHamiltonianModel):
     in the legacy module to the Landry-Subotnik spin-boson parameterization.
     """
 
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("D", "V", "k", "x0"))
+
     def diabatic_with_derivatives(self, Q, params):
         xp = self.xp
         p = merged_params(params, {"x0": 1.0, "k": 0.01, "D": 0.0, "V": 0.005})

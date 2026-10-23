@@ -23,6 +23,9 @@ class EschLevineLinearModel(AnalyticalHamiltonianModel):
 
     ndof: int = 1
 
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("V", "nstates", "w"))
+
     def diabatic_with_derivatives(self, Q, params):
         p = merged_params(params, {"nstates": 2, "V": [[0.0, 0.0], [0.0, 0.0]], "w": [[0.0, 0.0], [0.0, 0.0]]})
         x = Q[0]
@@ -60,6 +63,9 @@ class EschLevineJCP2020Model(AnalyticalHamiltonianModel):
     """
 
     ndof: int = 1
+
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("V", "delta", "eps", "i_crit", "nstates", "w0", "w1"))
 
     def diabatic_with_derivatives(self, Q, params):
         p = merged_params(params, {"w0": 0.25, "w1": 0.025, "V": 0.005, "eps": 0.0, "i_crit": 2, "nstates": 2, "delta": 0.01})

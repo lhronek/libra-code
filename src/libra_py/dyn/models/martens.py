@@ -22,6 +22,9 @@ class MartensModel1(AnalyticalHamiltonianModel):
     ndof: int = 2
     nstates: int = 1
 
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("Va", "Vb"))
+
     def diabatic_with_derivatives(self, Q, params):
         xp = self.xp
         p = merged_params(params, {"Va": 0.00625, "Vb": 0.0106})
@@ -49,6 +52,9 @@ class MartensModel2(AnalyticalHamiltonianModel):
 
     ndof: int = 2
     nstates: int = 1
+
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("Va", "Vb", "Vc"))
 
     def diabatic_with_derivatives(self, Q, params):
         xp = self.xp

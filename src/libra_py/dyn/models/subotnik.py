@@ -23,6 +23,9 @@ class SubotnikDumbbellModel(AnalyticalHamiltonianModel):
     150, 164101.
     """
 
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("A", "B", "C", "Z"))
+
     def diabatic_with_derivatives(self, Q, params):
         xp = self.xp
         p = merged_params(params, {"A": 0.0006, "B": 0.1, "C": 0.9, "Z": 10.0})
@@ -54,6 +57,9 @@ class SubotnikDoubleArchModel(AnalyticalHamiltonianModel):
     134, 024105. Also see J. Xu and L. Wang, J. Chem. Phys. 2019,
     150, 164101.
     """
+
+    # the keys of the model's params - refused in the base class's merge
+    KEYS = frozenset(("A", "B", "C", "Z"))
 
     def diabatic_with_derivatives(self, Q, params):
         xp = self.xp
