@@ -5470,8 +5470,9 @@ def fill_adiabatic_hamiltonians(obj, E, st_ci, s_ci=None):
 
 
 CP2K_COMPUTE_ADI_NBRA_KEYS = frozenset(("MO_prev", "_nbra_last_input", "act_state", "atom_labels", "ci_threshold",
-                                        "coordinates_prev", "data_prev", "is_first_time", "lowest_orbital",
-                                        "nelec_act_space", "nstates", "s_ci_inv_prev", "timestep", "timestep_st",
+                                        "coordinates_prev", "data_prev", "is_first_time", "logfile_name",
+                                        "lowest_orbital", "nelec_act_space", "nstates", "overlap_filename",
+                                        "s_ci_inv_prev", "time_overlap_filename", "timestep", "timestep_st",
                                         "working_directory_prefix"))
 def cp2k_compute_adi_nbra(q, params, full_id):
     """
