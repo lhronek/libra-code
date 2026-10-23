@@ -117,6 +117,9 @@ def state_num_cp2k(state_num: int):
     return state_num_str
 
 
+CUBE_FILE_NAMES_KEYS = frozenset(("curr_step", "es_software", "isUKS", "max_band", "min_band", "project_name"))
+
+
 def cube_file_names_cp2k(params):
     """
     This function will produce the cube file names produced by CP2K both for energy calculations
@@ -141,6 +144,7 @@ def cube_file_names_cp2k(params):
         names ( list ): The list of cube file names.
 
     """
+    refuse_unknown_keys(params, CUBE_FILE_NAMES_KEYS, "cp2k.methods.cube_file_names_cp2k", "params", "cube_file_names_cp2k does not read")
     # Critical parameters
     critical_params = ["project_name", "min_band", "max_band", "curr_step"]
     # Default parameters
@@ -920,6 +924,9 @@ def CP2K_input_static(cp2k_sample_energy_input: str, project_name: str,
             f.write(lines[i])
 
 
+READ_ENERGIES_LOG_KEYS = frozenset(("logfile_name", "max_band", "min_band", "spin", "time"))
+
+
 def read_energies_from_cp2k_log_file(params):
     """
     This function reads the energies from CP2K log file for a specific spin.
@@ -947,6 +954,7 @@ def read_energies_from_cp2k_log_file(params):
 
     """
 
+    refuse_unknown_keys(params, READ_ENERGIES_LOG_KEYS, "cp2k.methods.read_energies_from_cp2k_log_file", "params", "read_energies_from_cp2k_log_file does not read")
     # Critical parameters
     critical_params = ["logfile_name", "min_band", "max_band"]
     # Default parameters

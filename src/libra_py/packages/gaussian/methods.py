@@ -23,6 +23,7 @@ import numpy as np
 import libra_py.packages.cp2k.methods as CP2K_methods
 from libra_py.citools.sd_basis import refuse_tolerance_key
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 
 
 def read_gaussian_tddft_log_file(params):
@@ -148,6 +149,9 @@ def read_gaussian_tddft_log_file(params):
     return excitation_energies[0:number_of_states], ci_basis, ci_coefficients, spin_components
 
 
+READ_ENERGIES_LOG_KEYS = frozenset(("logfile_name", "max_band", "min_band", "spin"))
+
+
 def read_energies_from_gaussian_log_file(params):
     """
     This function read the energies from Gaussian log file and returns the Kohn-Sham and total_energies.
@@ -171,6 +175,7 @@ def read_energies_from_gaussian_log_file(params):
         total_energy (float): The total energy of the system.
 
     """
+    refuse_unknown_keys(params, READ_ENERGIES_LOG_KEYS, "gaussian.methods.read_energies_from_gaussian_log_file", "params", "read_energies_from_gaussian_log_file does not read")
     # Critical params
     critical_params = ["logfile_name", "min_band", "max_band"]
     # Default params

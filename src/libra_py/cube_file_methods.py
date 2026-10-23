@@ -32,6 +32,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 
 import util.libutil as comn
 import libra_py.packages.cp2k.methods as CP2K_methods
+from libra_py.params_check import refuse_unknown_keys
 
 def read_cube(filename: str):
     """
@@ -272,6 +273,10 @@ def integrate_cube(cube_A, cube_B, grid_volume):
 
 
 
+PLOT_CUBES_KEYS = frozenset(("MO_images_directory", "curr_step", "es_software", "isUKS", "max_band", "min_band",
+                             "path_to_tcl_file", "phase_factor_visual", "project_name", "states_to_be_plotted"))
+
+
 def plot_cubes(params):
     """
     This function plots the cubes for selected energy levels using VMD.
@@ -302,6 +307,7 @@ def plot_cubes(params):
 
     """
 
+    refuse_unknown_keys(params, PLOT_CUBES_KEYS, "cube_file_methods.plot_cubes", "params", "plot_cubes does not read")
    # Critical parameters
     critical_params = [
         "min_band",

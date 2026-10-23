@@ -582,6 +582,9 @@ def dftb_distribute(istep, fstep, nsteps_this_job, trajectory_xyz_file, dftb_inp
     os.chdir("../../")
 
 
+KS_ENERGIES_KEYS = frozenset(("logfile_name", "max_band", "min_band", "time"))
+
+
 def get_dftb_ks_energies(_params):
     """
     This function reads the band.out file generated from a dftb+ computations. The band.out file
@@ -602,6 +605,7 @@ def get_dftb_ks_energies(_params):
 
     """
 
+    refuse_unknown_keys(_params, KS_ENERGIES_KEYS, "dftbplus.methods.get_dftb_ks_energies", "_params", "get_dftb_ks_energies does not read")
     params = dict(_params)
 
     # Critical parameters

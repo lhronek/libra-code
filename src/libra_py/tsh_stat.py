@@ -43,6 +43,7 @@ import util.libutil as comn
 from . import units
 from . import probabilities
 from libra_py import data_conv
+from libra_py.params_check import refuse_unknown_keys
 
 
 def compute_etot(ham, p, Cdia, Cadi, projectors, iM, rep):
@@ -591,6 +592,9 @@ def denmat2prob(P):
     return prob
 
 
+PROBABILITIES_1D_SCATTERING_KEYS = frozenset(("act_dof", "left_boundary", "right_boundary"))
+
+
 def probabilities_1D_scattering(q, states, nst, params):
     """Computes the scattering probabilities in 1D
 
@@ -612,6 +616,7 @@ def probabilities_1D_scattering(q, states, nst, params):
 
     """
 
+    refuse_unknown_keys(params, PROBABILITIES_1D_SCATTERING_KEYS, "tsh_stat.probabilities_1D_scattering", "params", "probabilities_1D_scattering does not read")
     critical_params = []
     default_params = {"act_dof": 0, "left_boundary": -10.0, "right_boundary": 10.0}
     comn.check_input(params, default_params, critical_params)

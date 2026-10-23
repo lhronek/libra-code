@@ -37,6 +37,7 @@ from scipy.special import stdtrit
 import util.libutil as comn
 from libra_py import units
 from libra_py.hdf5_io import open_hdf5
+from libra_py.params_check import refuse_unknown_keys
 # from libra_py.workflows.nbra import lz, step4
 # from libra_py import data_outs, data_conv
 
@@ -49,6 +50,9 @@ def exp_func(x, a):
 
 def gau_func(x, a):
     return 1 - np.exp(-x**2 / a**2)
+
+
+PLOTTING_RUN_KEYS = frozenset(("do_show", "filename", "title_1"))
 
 
 def run(_params):
@@ -67,6 +71,7 @@ def run(_params):
             plots the figures
     """
 
+    refuse_unknown_keys(_params, PLOTTING_RUN_KEYS, "plotting.run", "_params", "plotting.run does not read")
     params = dict(_params)
 
     critical_params = []

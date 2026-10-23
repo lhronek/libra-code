@@ -1219,6 +1219,7 @@ def get_Hvib_scipy(params):
             Hvib[idata][time] is a CMATRIX for the data set indexed by `idata`
             at time `time`
     """
+    refuse_unknown_keys(params, STEP4_KEYS, "step4.get_Hvib_scipy", "params", "no function of the step-4 family reads")
     hvib = []
     for i in range(len(params['data_set_paths'])):
         # CMATRIX(re, im) below assumes the canonical convention (_im files =

@@ -32,6 +32,10 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 
 # import common_utils as comn
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
+
+
+TRANSFORM_DATA_KEYS = frozenset(("scale", "shift1", "shift2"))
 
 
 def transform_data(X, params):
@@ -71,6 +75,7 @@ def transform_data(X, params):
 
     """
 
+    refuse_unknown_keys(params, TRANSFORM_DATA_KEYS, "data_conv.transform_data", "params", "transform_data does not read")
     ndata = len(X)
     nsteps = len(X[0])
     nstates = X[0][0].num_of_cols
