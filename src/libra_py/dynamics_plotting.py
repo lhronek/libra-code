@@ -258,6 +258,10 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
         scan_path.append(MATRIX(q))
 
         model_params["timestep"] = step
+        if step == 0:
+            # the vibronic Hamiltonian is consumed when the model hands one over, rebuilt from the couplings otherwise
+            probe = comp_model(q, model_params, Py2Cpp_int([0, 0]))
+            hvib_update_method = 0 if hasattr(probe, "hvib_adi" if rep_tdse == 1 else "hvib_dia") else 1
 
         # Old way:
         # update_Hamiltonian_q( {"rep_tdse":rep_tdse, "rep_ham":rep_ham},
@@ -265,9 +269,12 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
 
         # New way
         dyn_var.set_q(q)
-        update_Hamiltonian_variables({"time_overlap_method": 1, "ham_update_method": 2,
-                                      "ham_transform_method": 0, "nac_update_method": 0,
-                                      "hvib_update_method": 0, "rep_tdse": rep_tdse, "rep_ham": rep_ham},
+        # rep_ham 0: a diabatic model, the adiabatic side by the internal diagonalization - 1: an adiabatic-native model;
+        # the plot reads energies and the derivatives the model hands over: no force, the couplings from the time overlaps and
+        # the vibronic Hamiltonian consumed or built in the engine, so the hand-over check asks the model for nothing but the Hamiltonian
+        update_Hamiltonian_variables({"time_overlap_method": 1, "ham_update_method": 1 if rep_ham == 0 else 2,
+                                      "ham_transform_method": 1 if rep_ham == 0 else 0, "nac_update_method": 2, "nac_algo": 0,
+                                      "hvib_update_method": hvib_update_method, "force_method": 0, "rep_tdse": rep_tdse},
                                      dyn_var, ham, ham, comp_model, model_params, 0)
 
         # if rep_tdse==0:
