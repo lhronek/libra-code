@@ -51,6 +51,19 @@ import util.libutil as comn
 from libra_py.params_check import warn_unknown_keys
 
 
+
+def _dataset(f, name):
+    """
+    The saved dataset of a property - a missing one names the property and the key that saves it, in place of h5py's
+    "component not found"
+    """
+    key = F"{name}/data"
+    if key not in f:
+        saved = ", ".join(sorted(f.keys()))
+        raise ValueError(F"the file {f.filename} holds no dataset {name} - add \"{name}\" to properties_to_save of the run "
+                         F"(the file holds: {saved})")
+    return f[key]
+
 COMMON_PLOT_DEFAULTS = {"prefix": "out", "filename": "mem_data.hdf", "output_level": 3,
                       "which_trajectories": [0], "which_dofs": [0],
                       "which_adi_states": [0], "which_dia_states": [0],
@@ -1293,7 +1306,7 @@ def plot_dyn(plot_params):
 
         _figsize = (24, 24)
         # the time axis once per file - every panel below is plotted against it
-        t = f["time/data"][:] if output_level >= 1 else None    # a level-0 file carries no time axis
+        t = _dataset(f, "time")[:] if output_level >= 1 else None    # a level-0 file carries no time axis
 
         if output_level >= 1:
 
@@ -1304,17 +1317,17 @@ def plot_dyn(plot_params):
             plt.title('t-Energies')
             plt.xlabel('Time, a.u.')
             plt.ylabel('Energy, a.u.')
-            plt.plot(t, f["Ekin_ave/data"][:], label="Kinetic energy", linewidth=2, color=colors["11"])
-            plt.plot(t, f["Epot_ave/data"][:], label="Potential energy", linewidth=2, color=colors["21"])
-            plt.plot(t, f["Etot_ave/data"][:], label="Total energy", linewidth=2, color=colors["31"])
+            plt.plot(t, _dataset(f, "Ekin_ave")[:], label="Kinetic energy", linewidth=2, color=colors["11"])
+            plt.plot(t, _dataset(f, "Epot_ave")[:], label="Potential energy", linewidth=2, color=colors["21"])
+            plt.plot(t, _dataset(f, "Etot_ave")[:], label="Total energy", linewidth=2, color=colors["31"])
 
             plt.subplot(1, 2, 2)
             plt.title('t-dEnergies')
             plt.xlabel('Time, a.u.')
             plt.ylabel('Energy fluctuation, a.u.')
-            plt.plot(t, f["dEkin_ave/data"][:], label="Kinetic energy", linewidth=2, color=colors["11"])
-            plt.plot(t, f["dEpot_ave/data"][:], label="Potential energy", linewidth=2, color=colors["21"])
-            plt.plot(t, f["dEtot_ave/data"][:], label="Total energy", linewidth=2, color=colors["31"])
+            plt.plot(t, _dataset(f, "dEkin_ave")[:], label="Kinetic energy", linewidth=2, color=colors["11"])
+            plt.plot(t, _dataset(f, "dEpot_ave")[:], label="Potential energy", linewidth=2, color=colors["21"])
+            plt.plot(t, _dataset(f, "dEtot_ave")[:], label="Total energy", linewidth=2, color=colors["31"])
 
             _save("t-en")
             plt.show()
@@ -1324,7 +1337,7 @@ def plot_dyn(plot_params):
             # ========= State indices =========
 
             # ntraj = f["states"].attrs["dim"][0]
-            ntraj = f["states/data"].shape[1]
+            ntraj = _dataset(f, "states").shape[1]
 
             plt.figure(num=None, figsize=(24, 24), dpi=300, frameon=False)
 
@@ -1333,7 +1346,7 @@ def plot_dyn(plot_params):
             plt.ylabel('State index')
 
             # the state indices of every trajectory in one read
-            S = f["states/data"][:]
+            S = _dataset(f, "states")[:]
             for tr in _selected(which_trajectories, ntraj)[0]:
                 plt.plot(t, S[:, tr], label="", linewidth=2, color=colors["11"])
 
@@ -1343,12 +1356,12 @@ def plot_dyn(plot_params):
         if output_level >= 3:
 
             # ========= SH, adi SE and dia SE populations =========
-            nadi = f["D_adi/data"].shape[1]  # attrs['dim'][1]
-            ndia = f["D_dia/data"].shape[1]  # attrs['dim'][1]
+            nadi = _dataset(f, "D_adi").shape[1]  # attrs['dim'][1]
+            ndia = _dataset(f, "D_dia").shape[1]  # attrs['dim'][1]
             # the three population blocks in one read each
-            SH = f["SH_pop/data"][:]
-            Dadi = f["D_adi/data"][:]
-            Ddia = f["D_dia/data"][:]
+            SH = _dataset(f, "SH_pop")[:]
+            Dadi = _dataset(f, "D_adi")[:]
+            Ddia = _dataset(f, "D_dia")[:]
             adi = _selected(which_adi_states, nadi)[0]
             dia = _selected(which_dia_states, ndia)[0]
 
@@ -1387,11 +1400,11 @@ def plot_dyn(plot_params):
         if output_level >= 3:
 
             # ========= SH, adi SE and dia SE populations =========
-            nadi = f["D_adi_raw/data"].shape[1]  # attrs['dim'][1]
-            ndia = f["D_dia_raw/data"].shape[1]  # attrs['dim'][1]
-            SHr = f["SH_pop_raw/data"][:]
-            Dadir = f["D_adi_raw/data"][:]
-            Ddiar = f["D_dia_raw/data"][:]
+            nadi = _dataset(f, "D_adi_raw").shape[1]  # attrs['dim'][1]
+            ndia = _dataset(f, "D_dia_raw").shape[1]  # attrs['dim'][1]
+            SHr = _dataset(f, "SH_pop_raw")[:]
+            Dadir = _dataset(f, "D_adi_raw")[:]
+            Ddiar = _dataset(f, "D_dia_raw")[:]
             adi = _selected(which_adi_states, nadi)[0]
             dia = _selected(which_dia_states, ndia)[0]
 
@@ -1430,13 +1443,13 @@ def plot_dyn(plot_params):
         if output_level >= 3:
 
             # ========= Coordinates =========
-            ntraj = f["q/data"].shape[1]  # attrs['dim'][1]
-            ndof = f["q/data"].shape[2]  # attrs['dim'][2]
+            ntraj = _dataset(f, "q").shape[1]  # attrs['dim'][1]
+            ndof = _dataset(f, "q").shape[2]  # attrs['dim'][2]
             # the plotted trajectories of q and p in one read each
             trajs, tsel = _selected(which_trajectories, ntraj)
             dofs, dsel = _span(which_dofs, ndof)
-            Q = f["q/data"][:, tsel, dsel]
-            P = f["p/data"][:, tsel, dsel]
+            Q = _dataset(f, "q")[:, tsel, dsel]
+            P = _dataset(f, "p")[:, tsel, dsel]
 
             plt.figure(num=None, figsize=(24, 12), dpi=300, frameon=False)
             plt.subplot(1, 2, 1)
@@ -1463,15 +1476,15 @@ def plot_dyn(plot_params):
 
         if output_level >= 4:
 
-            ntraj = f["hvib_adi/data"].shape[1]  # attrs['dim'][1]
-            nadi = f["hvib_adi/data"].shape[2]  # attrs['dim'][2]
-            ndia = f["hvib_dia/data"].shape[2]  # attrs['dim'][2]
+            ntraj = _dataset(f, "hvib_adi").shape[1]  # attrs['dim'][1]
+            nadi = _dataset(f, "hvib_adi").shape[2]  # attrs['dim'][2]
+            ndia = _dataset(f, "hvib_dia").shape[2]  # attrs['dim'][2]
             # the plotted diagonal energies read in trajectory slabs
             trajs = _selected(which_trajectories, ntraj)[0]
             adi = _selected(which_adi_states, nadi)[0]
             dia = _selected(which_dia_states, ndia)[0]
-            Eadi = _series(f["hvib_adi/data"], trajs, adi, adi)
-            Edia = _series(f["hvib_dia/data"], trajs, dia, dia)
+            Eadi = _series(_dataset(f, "hvib_adi"), trajs, adi, adi)
+            Edia = _series(_dataset(f, "hvib_dia"), trajs, dia, dia)
 
             # ============== Adiabatic energies =============
             plt.figure(num=None, figsize=(24, 12), dpi=300, frameon=False)
@@ -1499,13 +1512,13 @@ def plot_dyn(plot_params):
 
         if output_level >= 4:
 
-            ntraj = f["St/data"].shape[1]  # attrs['dim'][1]
-            nadi = f["St/data"].shape[2]  # attrs['dim'][2]
+            ntraj = _dataset(f, "St").shape[1]  # attrs['dim'][1]
+            nadi = _dataset(f, "St").shape[2]  # attrs['dim'][2]
             # the plotted diagonal time overlaps and projectors read in trajectory slabs
             trajs = _selected(which_trajectories, ntraj)[0]
             adi = _selected(which_adi_states, nadi)[0]
-            St = _series(f["St/data"], trajs, adi, adi)
-            Pr = _series(f["projector/data"], trajs, adi, adi)
+            St = _series(_dataset(f, "St"), trajs, adi, adi)
+            Pr = _series(_dataset(f, "projector"), trajs, adi, adi)
 
             # ============== St diagonal matrix elements =============
             plt.figure(num=None, figsize=(24, 12), dpi=300, frameon=False)
@@ -1533,14 +1546,14 @@ def plot_dyn(plot_params):
 
         if output_level >= 4:
 
-            ntraj = f["basis_transform/data"].shape[1]  # attrs['dim'][1]
-            ndia = f["basis_transform/data"].shape[2]  # attrs['dim'][2]
-            nadi = f["basis_transform/data"].shape[3]  # attrs['dim'][3]
+            ntraj = _dataset(f, "basis_transform").shape[1]  # attrs['dim'][1]
+            ndia = _dataset(f, "basis_transform").shape[2]  # attrs['dim'][2]
+            nadi = _dataset(f, "basis_transform").shape[3]  # attrs['dim'][3]
             # the plotted (dia, adi) elements read in trajectory slabs
             trajs = _selected(which_trajectories, ntraj)[0]
             pairs = [(istate2, istate) for istate in _selected(which_adi_states, nadi)[0]
                      for istate2 in _selected(which_dia_states, ndia)[0]]
-            U = _series(f["basis_transform/data"], trajs, [pr[0] for pr in pairs], [pr[1] for pr in pairs])
+            U = _series(_dataset(f, "basis_transform"), trajs, [pr[0] for pr in pairs], [pr[1] for pr in pairs])
 
             # ============== dia-to-adia transformation matrix =============
             plt.figure(num=None, figsize=(24, 24), dpi=300, frameon=False)
@@ -1711,7 +1724,7 @@ def hdf2xyz(labels, filename, snaps, trajectories, atoms, unit_conversion_factor
             md_xyz = md_xyz + F"{natoms*ntraj}\nsnapshot {isnap}\n"
 
             # the snapshot's coordinates in one read
-            q_snap = f["q/data"][isnap] * unit_conversion_factor
+            q_snap = _dataset(f, "q")[isnap] * unit_conversion_factor
             for itraj in trajectories:
                 for iatom in atoms:
 
