@@ -19,7 +19,10 @@
 """
 
 
-import torch
+try:
+    import torch
+except ImportError:  # the grid builders below need torch - the import of libra_py must not
+    torch = None
 
 
 def pair_rpl_vec(r_all, r_trial, sigma_all, sigma_trial, rrange1):
