@@ -35,14 +35,15 @@ class tmp:
     pass
 
 
-# the keys model1 reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+# the keys model1 reads from its params dict (its defaults and critical keys included) plus the three the Landry-Subotnik
+# parameter sets carry for the dynamics (gamma, kT, mass) - refused at the entry, the dispatch layer's keys skipped
 MODEL1_KEYS = frozenset((
-    "D", "V", "k", "x0"
+    "D", "V", "gamma", "k", "kT", "mass", "x0"
 ))
 
-# the keys model1a reads from its params dict - refused at the entry, the dispatch layer's keys skipped
+# the keys model1a reads from its params dict plus the Landry-Subotnik sets' gamma, kT, mass - refused at the entry, the dispatch layer's keys skipped
 MODEL1A_KEYS = frozenset((
-    "D", "V", "k", "x0"
+    "D", "V", "gamma", "k", "kT", "mass", "x0"
 ))
 
 # the keys model2 reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped

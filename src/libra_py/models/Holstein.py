@@ -34,9 +34,10 @@ class tmp:
     pass
 
 
-# the keys Holstein_uncoupled reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+# the keys Holstein_uncoupled reads from its params dict (its defaults and critical keys included) plus the mass the parameter
+# set get_Holstein_set1 carries for the nuclear initialization - refused at the entry, the dispatch layer's keys skipped
 HOLSTEIN_UNCOUPLED_KEYS = frozenset((
-    "el-phon_coupling", "is_periodic", "k_harmonic", "site_coupling"
+    "el-phon_coupling", "is_periodic", "k_harmonic", "mass", "site_coupling"
 ))
 
 # the keys Holstein2 reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped

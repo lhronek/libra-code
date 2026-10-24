@@ -34,14 +34,18 @@ class tmp:
     pass
 
 
-# the keys gen_bath_params reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+# the keys gen_bath_params reads from its params dict (its defaults and critical keys included) plus the inverse temperature beta the
+# parameter sets get_GLVC_set* carry for the record - refused at the entry, the dispatch layer's keys skipped
 GEN_BATH_PARAMS_KEYS = frozenset((
-    "Kondo_ksi", "Omega", "lambda", "nstates", "num_osc", "spectral_density"
+    "Kondo_ksi", "Omega", "beta", "lambda", "nstates", "num_osc", "spectral_density"
 ))
 
-# the keys GLVC reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+# the keys GLVC reads from its params dict (its defaults and critical keys included) plus the bath generator's keys and the
+# inverse temperature beta, which the parameter sets get_GLVC_set* keep in the dict the model receives - refused at the entry,
+# the dispatch layer's keys skipped
 GLVC_KEYS = frozenset((
-    "Ham", "coupl", "coupling_scaling", "mass", "nstates", "num_osc", "omega"
+    "Ham", "Kondo_ksi", "Omega", "beta", "coupl", "coupling_scaling", "lambda", "mass", "nstates", "num_osc", "omega",
+    "spectral_density"
 ))
 
 

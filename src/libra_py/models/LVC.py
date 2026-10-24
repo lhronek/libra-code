@@ -33,9 +33,10 @@ class tmp:
     pass
 
 
-# the keys LVC reads from its params dict (its defaults and critical keys included) - refused at the entry, the dispatch layer's keys skipped
+# the keys LVC reads from its params dict (its defaults and critical keys included) plus the two the parameter sets
+# get_LVC_set* carry for the record (Er, omega_DA) - refused at the entry, the dispatch layer's keys skipped
 LVC_KEYS = frozenset((
-    "Delta1", "Delta2", "coup", "d1", "d2", "mass", "omega"
+    "Delta1", "Delta2", "Er", "coup", "d1", "d2", "mass", "omega", "omega_DA"
 ))
 
 
