@@ -105,12 +105,23 @@ void dyn_variables::init_nuclear_dyn_var(bp::dict _params, Random& rnd){
   bp::dict params(_params);
 
   default_params["init_type"] = 0;
-  default_params["q"] = vector<double>(ndof, 0.0);
-  default_params["p"] = vector<double>(ndof, 0.0);
-  default_params["mass"] = vector<double>(ndof, 1.0);
-  default_params["force_constant"] = vector<double>(ndof, 0.001);
-  default_params["q_width"] = vector<double>(ndof, 1.0);
-  default_params["p_width"] = vector<double>(ndof, 1.0);
+  // the defaults are python lists: the key loop below extracts every list key as bp::list, and a
+  // vector<double> default (a doubleList to python) would fail that extraction for a direct caller
+  bp::list def_q, def_p, def_m, def_k, def_qw, def_pw;
+  for(int i = 0; i < ndof; i++){
+    def_q.append(0.0);
+    def_p.append(0.0);
+    def_m.append(1.0);
+    def_k.append(0.001);
+    def_qw.append(1.0);
+    def_pw.append(1.0);
+  }
+  default_params["q"] = def_q;
+  default_params["p"] = def_p;
+  default_params["mass"] = def_m;
+  default_params["force_constant"] = def_k;
+  default_params["q_width"] = def_qw;
+  default_params["p_width"] = def_pw;
 
   check_input(params, default_params, critical_params);
 
