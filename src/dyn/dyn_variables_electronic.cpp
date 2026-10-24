@@ -1366,11 +1366,7 @@ void dyn_variables::init_auxiliary_variables(bp::dict _params, Random& rnd){
         p_aux_var ( list of doubles ): the mean values of momenta for all DOFs [ units: a.u. ]
         m_aux_var ( list of doubles ): masses of all auxiliary DOFs [ units: a.u. ]
 
-        params ( dictionary ): control parameters
- 
-            * **params["init_type"]** ( int ): the type of sampling of auxiliary DOFs
-     
-                - 0 : initialize identical copy of coordinates and momenta
+        params ( dictionary ): the three lists above - the dict's init_type belongs to the amplitude initializer and is not read here
  
         rnd ( Random ): random numbers generator object
 
@@ -1390,7 +1386,6 @@ void dyn_variables::init_auxiliary_variables(bp::dict _params, Random& rnd){
   bp::dict default_params;
   bp::dict params(_params);
 
-  default_params["init_type"] = 0;
   //default_params["y_aux_var"] = vector<double>(1, 0.0);
   //default_params["p_aux_var"] = vector<double>(1, 0.0);
   //default_params["m_aux_var"] = vector<double>(1, 1.0);
@@ -1408,7 +1403,6 @@ void dyn_variables::init_auxiliary_variables(bp::dict _params, Random& rnd){
   check_input(params, default_params, critical_params);
 
 
-  int init_type = 0;
   vector<double> _Y_aux_var;
   vector<double> _P_aux_var;
   vector<double> _M_aux_var;
@@ -1419,27 +1413,19 @@ void dyn_variables::init_auxiliary_variables(bp::dict _params, Random& rnd){
     key = bp::extract<std::string>(params.keys()[i]);
 
     ///================= Computing Hamiltonian-related properties ====================
-    if(key=="init_type") {  init_type = bp::extract<int>(params.values()[i]); }
-    else if(key=="y_aux_var") {  _Y_aux_var = liblibra::libconverters::Py2Cpp<double>( bp::extract< bp::list >(params.values()[i]) ); }
+    if(key=="y_aux_var") {  _Y_aux_var = liblibra::libconverters::Py2Cpp<double>( bp::extract< bp::list >(params.values()[i]) ); }
     else if(key=="p_aux_var") {  _P_aux_var = liblibra::libconverters::Py2Cpp<double>( bp::extract< bp::list >(params.values()[i]) ); }
     else if(key=="m_aux_var") {  _M_aux_var = liblibra::libconverters::Py2Cpp<double>( bp::extract< bp::list >(params.values()[i]) ); }
   }
 
 
-  ///================= Sanity check ================================
-  if(! (init_type==0) ){
-    cout<<"WARNINIG in init_auxiliary_variables:\
-           the init_type = "<<init_type<<" is not known. Allowed values are: [0]\n";
-  }
   
 
   ///================= Actual calculations  ================================
 
-  if(init_type==0){
-    y_aux_var.push_back(_Y_aux_var[0]);
-    p_aux_var.push_back(_P_aux_var[0]);
-    m_aux_var.push_back(_M_aux_var[0]);
-  }// init_type == 0
+  y_aux_var.push_back(_Y_aux_var[0]);
+  p_aux_var.push_back(_P_aux_var[0]);
+  m_aux_var.push_back(_M_aux_var[0]);
 
 }
 
