@@ -352,7 +352,7 @@ def run_relaxation(_params, _potential, model_params):
             * **_params["nsteps"]** ( int ), **_params["progress_frequency"]** ( float ): as in run_dynamics [ default: 200, 0.1 ]
 
         _potential ( PyObject ): the function computing the Hamiltonian at a grid point (see init_wfc)
-        model_params ( dict ): its parameters - nstates = len(model_params["E_n"])
+        model_params ( dict ): its parameters - model_params["nstates"] states (the dispatch layer's key, the model may read no E_n)
 
     Returns:
         data_savers.mem_saver: when mem_output_level > 0, else None
@@ -364,7 +364,7 @@ def run_relaxation(_params, _potential, model_params):
     default_params = copy.deepcopy(RELAXATION_DEFAULTS)
     comn.check_input(params, default_params, critical_params)
 
-    nstates = len(model_params["E_n"])
+    nstates = model_params["nstates"]
     nsteps = params["nsteps"]
     print_freq = int(params["progress_frequency"] * nsteps)
     params.update({"nstates": nstates})

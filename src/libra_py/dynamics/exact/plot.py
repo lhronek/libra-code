@@ -98,7 +98,7 @@ def plot_mem(res, _params, model_params, plot_params):
     params = dict(_params)
 
     nsteps = params["nsteps"]
-    nstates = len(model_params["E_n"])
+    nstates = model_params["nstates"]
     prefix = params["prefix"]
     properties_to_save = params["properties_to_save"]
 
