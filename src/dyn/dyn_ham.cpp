@@ -899,8 +899,10 @@ void update_time_overlaps(dyn_control_params &prms, dyn_variables &dyn_var,
            ham.children[traj]->get_basis_transform();
       // a model that supplies its own time-overlaps must not have them
       // silently overwritten by a DISAGREEING recomputation (identity
-      // basis transforms make st = I and freeze the electronic dynamics)
-      if (ham.children[traj]->time_overlap_adi_supplied &&
+      // basis transforms make st = I and freeze the electronic dynamics) -
+      // at the init call ham_prev is ham itself: no interval exists yet, the
+      // recomputed identity is no disagreement with the supplied interval overlap
+      if (&ham_prev != &ham && ham.children[traj]->time_overlap_adi_supplied &&
           abs((st - ham.children[traj]->get_time_overlap_adi()).max_elt()) > 1e-8) {
         cout << "Error in update_time_overlaps(): the model supplies "
                 "obj.time_overlap_adi, but time_overlap_method = 1 recomputes the "
