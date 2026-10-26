@@ -79,15 +79,26 @@ COMMON_PLOT_DEFAULTS = {"prefix": "out", "filename": "mem_data.hdf", "output_lev
                       "what_to_plot": ["energies", "energy_fluctuations",
                                        "traj_resolved_adiabatic_ham", "traj_resolved_diabatic_ham",
                                        "coordinates", "phase_space",
-                                       "sh_pop", "se_pop_adi", "se_pop_dia",
-                                       "sh_pop_raw", "se_pop_adi_raw", "se_pop_dia_raw",
-                                       "time_overlaps", "projectors", "basis_transform"
+                                       "sh_pop_adi", "se_pop_adi", "se_pop_dia",
+                                       "time_overlaps", "projector", "basis_transform"
                                        ],
                       "no_label": 0
                       }
 # every key the TSH plots read - plot_dyn's own defaults are a subset: the entries warn about a key outside this set (the
 # tutorials share one plot dict with other modules' plots, so no refusal)
 TSH_PLOT_KEYS = frozenset(COMMON_PLOT_DEFAULTS)
+# every what_to_plot token the TSH plots draw - a token outside the set is warned about like an unknown key (a shared
+# plot dict may carry another module's tokens)
+TSH_PLOT_TOKENS = frozenset((
+    "VP", "basis_transform", "coherence_adi", "coherence_dia", "coordinates", "energies", "energy_fluctuations",
+    "f_xf", "forces", "mash_pop_adi", "mash_pop_dia", "momenta", "nab_phase", "p_aux", "p_quant", "phase_space",
+    "phase_space_aux", "projector", "q_aux", "se_pop_adi", "se_pop_dia", "sh_pop_adi", "sh_pop_adi_TR", "sh_pop_dia",
+    "sh_pop_dia_TR", "time_overlaps", "traj_resolved_adiabatic_ham", "traj_resolved_diabatic_ham"
+))
+
+
+def _warn_unknown_tokens(what_to_plot, where):
+    warn_unknown_keys(dict.fromkeys(what_to_plot), TSH_PLOT_TOKENS, where, "what_to_plot", "the TSH plots do not draw")
 
 
 def common_defaults(plot_params_):
@@ -1022,6 +1033,7 @@ def plot_dynamics(plot_params_):
     which_adi_states = plot_params["which_adi_states"]
     which_dia_states = plot_params["which_dia_states"]
     what_to_plot = plot_params["what_to_plot"]
+    _warn_unknown_tokens(what_to_plot, "plot_dynamics")
     out_prefix = prefix
 
     axes_fontsize = plot_params["axes_fontsize"]
@@ -1184,7 +1196,7 @@ def plot_dynamics(plot_params_):
             if plot_params["save_figures"] == 1 and res == 1:
                 _save("hvib_adi")
 
-        if "traj_resolved_adiabatic_ham" in what_to_plot:
+        if "traj_resolved_diabatic_ham" in what_to_plot:
             plt.figure(num=18, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
                        edgecolor='black', frameon=plot_params["frameon"])
             plt.subplot(1, 1, 1)
@@ -2199,6 +2211,7 @@ def plot_dynamics_xf(plot_params_):
     which_adi_states = plot_params["which_adi_states"]
     which_dia_states = plot_params["which_dia_states"]
     what_to_plot = plot_params["what_to_plot"]
+    _warn_unknown_tokens(what_to_plot, "plot_dynamics_xf")
     out_prefix = prefix
 
     axes_fontsize = plot_params["axes_fontsize"]
