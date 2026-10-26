@@ -666,12 +666,8 @@ def add_populations(plt, hdf_file, plot_params_, pop_type):
 
     pop_type (string): selector of the type of the population to plot
 
-        - "D_dia_raw"
-        - "D_adi_raw"
-        - "SH_pop_raw"
         - "D_dia"
         - "D_adi"
-        - "SH_pop"
         - "se_pop_adi"
         - "se_pop_dia"
         - "sh_pop_adi"
@@ -685,8 +681,8 @@ def add_populations(plt, hdf_file, plot_params_, pop_type):
     Call it after adding a sub-plot
     """
 
-    possible_options = ["D_dia_raw", "D_adi_raw", "SH_pop_raw", "D_dia", "D_adi", "SH_pop", "se_pop_adi", "se_pop_dia",
-                        "sh_pop_adi", "sh_pop_dia", "sh_pop_adi_TR", "sh_pop_dia_TR", "mash_pop_adi", "mash_pop_dia"]
+    possible_options = ["D_dia", "D_adi", "se_pop_adi", "se_pop_dia", "sh_pop_adi", "sh_pop_dia",
+                        "sh_pop_adi_TR", "sh_pop_dia_TR", "mash_pop_adi", "mash_pop_dia"]
     if pop_type not in possible_options:
         raise RuntimeError(F"in add_populations - the pop_type argument {pop_type} is invalid. "
                            F"Must be one of the following options: {possible_options}")
@@ -705,7 +701,7 @@ def add_populations(plt, hdf_file, plot_params_, pop_type):
 
     nstates, which_states = 0, []
 
-    if pop_type in ["D_dia"]:  # , "D_dia_raw"]:  # diabatic SE properties
+    if pop_type in ["D_dia"]:  # diabatic SE properties
         if "D_dia/data" in hdf_file.keys():
             nstates = hdf_file["D_dia/data"].shape[1]
             which_states = plot_params["which_dia_states"]
@@ -715,19 +711,14 @@ def add_populations(plt, hdf_file, plot_params_, pop_type):
             nstates = hdf_file["se_pop_dia/data"].shape[1]
             which_states = plot_params["which_dia_states"]
 
-    elif pop_type in ["D_adi"]:  # , "D_adi_raw"]: # adiabatic SE properties
-        if "D_adi/data" in hdf_file.keys():
-            nstates = hdf_file["D_adi/data"].shape[1]
+    elif pop_type in ["D_adi"]:  # adiabatic SE properties
+        if F"{pop_type}/data" in hdf_file.keys():
+            nstates = hdf_file[F"{pop_type}/data"].shape[1]
             which_states = plot_params["which_adi_states"]
 
     elif pop_type in ["se_pop_adi"]:  # adiabatic SE populations
         if "se_pop_adi/data" in hdf_file.keys():
             nstates = hdf_file["se_pop_adi/data"].shape[1]
-            which_states = plot_params["which_adi_states"]
-
-    elif pop_type in ["SH_pop"]:  # , "SH_pop_raw"]: # adiabatic SH properties
-        if "SH_pop/data" in hdf_file.keys():
-            nstates = hdf_file["SH_pop/data"].shape[1]
             which_states = plot_params["which_adi_states"]
 
     elif pop_type in ["sh_pop_dia"]:  # diabatic SH populations
@@ -761,13 +752,9 @@ def add_populations(plt, hdf_file, plot_params_, pop_type):
             which_states = plot_params["which_adi_states"]
 
     titles = {"D_dia": "Diabatic SE populations",
-              "D_dia_raw": "Diabatic SE populations (raw)",
               "se_pop_dia": "Diabatic SE populations",
               "D_adi": "Adiabatic SE populations",
-              "D_adi_raw": "Adiabatic SE populations (raw)",
               "se_pop_adi": "Adiabatic SE populations",
-              "SH_pop": "Adiabatic SH populations",
-              "SH_pop_raw": "Adiabatic SH populations (raw)",
               "sh_pop_dia": "Diabatic SH populations",
               "sh_pop_adi": "Adiabatic SH populations",
               "sh_pop_dia_TR": "Diabatic SH populations from the Tempelaar and Reichman's method",
@@ -787,10 +774,10 @@ def add_populations(plt, hdf_file, plot_params_, pop_type):
     plt.xlabel('Time, fs', fontsize=axes_label_fontsize[0])
     plt.ylabel('Population', fontsize=axes_label_fontsize[1])
 
-#    if pop_type in ["D_dia_raw", "D_adi_raw", "D_dia", "D_adi"]:
+#    if pop_type in ["D_dia", "D_adi"]:
 
     res = 0
-    if pop_type in ["D_dia", "D_adi", "SH_pop", "se_pop_adi", "se_pop_dia", "sh_pop_adi", "sh_pop_dia",
+    if pop_type in ["D_dia", "D_adi", "se_pop_adi", "se_pop_dia", "sh_pop_adi", "sh_pop_dia",
                     "sh_pop_adi_TR", "sh_pop_dia_TR", "mash_pop_adi", "mash_pop_dia"]:
         if F"{pop_type}/data" in hdf_file.keys():
             res = 1
@@ -803,8 +790,6 @@ def add_populations(plt, hdf_file, plot_params_, pop_type):
                 series = np.empty((len(t), 0))
             elif pop_type in ["D_dia", "D_adi"]:
                 series = _diagonal_series(P, states)
-            elif pop_type == "SH_pop":
-                series = P[:, selection, 0]
             else:
                 series = P[:, selection]
             for indx, istate in enumerate(states):
@@ -896,8 +881,8 @@ def add_time_overlaps_projectors(plt, hdf_file, plot_params_, prop_type):
 
         - "St" : <psi_i(t-dt)|psi_i(t)>, for selected adiabatic states,
             this property indicates the state-reorderings
-        - "projector": the diagonal elements of the cumulative transformation matrix
-            that converts the "raw" adiabatic states to the dynamically-consistent ones
+        - "projector": the diagonal elements of the step's basis re-expansion transform
+            (the time overlap's permutation and phases, or the LD rotation)
 
     Call it after adding a sub-plot
     """
@@ -927,7 +912,7 @@ def add_time_overlaps_projectors(plt, hdf_file, plot_params_, prop_type):
     nstates = hdf_file[F"{prop_type}/data"].shape[2]
 
     titles = {"St": "Time-overlaps of adiabatic states",
-              "projector": "Projectors of raw to dyn-consistent states",
+              "projector": "Basis re-expansion transforms of the steps",
               }
 
     if xlim is not None:
@@ -1359,7 +1344,7 @@ def plot_dyn(plot_params):
             nadi = _dataset(f, "D_adi").shape[1]  # attrs['dim'][1]
             ndia = _dataset(f, "D_dia").shape[1]  # attrs['dim'][1]
             # the three population blocks in one read each
-            SH = _dataset(f, "SH_pop")[:]
+            SH = _dataset(f, "sh_pop_adi")[:]
             Dadi = _dataset(f, "D_adi")[:]
             Ddia = _dataset(f, "D_dia")[:]
             adi = _selected(which_adi_states, nadi)[0]
@@ -1374,7 +1359,7 @@ def plot_dyn(plot_params):
             plt.ylabel('Population, a.u.')
 
             for indx, istate in enumerate(adi):
-                plt.plot(t, SH[:, istate, 0], label=F"state {istate}", linewidth=2, color=_color(colors, clrs_index, indx))
+                plt.plot(t, SH[:, istate], label=F"state {istate}", linewidth=2, color=_color(colors, clrs_index, indx))
 
             # ================ adi SE populations =============
             plt.subplot(1, 3, 2)
@@ -1395,49 +1380,6 @@ def plot_dyn(plot_params):
                 plt.plot(t, Ddia[:, istate, istate], label=F"state {istate}", linewidth=2, color=_color(colors, clrs_index, indx))
 
             _save("t-pops")
-            plt.show()
-
-        if output_level >= 3:
-
-            # ========= SH, adi SE and dia SE populations =========
-            nadi = _dataset(f, "D_adi_raw").shape[1]  # attrs['dim'][1]
-            ndia = _dataset(f, "D_dia_raw").shape[1]  # attrs['dim'][1]
-            SHr = _dataset(f, "SH_pop_raw")[:]
-            Dadir = _dataset(f, "D_adi_raw")[:]
-            Ddiar = _dataset(f, "D_dia_raw")[:]
-            adi = _selected(which_adi_states, nadi)[0]
-            dia = _selected(which_dia_states, ndia)[0]
-
-            plt.figure(num=None, figsize=(24, 8), dpi=300, frameon=False)
-
-            # ================ SH populations =============
-            plt.subplot(1, 3, 1)
-            plt.title('SH populations (raw)')
-            plt.xlabel('Time, a.u.')
-            plt.ylabel('Population, a.u.')
-
-            for indx, istate in enumerate(adi):
-                plt.plot(t, SHr[:, istate, 0], label=F"state {istate}", linewidth=2, color=_color(colors, clrs_index, indx))
-
-            # ================ adi SE populations =============
-            plt.subplot(1, 3, 2)
-            plt.title('adi SE populations (raw)')
-            plt.xlabel('Time, a.u.')
-            plt.ylabel('Population, a.u.')
-
-            for indx, istate in enumerate(adi):
-                plt.plot(t, Dadir[:, istate, istate], label=F"state {istate}", linewidth=2, color=_color(colors, clrs_index, indx))
-
-            # ================ dia SE populations =============
-            plt.subplot(1, 3, 3)
-            plt.title('dia SE populations (raw)')
-            plt.xlabel('Time, a.u.')
-            plt.ylabel('Population, a.u.')
-
-            for indx, istate in enumerate(dia):
-                plt.plot(t, Ddiar[:, istate, istate], label=F"state {istate}", linewidth=2, color=_color(colors, clrs_index, indx))
-
-            _save("t-pops_raw")
             plt.show()
 
         if output_level >= 3:
