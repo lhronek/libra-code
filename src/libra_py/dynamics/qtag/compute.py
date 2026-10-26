@@ -161,6 +161,7 @@ def qtag_momentum(_q, _p, _a, _s, coeff_on_surf, dyn_params):
 
     critical_params = []
     default_params = copy.deepcopy(QTAG_MOMENTUM_DEFAULTS)
+    refuse_unknown_keys(dyn_params, DYN_PARAMS_KEYS, "qtag.qtag_momentum", "dyn_params", "no function of the QTAG run reads")
     comn.check_input(params, default_params, critical_params)
 
     # Extract parameters from params dict...
@@ -322,6 +323,7 @@ def propagate_basis(_q, _p, _alp, _s, _states, coeff, dyn_params, surf_pops):
     params = dict(dyn_params)
     critical_params = list(PROPAGATE_BASIS_CRITICAL)
     default_params = copy.deepcopy(PROPAGATE_BASIS_DEFAULTS)
+    refuse_unknown_keys(dyn_params, DYN_PARAMS_KEYS, "qtag.propagate_basis", "dyn_params", "no function of the QTAG run reads")
     comn.check_input(params, default_params, critical_params)
 
     dt = params["dt"]

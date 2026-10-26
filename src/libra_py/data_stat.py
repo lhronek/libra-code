@@ -30,6 +30,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 
 # import common_utils as comn
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 from libra_py import data_conv
 
 
@@ -116,6 +117,10 @@ def mat_center_data(data):
     return data_new
 
 
+# the keys find_maxima reads - a caller sharing a larger dict hands over restrict(params, FIND_MAXIMA_KEYS)
+FIND_MAXIMA_KEYS = frozenset(("do_output", "logname", "verbose"))
+
+
 def find_maxima(data, params):
     """
 
@@ -149,6 +154,7 @@ def find_maxima(data, params):
 
     critical_params = []
     default_params = {"do_output": False, "logname": "data_maxima.txt", "verbose": 0}
+    refuse_unknown_keys(params, FIND_MAXIMA_KEYS, "data_stat.find_maxima", "params", "find_maxima does not read")
     comn.check_input(params, default_params, critical_params)
 
     do_output = params["do_output"]

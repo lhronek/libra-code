@@ -54,6 +54,7 @@ import util.libutil as comn
 import libra_py.packages.qe.utils as QE_utils
 import libra_py.units as units
 import libra_py.regexlib as rgl
+from libra_py.params_check import refuse_unknown_keys
 
 
 def cryst2cart(a1, a2, a3, r):
@@ -1647,6 +1648,12 @@ def get_QE_normal_modes(filename, verbosity=0):
 
 
 
+# the keys run_qe, read_info, read_all and read_wfc_grid read - one dict serves them all (run_qe calls read_info, read_info
+# calls read_all), so each refuses a key outside this set and a caller sharing a larger dict hands over restrict(params, QE_METHODS_KEYS)
+QE_METHODS_KEYS = frozenset(("BATCH_SYSTEM", "EXE", "EXE_EXPORT", "NP", "maxband", "maxband_soc", "minband", "minband_soc", "nac_method",
+                             "orthogonalize", "prefix", "prefix0", "prefix1", "read_grid", "read_wfc", "verb0", "verb1", "verb2", "wd"))
+
+
 def run_qe(params, t, dirname0, dirname1):
     """
 
@@ -1706,6 +1713,7 @@ def run_qe(params, t, dirname0, dirname1):
         "prefix1": "x1.scf",
         "nac_method": 0,
         "wd": "wd"}
+    refuse_unknown_keys(params, QE_METHODS_KEYS, "qe.run_qe", "params", "no QE method reads")
     comn.check_input(params, default_params, critical_params)
 
     BATCH_SYSTEM = params["BATCH_SYSTEM"]
@@ -1800,6 +1808,7 @@ def read_info(params):
     # Now try to get parameters from the input
     critical_params = []
     default_params = {"nac_method": 0, "wd": "wd"}
+    refuse_unknown_keys(params, QE_METHODS_KEYS, "qe.read_info", "params", "no QE method reads")
     comn.check_input(params, default_params, critical_params)
 
     nac_method = params["nac_method"]
@@ -1899,6 +1908,7 @@ def read_all(params):
                       "verb0": 0, "verb1": 0, "verb2": 0,
                       "nac_method": 0, "minband": 1, "maxband": 2
                       }
+    refuse_unknown_keys(params, QE_METHODS_KEYS, "qe.read_all", "params", "no QE method reads")
     comn.check_input(params, default_params, critical_params)
 
     wd = params["wd"]
@@ -2038,6 +2048,7 @@ def read_wfc_grid(params):
                       "minband": 1, "maxband": 2,
                       "minband_soc": 1, "maxband_soc": 2
                       }
+    refuse_unknown_keys(params, QE_METHODS_KEYS, "qe.read_wfc_grid", "params", "no QE method reads")
     comn.check_input(params, default_params, critical_params)
 
     nac_method = params["nac_method"]

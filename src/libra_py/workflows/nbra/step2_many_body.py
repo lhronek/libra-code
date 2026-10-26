@@ -189,14 +189,14 @@ def get_excitation_analysis_output(params):
         logfile_name = F"{logfile_directory}/step_{curr_step}.log"
         params.update({"logfile_name": logfile_name})
         excitation_energies, ci_basis_raw, ci_coefficients_raw_unnorm, spin_components = \
-            Gaussian_methods.read_gaussian_tddft_log_file(params)
+            Gaussian_methods.read_gaussian_tddft_log_file(restrict(params, Gaussian_methods.READ_TDDFT_LOG_KEYS))
 
     elif es_software == "dftb+":
 
         logfile_name = F"{logfile_directory}/TRA_{curr_step}.DAT"
         params.update({"logfile_name": logfile_name})
         excitation_energies, ci_basis_raw, ci_coefficients_raw_unnorm, spin_components = \
-            DFTB_methods.read_dftbplus_TRA_file(params)
+            DFTB_methods.read_dftbplus_TRA_file(restrict(params, DFTB_methods.READ_TRA_FILE_KEYS))
 
     return excitation_energies, ci_basis_raw, ci_coefficients_raw_unnorm, spin_components
 
@@ -266,6 +266,7 @@ def compute_cube_ks_overlaps(cubefiles_prev, params):
     # Default parameters
     default_params = {"isUKS": 0, "es_software": "cp2k"}
     # Check input
+    refuse_unknown_keys(params, RUN_STEP2_MANY_BODY_KEYS, "step2_many_body.compute_cube_ks_overlaps", "params", "no function of the many-body step-2 workflow reads")
     comn.check_input(params, default_params, critical_params)
     # Extract the variables
     curr_step = int(params["curr_step"])
@@ -583,6 +584,7 @@ def form_Hvib_real(params):
     # Default parameters
     default_params = {"isUKS": 0, "es_software": "cp2k", "logfile_directory": "logfiles"}
     # Check input
+    refuse_unknown_keys(params, RUN_STEP2_MANY_BODY_KEYS, "step2_many_body.form_Hvib_real", "params", "no function of the many-body step-2 workflow reads")
     comn.check_input(params, default_params, critical_params)
     # Extracting the data
 

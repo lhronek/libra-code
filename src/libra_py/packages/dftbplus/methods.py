@@ -701,6 +701,10 @@ def cube_generator_dftbplus(project_name, time_step, min_band, max_band, waveplo
         os.system("mv *" + str(state) + "-real.cube " + cube_name)
 
 
+# the keys read_dftbplus_TRA_file reads - the many-body workflow hands over restrict(params, READ_TRA_FILE_KEYS)
+READ_TRA_FILE_KEYS = frozenset(("ci_threshold", "isUKS", "logfile_name", "number_of_states"))
+
+
 def read_dftbplus_TRA_file(params):
     """
     This function reads TRA.dat files generated from TD-DFTB calculations using DFTB+ and returns
@@ -728,6 +732,7 @@ def read_dftbplus_TRA_file(params):
     # Default parameters
     default_params = {"ci_threshold": 0.001, "isUKS": 0}
     # Check input
+    refuse_unknown_keys(params, READ_TRA_FILE_KEYS, "dftbplus.read_dftbplus_TRA_file", "params", "the reader does not read")
     comn.check_input(params, default_params, critical_params)
 
     logfile_name = params["logfile_name"]

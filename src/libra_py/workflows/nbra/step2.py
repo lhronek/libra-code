@@ -45,7 +45,7 @@ from libra_py import units
 
 # import libra_py.common_utils as comn
 import util.libutil as comn
-from libra_py.params_check import refuse_unknown_keys
+from libra_py.params_check import refuse_unknown_keys, restrict
 
 from . import compute_properties
 from . import compute_hprime
@@ -200,7 +200,7 @@ def run(params):
             dirname0, dirname1 = "next0", "next1"
 
         # Run the QE calculations
-        QE_methods.run_qe(params, t, dirname0, dirname1)
+        QE_methods.run_qe(restrict(params, QE_methods.QE_METHODS_KEYS), t, dirname0, dirname1)
 
         if curr_index >= start_indx:
 
@@ -208,10 +208,10 @@ def run(params):
             params["curr_index"] = curr_index
 
             # First see wether the calculation is what we wanted
-            info0, all_e_dum0, info1, all_e_dum1 = QE_methods.read_info(params)
+            info0, all_e_dum0, info1, all_e_dum1 = QE_methods.read_info(restrict(params, QE_methods.QE_METHODS_KEYS))
 
             # Read present and next electronic structure (es) in a formatted way
-            es_curr, es_next = QE_methods.read_wfc_grid(params)
+            es_curr, es_next = QE_methods.read_wfc_grid(restrict(params, QE_methods.QE_METHODS_KEYS))
 
             # Finally,  using the current and the next wavefunctions to compute the properties of interest
 

@@ -35,7 +35,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 
 # import common_utils as comn
 import util.libutil as comn
-from libra_py.params_check import refuse_unknown_keys
+from libra_py.params_check import refuse_unknown_keys, restrict
 from . import units
 from . import data_stat
 from . import acf
@@ -228,7 +228,7 @@ def compute_mat_elt(X, a, b, params):
     T, norm_acf, raw_acf, W, J, J2 = recipe1(data_ab, params1)   # T is in fs, W is in cm^-1
 
     # ===== Determine all frequencies (peaks) and sort them (in accending manner) ====
-    out = data_stat.find_maxima(J2, params1)
+    out = data_stat.find_maxima(J2, restrict(params1, data_stat.FIND_MAXIMA_KEYS))
 
     if do_output:
         lgfile = open(logname, "a")

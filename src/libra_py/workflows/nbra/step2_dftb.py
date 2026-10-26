@@ -180,6 +180,8 @@ def do_step(snap, params):
                       "eigensolver": "eigh" 
                       }
 
+    refuse_unknown_keys(params, STEP2_DFTB_KEYS, "step2_dftb.do_step", "params", "no function of the DFTB+ step-2 workflow reads")
+
     comn.check_input(params, default_params, critical_params)
 
     # Get the parameters
@@ -412,6 +414,7 @@ def do_ovlp(snap, params):
                       "md_file": "md.xyz", "ovlp_gen_file": "x2.gen", "syst_spec": "C",
                       "ovlp_in_file": "dftb_in_overlaps.hsd", "tol": 2.5
                       }
+    refuse_unknown_keys(params, STEP2_DFTB_KEYS, "step2_dftb.do_ovlp", "params", "no function of the DFTB+ step-2 workflow reads")
     comn.check_input(params, default_params, critical_params)
 
     # Get the parameters
@@ -559,6 +562,8 @@ RUN_STEP2_LZ_KEYS = frozenset(("EXE", "ODIN_PARAMS", "do_tddftb", "dt", "eigenso
                                "get_dominant_sd_transitions", "get_midpoint_energy", "hs_in_file", "isnap",
                                "md_file", "mo_active_space", "out_dir", "scf_in_file", "sp_gen_file", "syst_spec",
                                "use_single_sd_energy"))
+# the dict run_step2 and run_step2_lz hand to do_step / do_ovlp - the helpers refuse a key outside the two entries' sets
+STEP2_DFTB_KEYS = RUN_STEP2_KEYS | RUN_STEP2_LZ_KEYS
 
 
 def run_step2_lz(params):

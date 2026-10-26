@@ -107,6 +107,7 @@ def do_step(i, params, run):
                       "mo_active_space": None, "mo_indexing_convention": "rel",
                       "direct_MO": 1, "spinpolarized": 0
                       }
+    refuse_unknown_keys(params, RUN_STEP2_KEYS, "step2_ergoscf.do_step", "params", "no function of the ErgoSCF step-2 workflow reads")
     comn.check_input(params, default_params, critical_params)
 
     # Get the parameters
@@ -268,6 +269,7 @@ def do_ovlp(i, params, run):
     # Now try to get parameters from the input
     critical_params = []
     default_params = {"EXE": "ergo", "md_file": "md.xyz"}
+    refuse_unknown_keys(params, RUN_STEP2_KEYS, "step2_ergoscf.do_ovlp", "params", "no function of the ErgoSCF step-2 workflow reads")
     comn.check_input(params, default_params, critical_params)
 
     # Get the parameters

@@ -26,6 +26,10 @@ import util.libutil as comn
 from libra_py.params_check import refuse_unknown_keys
 
 
+# the keys read_gaussian_tddft_log_file reads - the many-body workflow hands over restrict(params, READ_TDDFT_LOG_KEYS)
+READ_TDDFT_LOG_KEYS = frozenset(("ci_threshold", "isUKS", "logfile_name", "number_of_states"))
+
+
 def read_gaussian_tddft_log_file(params):
     """
     This function read Gaussian output file and extracts the excitation analysis results.
@@ -59,6 +63,7 @@ def read_gaussian_tddft_log_file(params):
     # Default parameters
     default_params = {"ci_threshold": 0.05, "number_of_states": 5, "isUKS": 0}
     # Check input
+    refuse_unknown_keys(params, READ_TDDFT_LOG_KEYS, "gaussian.read_gaussian_tddft_log_file", "params", "the reader does not read")
     comn.check_input(params, default_params, critical_params)
 
     # Gaussian log file name
