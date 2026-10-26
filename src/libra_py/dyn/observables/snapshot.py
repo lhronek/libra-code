@@ -9,6 +9,8 @@ from typing import Any, Iterable
 
 import numpy as np
 
+from libra_py.params_check import refuse_unknown_keys
+
 from .energies import (
     active_potential_energy,
     ehrenfest_potential_energy,
@@ -37,7 +39,6 @@ LEGACY_OUTPUT_LEVEL_KEYWORDS = {
         "E_NHC",
         "tcnbra_ekin",
         "tcnbra_thermostat_energy",
-        "Ekin_ave_qtsh",
         "ekin_aux_var",
     ),
     2: (
@@ -57,12 +58,8 @@ LEGACY_OUTPUT_LEVEL_KEYWORDS = {
         "f_aux_var",
     ),
     3: (
-        "SH_pop",
-        "SH_pop_raw",
         "D_adi",
-        "D_adi_raw",
         "D_dia",
-        "D_dia_raw",
         "coherence_adi",
         "coherence_dia",
         "q",
@@ -97,6 +94,29 @@ LEGACY_OUTPUT_LEVEL_KEYWORDS = {
     ),
     5: ("dc1_adi",),
 }
+
+# every old-style keyword the snapshot serves - a requested name outside it is refused with the nearest known one
+LEGACY_KEYWORDS = frozenset(name for names in LEGACY_OUTPUT_LEVEL_KEYWORDS.values() for name in names)
+
+# the five dead names of dynamics/tsh/save.DEAD_PROPERTIES (the certifier pins the equality), kept here so the package stays
+# free of liblibra - the live datasets are the ones in each step's eigenvector labels, the tracked labels of 2022 are not kept
+LEGACY_DEAD_KEYWORDS = {
+    "SH_pop": "sh_pop_adi holds the surface-hopping population in each step's eigenvector labels",
+    "SH_pop_raw": "sh_pop_adi holds the surface-hopping population in the eigenvector labels",
+    "D_adi_raw": "D_adi holds the adiabatic density in the eigenvector labels",
+    "D_dia_raw": "D_dia holds the diabatic density - the diabatic labels are never relabelled",
+    "Ekin_ave_qtsh": "no observable - the QTSH kinematic momentum and its kinetic energy left the engine in 2024",
+}
+
+
+def check_legacy_keywords(keywords) -> None:
+    """Refuse a requested old-style keyword no observable serves: the five legacy names with what replaces them, any
+    other unknown name with the nearest known one."""
+    dead = [name for name in keywords if name in LEGACY_DEAD_KEYWORDS]
+    if dead:
+        raise ValueError("the observable keywords name " + ", ".join(F"{n} ({LEGACY_DEAD_KEYWORDS[n]})" for n in dead))
+    refuse_unknown_keys(dict.fromkeys(keywords), LEGACY_KEYWORDS, "compute_legacy_observables", "keywords",
+                        "no observable serves")
 
 
 @dataclass(frozen=True)
@@ -221,11 +241,13 @@ def compute_legacy_observables(
     """
     Compute old-save-style observable names for one trajectory slice.
 
-    Unsupported method-specific keys are omitted unless the corresponding
-    TensorStorage field exists. This keeps snapshots economical and avoids
-    fabricating values for methods that are not active.
+    A keyword no observable serves is refused (check_legacy_keywords). A served method-specific key is omitted when
+    the corresponding TensorStorage field does not exist. This keeps snapshots economical and avoids fabricating
+    values for methods that are not active.
     """
 
+    keywords = tuple(keywords)
+    check_legacy_keywords(keywords)
     requested = set(keywords)
     idx = traj.tbf_ids
     result: dict[str, Any] = {
@@ -255,9 +277,6 @@ def compute_legacy_observables(
     _add_optional_array(result, requested, "tcnbra_ekin", storage)
     _add_optional_array(result, requested, "tcnbra_thermostat_energy", storage)
     _add_optional_array(result, requested, "ekin_aux_var", storage)
-    if "Ekin_ave_qtsh" in requested:
-        result["Ekin_ave_qtsh"] = float(np.mean(ekin))
-
     _add_active_states(result, requested, storage, traj)
     _add_population_observables(result, requested, storage, traj)
     _add_density_observables(result, requested, storage, traj)
@@ -321,21 +340,12 @@ def _add_population_observables(result, requested, storage, traj) -> None:
                 "adiabatic" if source.endswith("adi") else "diabatic",
             ))
 
-    if "SH_pop" in requested:
-        result["SH_pop"] = _normalized_counts(storage, traj, "adiabatic")[:, None]
-    if "SH_pop_raw" in requested:
-        result["SH_pop_raw"] = _normalized_counts(storage, traj, "adiabatic")[:, None]
-
 
 def _add_density_observables(result, requested, storage, traj) -> None:
     if "D_adi" in requested:
         result["D_adi"] = _average_density(storage, traj, "adiabatic")
-    if "D_adi_raw" in requested:
-        result["D_adi_raw"] = _average_density(storage, traj, "adiabatic")
     if "D_dia" in requested:
         result["D_dia"] = _average_density(storage, traj, "diabatic")
-    if "D_dia_raw" in requested:
-        result["D_dia_raw"] = _average_density(storage, traj, "diabatic")
     if "coherence_adi" in requested:
         result["coherence_adi"] = _coherence_indicator(_average_density(storage, traj, "adiabatic"))
     if "coherence_dia" in requested:
