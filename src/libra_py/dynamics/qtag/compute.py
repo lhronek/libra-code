@@ -840,6 +840,7 @@ def run_qtag(_q, _p, _alp, _s, _states, _coeff, _iM, _dyn_params, _compute_model
     critical_params = list(RUN_QTAG_CRITICAL)
     refuse_unknown_keys(dyn_params, DYN_PARAMS_KEYS, "qtag.run_qtag", "dyn_params", "no function of the QTAG run reads")
     comn.check_input(dyn_params, default_params, critical_params)
+    save.check_properties_to_save(dyn_params["properties_to_save"])    # a name no saver writes is refused here, before any output
 
     ndof = Q.num_of_rows
     ntraj = Q.num_of_cols  # total number of trajectories

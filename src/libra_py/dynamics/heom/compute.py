@@ -347,6 +347,7 @@ def run_dynamics(dyn_params, Ham, rho_init, adm_init=None):
     # check_input keeps every extra key, so a misspelled key would stay at its default silently
     refuse_unknown_keys(params, set(default_params) | set(critical_params), "heom.run_dynamics", "dyn_params", "run_dynamics does not read")
     comn.check_input(params, default_params, critical_params)
+    save.check_properties_to_save(params["properties_to_save"])    # a name no saver writes is refused here, before any output
 
     nsteps = params["nsteps"]
     print_freq = int(params["progress_frequency"] * nsteps)

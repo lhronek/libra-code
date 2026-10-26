@@ -363,6 +363,7 @@ def run_relaxation(_params, _potential, model_params):
     critical_params = []
     default_params = copy.deepcopy(RELAXATION_DEFAULTS)
     comn.check_input(params, default_params, critical_params)
+    save.check_properties_to_save(params["properties_to_save"])    # a name no saver writes is refused here, before the grid is built
 
     nstates = model_params["nstates"]
     nsteps = params["nsteps"]

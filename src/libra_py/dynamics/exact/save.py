@@ -49,6 +49,7 @@ import util.libutil as comn
 # import libra_py.units as units
 # import libra_py.data_outs as data_outs
 import libra_py.data_savers as data_savers
+from libra_py.params_check import refuse_unknown_keys
 
 # ===================== Exact calculations output ====================
 
@@ -57,6 +58,21 @@ import libra_py.data_savers as data_savers
 # compute.PARAMS_KEYS
 SAVER_KEYS = ("prefix", "prefix2", "hdf5_output_level", "txt_output_level", "txt2_output_level", "mem_output_level",
               "properties_to_save", "use_compression", "compression_level", "custom_pops")
+
+# every property the exact savers can write - exact_init_hdf5 and exact_init_custom_hdf5 allocate exactly these names (the
+# certifier pins the equality), a requested name outside the set is refused instead of staying in the keyword list unwritten
+SAVEABLE_PROPERTIES = frozenset((
+    "Ekin_adi", "Ekin_dia", "Epot_adi", "Epot_dia", "Etot_adi", "Etot_dia", "PSI_adi", "PSI_dia", "coherence_adi", "coherence_dia",
+    "custom_pops", "denmat_adi", "denmat_dia", "norm_adi", "norm_dia", "p2_adi", "p2_dia", "p_adi", "p_dia", "pop_adi", "pop_dia",
+    "q2_adi", "q2_dia", "q_adi", "q_dia", "reciPSI_adi", "reciPSI_dia", "time", "timestep"
+))
+
+
+def check_properties_to_save(properties):
+    """
+    Refuses a requested property no exact saver writes, the nearest known name named
+    """
+    refuse_unknown_keys(dict.fromkeys(properties), SAVEABLE_PROPERTIES, "exact.run_relaxation", "properties_to_save", "no saver writes")
 
 
 def exact_init_hdf5(saver, hdf5_output_level, _nsteps, _ndof, _nstates, _ngrid):

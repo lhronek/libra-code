@@ -50,9 +50,22 @@ import util.libutil as comn
 # import libra_py.units as units
 # import libra_py.data_outs as data_outs
 import libra_py.data_savers as data_savers
+from libra_py.params_check import refuse_unknown_keys
 
 
 # ===================== HEOM output ====================
+
+# every property the HEOM savers can write - init_heom_data allocates exactly these names (the certifier pins the equality),
+# a requested name outside the set is refused instead of staying in the keyword list unwritten
+SAVEABLE_PROPERTIES = frozenset(("auxdenmat", "denmat", "time", "timestep"))
+
+
+def check_properties_to_save(properties):
+    """
+    Refuses a requested property no HEOM saver writes, the nearest known name named
+    """
+    refuse_unknown_keys(dict.fromkeys(properties), SAVEABLE_PROPERTIES, "heom.run_dynamics", "properties_to_save", "no saver writes")
+
 
 def init_heom_data(saver, hdf5_output_level, _nsteps, _nquant, _nn_tot):
 

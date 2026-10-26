@@ -24,6 +24,19 @@ from liblibra_core import *
 
 import util.libutil as comn
 import libra_py.data_savers as data_savers
+from libra_py.params_check import refuse_unknown_keys
+
+
+# every property the QTAG savers can write - init_qtag_data allocates exactly these names (the certifier pins the equality),
+# a requested name outside the set is refused instead of staying in the keyword list unwritten
+SAVEABLE_PROPERTIES = frozenset(("Etot", "a", "coeffs", "dEtot", "p", "pops", "q", "s", "time"))
+
+
+def check_properties_to_save(properties):
+    """
+    Refuses a requested property no QTAG saver writes, the nearest known name named
+    """
+    refuse_unknown_keys(dict.fromkeys(properties), SAVEABLE_PROPERTIES, "qtag.run_qtag", "properties_to_save", "no saver writes")
 
 
 def init_qtag_data(saver, output_level, _nsteps, _ntraj, _ndof, _nstates):
