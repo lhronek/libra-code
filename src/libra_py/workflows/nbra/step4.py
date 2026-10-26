@@ -1060,10 +1060,10 @@ def nice_plots(dyn_params, init_states, tsh_methods, methods, batches, fig_label
 
                 if txt_type == 0:
                     infile1 = F"{prefix}/start_s{istate}_{name}_batch{batch}/time.txt"
-                    infile2 = F"{prefix}/start_s{istate}_{name}_batch{batch}/SH_pop.txt"
+                    infile2 = F"{prefix}/start_s{istate}_{name}_batch{batch}/sh_pop_adi.txt"
                 elif txt_type == 1:
                     infile1 = F"{prefix}/_start_s{istate}_{name}_batch{batch}/time.txt"
-                    infile2 = F"{prefix}/_start_s{istate}_{name}_batch{batch}/SH_pop.txt"
+                    infile2 = F"{prefix}/_start_s{istate}_{name}_batch{batch}/sh_pop_adi.txt"
 
                 # Plot the raw data
                 t = np.array(data_read.get_data_from_file2(infile1, [0])[0]) * units.au2fs

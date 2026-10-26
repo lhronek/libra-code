@@ -1281,7 +1281,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 - -1: all returned values are None [ default ]
                 - 0: also, all return values are none
                 - 1: 1-D info - Relevant variables to request to save: ["timestep", "time", "Ekin_ave", "Epot_ave", "Etot_ave",
-                    "Etherm", "E_NHC", "dEkin_ave", "dEpot_ave", "dEtot_ave", "tcnbra_thermostat_energy", "Ekin_ave_qtsh" ]
+                    "Etherm", "E_NHC", "dEkin_ave", "dEpot_ave", "dEtot_ave", "tcnbra_thermostat_energy", "tcnbra_ekin", "ekin_aux_var" ]
                 - 2: 2-D info - Relevant variables to request to save: ["states", "states_dia", "se_pop_adi", "se_pop_dia",
                     "sh_pop_adi", "sh_pop_dia", "sh_pop_adi_TR", "sh_pop_dia_TR", "mash_pop_adi", "mash_pop_dia", 
                     "sqc_pop_adi", "sqc_pop_dia", "fssh3_average_errors"] - the active state of the representation
@@ -1289,8 +1289,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                     from the density transformed with its diagonal set to the active-state indicator (Tempelaar
                     and Reichman 2018), so its changes are samples, not hops, and sh_pop_dia / sh_pop_adi count
                     those samples while sh_pop_dia_TR / sh_pop_adi_TR carry their expectation
-                - 3: 3-D info - Relevant variables to request to save: [ "SH_pop", "SH_pop_raw", "D_adi", "D_adi_raw", 
-                    "D_dia", "D_dia_raw", "q", "p", "f", "Cadi", "Cdia", "coherence_adi", "coherence_dia", "q_mm", "p_mm",
+                - 3: 3-D info - Relevant variables to request to save: [ "D_adi", "D_dia", "q", "p", "f", "Cadi", "Cdia", "coherence_adi", "coherence_dia", "q_mm", "p_mm",
                     "wp_width", "p_quant", "VP", "f_xf", "qtsh_f_nc" ]
                 - 4: 4-D info - Relevant variables to request to save: ["hvib_adi", "hvib_dia", "St", "basis_transform", 
                     "projector", "q_aux", "p_aux", "nab_phase"]
@@ -1333,11 +1332,11 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 if some properties are not listed in this variable, then they are not saved, even if `mem_output_level` suggests they may be
                 saved. You need to BOTH set the appropriate `mem_output_level` AND `properties_to_save`
 
-                [ default:  [ "timestep", "time", "Ekin_ave", "Epot_ave", "Etot_ave",
-                           "dEkin_ave", "dEpot_ave", "dEtot_ave", "states", "SH_pop", "SH_pop_raw",
-                           "D_adi", "D_adi_raw", "D_dia", "D_dia_raw", "q", "p", "Cadi", "Cdia",
-                           "hvib_adi", "hvib_dia", "St", "basis_transform", "projector"
-                ]
+                A name no saver writes is refused (save.check_properties_to_save) - the legacy SH_pop, SH_pop_raw, D_adi_raw,
+                D_dia_raw and Ekin_ave_qtsh with what replaces them, any other unknown name with the nearest known one.
+
+                [ default: the list in the code below - the energies, states, the se / sh populations, D_adi, D_dia,
+                           q, p, f, Cadi, Cdia, q_mm, p_mm, hvib_adi, hvib_dia, St, basis_transform, projector ]
 
             * **dyn_params["nfiles"]** ( int ): the number of Hamiltonian files a file-fed model holds, -1 for a model
                 that computes its Hamiltonian. The endpoint of step i reads file icond + i + 1 and the interval start
@@ -1515,7 +1514,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
     # observables, so an earlier resolution against a user dict without
     # properties_to_save would skip dm_dia and save them as silent zeros
     if dyn_params.get("compute_dm_dia", -1) == -1:
-        # Saved properties backed by dm_dia: D_dia/D_dia_raw directly -
+        # Saved properties backed by dm_dia: D_dia directly -
         # se_pop_dia, coherence_dia and mash_pop_dia via compute_average_dm(0) -
         # sh_pop_adi_TR via compute_average_sh_pop_TR(1) - the transformed
         # populations read the OPPOSITE representation's density matrix
@@ -1560,6 +1559,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
     state_tracking_algo = dyn_params["state_tracking_algo"]
     force_method = dyn_params["force_method"]
     properties_to_save = dyn_params["properties_to_save"]
+    save.check_properties_to_save(properties_to_save)      # a name no saver writes is refused here, not allocated and left at zero
     use_compression = dyn_params["use_compression"]
     compression_level = dyn_params["compression_level"]
     ensemble = dyn_params["ensemble"]

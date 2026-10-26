@@ -45,6 +45,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 
 import util.libutil as comn
+from libra_py.params_check import refuse_unknown_keys
 # import libra_py.units as units
 # import libra_py.data_outs as data_outs
 import libra_py.data_savers as data_savers
@@ -60,6 +61,43 @@ def _has_slot(saver, name):
         return False
     np_data = getattr(saver, "np_data", None)
     return True if np_data is None else name in np_data
+
+
+
+# every property the TSH savers can write - init_tsh_data allocates exactly these names (the certifier pins the equality),
+# a requested name outside the set is refused by check_properties_to_save instead of being allocated and left at zero
+SAVEABLE_PROPERTIES = frozenset((
+    "Cadi", "Cdia", "D_adi", "D_dia", "E_NHC", "Ekin_ave",
+    "Epot_ave", "Etherm", "Etot_ave", "St", "VP", "ave_decoherence_rates", "basis_transform",
+    "coherence_adi", "coherence_dia", "dEkin_ave", "dEpot_ave", "dEtot_ave", "dc1_adi", "ekin_aux_var",
+    "energy_gap_correlations", "energy_gap_fluctuations", "energy_gaps", "energy_gaps2", "f", "f_aux_var", "f_xf",
+    "fssh3_average_errors", "hvib_adi", "hvib_dia", "mash_pop_adi", "mash_pop_dia", "mean_energy_gaps", "mean_energy_gaps2",
+    "nab_phase", "p", "p_aux", "p_aux_var", "p_mm", "p_quant", "projector",
+    "q", "q_aux", "q_mm", "qtsh_f_nc", "se_pop_adi", "se_pop_dia", "sh_pop_adi",
+    "sh_pop_adi_TR", "sh_pop_dia", "sh_pop_dia_TR", "sqc_pop_adi", "sqc_pop_dia", "states",
+    "states_dia", "tcnbra_ekin", "tcnbra_thermostat_energy", "time", "timestep", "wp_width", "y_aux_var"
+))
+
+# the names allocated and never written, or duplicating a live dataset, each with what replaces it - the engine re-expands
+# the states and amplitudes into each step's eigenvector basis, so the live datasets are the eigenvector-label ones
+DEAD_PROPERTIES = {
+    "SH_pop": "sh_pop_adi holds the surface-hopping population - the states live in each step's eigenvector labels, the tracked labels of 2022 are not kept",
+    "SH_pop_raw": "sh_pop_adi holds the surface-hopping population in the eigenvector labels",
+    "D_adi_raw": "D_adi holds the adiabatic density in the eigenvector labels",
+    "D_dia_raw": "D_dia holds the diabatic density - the diabatic labels are never relabelled",
+    "Ekin_ave_qtsh": "no writer - the QTSH kinematic momentum and its kinetic energy left the engine in 2024",
+}
+
+
+def check_properties_to_save(properties):
+    """
+    Refuses a requested property no saver writes: the five legacy names with what replaces them, any other unknown
+    name with the nearest known one
+    """
+    dead = [name for name in properties if name in DEAD_PROPERTIES]
+    if dead:
+        raise ValueError("properties_to_save names " + ", ".join(F"{n} ({DEAD_PROPERTIES[n]})" for n in dead))
+    refuse_unknown_keys(dict.fromkeys(properties), SAVEABLE_PROPERTIES, "run_dynamics", "properties_to_save", "no saver writes")
 
 
 def init_tsh_data(saver, output_level, _nsteps, _ntraj, _ndof, _nadi, _ndia):
@@ -119,10 +157,6 @@ def init_tsh_data(saver, output_level, _nsteps, _ntraj, _ndof, _nadi, _ndia):
         # TC-NBRA thermostat energy
         if "tcnbra_thermostat_energy" in saver.keywords:
             saver.add_dataset("tcnbra_thermostat_energy", (_nsteps,), "R")
-
-        # Average kinetic energy in QTSH
-        if "Ekin_ave_qtsh" in saver.keywords:
-            saver.add_dataset("Ekin_ave_qtsh", (_nsteps,), "R")
 
         # KC-RPMD auxiliary electronic variable kinetic energy
         if "ekin_aux_var" in saver.keywords:
@@ -194,29 +228,13 @@ def init_tsh_data(saver, output_level, _nsteps, _ntraj, _ndof, _nadi, _ndia):
 
     if output_level >= 3:
 
-        # Average adiabatic SH populations (dynamically-consistent)
-        if "SH_pop" in saver.keywords:  # _has_slot(saver, "SH_pop"):
-            saver.add_dataset("SH_pop", (_nsteps, _nadi, 1), "R")
-
-        # Average adiabatic SH populations (raw)
-        if "SH_pop_raw" in saver.keywords:  # _has_slot(saver, "SH_pop_raw"):
-            saver.add_dataset("SH_pop_raw", (_nsteps, _nadi, 1), "R")
-
         # Average adiabatic density matrices (dynamically-consistent)
         if "D_adi" in saver.keywords:  # _has_slot(saver, "D_adi"):
             saver.add_dataset("D_adi", (_nsteps, _nadi, _nadi), "C")
 
-        # Average adiabatic density matrices (raw)
-        if "D_adi_raw" in saver.keywords:  # _has_slot(saver, "D_adi_raw"):
-            saver.add_dataset("D_adi_raw", (_nsteps, _nadi, _nadi), "C")
-
         # Average diabatic density matrices (dynamically-consistent)
         if "D_dia" in saver.keywords:  # _has_slot(saver, "D_dia"):
             saver.add_dataset("D_dia", (_nsteps, _ndia, _ndia), "C")
-
-        # Average diabatic density matrices (raw)
-        if "D_dia_raw" in saver.keywords:  # _has_slot(saver, "D_dia_raw"):
-            saver.add_dataset("D_dia_raw", (_nsteps, _ndia, _ndia), "C")
 
         # Average coherence indicator matrices
         if "coherence_adi" in saver.keywords:  # _has_slot(saver, "coherence_adi"):
@@ -296,7 +314,7 @@ def init_tsh_data(saver, output_level, _nsteps, _ntraj, _ndof, _nadi, _ndia):
         if "basis_transform" in saver.keywords:  # _has_slot(saver, "basis_transform"):
             saver.add_dataset("basis_transform", (_nsteps, _ntraj, _ndia, _nadi), "C")
 
-        # Trajectory-resolved projector matrices (from the raw adiabatic to consistent adiabatic)
+        # Trajectory-resolved projector matrices (the step's basis re-expansion transform, update_proj_adi)
         if "projector" in saver.keywords:  # _has_slot(saver, "projector"):
             saver.add_dataset("projector", (_nsteps, _ntraj, _nadi, _nadi), "C")
 
@@ -691,35 +709,20 @@ def save_hdf5_3D(saver, i, pops, pops_raw, dm_adi, dm_adi_raw, dm_dia, dm_dia_ra
     if txt_type == 0:
         t = i
 
-    # Average adiabatic SH populations (dynamically-consistent)
-    # Format: saver.add_dataset("SH_pop", (_nsteps, _nadi, 1), "R")
-    if _has_slot(saver, "SH_pop"):
-        saver.save_matrix(t, "SH_pop", pops)
-
-    # Average adiabatic SH populations (raw)
-    # Format: saver.add_dataset("SH_pop_raw", (_nsteps, _nadi, 1), "R")
-    if _has_slot(saver, "SH_pop_raw"):
-        saver.save_matrix(t, "SH_pop_raw", pops_raw)
+    # Average adiabatic SH populations
+    # Format: saver.add_dataset("sh_pop_adi", (_nsteps, _nadi), "R")
+    if _has_slot(saver, "sh_pop_adi"):
+        saver.save_vector(t, "sh_pop_adi", [pops.get(k, 0) for k in range(pops.num_of_rows)])
 
     # Average adiabatic density matrices (dynamically-consistent)
     # Format: saver.add_dataset("D_adi", (_nsteps, _nadi, _nadi), "C")
     if _has_slot(saver, "D_adi"):
         saver.save_matrix(t, "D_adi", dm_adi)
 
-    # Average adiabatic density matrices (raw)
-    # Format: saver.add_dataset("D_adi_raw", (_nsteps, _nadi, _nadi), "C")
-    if _has_slot(saver, "D_adi_raw"):
-        saver.save_matrix(t, "D_adi_raw", dm_adi_raw)
-
     # Average diabatic density matrices (dynamically-consistent)
     # Format: saver.add_dataset("D_dia", (_nsteps, _ndia, _ndia), "C")
     if _has_slot(saver, "D_dia"):
         saver.save_matrix(t, "D_dia", dm_dia)
-
-    # Average diabatic density matrices (raw)
-    # Format: saver.add_dataset("D_dia_raw", (_nsteps, _ndia, _ndia), "C")
-    if _has_slot(saver, "D_dia_raw"):
-        saver.save_matrix(t, "D_dia_raw", dm_dia_raw)
 
     # Trajectory-resolved coordinates
     # Format: saver.add_dataset("q", (_nsteps, _ntraj, _dof), "R")
@@ -909,7 +912,7 @@ def save_hdf5_4D(
     if _has_slot(saver, "basis_transform"):
         saver.save_multi_matrix(t, tr, "basis_transform", U)
 
-    # Trajectory-resolved projector matrices (from the raw adiabatic to consistent adiabatic)
+    # Trajectory-resolved projector matrices (the step's basis re-expansion transform, update_proj_adi)
     # Format: saver.add_dataset("projector", (_nsteps, _ntraj, _nadi, _nadi), "C")
     if _has_slot(saver, "projector"):
         saver.save_multi_matrix(t, tr, "projector", projector)
@@ -1273,7 +1276,7 @@ def print_results12(i, dt, res, prefix, file_output_level):
         add_doublelist2file("%s/energies.txt" % (prefix), i * dt, [Ekin, Epot, Etot, dEkin, dEpot, dEtot])
         add_cmatrix2file("%s/D_adi.txt" % (prefix), i * dt, dm_adi)
         add_cmatrix2file("%s/D_dia.txt" % (prefix), i * dt, dm_dia)
-        add_matrix2file("%s/SH_pop.txt" % (prefix), i * dt, pops)
+        add_matrix2file("%s/sh_pop_adi.txt" % (prefix), i * dt, pops)
 
     # File output
     if file_output_level >= 2:
@@ -1346,7 +1349,7 @@ def read_results(prefix, file_output_level, nadi, ndia, ndof, ntraj):
 
         obs_dm_adi = file2cmatrix("%s/D_adi.txt" % (prefix), nadi, nadi)
         obs_dm_dia = file2cmatrix("%s/D_dia.txt" % (prefix), ndia, ndia)
-        obs_pop = file2matrix("%s/SH_pop.txt" % (prefix), nadi, 1)
+        obs_pop = file2matrix("%s/sh_pop_adi.txt" % (prefix), nadi, 1)
 
     if file_output_level >= 2:
         obs_q = file2matrix("%s/q.txt" % (prefix), ndof, ntraj)
