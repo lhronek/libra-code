@@ -787,6 +787,10 @@ def run_tsh(common_params, compute_model, model_params):
 
     _model_params = dict(model_params)
     _model_params.update({"model0": model_params["model"]})
+    # run_dynamics reads the state count from the model's parameters - the runner's nstates is handed over, a differing one refused
+    if _model_params.get("nstates", nstates) != nstates:
+        raise ValueError(F"run_tsh: model_params nstates = {_model_params['nstates']} differs from the runner's nstates = {nstates}")
+    _model_params["nstates"] = nstates
 
     start = time.time()
     res = tsh_dynamics.generic_recipe(dyn_params, compute_model, _model_params,
