@@ -99,7 +99,7 @@ def _params_json_default(obj):
 # (the tutorial convention) - the old format: accepted with a warning, their place is runner_params (appended to the
 # records) or the runner's own dicts
 RUNNER_KEYS = ("nstates", "istate", "istep", "seed", "x0", "p0", "masses", "k", "which_adi_states", "which_dia_states",
-               "rep_ham", "elec_init_type", "nucl_init_type", "wait_time")
+               "rep_ham", "elec_init_type", "nucl_init_type", "wait_time", "dir_prefix")
 # the keys generic_recipe adds to dyn_params for itself before calling run_dynamics
 LIBRA_LAYER_KEYS = ("direct_init", "ntraj")
 # the keys of the electronic initialization dict: dyn_variables_electronic.cpp's readers (init_electronic_dyn_var, init_amplitudes,
