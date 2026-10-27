@@ -269,7 +269,7 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
 
         # New way
         dyn_var.set_q(q)
-        # rep_ham 0: a diabatic model, the adiabatic side by the internal diagonalization - 1: an adiabatic-native model;
+        # rep_ham 0: a diabatic model, the adiabatic side by the internal diagonalization - 1: an adiabatic-native model.
         # the plot reads energies and the derivatives the model hands over: no force, the couplings from the time overlaps and
         # the vibronic Hamiltonian consumed or built in the engine, so the hand-over check asks the model for nothing but the Hamiltonian
         update_Hamiltonian_variables({"time_overlap_method": 1, "ham_update_method": 1 if rep_ham == 0 else 2,
