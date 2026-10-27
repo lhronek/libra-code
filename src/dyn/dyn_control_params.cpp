@@ -974,6 +974,13 @@ void dyn_control_params::set_parameters(bp::dict params){
 
     else if(key=="reorg_energy") { reorg_energy =  bp::extract<double>(params.values()[i]); }
 
+    else{
+      // a key outside the chain was dropped silently here - a misspelling kept its default for the whole run
+      std::cout<<"Error in dyn_control_params::set_parameters(): the key '"<<key<<"' is not a parameter of the engine - "
+               <<"run_dynamics hands over the engine's keys alone (restrict), a direct caller passes them alone too\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+
   }// for i
 
   sanity_check();

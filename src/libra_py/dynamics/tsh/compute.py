@@ -46,7 +46,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 
 import util.libutil as comn
-from libra_py.params_check import refuse_unknown_keys
+from libra_py.params_check import refuse_unknown_keys, restrict
 from libra_py.blas_threads import blas_thread_limit
 import libra_py.units as units
 import libra_py.data_outs as data_outs
@@ -98,6 +98,9 @@ def _params_json_default(obj):
 # the keys of dyn_params that neither the engine nor run_dynamics reads but libra's own runners carry in the same dict
 # (the tutorial convention) - the old format: accepted with a warning, their place is runner_params (appended to the
 # records) or the runner's own dicts
+# the engine's own parameters (save.ENGINE_KEYS) - every C++ entry that takes the parameter dict receives
+# restrict(dyn_params, ENGINE_KEYS), the python-layer keys stay here
+ENGINE_KEYS = save.ENGINE_KEYS
 RUNNER_KEYS = ("nstates", "istate", "istep", "seed", "x0", "p0", "masses", "k", "which_adi_states", "which_dia_states",
                "rep_ham", "elec_init_type", "nucl_init_type", "wait_time", "dir_prefix")
 # the keys generic_recipe adds to dyn_params for itself before calling run_dynamics
@@ -1624,8 +1627,8 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
     model_params.update({"timestep": icond, "timestep_st": icond})
 
     if not ham_initialized:
-        update_Hamiltonian_variables(dyn_params, dyn_var, ham, ham, compute_model, model_params, 0)
-        update_Hamiltonian_variables(dyn_params, dyn_var, ham, ham, compute_model, model_params, 1)
+        update_Hamiltonian_variables(restrict(dyn_params, ENGINE_KEYS), dyn_var, ham, ham, compute_model, model_params, 0)
+        update_Hamiltonian_variables(restrict(dyn_params, ENGINE_KEYS), dyn_var, ham, ham, compute_model, model_params, 1)
 
     # the diabatic-representation hop proposals (tsh_method 3 with rep_lz 0/1,
     # tsh_method 4) detect crossings in ham_dia and index it by adiabatic
@@ -1684,8 +1687,8 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
     ham_aux = nHamiltonian(ham, 1)
     ham_aux.copy_content(ham);
 
-    prms = dyn_control_params();
-    prms.set_parameters(dyn_params);
+    prms = dyn_control_params()
+    prms.set_parameters(restrict(dyn_params, ENGINE_KEYS))
 
     # Copy diabatic-to-adiabatic basis transformation to the dynamical variable
     dyn_var.update_basis_transform(ham)
@@ -1696,8 +1699,8 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
     # the first save (which happens before the first step) would record them.
     # The prev-dm snapshot (FSSH2/FSSH3/GFSH-orig - self-gated otherwise) must
     # be taken from these refreshed matrices.
-    dyn_var.update_amplitudes(dyn_params, ham)
-    dyn_var.update_density_matrix(dyn_params, ham, 1)
+    dyn_var.update_amplitudes(restrict(dyn_params, ENGINE_KEYS), ham)
+    dyn_var.update_density_matrix(restrict(dyn_params, ENGINE_KEYS), ham, 1)
     dyn_var.save_curr_dm_into_prev()
 
     # Recompute the orthogonalized reprojection matrices, stored in
@@ -1739,7 +1742,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
             model_params["act_state"] = { itraj : dyn_var.act_states[itraj] for itraj in range(ntraj)  } 
 
 
-            compute_dynamics(dyn_var, dyn_params, ham, ham_aux, compute_model, model_params, rnd, therm)
+            compute_dynamics(dyn_var, restrict(dyn_params, ENGINE_KEYS), ham, ham_aux, compute_model, model_params, rnd, therm)
 
             # the time-overlap of the interval just crossed - saved post-step so
             # frame i means [t_i, t_i+1] under both time_overlap_method values
@@ -2022,8 +2025,8 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
         dia_consumed = (dyn_params.get("rep_tdse", 1) in (0, 2)
                         or dyn_params.get("rep_sh", 1) == 0)
         if init_elec.get("rep", 1) == 0 or dia_consumed:
-            update_Hamiltonian_variables(dyn_params1, dyn_var, ham, ham, compute_model, model_params1, 0)
-            update_Hamiltonian_variables(dyn_params1, dyn_var, ham, ham, compute_model, model_params1, 1)
+            update_Hamiltonian_variables(restrict(dyn_params1, ENGINE_KEYS), dyn_var, ham, ham, compute_model, model_params1, 0)
+            update_Hamiltonian_variables(restrict(dyn_params1, ENGINE_KEYS), dyn_var, ham, ham, compute_model, model_params1, 1)
             # the same dyn_params, timestep icond and geometry as run_dynamics' start evaluation, and the same model
             # when model0 is the run's model - that evaluation is skipped then (a driver's step is a full
             # electronic-structure run)
@@ -2056,9 +2059,9 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
         # print( dyn_params1 )
         # print(model_params1)
         # sys.exit()
-        update_Hamiltonian_variables(dyn_params1, dyn_var, ham, ham, compute_model, model_params1, 0)
+        update_Hamiltonian_variables(restrict(dyn_params1, ENGINE_KEYS), dyn_var, ham, ham, compute_model, model_params1, 0)
         # sys.exit(0)
-        update_Hamiltonian_variables(dyn_params1, dyn_var, ham, ham, compute_model, model_params1, 1)
+        update_Hamiltonian_variables(restrict(dyn_params1, ENGINE_KEYS), dyn_var, ham, ham, compute_model, model_params1, 1)
     for key in _init_keys:
         if key in _init_saved:
             model_params[key] = _init_saved[key]
@@ -2098,8 +2101,8 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
         # the seed converts, it does not propagate - the integrator of the propagated representation need not
         # exist in the amplitude one (Zhu's 20 under rep_tdse 3), 0 is implemented in every representation
         seed_prms["electronic_integrator"] = 0
-        dyn_var.update_density_matrix(seed_prms, ham, 1)
-    dyn_var.update_density_matrix(dyn_params, ham, 1)
+        dyn_var.update_density_matrix(restrict(seed_prms, ENGINE_KEYS), ham, 1)
+    dyn_var.update_density_matrix(restrict(dyn_params, ENGINE_KEYS), ham, 1)
     #sys.exit(0)
     if dyn_params["rep_sh"] == 1:
         dyn_var.init_active_states(init_elec, rnd)
@@ -2108,7 +2111,7 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
     # the savers read the other representation's active states at t0, before the first
     # step's sync - sample them here with the same gate and sampler as every step
     prms0 = dyn_control_params()
-    prms0.set_parameters(dyn_params)
+    prms0.set_parameters(restrict(dyn_params, ENGINE_KEYS))
     if need_active_states_diff_rep(prms0) == 1:
         dyn_var.set_active_states_diff_rep(int(dyn_params["rep_sh"]), rnd)
 

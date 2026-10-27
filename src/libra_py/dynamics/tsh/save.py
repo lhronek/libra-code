@@ -45,7 +45,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 
 import util.libutil as comn
-from libra_py.params_check import refuse_unknown_keys
+from libra_py.params_check import refuse_unknown_keys, restrict
 # import libra_py.units as units
 # import libra_py.data_outs as data_outs
 import libra_py.data_savers as data_savers
@@ -63,6 +63,12 @@ def _has_slot(saver, name):
     return True if np_data is None else name in np_data
 
 
+
+# the engine's own parameters - every key dyn_control_params::set_parameters reads (the exported properties, the certifier pins
+# them to the C++ chain) - every C++ entry that takes the parameter dict (set_parameters, update_Hamiltonian_variables,
+# compute_dynamics, the amplitude, density and energy calls) receives restrict(dyn_params, ENGINE_KEYS) - the python-layer
+# keys stay in python, and the C++ setter refuses any other key
+ENGINE_KEYS = frozenset(k for k in dir(dyn_control_params) if isinstance(getattr(dyn_control_params, k), property))
 
 # every property the TSH savers can write - init_tsh_data allocates exactly these names (the certifier pins the equality),
 # a requested name outside the set is refused by check_properties_to_save instead of being allocated and left at zero
@@ -536,7 +542,7 @@ def save_hdf5_1D_new(saver, i, params, dyn_var, ham, txt_type=0):
     saver.save_scalar(t, "Ekin_ave", Ekin)
 
     # Average potential energy
-    Epot = average_potential_energy(params, dyn_var, ham)
+    Epot = average_potential_energy(restrict(params, ENGINE_KEYS), dyn_var, ham)
     saver.save_scalar(t, "Epot_ave", Epot)
 
     # Average total energy
