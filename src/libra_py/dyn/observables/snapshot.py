@@ -300,12 +300,19 @@ def _add_optional_scalar(result, requested, name, storage, default) -> None:
     result[name] = _compact_optional_value(value, default)
 
 
+def _warn_absent(name, field) -> None:
+    """A requested keyword whose storage field is absent is omitted - said once per call, not silently"""
+    print(F"WARNING in compute_legacy_observables(): the keyword {name} was requested but the storage holds no {field} - omitted")
+
+
 def _add_optional_array(result, requested, name, storage) -> None:
-    if name not in requested or not hasattr(storage, name):
+    if name not in requested:
         return
-    value = getattr(storage, name)
-    if value is not None:
-        result[name] = np.asarray(value)
+    value = getattr(storage, name, None)
+    if value is None:
+        _warn_absent(name, name)
+        return
+    result[name] = np.asarray(value)
 
 
 def _add_active_states(result, requested, storage, traj) -> None:
@@ -383,11 +390,13 @@ def _add_raw_field_observables(result, requested, storage, traj) -> None:
     }
     idx = traj.tbf_ids
     for name, field in field_map.items():
-        if name not in requested or not hasattr(storage, field):
+        if name not in requested:
             continue
-        value = getattr(storage, field)
-        if value is not None:
-            result[name] = value[traj.id, idx]
+        value = getattr(storage, field, None)
+        if value is None:
+            _warn_absent(name, field)
+            continue
+        result[name] = value[traj.id, idx]
 
 
 def _add_gap_observables(result, requested, storage, traj) -> None:
@@ -410,6 +419,8 @@ def _add_gap_observables(result, requested, storage, traj) -> None:
         elif name in ("energy_gaps", "energy_gaps2"):
             gaps = _hamiltonian_energy_gaps(storage, traj)
             result[name] = gaps * gaps if name == "energy_gaps2" else gaps
+        else:
+            _warn_absent(name, field)
 
 
 def _normalized_counts(storage, traj, rep):
