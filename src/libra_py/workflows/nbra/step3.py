@@ -4707,7 +4707,8 @@ def run_step3_pod(params):
             partner = int(np.argmax(row))
             # the largest other overlap may sit on a basis state of the block (a swap inside the basis) or on a block
             # state outside it while the basis still carries the state - named as what it is
-            where = (F"the basis state {cur.index(partner)} ({pod_state(cur.index(partner))})" if partner in cur
+            # the partner is a block state of the later frame - the basis state it carries there is nxt's
+            where = (F"the basis state {nxt.index(partner)} ({pod_state(nxt.index(partner))})" if partner in nxt
                      else F"the block state {partner} outside the basis")
             check = pod_check_block([cur[c], nxt[c], partner], frames[i], frames[i + 1])
             if dia_reordering or selection == 'identity':
