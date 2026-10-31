@@ -3658,6 +3658,116 @@ def _classify_continuations(d, inside, threshold):
     return edges, mixed, unresolved
 
 
+def _reindexed_orbital_numbers(active_space, data_dim, lowest_orbital):
+    """The orbital numbers (CP2K's, from 1) of the reindexed active spin-orbitals of the SD route: the alpha
+    spin-orbital j is the j-th active alpha window position, the beta -j the j-th active beta one, and the window
+    position i is the orbital lowest_orbital + i."""
+    n = data_dim // 2
+    alpha = [a for a in active_space if a < n]
+    beta = [b - n for b in active_space if b >= n]
+    return [int(lowest_orbital) + int(a) for a in alpha], [int(lowest_orbital) + int(b) for b in beta]
+
+
+def _sd_reference_set(sd_lists, sd_charge):
+    """The determinant the SDs of a frame are described against: a hole basis (sd_charge 1) is the closed shell minus
+    one spin-orbital, so the union of its determinants, an electron basis (-1) the closed shell plus one, so their
+    intersection, a neutral basis the lowest-orbital-sum determinant (the reference of its single excitations)."""
+    sets = [frozenset(int(o) for o in sd) for sd in sd_lists]
+    if int(sd_charge) == 1:
+        return frozenset().union(*sets)
+    if int(sd_charge) == -1:
+        return frozenset.intersection(*sets)
+    return min(sets, key=lambda s: sum(abs(o) for o in s))
+
+
+def _sd_content(sd, ref, alpha_numbers, beta_numbers):
+    """A determinant against the reference: its holes and its electrons as [orbital number, spin], ascending."""
+    occ = frozenset(int(o) for o in sd)
+
+    def name(o):
+        return [alpha_numbers[o - 1], "alpha"] if o > 0 else [beta_numbers[-o - 1], "beta"]
+    return {"holes": sorted((name(o) for o in ref - occ), key=lambda x: x[0]),
+            "electrons": sorted((name(o) for o in occ - ref), key=lambda x: x[0])}
+
+
+def _sd_content_text(entry, spins=False, short=False):
+    """A determinant in words - 'the hole in orbital 59', 'the electron in orbital 61', 'the excitation 58 -> 61',
+    'the reference determinant' - the spin named when spins is set (a basis of one spin says nothing by it) - short:
+    'orbital 59', '58 -> 61', 'reference' for the labels map."""
+    h, p = entry["holes"], entry["electrons"]
+
+    def orb(x):
+        return F"{x[0]}{' ' + x[1] if spins else ''}"
+    if not h and not p:
+        return "reference" if short else "the reference determinant"
+    if len(h) == 1 and not p:
+        return F"orbital {orb(h[0])}" if short else F"the hole in orbital {orb(h[0])}"
+    if len(p) == 1 and not h:
+        return F"orbital {orb(p[0])}" if short else F"the electron in orbital {orb(p[0])}"
+    if len(h) == 1 and len(p) == 1:
+        return F"{orb(h[0])} -> {orb(p[0])}" if short else F"the excitation {orb(h[0])} -> {orb(p[0])}"
+    text = "holes " + ", ".join(orb(x) for x in h) + " electrons " + ", ".join(orb(x) for x in p)
+    return text if short else "the determinant with " + text
+
+
+class _SdLabels:
+    """The determinant under every SD label at every frame of the SD route - sd_lists per frame in the frame's energy
+    order, perms the label permutations of the reordering (None: the labels are the energy order). Written as
+    sd_labels.json next to U_sd_labels.json, read by the refusals of the route (the orbitals they name) and by the
+    tool step3-labels.py."""
+
+    def __init__(self, sd_lists, perms, active_space, data_dim, lowest_orbital, highest_orbital, sd_charge,
+                 start_time):
+        alpha, beta = _reindexed_orbital_numbers(active_space, data_dim, lowest_orbital)
+        self.frames = [int(start_time) + i for i in range(len(sd_lists))]
+        self.kind = {1: "hole", -1: "electron"}.get(int(sd_charge), "neutral")
+        self.window = [int(lowest_orbital), int(highest_orbital)]
+        self.entries = []
+        for i, lists in enumerate(sd_lists):
+            ref = _sd_reference_set(lists, sd_charge)
+            rows = [_sd_content(sd, ref, alpha, beta) for sd in lists]
+            if perms is not None:
+                order = perms[min(i, len(perms) - 1)]
+                rows = [rows[int(order[j])] for j in range(len(rows))]
+            self.entries.append(rows)
+        self.spins = len({x[1] for fr in self.entries for e in fr for x in e["holes"] + e["electrons"]}) > 1
+        self.followed = perms is not None
+
+    def text(self, i, j):
+        return _sd_content_text(self.entries[i][j], self.spins)
+
+    def short(self, i, j):
+        return _sd_content_text(self.entries[i][j], self.spins, short=True)
+
+    def orbitals(self, i, j):
+        e = self.entries[i][j]
+        return sorted({int(x[0]) for x in e["holes"] + e["electrons"]})
+
+    def map_lines(self, i, width=100):
+        """'0 = orbital 60, 1 = orbital 58, ...', wrapped into lines of at most width characters"""
+        lines, line = [], ""
+        for j in range(len(self.entries[i])):
+            item = F"{j} = {self.short(i, j)}"
+            if line and len(line) + 2 + len(item) > width:
+                lines.append(line)
+                line = item
+            else:
+                line = item if not line else line + ", " + item
+        lines.append(line)
+        return lines
+
+    def write(self, path):
+        with open(path, 'w') as f:
+            json.dump({"note": "the determinant under every SD label at every frame, as [orbital number, spin] of its "
+                               "holes and its electrons against the reference (a hole basis: the closed shell minus "
+                               "one spin-orbital, an electron basis: plus one, a neutral basis: its lowest "
+                               "determinant) - labels[frame index][label], the frames in 'frames', and the labels are "
+                               + ("the energy order at the first frame and follow the states by identity under "
+                                  "do_state_reordering 1, 2 or 22" if self.followed else
+                                  "the energy order of every frame"),
+                       "kind": self.kind, "window": self.window, "frames": self.frames, "labels": self.entries}, f)
+
+
 def _follow_diabatic_interval(W_curr, O, A_prev, groups, reordering, alpha=0.0, e_rows=None, e_cols=None):
     """One interval of the diabatic following, shared by the step-3 series (_follow_diabatic_states) and the on-the-fly
     driver: O = W_prev^T St W_curr is the time-overlap block of the followed states of the earlier frame (rows) with the
@@ -4773,6 +4883,9 @@ def run_step3_sd_nacs_libint(params):
                 is recorded [default: 1/sqrt(2) = 0.707, more than half of a state's weight on its own continuation].
                 In the energy order (do_state_reordering 0) nothing is refused - a crossing of adiabatic states is the
                 convention there and is left to the propagation.
+                sd_labels.json records the determinant under every SD label at every frame (the orbital numbers of its
+                hole or electron, the excitation of a neutral basis), written before the continuity check so that a
+                refused run keeps it.
                 sd_route_report.json records unresolved_frames (internal continuations below the floor let through),
                 edge_departures, min_continuity and reordered_frames.
             * **params['active_space_selection']** (string): how the orbitals of the active space are picked at every
@@ -5234,6 +5347,10 @@ def run_step3_sd_nacs_libint(params):
     print('Done with computing the SD overlaps. Elapsed time:', time.time() - t2)
     if W_dia is not None:
         # the records follow the states: written once the columns of W stand in the order of start_time
+        # the determinant under every SD label at every frame in the energy order (sd_labels.json from here, rewritten
+        # with the followed labels after the reordering)
+        _SdLabels(sd_states_reindexed_sorted, None, ks_active_space, data_dim, params['lowest_orbital'],
+                  params['highest_orbital'], sd_charge, start_time).write(F'{res_dir_2}/sd_labels.json')
         perms_dia, swaps_dia, unresolved_dia, cont_dia, edges_dia, align_dia = _follow_diabatic_states(
             W_dia, St_sds, start_time, "sd", dia_index, dia_reordering, dia_alpha, _state_energies(dia_energies),
             dia_min_overlap)
@@ -5274,6 +5391,11 @@ def run_step3_sd_nacs_libint(params):
             W_dia = [_permute_rows(W_dia[i], perms[i]) for i in range(len(W_dia))]
         print('Done with state-reordering of SDs. Elapsed time:', time.time() - t2)
     # the continuity of the SD states as labeled: refused below the threshold after a reordering, recorded otherwise
+    # the determinant under every SD label at every frame, written before the continuity check so that a refused run
+    # keeps it (the labels are the energy order at start_time, followed by identity under a reordering)
+    _SdLabels(sd_states_reindexed_sorted, perms if params['do_state_reordering'] in (1, 2, 22) else None,
+              ks_active_space, data_dim, params['lowest_orbital'], params['highest_orbital'], sd_charge,
+              start_time).write(F'{res_dir_2}/sd_labels.json')
     route_report = {"sd": _continuity_record(St_sds, start_time, params['do_state_reordering'],
                                              params['state_reordering_alpha'], sd_min_overlap,
                                              perms if params['do_state_reordering'] in (1, 2, 22) else None)}
