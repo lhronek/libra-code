@@ -3768,6 +3768,38 @@ class _SdLabels:
                        "kind": self.kind, "window": self.window, "frames": self.frames, "labels": self.entries}, f)
 
 
+def _composition_text(weights, names, floor=0.1, most=3):
+    """'0.96 orbital 29 + 0.27 orbital 30' - the largest |weights| on the named components, at most `most` of them
+    above floor, the largest alone when none reaches it"""
+    order = np.argsort(-np.abs(np.asarray(weights, dtype=float)))
+    parts = [F"{abs(float(weights[k])):.2f} {names[k]}" for k in order[:most] if abs(float(weights[k])) >= floor]
+    return " + ".join(parts) if parts else F"{abs(float(weights[order[0]])):.2f} {names[order[0]]}"
+
+
+def _leading_components(weights, floor=0.1, most=3):
+    """the indices of the largest |weights| above floor, at most `most`, the largest alone when none reaches it"""
+    order = [int(k) for k in np.argsort(-np.abs(np.asarray(weights, dtype=float)))]
+    lead = [k for k in order[:most] if abs(float(weights[k])) >= floor]
+    return lead if lead else order[:1]
+
+
+def _check_block(kind, lines):
+    """The last lines of a refusal, set apart as a section: the heading '<KIND> TO CHECK IN CP2K' underlined, then
+    the lines - the indices to look at in CP2K are the most visible part of the message."""
+    head = F"{kind.upper()} TO CHECK IN CP2K"
+    return ["", head, "=" * len(head)] + list(lines)
+
+
+def _orbital_check_block(orbitals, k0, k1, window):
+    """'ORBITALS TO CHECK IN CP2K' - 'orbitals 58, 59, 60 at frames 5257 and 5258' and their place in the step-2 files
+    (the window 50 - 65, the positions 8, 9, 10)"""
+    orbs = sorted({int(o) for o in orbitals})
+    return _check_block("orbitals", [
+        F"orbitals {', '.join(map(str, orbs))} at frames {k0} and {k1}",
+        F"(the window {window[0]} - {window[1]} of the step-2 files, their positions "
+        F"{', '.join(str(o - window[0]) for o in orbs)})"])
+
+
 def _follow_diabatic_interval(W_curr, O, A_prev, groups, reordering, alpha=0.0, e_rows=None, e_cols=None):
     """One interval of the diabatic following, shared by the step-3 series (_follow_diabatic_states) and the on-the-fly
     driver: O = W_prev^T St W_curr is the time-overlap block of the followed states of the earlier frame (rows) with the
@@ -3819,7 +3851,7 @@ def _follow_diabatic_interval(W_curr, O, A_prev, groups, reordering, alpha=0.0, 
 
 
 def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=None, reordering=0, alpha=0.0,
-                            energies=None, min_overlap=CONTINUITY_FLOOR):
+                            energies=None, min_overlap=CONTINUITY_FLOOR, describe_states=None, sd_content=None):
     """The localization eigenvectors carry arbitrary signs: every diabatic state follows the trajectory through the
     time overlaps of its own basis, O = W(i)^T St(i) W(i+1), and the sign of every column of W(i+1) is set by the
     sign of diag(O) (in place). reordering 0: a column whose |O_cc| falls below min_overlap does not continue itself -
@@ -3844,7 +3876,10 @@ def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=N
     definite: the signs and the rotation within degenerate states, whose orientation the eigensolver sets anew at
     every frame, are taken out, the within-group derivative coupling of a diabatic propagation vanishes, and the
     continuity is the diagonal of the aligned block. W(i) becomes W(i) A(i) in place at the end and the records of
-    the states are rotated as diagonal quantities (_rotate_records).
+    the states are rotated as diagonal quantities (_rotate_records). describe_states (callable c -> text) and
+    sd_content (a _SdLabels of the frames in their energy order) make the refusals name the states: what every
+    diabatic state is, its composition over the determinants of the frame, and end with the orbitals to check in
+    CP2K.
 
     Returns:
         perms (list of arrays): perms[i][c] is the column, in the energy order of frame i, that carries the state
@@ -3886,6 +3921,37 @@ def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=N
             row = np.abs(O[c]).copy()
             row[c] = -1.0
             partner = int(np.argmax(row))
+            if describe_states is not None and sd_content is not None:
+                k0, k1 = start_time + i, start_time + i + 1
+                names0 = [sd_content.short(i, r) for r in range(W_list[i].shape[0])]
+                names1 = [sd_content.short(i + 1, r) for r in range(W_list[i + 1].shape[0])]
+                orbs = [o for r in _leading_components(W_list[i][:, c]) for o in sd_content.orbitals(i, r)]
+                orbs += [o for r in _leading_components(W_list[i + 1][:, partner])
+                        for o in sd_content.orbitals(i + 1, r)]
+                if reordering:
+                    head = (F"the localized state {c} of frame {k0} carries |<{c}|{c}>| = {d[c]:.3f} into frame {k1} "
+                            F"even after the reordering{' and the alignment' if reordering in (5, 52) else ''} "
+                            F"within its group - the states mix by more than the threshold's angle within one frame, "
+                            F"the frame spacing does not resolve the crossing")
+                    tail = "a lower diabatic_state_reordering_min_overlap lets the frame through and records it"
+                else:
+                    head = (F"the localized state {c} of frame {k0} continues into state {partner} of frame {k1} - two "
+                            F"localized states swap between the frames and the labels would mean other states from "
+                            F"there on")
+                    tail = ("remedies: follow the states with do_diabatic_state_reordering 2 (within a tracking group "
+                            "- one fragment's states of a manifold), narrow the manifold or the active space, or let "
+                            "the window follow the orbital with active_space_selection 'identity' (across groups, or "
+                            "a group of one state)")
+                pad_c, pad_p = " " * len(F"state {c}:"), " " * len(F"state {partner}:")
+                raise ValueError("\n".join([
+                    head,
+                    F"  |<{c}|{c}>| = {d[c]:.3f} below the threshold {min_overlap:.4g}, |<{c}|{partner}>| = "
+                    F"{row[partner]:.3f}, the space carries {inside[c]:.3f} of the state",
+                    F"  state {c}:  {describe_states(c)}",
+                    F"  {pad_c}  frame {k0}  {_composition_text(W_list[i][:, c], names0)}",
+                    F"  state {partner}:  {describe_states(partner)}",
+                    F"  {pad_p}  frame {k1}  {_composition_text(W_list[i + 1][:, partner], names1)}",
+                    F"  {tail}"] + _orbital_check_block(orbs, k0, k1, sd_content.window)))
             if reordering:
                 raise ValueError(F"the diabatic {basis.upper()} state {c} of frame {start_time + i} carries "
                                  F"|<{c}|{c}>| = {d[c]:.3f} into frame {start_time + i + 1} even after the reordering"
@@ -3977,7 +4043,7 @@ def _tracking_record(reordering, alpha, min_overlap, perms, swaps, unresolved, m
                 "the state that took most of it])"}
 
 
-def _continuity_record(St_list, start_time, reordering, alpha, min_overlap, perms=None, basis="SD"):
+def _continuity_record(St_list, start_time, reordering, alpha, min_overlap, perms=None, basis="SD", describe=None):
     """How the states of a basis continue between the frames as labeled. A state whose |St_cc| falls below
     min_overlap is an EDGE DEPARTURE when the whole space carries less than min_overlap of it (sqrt(sum_j |St_cj|^2)
     - it left the active space through its edge, the remedy is the space) and is recorded, or an INTERNAL MIXING
@@ -3988,7 +4054,8 @@ def _continuity_record(St_list, start_time, reordering, alpha, min_overlap, perm
     continuation below the floor (unresolved), the edge departures ([frame, state, kept, carried by the space, the
     state that took most of it]), the
     smallest |St_cc|, and the frames at which the reordering changed the labels (perms: the per-frame label
-    permutations of apply_state_reordering_general)."""
+    permutations of apply_state_reordering_general). describe (a _SdLabels) makes the refusal name the determinant
+    under every label at both frames and end with the orbitals to check in CP2K."""
     conts, edges, unresolved = [], [], []
     for i, St in enumerate(St_list):
         A = np.abs(np.asarray(St.todense()).real)
@@ -4004,6 +4071,23 @@ def _continuity_record(St_list, start_time, reordering, alpha, min_overlap, perm
                 row = A[j].copy()
                 row[j] = -1.0
                 partner = int(np.argmax(row))
+                if describe is not None:
+                    k0, k1 = start_time + i, start_time + i + 1
+                    pad = " " * len(F"{basis} state {j}:")
+                    orbs = describe.orbitals(i, j) + describe.orbitals(i + 1, j) + describe.orbitals(i + 1, partner)
+                    raise ValueError("\n".join([
+                        F"the {basis} state {j} of frame {k0} continues into state {partner} of frame {k1} after the "
+                        F"reordering - an internal mixing the frame spacing does not resolve",
+                        F"  |<{j}|{j}>| = {c[j]:.3f} below the threshold {min_overlap:.4g}, |<{j}|{partner}>| = "
+                        F"{row[partner]:.3f}, the space carries {inside[j]:.3f} of the state",
+                        F"  {basis} state {j}:  frame {k0}  {describe.text(i, j)}",
+                        F"  {pad}  frame {k1}  {describe.text(i + 1, j)}  (where its continuation was assigned)",
+                        F"  {basis} state {partner}:  frame {k1}  {describe.text(i + 1, partner)}",
+                        F"  the labels at frame {k0}:"] + [F"    {l}" for l in describe.map_lines(i)] + [
+                        F"  the labels at frame {k1}:"] + [F"    {l}" for l in describe.map_lines(i + 1)] + [
+                        F"  a lower state_reordering_min_overlap lets the frame through and records it in "
+                        F"sd_route_report.json, 0 switches the check off - sd_labels.json holds the determinant of "
+                        F"every label at every frame"] + _orbital_check_block(orbs, k0, k1, describe.window)))
                 raise ValueError(F"the {basis} state {j} of frame {start_time + i} continues into state {partner} "
                                  F"of frame {start_time + i + 1} after the reordering (|<{j}|{j}>| = {c[j]:.3f} below "
                                  F"the threshold {min_overlap:.4g}, |<{j}|{partner}>| = {row[partner]:.3f}, the space "
@@ -4518,6 +4602,34 @@ def run_step3_pod(params):
 
     idx, frag, rank = _pod_route_hole_basis(nmo, occupied, per_block)
     n = len(idx)
+
+    def pod_state(c):
+        # a basis state by libra's block and rank
+        return F"block {frag[c]}, rank {rank[c]}"
+
+    def pod_cp2k(c):
+        # the same state by CP2K's numbers: the block from 1, the state counted from the bottom of the block
+        return F"state {occupied[frag[c]] - rank[c]} of CP2K block {frag[c] + 1}"
+
+    def pod_global(p):
+        # a block state outside the basis by its global index: its block and CP2K's numbers
+        b = int(np.searchsorted(off, p, side='right') - 1)
+        return F"state {p - off[b] + 1} of CP2K block {b + 1}"
+
+    def pod_check_block(globals_, k0, k1):
+        # the last lines of a refusal: the block states to look at, grouped by CP2K's block with CP2K's state
+        # numbers, and their rows and columns of the step-2 files
+        g = sorted({int(x) for x in globals_})
+        by_block = {}
+        for x in g:
+            b = int(np.searchsorted(off, x, side='right') - 1)
+            by_block.setdefault(b, []).append(x - off[b] + 1)
+        where = ", ".join(F"block {b + 1}: state{'s' if len(s) > 1 else ''} {', '.join(map(str, s))}"
+                          for b, s in sorted(by_block.items()))
+        return _check_block("block states", [
+            F"{where} at frames {k0} and {k1}",
+            F"(the state number counted from the bottom of the block - their time overlaps are the rows and columns "
+            F"{', '.join(map(str, g))} of St_pod_cp2k_{k0}.npz, their energies in POD_cp2k_hab_{k0}.npz)"])
     # the block state that carries every diabatic state at every frame (the energy-ordered basis of start_time at
     # the start), the printed sign of every block state followed along the trajectory - A[k] the cumulative
     # orthogonal transform of the followed basis, the signs alone or, aligned, the rotation within every block -
@@ -4593,31 +4705,37 @@ def run_step3_pod(params):
             row = np.abs(rows[c]).copy()
             row[nxt[c]] = -1.0
             partner = int(np.argmax(row))
-            if dia_reordering or selection == 'identity':
-                raise ValueError(F"the POD block state {cur[c]} (block {frag[c]}, rank {rank[c]} of frame "
-                                 F"{start_time}) carries |<s|s'>| = {d[c]:.3f} into frame {frames[i + 1]} even after "
-                                 F"the {'following through' if selection == 'identity' else 'reordering within'} its "
-                                 F"{'block' if selection == 'identity' else 'window'}"
-                                 F"{' and the alignment' if dia_reordering in (5, 52) else ''} (the largest other "
-                                 F"overlap {row[partner]:.3f} into the "
-                                 F"block state {partner}, the threshold "
-                                 F"{dia_min_overlap:.4g}) - the states mix by more "
-                                 F"than the threshold's angle within one frame: the frame spacing does not resolve the "
-                                 F"crossing (a lower diabatic_state_reordering_min_overlap lets the frame through and "
-                                 F"records it)")
             # the largest other overlap may sit on a basis state of the block (a swap inside the basis) or on a block
             # state outside it while the basis still carries the state - named as what it is
-            if partner in cur:
-                b = cur.index(partner)
-                where = F"the basis state {b} (block {frag[b]}, rank {rank[b]})"
-            else:
-                where = F"the block state {partner} outside the basis"
-            raise ValueError(F"the POD block state {cur[c]} (block {frag[c]}, rank {rank[c]}) of frame {frames[i]} "
-                             F"continues into {where} of frame {frames[i + 1]} (|<s|s>| = {d[c]:.3f} below the "
-                             F"threshold {dia_min_overlap:.4g}, |<s|s'>| = {row[partner]:.3f}, the basis carries "
-                             F"{inside[c]:.3f} of the state) - two block states swap between the frames and the labels "
-                             F"would mean other states from there on: narrow num_occ_states_per_block, or follow the "
-                             F"states with do_diabatic_state_reordering 2")
+            where = (F"the basis state {cur.index(partner)} ({pod_state(cur.index(partner))})" if partner in cur
+                     else F"the block state {partner} outside the basis")
+            check = pod_check_block([cur[c], nxt[c], partner], frames[i], frames[i + 1])
+            if dia_reordering or selection == 'identity':
+                raise ValueError("\n".join([
+                    F"the POD block state {cur[c]} ({pod_state(c)} of frame {start_time}) carries |<s|s'>| = "
+                    F"{d[c]:.3f} into frame {frames[i + 1]} even after the "
+                    F"{'following through' if selection == 'identity' else 'reordering within'} its "
+                    F"{'block' if selection == 'identity' else 'window'}"
+                    F"{' and the alignment' if dia_reordering in (5, 52) else ''} - the states mix by more than the "
+                    F"threshold's angle within one frame, the frame spacing does not resolve the crossing",
+                    F"  its continuation carries {d[c]:.3f} below the threshold {dia_min_overlap:.4g}, the largest "
+                    F"other overlap {row[partner]:.3f} goes into {where}, the basis carries {inside[c]:.3f} of the "
+                    F"state",
+                    F"  at frame {frames[i]} the state is the block state {cur[c]} ({pod_global(cur[c])}), at frame "
+                    F"{frames[i + 1]} its continuation the block state {nxt[c]} ({pod_global(nxt[c])}), the largest "
+                    F"other the block state {partner} ({pod_global(partner)})",
+                    "  a lower diabatic_state_reordering_min_overlap lets the frame through and records it"]
+                    + check))
+            raise ValueError("\n".join([
+                F"the POD block state {cur[c]} ({pod_state(c)}) of frame {frames[i]} continues into {where} of frame "
+                F"{frames[i + 1]} - two block states swap between the frames and the labels would mean other states "
+                F"from there on",
+                F"  |<s|s>| = {d[c]:.3f} below the threshold {dia_min_overlap:.4g}, |<s|s'>| = {row[partner]:.3f}, "
+                F"the basis carries {inside[c]:.3f} of the state",
+                F"  the block state {cur[c]} is {pod_global(cur[c])}, the block state {partner} is "
+                F"{pod_global(partner)}",
+                "  remedies: narrow num_occ_states_per_block, or follow the states with do_diabatic_state_reordering 2"]
+                + check))
         # every state let through below the floor that the basis still carries is an unresolved continuation
         if len(unresolved_idx):
             unresolved.append(frames[i + 1])
@@ -4671,12 +4789,27 @@ def run_step3_pod(params):
                               _partner(O[j], j)])
         for j in mixed_idx[:1]:
             if params['do_state_reordering'] in (1, 2, 22) and sd_min_overlap > 0.0:
-                raise ValueError(F"the adiabatic hole state {j} of frame {frames[k - 1]} carries |<{j}|{j}>| = "
-                                 F"{d_adi[j]:.3f} into frame {frames[k]} after the reordering, below the threshold "
-                                 F"{sd_min_overlap:.4g} (the basis carries {inside_adi[j]:.3f} of the state) - an "
-                                 F"internal "
-                                 F"mixing the frame spacing does not resolve: a lower state_reordering_min_overlap "
-                                 F"lets the frame through and records it, 0 switches the check off")
+                row = np.abs(O[j]).copy()
+                row[j] = -1.0
+                partner = int(np.argmax(row))
+                names = [F"{pod_state(c)} ({pod_cp2k(c)})" for c in range(n)]
+                lead_prev = _leading_components(V[k - 1][:, j])
+                lead_next = _leading_components(V[k][:, j]) + _leading_components(V[k][:, partner])
+                lead = lead_prev + lead_next
+                globals_ = [track[k - 1][c] for c in lead_prev] + [track[k][c] for c in lead_next]
+                pad = " " * len(F"state {j}:")
+                raise ValueError("\n".join([
+                    F"the adiabatic hole state {j} of frame {frames[k - 1]} continues into state {partner} of frame "
+                    F"{frames[k]} after the reordering - an internal mixing the frame spacing does not resolve",
+                    F"  |<{j}|{j}>| = {d_adi[j]:.3f} below the threshold {sd_min_overlap:.4g}, |<{j}|{partner}>| = "
+                    F"{row[partner]:.3f}, the basis carries {inside_adi[j]:.3f} of the state",
+                    F"  state {j}:  frame {frames[k - 1]}  {_composition_text(V[k - 1][:, j], names)}",
+                    F"  {pad}  frame {frames[k]}  {_composition_text(V[k][:, j], names)}  (where its continuation was "
+                    F"assigned)",
+                    F"  state {partner}:  frame {frames[k]}  {_composition_text(V[k][:, partner], names)}",
+                    F"  a lower state_reordering_min_overlap lets the frame through and records it in "
+                    F"pod_route_report.json, 0 switches the check off"]
+                    + pod_check_block(globals_, frames[k - 1], frames[k])))
         if len(unresolved_idx):
             adi_unresolved.append(frames[k])
         if params['apply_phase_correction']:
@@ -4885,7 +5018,7 @@ def run_step3_sd_nacs_libint(params):
                 convention there and is left to the propagation.
                 sd_labels.json records the determinant under every SD label at every frame (the orbital numbers of its
                 hole or electron, the excitation of a neutral basis), written before the continuity check so that a
-                refused run keeps it.
+                refused run keeps it - the refusals name those determinants and end with the orbitals to check in CP2K.
                 sd_route_report.json records unresolved_frames (internal continuations below the floor let through),
                 edge_departures, min_continuity and reordered_frames.
             * **params['active_space_selection']** (string): how the orbitals of the active space are picked at every
@@ -5347,13 +5480,34 @@ def run_step3_sd_nacs_libint(params):
     print('Done with computing the SD overlaps. Elapsed time:', time.time() - t2)
     if W_dia is not None:
         # the records follow the states: written once the columns of W stand in the order of start_time
-        # the determinant under every SD label at every frame in the energy order (sd_labels.json from here, rewritten
-        # with the followed labels after the reordering)
-        _SdLabels(sd_states_reindexed_sorted, None, ks_active_space, data_dim, params['lowest_orbital'],
-                  params['highest_orbital'], sd_charge, start_time).write(F'{res_dir_2}/sd_labels.json')
+        # what every diabatic state is, for the refusals: the carrier, its fragment and rank, the manifold's shared
+        # spin-orbital as an orbital number, and the determinants of every frame in their energy order (sd_labels.json
+        # in that order from here, rewritten with the followed labels after the reordering)
+        alpha_numbers, beta_numbers = _reindexed_orbital_numbers(ks_active_space, data_dim, params['lowest_orbital'])
+        sd_rows = _SdLabels(sd_states_reindexed_sorted, None, ks_active_space, data_dim, params['lowest_orbital'],
+                            params['highest_orbital'], sd_charge, start_time)
+        sd_rows.write(F'{res_dir_2}/sd_labels.json')
+
+        def describe_dia_state(c):
+            entry = dia_index[c]
+            if entry[0] == "loc":
+                key = entry[1]
+                manifold = ""
+                if key is not None:
+                    key = int(key)
+                    orbital = alpha_numbers[key - 1] if key > 0 else beta_numbers[-key - 1]
+                    manifold = (F" (manifold {key}: the determinants sharing the {'alpha' if key > 0 else 'beta'} "
+                                F"orbital {orbital})")
+                return F"the {localized_carrier} on fragment {entry[2]}, rank {entry[3]}{manifold}"
+            if entry[0] == "joint":
+                return (F"the hole on fragment {entry[2]}, rank {entry[3]} with the electron on fragment {entry[4]}, "
+                        F"rank {entry[5]}")
+            if entry[0] == "sd":
+                return "an unlocalized determinant"
+            return "the reference"
         perms_dia, swaps_dia, unresolved_dia, cont_dia, edges_dia, align_dia = _follow_diabatic_states(
             W_dia, St_sds, start_time, "sd", dia_index, dia_reordering, dia_alpha, _state_energies(dia_energies),
-            dia_min_overlap)
+            dia_min_overlap, describe_states=describe_dia_state, sd_content=sd_rows)
         followed = lambda records: _rotate_records(_permute_records(records, perms_dia), align_dia)
         _write_diabatization_records(res_dir_2, localized_carrier, dia_index, followed(dia_pops), followed(dia_hole),
                                      followed(dia_energies), start_time, str(params['diabatization_scheme']).lower(),
@@ -5393,12 +5547,14 @@ def run_step3_sd_nacs_libint(params):
     # the continuity of the SD states as labeled: refused below the threshold after a reordering, recorded otherwise
     # the determinant under every SD label at every frame, written before the continuity check so that a refused run
     # keeps it (the labels are the energy order at start_time, followed by identity under a reordering)
-    _SdLabels(sd_states_reindexed_sorted, perms if params['do_state_reordering'] in (1, 2, 22) else None,
-              ks_active_space, data_dim, params['lowest_orbital'], params['highest_orbital'], sd_charge,
-              start_time).write(F'{res_dir_2}/sd_labels.json')
+    sd_labels = _SdLabels(sd_states_reindexed_sorted, perms if params['do_state_reordering'] in (1, 2, 22) else None,
+                          ks_active_space, data_dim, params['lowest_orbital'], params['highest_orbital'], sd_charge,
+                          start_time)
+    sd_labels.write(F'{res_dir_2}/sd_labels.json')
     route_report = {"sd": _continuity_record(St_sds, start_time, params['do_state_reordering'],
                                              params['state_reordering_alpha'], sd_min_overlap,
-                                             perms if params['do_state_reordering'] in (1, 2, 22) else None)}
+                                             perms if params['do_state_reordering'] in (1, 2, 22) else None,
+                                             describe=sd_labels)}
     print(F"SD states: {len(route_report['sd']['reordered_frames'])} reordered frames, "
           F"{len(route_report['sd']['unresolved_frames'])} frames let through with a continuation below the floor, "
           F"{len(route_report['sd']['edge_departures'])} edge departures (a state left the active space), continuity "
