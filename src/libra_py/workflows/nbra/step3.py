@@ -3658,14 +3658,17 @@ def _classify_continuations(d, inside, threshold):
     return edges, mixed, unresolved
 
 
-def _reindexed_orbital_numbers(active_space, data_dim, lowest_orbital):
-    """The orbital numbers (CP2K's, from 1) of the reindexed active spin-orbitals of the SD route: the alpha
-    spin-orbital j is the j-th active alpha window position, the beta -j the j-th active beta one, and the window
-    position i is the orbital lowest_orbital + i."""
+def _reindexed_orbital_numbers(active_space, data_dim, lowest_orbital, perm=None):
+    """The orbital numbers (CP2K's at the frame, from 1) of the reindexed active spin-orbitals of the SD route: the
+    alpha spin-orbital j is the j-th active alpha window position, the beta -j the j-th active beta one, and the
+    window position i is the orbital lowest_orbital + i - under the followed window (active_space_selection
+    'identity') the label at position i sits at the stored position perm[i] of the frame, the orbital
+    lowest_orbital + perm[i]."""
     n = data_dim // 2
-    alpha = [a for a in active_space if a < n]
-    beta = [b - n for b in active_space if b >= n]
-    return [int(lowest_orbital) + int(a) for a in alpha], [int(lowest_orbital) + int(b) for b in beta]
+    pos = list(range(data_dim)) if perm is None else [int(p) for p in perm]
+    alpha = [pos[a] for a in active_space if a < n]
+    beta = [pos[b] - n for b in active_space if b >= n]
+    return [int(lowest_orbital) + a for a in alpha], [int(lowest_orbital) + b for b in beta]
 
 
 def _sd_reference_set(sd_lists, sd_charge):
@@ -3717,14 +3720,19 @@ class _SdLabels:
     tool step3-labels.py."""
 
     def __init__(self, sd_lists, perms, active_space, data_dim, lowest_orbital, highest_orbital, sd_charge,
-                 start_time):
-        alpha, beta = _reindexed_orbital_numbers(active_space, data_dim, lowest_orbital)
+                 start_time, orbital_perms=None):
         self.frames = [int(start_time) + i for i in range(len(sd_lists))]
+        # the orbital numbers of the active positions at every frame - CP2K's at that frame, under the followed
+        # window (orbital_perms, {frame: perm}) those of the orbitals the labels sit on there
+        self.numbers = [_reindexed_orbital_numbers(active_space, data_dim, lowest_orbital,
+                                                   None if orbital_perms is None else orbital_perms[k])
+                        for k in self.frames]
         self.kind = {1: "hole", -1: "electron"}.get(int(sd_charge), "neutral")
         self.window = [int(lowest_orbital), int(highest_orbital)]
         self.entries = []
         for i, lists in enumerate(sd_lists):
             ref = _sd_reference_set(lists, sd_charge)
+            alpha, beta = self.numbers[i]
             rows = [_sd_content(sd, ref, alpha, beta) for sd in lists]
             if perms is not None:
                 order = perms[min(i, len(perms) - 1)]
@@ -3738,6 +3746,11 @@ class _SdLabels:
 
     def short(self, i, j):
         return _sd_content_text(self.entries[i][j], self.spins, short=True)
+
+    def spin_orbital(self, i, key):
+        """the orbital number (CP2K's at frame i) and the spin of the reindexed spin-orbital key (j alpha, -j beta)"""
+        alpha, beta = self.numbers[i]
+        return (alpha[key - 1], "alpha") if key > 0 else (beta[-key - 1], "beta")
 
     def orbitals(self, i, j):
         e = self.entries[i][j]
@@ -3761,7 +3774,9 @@ class _SdLabels:
             json.dump({"note": "the determinant under every SD label at every frame, as [orbital number, spin] of its "
                                "holes and its electrons against the reference (a hole basis: the closed shell minus "
                                "one spin-orbital, an electron basis: plus one, a neutral basis: its lowest "
-                               "determinant) - labels[frame index][label], the frames in 'frames', and the labels are "
+                               "determinant) - the orbital numbers are CP2K's at that frame, from 1 (under "
+                               "active_space_selection 'identity' those of the orbitals the labels sit on there) - "
+                               "labels[frame index][label], the frames in 'frames', and the labels are "
                                + ("the energy order at the first frame and follow the states by identity under "
                                   "do_state_reordering 1, 2 or 22" if self.followed else
                                   "the energy order of every frame"),
@@ -3876,7 +3891,8 @@ def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=N
     definite: the signs and the rotation within degenerate states, whose orientation the eigensolver sets anew at
     every frame, are taken out, the within-group derivative coupling of a diabatic propagation vanishes, and the
     continuity is the diagonal of the aligned block. W(i) becomes W(i) A(i) in place at the end and the records of
-    the states are rotated as diagonal quantities (_rotate_records). describe_states (callable c -> text) and
+    the states are rotated as diagonal quantities (_rotate_records). describe_states (callable (c, i) -> text, i the
+    frame index) and
     sd_content (a _SdLabels of the frames in their energy order) make the refusals name the states: what every
     diabatic state is, its composition over the determinants of the frame, and end with the orbitals to check in
     CP2K.
@@ -3947,9 +3963,9 @@ def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=N
                     head,
                     F"  |<{c}|{c}>| = {d[c]:.3f} below the threshold {min_overlap:.4g}, |<{c}|{partner}>| = "
                     F"{row[partner]:.3f}, the space carries {inside[c]:.3f} of the state",
-                    F"  state {c}:  {describe_states(c)}",
+                    F"  state {c}:  {describe_states(c, i)}",
                     F"  {pad_c}  frame {k0}  {_composition_text(W_list[i][:, c], names0)}",
-                    F"  state {partner}:  {describe_states(partner)}",
+                    F"  state {partner}:  {describe_states(partner, i + 1)}",
                     F"  {pad_p}  frame {k1}  {_composition_text(W_list[i + 1][:, partner], names1)}",
                     F"  {tail}"] + _orbital_check_block(orbs, k0, k1, sd_content.window)))
             if reordering:
@@ -4607,10 +4623,6 @@ def run_step3_pod(params):
         # a basis state by libra's block and rank
         return F"block {frag[c]}, rank {rank[c]}"
 
-    def pod_cp2k(c):
-        # the same state by CP2K's numbers: the block from 1, the state counted from the bottom of the block
-        return F"state {occupied[frag[c]] - rank[c]} of CP2K block {frag[c] + 1}"
-
     def pod_global(p):
         # a block state outside the basis by its global index: its block and CP2K's numbers
         b = int(np.searchsorted(off, p, side='right') - 1)
@@ -4793,10 +4805,11 @@ def run_step3_pod(params):
                 row = np.abs(O[j]).copy()
                 row[j] = -1.0
                 partner = int(np.argmax(row))
-                names = [F"{pod_state(c)} ({pod_cp2k(c)})" for c in range(n)]
+                # the basis states by their ranks at start_time and by the block states they sit on at each frame
+                names_prev = [F"{pod_state(c)} ({pod_global(track[k - 1][c])})" for c in range(n)]
+                names_next = [F"{pod_state(c)} ({pod_global(track[k][c])})" for c in range(n)]
                 lead_prev = _leading_components(V[k - 1][:, j])
                 lead_next = _leading_components(V[k][:, j]) + _leading_components(V[k][:, partner])
-                lead = lead_prev + lead_next
                 globals_ = [track[k - 1][c] for c in lead_prev] + [track[k][c] for c in lead_next]
                 pad = " " * len(F"state {j}:")
                 raise ValueError("\n".join([
@@ -4804,10 +4817,10 @@ def run_step3_pod(params):
                     F"{frames[k]} after the reordering - an internal mixing the frame spacing does not resolve",
                     F"  |<{j}|{j}>| = {d_adi[j]:.3f} below the threshold {sd_min_overlap:.4g}, |<{j}|{partner}>| = "
                     F"{row[partner]:.3f}, the basis carries {inside_adi[j]:.3f} of the state",
-                    F"  state {j}:  frame {frames[k - 1]}  {_composition_text(V[k - 1][:, j], names)}",
-                    F"  {pad}  frame {frames[k]}  {_composition_text(V[k][:, j], names)}  (where its continuation was "
-                    F"assigned)",
-                    F"  state {partner}:  frame {frames[k]}  {_composition_text(V[k][:, partner], names)}",
+                    F"  state {j}:  frame {frames[k - 1]}  {_composition_text(V[k - 1][:, j], names_prev)}",
+                    F"  {pad}  frame {frames[k]}  {_composition_text(V[k][:, j], names_next)}  (where its continuation "
+                    F"was assigned)",
+                    F"  state {partner}:  frame {frames[k]}  {_composition_text(V[k][:, partner], names_next)}",
                     F"  a lower state_reordering_min_overlap lets the frame through and records it in "
                     F"pod_route_report.json, 0 switches the check off"]
                     + pod_check_block(globals_, frames[k - 1], frames[k])))
@@ -5018,8 +5031,9 @@ def run_step3_sd_nacs_libint(params):
                 In the energy order (do_state_reordering 0) nothing is refused - a crossing of adiabatic states is the
                 convention there and is left to the propagation.
                 sd_labels.json records the determinant under every SD label at every frame (the orbital numbers of its
-                hole or electron, the excitation of a neutral basis), written before the continuity check so that a
-                refused run keeps it - the refusals name those determinants and end with the orbitals to check in CP2K.
+                hole or electron at that frame, the excitation of a neutral basis), written before the continuity check
+                so that a refused run keeps it - the refusals name those determinants and end with the orbitals to check
+                in CP2K.
                 sd_route_report.json records unresolved_frames (internal continuations below the floor let through),
                 edge_departures, min_continuity and reordered_frames.
             * **params['active_space_selection']** (string): how the orbitals of the active space are picked at every
@@ -5484,21 +5498,19 @@ def run_step3_sd_nacs_libint(params):
         # what every diabatic state is, for the refusals: the carrier, its fragment and rank, the manifold's shared
         # spin-orbital as an orbital number, and the determinants of every frame in their energy order (sd_labels.json
         # in that order from here, rewritten with the followed labels after the reordering)
-        alpha_numbers, beta_numbers = _reindexed_orbital_numbers(ks_active_space, data_dim, params['lowest_orbital'])
         sd_rows = _SdLabels(sd_states_reindexed_sorted, None, ks_active_space, data_dim, params['lowest_orbital'],
-                            params['highest_orbital'], sd_charge, start_time)
+                            params['highest_orbital'], sd_charge, start_time, orbital_perms)
         sd_rows.write(F'{res_dir_2}/sd_labels.json')
 
-        def describe_dia_state(c):
+        def describe_dia_state(c, i):
+            # what the diabatic state c is - the manifold's shared spin-orbital by its orbital number at frame i
             entry = dia_index[c]
             if entry[0] == "loc":
                 key = entry[1]
                 manifold = ""
                 if key is not None:
-                    key = int(key)
-                    orbital = alpha_numbers[key - 1] if key > 0 else beta_numbers[-key - 1]
-                    manifold = (F" (manifold {key}: the determinants sharing the {'alpha' if key > 0 else 'beta'} "
-                                F"orbital {orbital})")
+                    orbital, spin = sd_rows.spin_orbital(i, int(key))
+                    manifold = F" (manifold {int(key)}: the determinants sharing the {spin} orbital {orbital})"
                 return F"the {localized_carrier} on fragment {entry[2]}, rank {entry[3]}{manifold}"
             if entry[0] == "joint":
                 return (F"the hole on fragment {entry[2]}, rank {entry[3]} with the electron on fragment {entry[4]}, "
@@ -5550,7 +5562,7 @@ def run_step3_sd_nacs_libint(params):
     # keeps it (the labels are the energy order at start_time, followed by identity under a reordering)
     sd_labels = _SdLabels(sd_states_reindexed_sorted, perms if params['do_state_reordering'] in (1, 2, 22) else None,
                           ks_active_space, data_dim, params['lowest_orbital'], params['highest_orbital'], sd_charge,
-                          start_time)
+                          start_time, orbital_perms)
     sd_labels.write(F'{res_dir_2}/sd_labels.json')
     route_report = {"sd": _continuity_record(St_sds, start_time, params['do_state_reordering'],
                                              params['state_reordering_alpha'], sd_min_overlap,
