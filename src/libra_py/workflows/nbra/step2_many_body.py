@@ -22,6 +22,8 @@ import numpy as np
 import math
 import sys
 import os
+import shutil
+import glob
 
 import time
 import copy
@@ -1028,7 +1030,16 @@ def run_step2_many_body(params):
                step + 1), E_ks_job[step + 1], fmt='%.16e', delimiter=" ")
     print("All steps were done successfully for this job!")
 
-    os.system("mv logfiles/* ../../all_logfiles/.")
-    os.system("mv pdosfiles/* ../../all_pdosfiles/.")
-    os.system("rm " + trajectory_xyz_filename)
-    os.system("rm *wfn")
+    # python moves, not shell globs - a `mv logfiles/*` over a long job's files exceeds the kernel's argument limit and os.system
+    # would hide the failure
+    for f in sorted(glob.glob("logfiles/*")):
+        if os.path.isfile(f):
+            shutil.move(f, os.path.join("../../all_logfiles", os.path.basename(f)))
+    for f in sorted(glob.glob("pdosfiles/*")):
+        if os.path.isfile(f):
+            shutil.move(f, os.path.join("../../all_pdosfiles", os.path.basename(f)))
+    if os.path.isfile(trajectory_xyz_filename):
+        os.remove(trajectory_xyz_filename)
+    for f in glob.glob("*wfn"):
+        if os.path.isfile(f):
+            os.remove(f)

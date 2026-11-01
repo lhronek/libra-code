@@ -18,6 +18,7 @@
 """
 
 import os
+import glob
 import sys
 
 if sys.platform == "cygwin":
@@ -316,9 +317,12 @@ def do_ovlp(i, params, run):
 
 
 def clean():
-    os.system("rm ergoscf.out")
-    os.system("rm density.bin")
-    os.system("rm F_matrix_*.mtx")
+    for f in ("ergoscf.out", "density.bin"):
+        if os.path.isfile(f):
+            os.remove(f)
+    for f in glob.glob("F_matrix_*.mtx"):      # a python loop, not a shell glob - no argument limit, a failure raises
+        if os.path.isfile(f):
+            os.remove(f)
 
 
 RUN_STEP2_KEYS = frozenset(("EXE", "direct_MO", "dt", "fsnap", "isnap", "md_file", "mo_active_space",

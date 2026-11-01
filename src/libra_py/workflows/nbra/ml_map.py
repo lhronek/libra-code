@@ -19,6 +19,7 @@
 """
 
 import os
+import shutil
 import sys
 import glob
 import time
@@ -936,8 +937,10 @@ def compute_properties(params, models, input_scalers, output_scalers):
             # we have to make a cp2k input file based on the reference input
             # and then run it. Then since the files are large we need to remove them
     # os.system("rm *.log *.npy *.wfn* *.inp *.xyz")
-    os.system("mkdir ../ml_total_energy")
-    os.system("mv output*.out ../ml_total_energy/.")
+    os.makedirs("../ml_total_energy", exist_ok=True)
+    for f in sorted(glob.glob("output*.out")):     # a python loop, not a shell glob - no argument limit, a failure raises
+        if os.path.isfile(f):
+            shutil.move(f, os.path.join("../ml_total_energy", f))
     # os.system("rm *.out")
     # os.chdir("../")
     # os.system(f"rm -rf tmp_guess_ham_{params['job']}")
