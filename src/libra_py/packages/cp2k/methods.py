@@ -2632,6 +2632,31 @@ def collect_xyz_files(step, destination):
         shutil.move(f, os.path.join(destination, f))
 
 
+def collect_log_files(step, destination):
+    """Move the CP2K logs step 2 wrote for `step` into `destination`: the xTB OT and diagonalization logs and the DFT
+    diagonalization log, whichever exist - called as the step ends, so a run stopped early leaves its logs collected"""
+    for f in (F"OUT-ot_{step}.log", F"OUT-diag_{step}.log", F"step_{step}.log"):
+        if os.path.isfile(f):
+            shutil.move(f, os.path.join(destination, f))
+
+
+def collect_image_files(step, destination, image_format):
+    """Move the orbital images step 2 rendered for `step` (Diag_libra-{step}-*.<format> and Diag_{step}-*.<format>) into
+    `destination`"""
+    ext = image_format.lower()
+    for f in sorted(glob.glob(F"Diag_libra-{step}-*.{ext}") + glob.glob(F"Diag_{step}-*.{ext}")):
+        if os.path.isfile(f):
+            shutil.move(f, os.path.join(destination, os.path.basename(f)))
+
+
+def remove_cube_files(step):
+    """Remove the cube files CP2K printed for `step` (Diag_libra-{step}-WFN_*.cube and Diag_{step}-WFN_*.cube) once their
+    images are rendered"""
+    for f in glob.glob(F"Diag_libra-{step}-WFN_*.cube") + glob.glob(F"Diag_{step}-WFN_*.cube"):
+        if os.path.isfile(f):
+            os.remove(f)
+
+
 def aux_pdos(
         c1,
         atoms,

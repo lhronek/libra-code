@@ -994,6 +994,7 @@ def run_cp2k_libint_step2(params):
             CP2K_methods.collect_pdos_files(params["all_pdosfiles"])
             CP2K_methods.collect_inp_files(step, params["all_inpfiles"])
             CP2K_methods.collect_xyz_files(step, params["all_xyzfiles"])
+            CP2K_methods.collect_log_files(step, params["all_logfiles"])
             continue
 
         # now if the counter is equal to zero
@@ -1469,13 +1470,19 @@ def run_cp2k_libint_step2(params):
                             phase_factors_alpha[c_plot, 0] *= f_alpha
                     if params['together_mode']:
                         break
+                # the images of step - 1 are rendered and its cubes plotted - collected now, not at the run's end
+                CP2K_methods.collect_image_files(step - 1, params["all_images"], params["image_format"])
+                if params["remove_cube"]:
+                    CP2K_methods.remove_cube_files(step - 1)
             print(F'Done with step {step}.', 'Elapsed time:', time.time() - t1_all)
         counter += 1
         # Move all the pdos files to all_pdosfiles for the step that is done!
         CP2K_methods.collect_pdos_files(params["all_pdosfiles"])
         CP2K_methods.collect_inp_files(step, params["all_inpfiles"])
         CP2K_methods.collect_xyz_files(step, params["all_xyzfiles"])
-    # Move all the logfiles after the job is done. This is important in case one requires to restart the calculations
+        CP2K_methods.collect_log_files(step, params["all_logfiles"])
+    # the sweeps of what the per-step collectors left - a run stopped between a CP2K run and its collection, the last
+    # step's cubes, the restart files
     os.system(F'mv *.log {params["all_logfiles"]}/.')
     if os.path.isfile("overlap_deltat_auto.inp"):
         shutil.move("overlap_deltat_auto.inp", os.path.join(params["all_inpfiles"], "overlap_deltat_auto.inp"))
