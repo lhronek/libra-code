@@ -1482,12 +1482,21 @@ def run_cp2k_libint_step2(params):
         CP2K_methods.collect_xyz_files(step, params["all_xyzfiles"])
         CP2K_methods.collect_log_files(step, params["all_logfiles"])
     # the sweeps of what the per-step collectors left - a run stopped between a CP2K run and its collection, the last
-    # step's cubes, the restart files
-    os.system(F'mv *.log {params["all_logfiles"]}/.')
+    # step's cubes, the restart files; python moves, not a shell glob: a `mv *.log` over the files of a long run exceeds the
+    # kernel's argument limit (2 MB here, about 100 000 names) and os.system would hide its failure
+    for f in sorted(glob.glob("*.log")):
+        if os.path.isfile(f):
+            shutil.move(f, os.path.join(params["all_logfiles"], f))
     if os.path.isfile("overlap_deltat_auto.inp"):
         shutil.move("overlap_deltat_auto.inp", os.path.join(params["all_inpfiles"], "overlap_deltat_auto.inp"))
-    os.system(F'mv *{params["image_format"].lower()} {params["all_images"]}/.')
-    os.system('rm *.wfn* *.tdwfn*')
+    for f in sorted(glob.glob(F'*{params["image_format"].lower()}')):
+        if os.path.isfile(f):
+            shutil.move(f, os.path.join(params["all_images"], f))
+    for f in glob.glob("*.wfn*") + glob.glob("*.tdwfn*"):
+        if os.path.isfile(f):
+            os.remove(f)
     if params["remove_cube"]:
-        os.system("rm *.cube")
+        for f in glob.glob("*.cube"):
+            if os.path.isfile(f):
+                os.remove(f)
     print('Done with the job!!!')
