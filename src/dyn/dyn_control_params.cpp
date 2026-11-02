@@ -72,6 +72,7 @@ dyn_control_params::dyn_control_params(){
   state_tracking_algo = -1;
   dia_tracking_algo = 0;
   MK_alpha = 0.0;
+  state_tracking_gap_max = 0.5 / 27.211386245988;
   MK_verbosity = 0;
   MK_scaling_function = 0;
   convergence = 0;
@@ -200,6 +201,7 @@ dyn_control_params::dyn_control_params(const dyn_control_params& x){
   state_tracking_algo = x.state_tracking_algo;
   dia_tracking_algo = x.dia_tracking_algo;
   MK_alpha = x.MK_alpha;
+  state_tracking_gap_max = x.state_tracking_gap_max;
   MK_verbosity = x.MK_verbosity;
   MK_scaling_function = x.MK_scaling_function;
   convergence = x.convergence;
@@ -467,6 +469,13 @@ void dyn_control_params::sanity_check(){
     std::cout<<"Error in dyn_control_params::sanity_check: decoherence_times_type = 5 (the Gu-Franco rates) with reorg_energy = "
         <<reorg_energy<<" Ha and Temperature = "<<Temperature<<" K - the prefactor sqrt(4 lambda kB T) is zero or NaN, both must"
         <<" be positive (reorg_energy has no physical default - set the reorganization energy of the bath)\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+  }
+
+  /// state_tracking_gap_max bounds the gap a relabel may cross - 0 refuses every relabel, below 0 nothing could pass
+  if(state_tracking_gap_max<0.0){
+    std::cout<<"Error in dyn_control_params::sanity_check: state_tracking_gap_max = "<<state_tracking_gap_max<<" Ha must not"
+        <<" be negative - it is the largest energy gap a state-tracking relabel may cross (0 refuses every relabel)\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
@@ -865,6 +874,7 @@ void dyn_control_params::set_parameters(bp::dict params){
     else if(key=="state_tracking_algo"){  state_tracking_algo = bp::extract<int>(params.values()[i]);  }
     else if(key=="dia_tracking_algo"){  dia_tracking_algo = bp::extract<int>(params.values()[i]);  }
     else if(key=="MK_alpha") { MK_alpha = bp::extract<double>(params.values()[i]);  }
+    else if(key=="state_tracking_gap_max") { state_tracking_gap_max = bp::extract<double>(params.values()[i]);  }
     else if(key=="MK_verbosity") { MK_verbosity = bp::extract<int>(params.values()[i]);  }
     else if(key=="MK_scaling_function") { MK_scaling_function = bp::extract<int>(params.values()[i]);  }
     else if(key=="convergence") { convergence = bp::extract<int>(params.values()[i]);  }

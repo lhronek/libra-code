@@ -219,6 +219,8 @@ def _print_simulation_params(dyn_params, nadi, ntraj, init_params=None, model_pa
         for key in ("MK_alpha", "MK_verbosity", "MK_scaling_function"):
             if key in p:
                 lines.append(row(F"{key}:", p[key]))
+    if tracking in (1, 2, 21, 22, 4, -12, 52, 62) and "state_tracking_gap_max" in p:
+        lines.append(row("state_tracking_gap_max:", p["state_tracking_gap_max"]))
     if tracking in (3, 32, 33):
         for key in ("convergence", "max_number_attempts",
                     "min_probability_reordering"):
@@ -654,6 +656,14 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
 
             * **dyn_params["MK_alpha"]** ( double ): Munkres-Kuhn alpha
                 (selects the range of orbitals included in reordering) [default: 0.0]
+
+
+            * **dyn_params["state_tracking_gap_max"]** ( double ): the largest energy gap [a.u.] a state-tracking
+                relabel may cross (the relabel routes 1, 2, 21, 22, 4 and the label twins -12, 52, 62): a relabel is
+                a crossing inside the step and nearly degenerate, one across a wider gap means the time overlap does
+                not describe the states the energies belong to and the step is refused (check_relabel_gap) - MK_alpha
+                only damps such a pairing's cost, it cannot refuse it when the diagonal overlaps vanish; 0 refuses
+                every relabel [default: 0.5 eV = 0.018375]
 
 
             * **dyn_params["MK_verbosity"]** ( double ): Munkres-Kuhn verbosity:
@@ -1389,6 +1399,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                            "do_phase_correction": 1, "phase_correction_tol": 1e-3,
                            "do_nac_phase_correction": 0,
                            "state_tracking_algo": -1, "MK_alpha": 0.0, "MK_verbosity": 0,
+                           "state_tracking_gap_max": 0.5 / 27.211386245988,
                            "convergence": 0, "max_number_attempts": 100, "min_probability_reordering": 0.0,
                            "is_nbra": 0, "icond": 0, "nfiles": -1, "periodic_dynamics": 0, "thermally_corrected_nbra": 0,
                            "hop_force_refresh": 0, "total_energy": 0.01,

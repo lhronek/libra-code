@@ -382,6 +382,15 @@ class dyn_control_params{
   double MK_alpha;
 
   /**
+    The largest energy gap a state-tracking relabel may cross [a.u., default: 0.5 eV]. A relabel that pairs a state
+    with another is a crossing inside the step, nearly degenerate by definition - one across a wider gap means the
+    time overlap does not describe the states the energies belong to, and the step is refused (check_relabel_gap,
+    at every route that chooses a label permutation: 1, 2, 21, 22, 4 and the label twins -12, 52, 62); 0 refuses
+    every relabel
+  */
+  double state_tracking_gap_max;
+
+  /**
     Munkres-Kuhn verbosity.
  
     Options:

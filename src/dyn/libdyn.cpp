@@ -96,6 +96,7 @@ void export_dyn_control_params_objects(){
       .def_readwrite("state_tracking_algo", &dyn_control_params::state_tracking_algo)
       .def_readwrite("dia_tracking_algo", &dyn_control_params::dia_tracking_algo)
       .def_readwrite("MK_alpha", &dyn_control_params::MK_alpha)
+      .def_readwrite("state_tracking_gap_max", &dyn_control_params::state_tracking_gap_max)
       .def_readwrite("MK_verbosity", &dyn_control_params::MK_verbosity)
       .def_readwrite("MK_scaling_function", &dyn_control_params::MK_scaling_function)
       .def_readwrite("convergence", &dyn_control_params::convergence)

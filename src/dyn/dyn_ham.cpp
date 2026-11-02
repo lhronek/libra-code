@@ -1100,6 +1100,7 @@ void update_proj_adi(dyn_control_params &prms, dyn_variables &dyn_var,
       CMATRIX Eadi(ham->get_ham_adi());
       CMATRIX TH(T_new.H());
       dyn_var.proj_perm[itraj] = jonker_volgenant(TH, Eadi, prms.MK_alpha, prms.MK_scaling_function);
+      check_relabel_gap(prms, Eadi, TH, dyn_var.proj_perm[itraj], "update_proj_adi() (the label twins)");
     }
     *dyn_var.proj_adi[itraj] = T_new;
     } catch (...) {

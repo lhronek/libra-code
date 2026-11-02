@@ -840,6 +840,29 @@ vector<int> get_stochastic_reordering3(CMATRIX& time_overlap, Random& rnd, int c
 }
 
 
+
+void check_relabel_gap(dyn_control_params& prms, CMATRIX& Eadi, CMATRIX& St, vector<int>& perm_t, std::string where){
+/**
+  A relabel that pairs state i with state j is a crossing inside the step, nearly degenerate by definition - one
+  across a gap wider than state_tracking_gap_max means the pairing St does not describe the states the energies
+  belong to, and the step is refused. Every route that chooses a label permutation calls this right after the choice.
+*/
+  int nst = perm_t.size();
+  for(int i=0; i<nst; i++){
+    int j = perm_t[i];
+    if(j==i){ continue; }
+    double gap = fabs(Eadi.get(i,i).real() - Eadi.get(j,j).real());
+    if(gap > prms.state_tracking_gap_max){
+      std::cout<<"Error in "<<where<<": state_tracking_algo = "<<prms.state_tracking_algo<<" pairs state "<<i<<" with state "<<j
+               <<" across a gap of "<<gap<<" Ha ("<<gap*27.211386245988<<" eV) on the pairing weights |St("<<i<<", "<<j<<")| = "
+               <<std::abs(St.get(i,j))<<", |St("<<j<<", "<<i<<")| = "<<std::abs(St.get(j,i))<<" - a crossing inside a step is"
+               <<" nearly degenerate, so the time overlap does not describe the states the energies belong to"
+               <<" (state_tracking_gap_max = "<<prms.state_tracking_gap_max<<" Ha, 0 refuses every relabel)\n";
+      std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
+    }
+  }
+}
+
 void update_projectors(dyn_control_params& prms, vector<CMATRIX>& projectors, 
   vector<CMATRIX>& Eadi, vector<CMATRIX>& St, Random& rnd){
 
@@ -894,6 +917,7 @@ void update_projectors(dyn_control_params& prms, vector<CMATRIX>& projectors,
       std::cout<<"Error in update_projectors(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: 0, 1, 2, 21, 22, 3, 32, 33, 4)\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
+    check_relabel_gap(prms, Eadi[traj], st, perm_t, "update_projectors()");
     
     // P -> P * perm
     CMATRIX p_i(nst, nst);
@@ -971,6 +995,7 @@ vector< vector<int> > compute_permutations(dyn_control_params& prms, vector<CMAT
       std::cout<<"Error in compute_permutations(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: 0, 1, 2, 21, 22, 3, 32, 33, 4)\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
     }
+    check_relabel_gap(prms, Eadi[traj], st, perm_t, "compute_permutations()");
 
     res.push_back(perm_t);
     
@@ -1021,6 +1046,7 @@ vector<CMATRIX> compute_projectors(dyn_control_params& prms, vector<CMATRIX>& Ea
     if(prms.state_tracking_algo==33){
         perm_t = get_stochastic_reordering3(st, rnd, prms.convergence, prms.max_number_attempts, prms.min_probability_reordering, 0);
     }
+    check_relabel_gap(prms, Eadi[traj], st, perm_t, "compute_projectors()");
     
     // P -> P * perm
     res[traj] = permutation2cmatrix(perm_t);
@@ -1078,6 +1104,7 @@ CMATRIX compute_projector(dyn_control_params& prms, CMATRIX& Eadi, CMATRIX& St){
     std::cout<<"Error in compute_projector(): state_tracking_algo = "<<prms.state_tracking_algo<<" has no branch here (implemented: 0, 1, 2, 4, 21, 22 - the stochastic 3, 32, 33 need a random generator this function does not receive)\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
+  check_relabel_gap(prms, Eadi, St, perm_t, "compute_projector()");
 
   // P -> P * perm
   res = permutation2cmatrix(perm_t);
