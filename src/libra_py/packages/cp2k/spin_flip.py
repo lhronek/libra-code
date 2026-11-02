@@ -107,26 +107,18 @@ def spin_flip_amplitudes(evect, C_beta, S_ao, n_beta_occ, C_alpha_occ):
     return proj[n_beta_occ:], float(np.sum(proj[:n_beta_occ] ** 2)), float(np.sum(proj ** 2))
 
 
-def s2_spin_flip(X, n_alpha_occ, n_beta_occ, S_ab):
-    """||S_+ Psi||^2 of the spin-flip state X[a, i] (beta virtual a, alpha occupied i - the orbitals 0-based, the alpha
-    occupied the first n_alpha_occ of the alpha set, the beta occupied the first n_beta_occ of the beta set, the beta
-    virtual a the beta orbital n_beta_occ + a) with S_ab = C_alpha S C_beta^T over ALL MOs of both spins - the excess
-    <S^2> - Ms (Ms + 1), which is <S^2> itself for the Ms = 0 states of a triplet reference (s2_total adds the rest). The
-    determinant of the term (i, a) lists the alpha orbitals first, then the beta ones, each sorted, so the amplitude
-    X[a, i] of the listed determinant (the beta orbital in the slot of i, spin_flip_amplitudes) enters with the parity
-    (-1)^(n_alpha_occ - 1 - i) of moving that orbital past the alpha orbitals above the slot - its place among the beta
-    orbitals costs every term the same sign, which the squares cancel. S_+ takes the beta
-    electron of orbital b into the empty alpha orbital p with the coefficient S_ab[p, b] and the parity of removing b
-    from the sorted beta list and inserting p into the sorted alpha list. Four kinds of landing pattern: p = i and b
-    = a restore the reference pattern (one pattern for all terms), p = i alone leaves the alpha reference with the
-    beta pattern of (a, b), b = a alone the beta reference with the alpha pattern of (i, p), and p != i, b != a is
-    unique to its term - the coefficients of a shared pattern add before squaring."""
+def _s2_landing(X, n_alpha_occ, n_beta_occ, S_ab):
+    """The landing patterns of S_+ on the state X (the listed amplitudes, s2_spin_flip): the coefficient of the
+    reference pattern, the beta patterns of p = i (nvirt, n_beta_occ), the alpha patterns of b = a (n_alpha_occ,
+    nmo_a, zero where p is occupied or p = i), and for the patterns unique to their term the amplitudes (n_alpha_occ,
+    nvirt) with the weight sum over the empty p != i and the occupied b of S_ab[p, b]^2 per alpha orbital - two states
+    share every pattern, so their bilinear form is the sum of the products (s2_spin_flip_matrix)"""
     X = np.asarray(X, dtype=float)
     S_ab = np.asarray(S_ab, dtype=float)
     nvirt, nocc = X.shape
     if nocc != n_alpha_occ:
         raise ValueError(F"X has {nocc} occupied columns, the reference {n_alpha_occ} alpha occupied orbitals")
-    # the listed amplitude enters the sorted lists with the slot parity (the docstring)
+    # the listed amplitude enters the sorted lists with the slot parity (the docstring of s2_spin_flip)
     X = X * ((-1.0) ** (n_alpha_occ - 1 - np.arange(n_alpha_occ)))[np.newaxis, :]
     nmo_a = S_ab.shape[0]
     alpha_occ = np.arange(n_alpha_occ)
@@ -148,34 +140,62 @@ def s2_spin_flip(X, n_alpha_occ, n_beta_occ, S_ab):
     par_b_virt = 1.0 if (n_alpha_left + n_beta_occ) % 2 == 0 else -1.0   # b = the virtual a itself
     S_occ = S_ab[:, :n_beta_occ]                                         # (p, b) for b in beta_occ
     S_virt = S_ab[:, virt]                                               # (p, a)
-    total = 0.0
     # (1) p = i and b = a: the reference pattern - one coefficient over all terms
     c_ref = sum(X[a, i] * par_p[i, i] * par_b_virt * S_virt[i, a] for i in range(n_alpha_occ) for a in range(nvirt))
-    total += c_ref ** 2
     # (2) p = i, b in beta_occ: the alpha reference with the beta pattern (a, b) - summed over i
     c2 = np.einsum("ai,i,ib->ab", X, par_p[alpha_occ, alpha_occ], S_occ[alpha_occ, :]) * par_b_occ[None, :]
-    total += float(np.sum(c2 ** 2))
     # (3) b = a, p != i and empty: the beta reference with the alpha pattern (i, p) - summed over a
     c3 = np.einsum("ai,pa->ip", X, S_virt) * par_p * par_b_virt
     c3 = np.where(empty, c3, 0.0)
     c3[alpha_occ, alpha_occ] = 0.0
-    total += float(np.sum(c3 ** 2))
-    # (4) p != i, b != a: every term its own pattern
-    w4 = (X ** 2).T                                                      # (i, a)
+    # (4) p != i, b != a: every term its own pattern, with the weight of its landings
     sp = np.where(empty, 1.0, 0.0)
     sp[alpha_occ, alpha_occ] = 0.0                                       # p != i
-    sum_p = sp @ (S_occ ** 2)                                            # (i, b): sum over empty p != i of S_ab[p, b]^2
-    total += float(np.sum(w4 * sum_p.sum(axis=1)[:, None]))
-    return float(total)
+    s4 = (sp @ (S_occ ** 2)).sum(axis=1)                                 # (i,): sum over empty p != i and b of S_ab[p, b]^2
+    return float(c_ref), c2, c3, X.T, s4
 
 
-def s2_spin_flip_brute(X, n_alpha_occ, n_beta_occ, S_ab, threshold=1e-12):
-    """The same ||S_+ Psi||^2 by the explicit landing patterns of every term in a dictionary - the reference the closed
-    form is checked against."""
+def s2_spin_flip(X, n_alpha_occ, n_beta_occ, S_ab):
+    """||S_+ Psi||^2 of the spin-flip state X[a, i] (beta virtual a, alpha occupied i - the orbitals 0-based, the alpha
+    occupied the first n_alpha_occ of the alpha set, the beta occupied the first n_beta_occ of the beta set, the beta
+    virtual a the beta orbital n_beta_occ + a) with S_ab = C_alpha S C_beta^T over ALL MOs of both spins - the excess
+    <S^2> - Ms (Ms + 1), which is <S^2> itself for the Ms = 0 states of a triplet reference (s2_total adds the rest). The
+    determinant of the term (i, a) lists the alpha orbitals first, then the beta ones, each sorted, so the amplitude
+    X[a, i] of the listed determinant (the beta orbital in the slot of i, spin_flip_amplitudes) enters with the parity
+    (-1)^(n_alpha_occ - 1 - i) of moving that orbital past the alpha orbitals above the slot - its place among the beta
+    orbitals costs every term the same sign, which the squares cancel. S_+ takes the beta
+    electron of orbital b into the empty alpha orbital p with the coefficient S_ab[p, b] and the parity of removing b
+    from the sorted beta list and inserting p into the sorted alpha list. Four kinds of landing pattern: p = i and b
+    = a restore the reference pattern (one pattern for all terms), p = i alone leaves the alpha reference with the
+    beta pattern of (a, b), b = a alone the beta reference with the alpha pattern of (i, p), and p != i, b != a is
+    unique to its term - the coefficients of a shared pattern add before squaring (_s2_landing)."""
+    c_ref, c2, c3, Xs, s4 = _s2_landing(X, n_alpha_occ, n_beta_occ, S_ab)
+    return float(c_ref ** 2 + np.sum(c2 ** 2) + np.sum(c3 ** 2) + np.sum(Xs ** 2 * s4[:, None]))
+
+
+def s2_spin_flip_matrix(X_list, n_alpha_occ, n_beta_occ, S_ab):
+    """The excess-<S^2> matrix over the states X_list: <S_+ Psi_k | S_+ Psi_l> by the landing patterns of _s2_landing,
+    every pattern's coefficients of the two states multiplied (the diagonal is s2_spin_flip) - s2_total on the
+    diagonal gives <S^2>, the off-diagonal elements the spin mixing of the pairs (purify_spin_mixtures)."""
+    parts = [_s2_landing(X, n_alpha_occ, n_beta_occ, S_ab) for X in X_list]
+    n = len(parts)
+    M = np.zeros((n, n))
+    for k in range(n):
+        c_ref_k, c2_k, c3_k, Xs_k, s4 = parts[k]
+        for l in range(k, n):
+            c_ref_l, c2_l, c3_l, Xs_l, _ = parts[l]
+            M[k, l] = M[l, k] = (c_ref_k * c_ref_l + np.sum(c2_k * c2_l) + np.sum(c3_k * c3_l)
+                                 + np.sum(Xs_k * Xs_l * s4[:, None]))
+    return M
+
+
+def _s2_patterns(X, n_alpha_occ, n_beta_occ, S_ab, threshold=1e-12):
+    """The landing patterns of S_+ on the state X, every pattern (the sorted alpha set, the sorted beta set) with its
+    coefficient - the explicit form the closed one is checked against, the listed amplitude entering with the slot
+    parity of the sorted lists (s2_spin_flip)."""
     X = np.asarray(X, dtype=float)
     S_ab = np.asarray(S_ab, dtype=float)
     nvirt, nocc = X.shape
-    # the sorted lists of s2_spin_flip - the listed amplitude enters with the slot parity
     X = X * ((-1.0) ** (n_alpha_occ - 1 - np.arange(n_alpha_occ)))[np.newaxis, :]
     coeff = {}
     for i in range(n_alpha_occ):
@@ -194,7 +214,71 @@ def s2_spin_flip_brute(X, n_alpha_occ, n_beta_occ, S_ab, threshold=1e-12):
                     sign_p = -1.0 if sum(1 for o in A if o < p) % 2 else 1.0
                     key = (tuple(sorted(A + [p])), B2)
                     coeff[key] = coeff.get(key, 0.0) + x * sign_b * sign_p * S_ab[p, b]
-    return float(sum(v * v for v in coeff.values()))
+    return coeff
+
+
+def s2_spin_flip_brute(X, n_alpha_occ, n_beta_occ, S_ab, threshold=1e-12):
+    """The same ||S_+ Psi||^2 by the explicit landing patterns of every term in a dictionary - the reference the closed
+    form is checked against."""
+    return float(sum(v * v for v in _s2_patterns(X, n_alpha_occ, n_beta_occ, S_ab, threshold).values()))
+
+
+def s2_spin_flip_brute_matrix(X_list, n_alpha_occ, n_beta_occ, S_ab, threshold=1e-12):
+    """The excess-<S^2> matrix over the states by the explicit landing patterns - the reference of s2_spin_flip_matrix."""
+    dicts = [_s2_patterns(X, n_alpha_occ, n_beta_occ, S_ab, threshold) for X in X_list]
+    n = len(dicts)
+    M = np.zeros((n, n))
+    for k in range(n):
+        for l in range(k, n):
+            M[k, l] = M[l, k] = sum(v * dicts[l].get(key, 0.0) for key, v in dicts[k].items())
+    return M
+
+
+def purify_spin_mixtures(X_list, omegas, s2_matrix, classes, window, mix_min=0.05):
+    """The roots whose spin mixing the Davidson left in (a degenerate singlet and triplet pair delivered as two mixtures,
+    a singlet crossing a spin-incomplete root) rotated to the eigenvectors of their excess-<S^2> block: the roots are
+    grouped by the edges (k, l) with |s2_matrix[k, l]| above mix_min and |omegas[k] - omegas[l]| below window, every
+    group with a root of the class "mixed" is diagonalized in its block, and its states take the eigenvectors. A state
+    is a dict with X (the rotated amplitudes), omega (the expectation value sum_k U_kj^2 omegas[k]), s2 (the excess
+    eigenvalue), roots (the group's 0-based roots), weights (U_kj^2 over them) and group (the group's index, None for a
+    root left alone). Returns the states in the order of their omega and the list of purified groups (roots, the
+    excess eigenvalues, the weights) for the record."""
+    omegas = np.asarray(omegas, dtype=float)
+    n = len(X_list)
+    parent = list(range(n))
+
+    def find(k):
+        while parent[k] != k:
+            parent[k] = parent[parent[k]]
+            k = parent[k]
+        return k
+    for k in range(n):
+        for l in range(k + 1, n):
+            if abs(s2_matrix[k, l]) > mix_min and abs(omegas[k] - omegas[l]) < window:
+                parent[find(k)] = find(l)
+    groups = {}
+    for k in range(n):
+        groups.setdefault(find(k), []).append(k)
+    states, purified = [], []
+    for members in groups.values():
+        members = sorted(members)
+        if len(members) == 1 or not any(classes[k] == "mixed" for k in members):
+            for k in members:
+                states.append({"X": np.asarray(X_list[k], dtype=float), "omega": float(omegas[k]),
+                               "s2": float(s2_matrix[k, k]), "roots": [k], "weights": [1.0], "group": None})
+            continue
+        block = s2_matrix[np.ix_(members, members)]
+        vals, U = np.linalg.eigh(0.5 * (block + block.T))
+        gi = len(purified)
+        for j in range(len(members)):
+            w = U[:, j] ** 2
+            X_new = sum(U[k, j] * np.asarray(X_list[m], dtype=float) for k, m in enumerate(members))
+            states.append({"X": X_new, "omega": float(np.dot(w, omegas[members])), "s2": float(vals[j]),
+                           "roots": list(members), "weights": [float(v) for v in w], "group": gi})
+        purified.append({"roots": list(members), "s2": [float(v) for v in vals],
+                         "weights": [[float(v) for v in U[:, j] ** 2] for j in range(len(members))]})
+    states.sort(key=lambda s: s["omega"])
+    return states, purified
 
 
 SPIN_NAMES = {0: "singlet", 1: "doublet", 2: "triplet", 3: "quartet", 4: "quintet", 5: "sextet", 6: "septet", 7: "octet"}

@@ -42,7 +42,7 @@ from libra_py.packages.driver_forces import (ForceHandover, check_excitation_ene
 from libra_py.packages.cp2k.spin_flip import (read_tdwfn, check_restart_orbitals, spin_flip_amplitudes, s2_spin_flip, classify_spin,
                                               spin_flip_sd_basis, spin_flip_sd2ci, spin_flip_densities,
                                               spin_flip_carrier_operators, spin_flip_carrier_operators_high_spin,
-                                              s_reference, s2_total, spin_name)
+                                              s_reference, s2_total, spin_name, s2_spin_flip_matrix, purify_spin_mixtures)
 
 from libra_py import data_outs, data_read, data_stat, data_conv
 from libra_py import units, molden_methods
@@ -5897,20 +5897,24 @@ def _cp2k_force_refresh(params, itraj, coordinates, nat, nstates):
     def force_of(new_state):
         wd = F"{params.get('working_directory_prefix', 'wd')}_itraj{itraj}"
         if params.get("spin_flip", 0):
-            # the new singlet's root of this step, the roots up to it
-            root = int(params["sf_roots"][itraj][new_state])
-            run_params = _cp2k_run_params(params, False, wd, root, params.get("force_source", "active_state"),
-                                          nstates - 1, nexc_override=root)
-            res = compute_state_energy_and_force(coordinates, run_params)
-            w_last = np.asarray(params["sf_omegas"][itraj], dtype=float)
-            w_now = np.asarray(res["omegas"], dtype=float)
-            m = min(w_last.size, w_now.size)
-            dev = max(abs(float(res["E_adi"][0]) - float(params["sf_eref"][itraj])),
-                      float(np.abs(w_now[:m] - w_last[:m]).max()))
-            if dev > 1e-4:
-                raise RuntimeError(F"force_refresh of trajectory {itraj}: the roots at the call-back differ from the "
-                                   F"regular call of the step by {dev:.2e} Ha - the geometry moved between them")
-            return res["forces"]
+            # the new state's roots of this step with their weights (one root with weight 1 unless the state is a
+            # purified mixture), each run on the roots up to it, the forces combined
+            total = None
+            for root, weight in params["sf_force_roots"][itraj][new_state]:
+                run_params = _cp2k_run_params(params, False, wd, root, params.get("force_source", "active_state"),
+                                              nstates - 1, nexc_override=root)
+                res = compute_state_energy_and_force(coordinates, run_params)
+                w_last = np.asarray(params["sf_omegas"][itraj], dtype=float)
+                w_now = np.asarray(res["omegas"], dtype=float)
+                m = min(w_last.size, w_now.size)
+                dev = max(abs(float(res["E_adi"][0]) - float(params["sf_eref"][itraj])),
+                          float(np.abs(w_now[:m] - w_last[:m]).max()))
+                if dev > 1e-4:
+                    raise RuntimeError(F"force_refresh of trajectory {itraj}: the roots at the call-back differ from the "
+                                       F"regular call of the step by {dev:.2e} Ha - the geometry moved between them")
+                part = weight * np.asarray(res["forces"], dtype=float)
+                total = part if total is None else total + part
+            return total
         # the roots up to the new state alone (the regular call's variational roots in a smaller subspace) - a hop
         # to the ground state needs none, CP2K aborts on NSTATES 0, so one root stays
         run_params = _cp2k_run_params(params, False, wd, new_state, params.get("force_source", "active_state"),
@@ -5930,6 +5934,7 @@ def _cp2k_force_refresh(params, itraj, coordinates, nat, nstates):
 
 # ======================= the fragment diabatic basis on the fly (dia_basis "fragment") =======================
 FRAGMENT_DIA_REORDERINGS = (0, 1, 2, 22, 5, 52)
+PURIFIED_FORCE_WEIGHT_MIN = 1e-3  ### a root below this weight in a purified spin-flip state is left out of its force (one CP2K run per root kept)
 
 
 def fragment_options(params):
@@ -6484,7 +6489,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
     # ---------------- per-trajectory caches ----------------
     for key in ("mo_prev", "ci_prev", "E_adi_last", "force_rows", "S_prev", "sd_prev",
                 "coordinates_prev", "is_first_time", "act_state", "homo", "nelec",
-                "sf_roots", "sf_prev", "sf_omegas", "sf_eref"):
+                "sf_roots", "sf_force_roots", "sf_prev", "sf_omegas", "sf_eref"):
         params.setdefault(key, {})
     is_first_time = params["is_first_time"].get(itraj, True)
     act_state = int(params["act_state"].get(itraj, 0))
@@ -6845,35 +6850,59 @@ def cp2k_compute_adi_impl(q, params, full_id):
             excess = s2_spin_flip(X, n_a_occ, n_b_occ, S_ab)
             s2_all.append(s2_total(excess, n_a_occ, n_b_occ))
             cls_all.append(classify_spin(excess, s2_low_spin_max, s2_high_spin_min, s_ref))
-        low_roots = [int(k) for k in np.argsort(omegas[:nroots]) if cls_all[k] == low_name]
-        if len(low_roots) < nstates:
-            raise ValueError(F"{wd} step {params.get('timestep', '?')}: {len(low_roots)} {low_name} roots among the "
-                             F"{nroots} spin-flip roots (<S^2> {np.round(s2_all, 3).tolist()}) for {nstates} states "
-                             F"- raise number_of_states")
-        roots = [k + 1 for k in low_roots[:nstates]]             # CP2K's 1-based root of every state
+        # the spin mixing the Davidson leaves between roots - a degenerate singlet and triplet delivered as two
+        # mixtures, a singlet crossing a spin-incomplete root - is undone within every group of roots that share it
+        # (purify_spin_mixtures): the states handed over are the eigenvectors of the group's <S^2> block, their energies
+        # the expectation values, their forces the weighted forces of their roots
+        s2_excess = s2_spin_flip_matrix(X_all, n_a_occ, n_b_occ, S_ab)
+        purify_window = float(params.get("spin_purify_window", 0.5 / units.au2ev))
+        sf_states, purified = purify_spin_mixtures(X_all, omegas[:nroots], s2_excess, cls_all, purify_window)
+        for st in sf_states:
+            st["cls"] = classify_spin(st["s2"], s2_low_spin_max, s2_high_spin_min, s_ref)
+        low = [st for st in sf_states if st["cls"] == low_name]
+        if len(low) < nstates:
+            raise ValueError(F"{wd} step {params.get('timestep', '?')}: {len(low)} {low_name} states among the "
+                             F"{nroots} spin-flip roots (<S^2> {np.round(s2_all, 3).tolist()}"
+                             + (F", the purified groups {[[r + 1 for r in p['roots']] for p in purified]} -> "
+                                F"{[np.round(p['s2'], 3).tolist() for p in purified]}" if purified else "")
+                             + F") for {nstates} states - raise number_of_states")
+        manifold = low[:nstates]
+        # CP2K's 1-based root of every state: the leading root of a purified state, the root itself otherwise
+        roots = [int(st["roots"][int(np.argmax(st["weights"]))]) + 1 for st in manifold]
+        # the roots a state's force is built from, with their weights: every root above the floor, renormalized
+        force_roots = []
+        for st in manifold:
+            kept = [(int(r) + 1, float(w)) for r, w in zip(st["roots"], st["weights"]) if w > PURIFIED_FORCE_WEIGHT_MIN]
+            total_w = sum(w for _, w in kept)
+            force_roots.append([(r, w / total_w) for r, w in kept])
         E_ref = float(res["E_adi"][0])
-        E_adi_curr = E_ref + omegas[np.array(roots) - 1]
-        mixed_inside = [k + 1 for k in range(nroots) if cls_all[k] == "mixed" and omegas[k] < omegas[roots[-1] - 1]]
-        rerun = force_source == "active_state" and roots[act_state] != sf_root_guess
+        E_adi_curr = E_ref + np.array([st["omega"] for st in manifold])
+        mixed_inside = [k + 1 for k in range(nroots) if cls_all[k] == "mixed" and omegas[k] < manifold[-1]["omega"]]
+        # the force of the active state: one run per contributing root, the first run's reused when it is one of them
+        needed = [r for r, _ in force_roots[act_state] if r != sf_root_guess]
+        rerun = force_source == "active_state" and len(needed) > 0
         if rerun:
-            # the force of the active root of this step
-            run_params = _cp2k_run_params(params, False, wd, roots[act_state], force_source, nexc)
-            res_force = compute_state_energy_and_force(coordinates, run_params)
-            w_force = np.asarray(res_force["omegas"], dtype=float)
-            if w_force.size < nroots:
-                raise RuntimeError(F"{wd} step {params.get('timestep', '?')}: the force run on root {roots[act_state]} "
-                                   F"returned {w_force.size} roots for the step's {nroots}")
-            dev = max(abs(float(res_force["E_adi"][0]) - E_ref), float(np.abs(w_force[:nroots] - omegas[:nroots]).max()))
-            if dev > 1e-5:
-                raise RuntimeError(F"{wd} step {params.get('timestep', '?')}: the force run on root "
-                                   F"{roots[act_state]} gives roots {dev:.1e} Ha away from the step's")
-            forces = res_force["forces"]
-            # the energies of the solution that gave the force - the first run's differ from it by the SCF and
-            # TDDFPT convergence noise (up to the 1e-5 Ha tolerated above), which entered the total energy at every rerun
-            E_ref = float(res_force["E_adi"][0])
-            omegas = w_force
-            E_adi_curr = E_ref + omegas[np.array(roots) - 1]
+            run_forces = {r: np.asarray(res["forces"], dtype=float) for r, _ in force_roots[act_state] if r == sf_root_guess}
+            for r in needed:
+                run_params = _cp2k_run_params(params, False, wd, r, force_source, nexc)
+                res_force = compute_state_energy_and_force(coordinates, run_params)
+                w_force = np.asarray(res_force["omegas"], dtype=float)
+                if w_force.size < nroots:
+                    raise RuntimeError(F"{wd} step {params.get('timestep', '?')}: the force run on root {r} returned "
+                                       F"{w_force.size} roots for the step's {nroots}")
+                dev = max(abs(float(res_force["E_adi"][0]) - E_ref), float(np.abs(w_force[:nroots] - omegas[:nroots]).max()))
+                if dev > 1e-5:
+                    raise RuntimeError(F"{wd} step {params.get('timestep', '?')}: the force run on root {r} gives roots "
+                                       F"{dev:.1e} Ha away from the step's")
+                run_forces[r] = np.asarray(res_force["forces"], dtype=float)
+                # the energies of the solution that gave the force - the first run's differ from it by the SCF and
+                # TDDFPT convergence noise (up to the 1e-5 Ha tolerated above), which entered the total energy at every rerun
+                E_ref = float(res_force["E_adi"][0])
+                omegas = w_force
+            forces = sum(w * run_forces[r] for r, w in force_roots[act_state])
+            E_adi_curr = E_ref + np.array([float(np.dot(st["weights"], omegas[st["roots"]])) for st in manifold])
         params["sf_roots"][itraj] = roots
+        params["sf_force_roots"][itraj] = force_roots
         params["sf_omegas"][itraj] = omegas
         params["sf_eref"][itraj] = E_ref
         # the flipped determinants and the time overlaps of the states - the sign of every state continues the
@@ -6881,11 +6910,29 @@ def cp2k_compute_adi_impl(q, params, full_id):
         if "sf_basis" not in params:
             params["sf_basis"] = spin_flip_sd_basis(n_a_occ, n_b_occ, nmo)
         sd_states, sf_index = params["sf_basis"]
-        T_curr = spin_flip_sd2ci([X_all[r - 1] for r in roots], sf_index, len(sd_states))
+        T_curr = spin_flip_sd2ci([st["X"] for st in manifold], sf_index, len(sd_states))
         T_prev = _carried(params, "sf_prev", itraj, T_curr, is_first_time)
         st_sd, _ = sd_overlaps(sd_states, St_in, Sp_in, Sc_in, orthonormalize=sd_orthon, kernel=sd_kernel,
                                cache=sd_cache)
         st_ci = T_prev.T @ st_sd @ T_curr
+        # every state of the previous step continues into one state of this step, or the manifold changed its
+        # identity (a state replaced by the next one of its class) and the engine would relabel across a gap
+        if not is_first_time:
+            from libra_py.workflows.nbra import step3
+            floor = float(params.get("state_reordering_min_overlap", step3.CONTINUITY_FLOOR))
+            continuity = np.abs(st_ci).max(axis=1)
+            partner = np.abs(st_ci).argmax(axis=1)
+            if (continuity < floor).any() or len(set(int(p) for p in partner)) < nstates:
+                k = int(np.argmin(continuity))
+                E_prev = np.asarray(params["E_adi_last"][itraj], dtype=float)
+                raise ValueError(F"{wd} step {params.get('timestep', '?')}: the state {k} of the previous step "
+                                 F"({E_prev[k] * units.au2ev:.4f} eV) continues into no state of this step - its largest time "
+                                 F"overlap |<{k}|{int(partner[k])}>| = {continuity[k]:.3f} (state {int(partner[k])} at "
+                                 F"{E_adi_curr[int(partner[k])] * units.au2ev:.4f} eV) lies below state_reordering_min_overlap "
+                                 F"{floor:.4g}, the partners {partner.tolist()} - the manifold changed its identity: the roots "
+                                 F"{roots}, <S^2> {np.round(s2_all, 3).tolist()}"
+                                 + (F", the purified groups {[[r + 1 for r in p['roots']] for p in purified]}" if purified else "")
+                                 + " (spin-flip-record.txt) - a lower threshold lets the step through")
         sf_signs = np.ones(nstates)
         for k in range(nstates):
             if st_ci[k, k] < 0.0:
@@ -6894,16 +6941,25 @@ def cp2k_compute_adi_impl(q, params, full_id):
                 sf_signs[k] = -1.0
         params["sf_prev"][itraj] = T_curr
         # the states in the sign convention of the hand-over - the fragment operators of dia_basis "fragment" read them
-        X_states = [X_all[r - 1] * sf_signs[k] for k, r in enumerate(roots)]
+        X_states = [st["X"] * sf_signs[k] for k, st in enumerate(manifold)]
         T_dia = None
         with open(f"{wd}/spin-flip-record.txt", "a") as rec:
             rec.write(F"step {params.get('timestep', '?')}  E_ref {E_ref:.8f} Ha  states -> roots {roots}  "
-                      F"active {act_state}" + (F"  force rerun on root {roots[act_state]}, its energies handed over" if rerun else "")
+                      F"active {act_state}"
+                      + (F"  force runs on roots {[r for r in needed]} of {[(r, round(w, 3)) for r, w in force_roots[act_state]]}, "
+                         F"their energies handed over" if rerun else "")
                       + (F"  mixed roots inside the manifold's range {mixed_inside}" if mixed_inside else "") + "\n")
             for k in range(nroots):
                 st = roots.index(k + 1) if (k + 1) in roots else "-"
                 rec.write(F"  root {k + 1:3d}  omega {omegas[k] * units.au2ev:9.4f} eV  <S^2> {s2_all[k]:.4f}  "
                           F"{cls_all[k]:8s}  state {st}\n")
+            for p in purified:
+                rec.write(F"  purified roots {[r + 1 for r in p['roots']]} -> <S^2> {np.round(p['s2'], 3).tolist()}  "
+                          F"weights {[np.round(w, 3).tolist() for w in p['weights']]}\n")
+            for k, st in enumerate(manifold):
+                if st["group"] is not None:
+                    rec.write(F"  state {k} = roots {[r + 1 for r in st['roots']]} weights {np.round(st['weights'], 3).tolist()}  "
+                              F"omega {st['omega'] * units.au2ev:9.4f} eV  <S^2> {st['s2']:.4f}  {st['cls']}\n")
     elif time_dependent:
         # ---------------- CI data, phase-consistent ----------------
         if params.get("ci_source", "namd_print") == "namd_print":
@@ -7502,7 +7558,8 @@ CP2K_COMPUTE_ADI_KEYS = frozenset(("E_adi_last", "S_prev", "_ao_atom_map", "_ste
                                    "pod2gs_kept_block", "prefetch_trajectories", "project", "retry_templates",
                                    "s2_high_spin_min", "s2_low_spin_max", "s_ihalf_prev", "sd_basis",
                                    "sd_capture_max_drop", "sd_overlap_kernel", "sd_prev", "sd_state_ordering",
-                                   "sf_basis", "sf_eref", "sf_omegas", "sf_prev", "sf_roots", "spin_flip",
+                                   "sf_basis", "sf_eref", "sf_force_roots", "sf_omegas", "sf_prev", "sf_roots",
+                                   "spin_flip", "spin_purify_window", "state_reordering_min_overlap",
                                    "time_dependent", "timestep", "working_directory_prefix"))
 def cp2k_compute_adi(q, params, full_id):
     """Traceback-printing wrapper: C++ callers swallow Python exceptions. A repeated call for the same step, active
