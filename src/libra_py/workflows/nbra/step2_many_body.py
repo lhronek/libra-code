@@ -200,6 +200,9 @@ def get_excitation_analysis_output(params):
         excitation_energies, ci_basis_raw, ci_coefficients_raw_unnorm, spin_components = \
             DFTB_methods.read_dftbplus_TRA_file(restrict(params, DFTB_methods.READ_TRA_FILE_KEYS))
 
+    else:
+        raise ValueError(F"es_software {es_software!r} has no excitation-analysis reader - cp2k, gaussian and dftb+ are implemented")
+
     return excitation_energies, ci_basis_raw, ci_coefficients_raw_unnorm, spin_components
 
 
