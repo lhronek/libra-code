@@ -6342,6 +6342,23 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     carries the reference's own multiplicity (its exact Ms
                     component has the excess 2 S_ref) [default 1.5] - between
                     the two bounds a spin-incomplete mixture, in no manifold
+                spin_purify_window (float, Ha): a root of mixed spin and a root
+                    coupled to it by the excess-<S^2> matrix within this energy
+                    are rotated as a pair to the eigenvectors of their 2 x 2
+                    block (purify_spin_mixtures, the pairs taken by decreasing
+                    coupling, a root in one pair at most) - a rotated state's
+                    energy and force are the roots' weighted ones [default 2 eV:
+                    the spin-incomplete root of ethylene mixes into the V state
+                    from 1.3 eV above it]
+                spin_purify_min_weight (float): a pair is rotated only when an
+                    eigenvector carries more than this weight beyond its leading
+                    root, and a rotated state's force is built from its roots
+                    above this weight, one force run each [default 0.05]
+                state_reordering_min_overlap (float): the continuity floor of the
+                    manifold - a state of the previous step whose largest time
+                    overlap with this step's states lies below it refuses the
+                    step, the manifold changed its identity [default 1/sqrt(2),
+                    step 3's floor]
                 carrier_reference (str): with spin_flip 1 and dia_basis
                     "fragment", required - "ground": the hole and the electron
                     of every excited root relative to the lowest one, which stays
