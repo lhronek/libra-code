@@ -311,6 +311,11 @@ BOOST_PYTHON_MODULE(cyglibra_core){
 BOOST_PYTHON_MODULE(liblibra_core){
 #endif
 
+  // the stdout of a pooled dynamics worker is the runner's log file - block-buffered by default, the 8 KB chunks of
+  // several forked workers land in it interleaved mid-line; line buffering writes every line whole as it completes
+  // (set before the banner, the stream's first output - Python's own sys.stdout never touches this stream)
+  setvbuf(stdout, NULL, _IOLBF, 0);
+
   libra_print_banner();
 
   // Register converters:

@@ -1376,6 +1376,7 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
         None: saves the data to files
     """
 
+    data_outs.line_buffered_output()      # whole lines from every pooled worker into a shared log
     # Create copies of the input dynamical variables, so we could run several such
     # functions with the same input variables without worries that they will be altered
     # inside of each other

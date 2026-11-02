@@ -48,6 +48,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 import util.libutil as comn
 from libra_py.params_check import refuse_unknown_keys
 import libra_py.units as units
+import libra_py.data_outs as data_outs
 from . import save
 
 
@@ -320,6 +321,7 @@ def run_dynamics(dyn_params, Ham, rho_init, adm_init=None):
 
     """
 
+    data_outs.line_buffered_output()      # whole lines from every pooled worker into a shared log
     params = dict(dyn_params)
 
     # Parameters and dimensions
