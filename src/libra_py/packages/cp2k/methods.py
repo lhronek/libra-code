@@ -4143,6 +4143,11 @@ def run_cp2k(coords_bohr, params):
                 {project}_ot, restart chained across steps) and the main run
                 restarts from its wavefunction - the two-run scheme of the
                 NBRA step2 xTB workflow, for large/hard-SCF systems [default None]
+            ot_restart_source (str): the wfn a later step's OT run restarts from -
+                "ot" = its own chain's {project}_ot-RESTART.wfn, "diag" = the
+                main run's {project}-RESTART.wfn of the previous step (the
+                diagonalization's basin, CP2K reads its occupied orbitals); a
+                chain's first call has the OT's own file alone     [default "ot"]
             retry_templates (list of str): templates to fall back to, in order,
                 when the run fails - each retries the whole step (OT run
                 included). Meant for the geometries where the SCF of the main
@@ -4192,6 +4197,10 @@ def run_cp2k(coords_bohr, params):
 
     ot_restart = f"{project}_ot-RESTART.wfn"
     ot_done = [False]                   # the OT run of this step completed - its restart is this step's
+    ot_source = params.get("ot_restart_source", "ot")
+    if ot_source not in ("ot", "diag"):
+        raise ValueError(f"ot_restart_source = {ot_source!r} - \"ot\" (the OT chain's own {ot_restart}) or "
+                         f"\"diag\" (the main run's {project}-RESTART.wfn of the previous step) is needed")
 
     def _attempt(template):
         """one whole step: the OT pre-convergence run (where configured, once per
@@ -4208,6 +4217,10 @@ def run_cp2k(coords_bohr, params):
                                   "project": f"{project}_ot",
                                   "input_name": "ot_input.inp",
                                   "act_state": 0})
+                # "diag": the OT starts in the main run's basin - the previous step's diagonalization wfn,
+                # whose occupied orbitals CP2K reads past the ADDED_MOS (the OT chain's own file otherwise)
+                if ot_source == "diag" and os.path.exists(os.path.join(wd, f"{project}-RESTART.wfn")):
+                    ot_params["wfn_restart_file"] = f"{project}-RESTART.wfn"
                 make_cp2k_input(ot_params, working_directory=wd)
                 _execute("ot_input.inp", "ot.log")
                 ot_done[0] = True
@@ -5863,7 +5876,7 @@ def _cp2k_run_params(params, is_first_time, wd, act_state, force_source, nexc, n
     &EXCITED_STATES section, so the parsed FORCES| block is the S0 forces). nexc_override sets the excited-root
     count of this run over params["number_of_states"] - the force refresh needs the roots up to the new state alone."""
     run_params = {k: params[k] for k in
-                  ("atom_labels", "input_template", "ot_template", "time_dependent",
+                  ("atom_labels", "input_template", "ot_template", "ot_restart_source", "time_dependent",
                    "force_source", "cp2k_exe", "cp2k_data_dir",
                    "omp_num_threads", "mpi_executable", "nprocs", "project",
                    "retry_templates", "allow_unconverged_scf", "spin_flip",
@@ -6262,6 +6275,12 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     only on each trajectory's first call - later calls restart
                     the diagonalization from their own previous-step wfn
                     [default: False]
+                ot_restart_source (str): with the OT at every step, the wfn a
+                    later call's OT restarts from - "ot" its own chain's
+                    {project}_ot-RESTART.wfn, "diag" the previous call's
+                    diagonalization wfn {project}-RESTART.wfn (the OT stays in
+                    the diagonalization's basin, the diagonalization then
+                    converges on the same-geometry OT density) [default: "ot"]
                 retry_templates (list of str): the templates run_cp2k tries in
                     turn after an unconverged SCF, each from the restart the
                     failed attempt left [default: none]
@@ -7567,7 +7586,7 @@ CP2K_COMPUTE_ADI_KEYS = frozenset(("E_adi_last", "S_prev", "_ao_atom_map", "_ste
                                    "mpi_executable", "nelec", "nprocs", "nstates", "num_occ_alpha", "num_occ_beta",
                                    "num_occ_states", "num_unocc_alpha", "num_unocc_beta", "num_unocc_states",
                                    "number_of_states", "occupancy_tolerance", "occupation_threshold",
-                                   "omp_num_threads", "ot_first_call_only", "ot_template", "overlap_backend",
+                                   "omp_num_threads", "ot_first_call_only", "ot_restart_source", "ot_template", "overlap_backend",
                                    "overlap_csr_write", "overlap_template", "parse_pool_workers",
                                    "pod2gs_kept_block", "prefetch_trajectories", "project", "retry_templates",
                                    "s2_high_spin_min", "s2_low_spin_max", "s_ihalf_prev", "sd_basis",
