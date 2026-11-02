@@ -6,17 +6,71 @@
 # * License, or (at your option) any later version.
 # * http://www.gnu.org/copyleft/gpl.txt
 # ***********************************************************/
+import os
 import sys
+import atexit
+import threading
 
-# every libra process writes whole lines: a stdout sent to a file is block-buffered, and the forked pool workers of step 2,
-# step 3 and the dynamics share the runner's - the 8 KB chunks of several workers land interleaved mid-line in the common
-# log, a child process's output overtakes the lines still in the buffer (the C stdout of the C++ prints is line-buffered by
-# liblibra_core's import, a stream without reconfigure - a notebook's or a capture - is left alone)
-if hasattr(sys.stdout, "reconfigure") and not getattr(sys.stdout, "line_buffering", False):
-    try:
-        sys.stdout.reconfigure(line_buffering=True)
-    except (ValueError, OSError):      # a detached or closed stream
-        pass
+
+class _WholeLines:
+    """sys.stdout of every libra process: a line goes out whole, in one write, when its newline arrives. print writes a
+    line in pieces (the text, the end), the forked pool workers of step 2, step 3 and the dynamics share the runner's
+    stdout, and `python -u` makes it unbuffered - the pieces of several workers landed interleaved mid-line in the common
+    log, and two threads of one process merged their lines. Each thread's pieces wait in its own buffer until the newline,
+    then the whole line is written and flushed under one lock, whatever the stream's own mode (unbuffered, a file's block
+    buffer, a terminal) - everything else is the wrapped stream's. The C stdout and stderr of the C++ prints are
+    line-buffered by liblibra_core's import."""
+
+    _libra_whole_lines = True
+
+    def __init__(self, stream):
+        self._stream = stream
+        self._parts = {}
+        self._lock = threading.Lock()
+
+    def write(self, text):
+        tid = threading.get_ident()
+        buf = self._parts.pop(tid, "") + text
+        cut = buf.rfind("\n")
+        if cut >= 0:
+            with self._lock:
+                self._stream.write(buf[:cut + 1])
+                self._stream.flush()
+            buf = buf[cut + 1:]
+        if buf:
+            self._parts[tid] = buf
+        return len(text)
+
+    def writelines(self, lines):
+        for line in lines:
+            self.write(line)
+
+    def flush(self):
+        buf = self._parts.pop(threading.get_ident(), "")
+        with self._lock:
+            if buf:
+                self._stream.write(buf)
+            self._stream.flush()
+
+    def flush_all(self):
+        with self._lock:
+            for buf in self._parts.values():
+                self._stream.write(buf)
+            self._parts.clear()
+            self._stream.flush()
+
+    def _after_fork(self):
+        self._lock = threading.Lock()      # the parent's threads, one of them maybe holding the lock, do not exist here
+        self._parts = {}
+
+    def __getattr__(self, name):
+        return getattr(self._stream, name)
+
+
+if sys.stdout is not None and not getattr(sys.stdout, "_libra_whole_lines", False):
+    sys.stdout = _WholeLines(sys.stdout)
+    atexit.register(sys.stdout.flush_all)
+    os.register_at_fork(after_in_child=sys.stdout._after_fork)
 
 
 def __getattr__(name):
