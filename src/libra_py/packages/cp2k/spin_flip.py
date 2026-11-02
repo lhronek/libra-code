@@ -94,20 +94,16 @@ def cp2k_mo_phases(C):
 def spin_flip_amplitudes(evect, C_beta, S_ao, n_beta_occ, C_alpha_occ):
     """The amplitudes X[a, i] of one spin-flip root over the beta virtual MOs (a) and the alpha occupied orbitals (i)
     from its AO-basis response evect (nao, n_alpha_occ): the projection onto the beta MOs C_beta (nmo, nao) through the
-    AO overlap S_ao, every matrix in one AO order. Two signs per column i turn CP2K's response into the amplitude of
-    the determinants of spin_flip_sd_basis: the restart stores the response of every alpha occupied orbital for the
-    orbital's phase +1 (cp2k_mo_phases), so the column takes the phase of the given alpha occupied orbital
-    C_alpha_occ[i] (the orbitals the determinants are built from), and the determinant keeps the beta orbital in the
-    alpha orbital's slot where a^+_{a beta} a_{i alpha} |0> puts it after the alpha block, (-1)^(n_alpha_occ - i)
-    apart - without the two signs the spin of a root is read right only where the wfn's phases happen to compensate
-    the parity (the triplet component of a planar ethylene did, a twisted one did not). Also returned: the weight the
-    projection leaves on the beta occupied orbitals (zero for a response that lives in the beta virtual space, as
-    CP2K's does) and the weight the beta MOs carry in all (1 when they span the AO space - ADDED_MOS must cover every
-    virtual)."""
+    AO overlap S_ao, every matrix in one AO order. X[a, i] is the amplitude of a^+_{a beta} a_{i alpha} |0>, the
+    determinant of spin_flip_sd_basis with the beta orbital in the slot of i, with one sign per column: the restart
+    stores the response of every alpha occupied orbital for the orbital's phase +1 (cp2k_mo_phases), so the column
+    takes the phase of the given alpha occupied orbital C_alpha_occ[i] (the orbitals the determinants are built from).
+    The spin routines, derived over sorted determinants, take the slot parity themselves (s2_spin_flip). Also returned:
+    the weight the projection leaves on the beta occupied orbitals (zero for a response that lives in the beta virtual
+    space, as CP2K's does) and the weight the beta MOs carry in all (1 when they span the AO space - ADDED_MOS must
+    cover every virtual)."""
     proj = np.asarray(C_beta, dtype=float) @ np.asarray(S_ao, dtype=float) @ np.asarray(evect, dtype=float)
-    n_alpha_occ = np.asarray(C_alpha_occ).shape[0]
-    parity = (-1.0) ** (n_alpha_occ - 1 - np.arange(n_alpha_occ))
-    proj = proj * (cp2k_mo_phases(C_alpha_occ) * parity)[np.newaxis, :]
+    proj = proj * cp2k_mo_phases(C_alpha_occ)[np.newaxis, :]
     return proj[n_beta_occ:], float(np.sum(proj[:n_beta_occ] ** 2)), float(np.sum(proj ** 2))
 
 
@@ -116,7 +112,10 @@ def s2_spin_flip(X, n_alpha_occ, n_beta_occ, S_ab):
     occupied the first n_alpha_occ of the alpha set, the beta occupied the first n_beta_occ of the beta set, the beta
     virtual a the beta orbital n_beta_occ + a) with S_ab = C_alpha S C_beta^T over ALL MOs of both spins - the excess
     <S^2> - Ms (Ms + 1), which is <S^2> itself for the Ms = 0 states of a triplet reference (s2_total adds the rest). The
-    determinant of the term (i, a) lists the alpha orbitals first, then the beta ones, each sorted. S_+ takes the beta
+    determinant of the term (i, a) lists the alpha orbitals first, then the beta ones, each sorted, so the amplitude
+    X[a, i] of the listed determinant (the beta orbital in the slot of i, spin_flip_amplitudes) enters with the parity
+    (-1)^(n_alpha_occ - 1 - i) of moving that orbital past the alpha orbitals above the slot - its place among the beta
+    orbitals costs every term the same sign, which the squares cancel. S_+ takes the beta
     electron of orbital b into the empty alpha orbital p with the coefficient S_ab[p, b] and the parity of removing b
     from the sorted beta list and inserting p into the sorted alpha list. Four kinds of landing pattern: p = i and b
     = a restore the reference pattern (one pattern for all terms), p = i alone leaves the alpha reference with the
@@ -127,6 +126,8 @@ def s2_spin_flip(X, n_alpha_occ, n_beta_occ, S_ab):
     nvirt, nocc = X.shape
     if nocc != n_alpha_occ:
         raise ValueError(F"X has {nocc} occupied columns, the reference {n_alpha_occ} alpha occupied orbitals")
+    # the listed amplitude enters the sorted lists with the slot parity (the docstring)
+    X = X * ((-1.0) ** (n_alpha_occ - 1 - np.arange(n_alpha_occ)))[np.newaxis, :]
     nmo_a = S_ab.shape[0]
     alpha_occ = np.arange(n_alpha_occ)
     beta_occ = np.arange(n_beta_occ)
@@ -174,6 +175,8 @@ def s2_spin_flip_brute(X, n_alpha_occ, n_beta_occ, S_ab, threshold=1e-12):
     X = np.asarray(X, dtype=float)
     S_ab = np.asarray(S_ab, dtype=float)
     nvirt, nocc = X.shape
+    # the sorted lists of s2_spin_flip - the listed amplitude enters with the slot parity
+    X = X * ((-1.0) ** (n_alpha_occ - 1 - np.arange(n_alpha_occ)))[np.newaxis, :]
     coeff = {}
     for i in range(n_alpha_occ):
         A = [o for o in range(n_alpha_occ) if o != i]
