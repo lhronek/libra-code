@@ -251,7 +251,7 @@ def run_dynamics(wfc, _params, model_params, savers):
 
         # ================ Saving the data ==================
         if step % print_freq == 0:
-            print(F" step= {step}")
+            print(F" step = {step}")
 
         # Save properties
         if savers["hdf5_saver"] is not None:

@@ -1011,7 +1011,7 @@ def save_tsh_data_123(_savers, params,
 
     if progress_frequency is not None and progress_frequency > 0:
         if i % max(1, int(progress_frequency * nsteps)) == 0:
-            print(F" step= {i}")
+            print(F" step = {i}")
 
     if hdf5_output_level >= 1 and _savers["hdf5_saver"] is not None:
         save_hdf5_1D(_savers["hdf5_saver"], i, dt, Ekin, Epot, Etot, dEkin, dEpot, dEtot, Etherm, E_NHC)
@@ -1110,7 +1110,7 @@ def save_tsh_data_1234_new(_savers, params, i, dyn_var, ham):
 
     if progress_frequency is not None and progress_frequency > 0:
         if i % max(1, int(progress_frequency * nsteps)) == 0:
-            print(F" step= {i}")
+            print(F" step = {i}")
 
     if i % nprint == 0:
         i = int(i / nprint)

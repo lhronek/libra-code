@@ -929,7 +929,7 @@ def make_var_pool(dyn_params, compute_model, model_params, _rnd,
                 prms = dict(dyn_params)
 
                 # only the first work item reports progress - every pooled
-                # dynamics otherwise repeats the same " step= " counts
+                # dynamics otherwise repeats the same " step = " counts
                 if len(var_pool) > 0:
                     prms["progress_frequency"] = 0
 

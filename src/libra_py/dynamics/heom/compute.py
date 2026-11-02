@@ -459,7 +459,7 @@ def run_dynamics(dyn_params, Ham, rho_init, adm_init=None):
         save.save_heom_data(_savers, step, print_freq, params, aux_memory["rho_unpacked"])
 
         if step % print_freq == 0:
-            print(F" step= {step}")
+            print(F" step = {step}")
 
             if params["verbosity"] >= 3:
                 print("nonzero = ", Cpp2Py(params["nonzero"]))
