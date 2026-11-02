@@ -697,6 +697,10 @@ void dyn_variables::init_amplitudes(bp::dict _params, Random& rnd){
                     their phases are set to exp(-2*pi*i*rnd), where rnd is a random 
                     number uniformly distributed on the [0, 1] interval (line in option 1)
 
+                - 21 : the amplitudes of option 2 (sqrt(istates[i]) with identical phases) with
+                    the active state set to "istate" instead of drawn from the populations - a
+                    superposition started on a chosen surface
+
                 - 4 : initialize all states according to Voronoi-style sampling 
                     Designed for MASH dynamics
                     Uses "istates" instead of the "istate", similar to the types 2 and 3
@@ -711,14 +715,14 @@ void dyn_variables::init_amplitudes(bp::dict _params, Random& rnd){
                 [ default: 1 ]
 
             * **params["istate"]** ( int ): the index of the initial electronic state, used 
-                only when **params["init_type"]** is 0 or 1, in which case it defines on 
-                which state the amplitudes will be initialized [ default: 0]
+                when **params["init_type"]** is 0, 1, 4, 5, 6 or 21 - the active state, and for
+                0 and 1 the state the amplitudes are initialized on [ default: 0]
 
             * **params["sqc_gamma"]** ( double ): the Meyer-Miller gamma of the SQC windows (init_type 5/6) -
                 -1 (default) selects the window's standard value (0.366 square, 1/3 triangle)
 
             * **params["istates"]** ( list of ints ): the list of the populations on all electronic
-                states included in the basis, used only when **params["init_type"]** is 2 or 3, 
+                states included in the basis, used only when **params["init_type"]** is 2, 3, 4 or 21, 
                 in which case it defines on which states the amplitudes will be initialized.
                 The length of this list should be consistent with ```nstates``` variable. And the sum
                 of all entries should be 1.0 [ default: [1.0], meaning that only the lowest state
@@ -801,8 +805,8 @@ void dyn_variables::init_amplitudes(bp::dict _params, Random& rnd){
   }
 
   if(! (init_type==0 || init_type==1 || init_type==2 || init_type==3 || init_type==4 ||
-        init_type==5 || init_type==6)){
-    cout<<"ERROR in init_amplitudes: the init_type = "<<init_type<<" is not known. Allowed values are: [0, 1, 2, 3, 4, 5, 6]\n";
+        init_type==5 || init_type==6 || init_type==21)){
+    cout<<"ERROR in init_amplitudes: the init_type = "<<init_type<<" is not known. Allowed values are: [0, 1, 2, 3, 4, 5, 6, 21]\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
@@ -825,7 +829,7 @@ void dyn_variables::init_amplitudes(bp::dict _params, Random& rnd){
     }
   }
 
-  if(init_type==2 || init_type==3){
+  if(init_type==2 || init_type==3 || init_type==21){
     if((int)istates.size()!=ndia && rep==0){
       cout<<"ERROR in init_amplitudes: the istates array is of length = "<<istates.size()<<", but should be of length "<<ndia<<"\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
@@ -872,7 +876,7 @@ void dyn_variables::init_amplitudes(bp::dict _params, Random& rnd){
 
     }// init_type==1
 
-    else if(init_type==2){
+    else if(init_type==2 || init_type==21){
       if(verbosity > 0){
         cout<<"======= Initialization type is "<<init_type<<" ========\n";
         cout<<"setting representation "<<rep<<" coefficients C_i for all i to sqrt( target populations) \n";
@@ -1147,12 +1151,12 @@ void dyn_variables::init_active_states(bp::dict _params, Random& rnd){
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
-  if(! (init_type==0 || init_type==1 || init_type==2 || init_type==3 || init_type==4 || init_type==5 || init_type==6) ){
-    cout<<"ERROR in init_active_states: the init_type = "<<init_type<<" is not known. Allowed values are: [0, 1, 2, 3, 4, 5, 6]\n";
+  if(! (init_type==0 || init_type==1 || init_type==2 || init_type==3 || init_type==4 || init_type==5 || init_type==6 || init_type==21) ){
+    cout<<"ERROR in init_active_states: the init_type = "<<init_type<<" is not known. Allowed values are: [0, 1, 2, 3, 4, 5, 6, 21]\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
-  if(init_type==0 || init_type==1 || init_type==4 || init_type==5 || init_type==6){
+  if(init_type==0 || init_type==1 || init_type==4 || init_type==5 || init_type==6 || init_type==21){
     if(istate>=ndia && rep==0){
       cout<<"ERROR in init_active_states: the istate is= "<<istate<<", but should be less than "<<ndia<<"\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
@@ -1189,7 +1193,7 @@ void dyn_variables::init_active_states(bp::dict _params, Random& rnd){
 
   //================ For adiabatic - set up them directly =================
   for(traj=0; traj<ntraj; traj++){
-    if(init_type==0 || init_type==1 || init_type==4 || init_type==5 || init_type==6){ 
+    if(init_type==0 || init_type==1 || init_type==4 || init_type==5 || init_type==6 || init_type==21){ 
       act_states.push_back(istate);
     }
     else if(init_type==2 || init_type==3){
@@ -1277,12 +1281,12 @@ void dyn_variables::init_active_states_dia(bp::dict _params, Random& rnd){
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
-  if(! (init_type==0 || init_type==1 || init_type==2 || init_type==3 || init_type==4 || init_type==5 || init_type==6) ){
-    cout<<"ERROR in init_active_states_dia: the init_type = "<<init_type<<" is not known. Allowed values are: [0, 1, 2, 3, 4, 5, 6]\n";
+  if(! (init_type==0 || init_type==1 || init_type==2 || init_type==3 || init_type==4 || init_type==5 || init_type==6 || init_type==21) ){
+    cout<<"ERROR in init_active_states_dia: the init_type = "<<init_type<<" is not known. Allowed values are: [0, 1, 2, 3, 4, 5, 6, 21]\n";
     std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
-  if(init_type==0 || init_type==1 || init_type==4 || init_type==5 || init_type==6){
+  if(init_type==0 || init_type==1 || init_type==4 || init_type==5 || init_type==6 || init_type==21){
     if(istate>=ndia && rep==0){
       cout<<"ERROR in init_active_states_dia: the istate is= "<<istate<<", but should be less than "<<ndia<<"\n";
       std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
@@ -1319,7 +1323,7 @@ void dyn_variables::init_active_states_dia(bp::dict _params, Random& rnd){
 
   //================ For diabatic - set up them directly =================
   for(traj=0; traj<ntraj; traj++){
-    if(init_type==0 || init_type==1 || init_type==4 || init_type==5 || init_type==6){ 
+    if(init_type==0 || init_type==1 || init_type==4 || init_type==5 || init_type==6 || init_type==21){ 
       act_states_dia.push_back(istate);
     }
     else if(init_type==2 || init_type==3){

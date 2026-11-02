@@ -176,7 +176,7 @@ def _print_simulation_params(dyn_params, nadi, ntraj, init_params=None, model_pa
                       row("init_elec.init_type:", ie.get("init_type", "n/a")),
                       row("init_elec.istate:", ie.get("istate", "n/a")),
                       row("init_elec.init_dm_type:", ie.get("init_dm_type", "n/a"))]
-            if int(ie.get("init_type", 0)) in (2, 3):
+            if int(ie.get("init_type", 0)) in (2, 3, 4, 21):
                 ist = ie.get("istates", [])
                 val = ist if len(ist) <= 6 else F"list({len(ist)})"
                 lines.append(row("init_elec.istates:", val))
