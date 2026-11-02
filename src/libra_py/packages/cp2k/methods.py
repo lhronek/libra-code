@@ -6861,7 +6861,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
         if len(low) < nstates:
             raise ValueError(F"{wd} step {params.get('timestep', '?')}: {len(low)} {low_name} states among the "
                              F"{nroots} spin-flip roots (<S^2> {np.round(s2_all, 3).tolist()}"
-                             + (F", the purified groups {[[r + 1 for r in p['roots']] for p in purified]} -> "
+                             + (F", the purified pairs {[[r + 1 for r in p['roots']] for p in purified]} -> "
                                 F"{[np.round(p['s2'], 3).tolist() for p in purified]}" if purified else "")
                              + F") for {nstates} states - raise number_of_states")
         manifold = low[:nstates]
@@ -6928,7 +6928,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
                                  F"{E_adi_curr[int(partner[k])] * units.au2ev:.4f} eV) lies below state_reordering_min_overlap "
                                  F"{floor:.4g}, the partners {partner.tolist()} - the manifold changed its identity: the roots "
                                  F"{roots}, <S^2> {np.round(s2_all, 3).tolist()}"
-                                 + (F", the purified groups {[[r + 1 for r in p['roots']] for p in purified]}" if purified else "")
+                                 + (F", the purified pairs {[[r + 1 for r in p['roots']] for p in purified]}" if purified else "")
                                  + " (spin-flip-record.txt) - a lower threshold lets the step through")
         sf_signs = np.ones(nstates)
         for k in range(nstates):
@@ -6954,7 +6954,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
                 rec.write(F"  purified roots {[r + 1 for r in p['roots']]} -> <S^2> {np.round(p['s2'], 3).tolist()}  "
                           F"weights {[np.round(w, 3).tolist() for w in p['weights']]}\n")
             for k, st in enumerate(manifold):
-                if st["group"] is not None:
+                if st["pair"] is not None:
                     rec.write(F"  state {k} = roots {[r + 1 for r in st['roots']]} weights {np.round(st['weights'], 3).tolist()}  "
                               F"omega {st['omega'] * units.au2ev:9.4f} eV  <S^2> {st['s2']:.4f}  {st['cls']}\n")
     elif time_dependent:

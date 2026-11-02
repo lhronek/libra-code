@@ -236,55 +236,56 @@ def s2_spin_flip_brute_matrix(X_list, n_alpha_occ, n_beta_occ, S_ab, threshold=1
 
 def purify_spin_mixtures(X_list, omegas, s2_matrix, classes, window, min_weight=0.05, mix_min=0.05):
     """The roots whose spin mixing the Davidson left in (a degenerate singlet and triplet pair delivered as two mixtures,
-    a singlet crossing a spin-incomplete root) rotated to the eigenvectors of their excess-<S^2> block: the roots are
-    grouped by the edges (k, l) with |s2_matrix[k, l]| above mix_min and |omegas[k] - omegas[l]| below window, every
-    group with a root of the class "mixed" is diagonalized in its block, and its states take the eigenvectors when
-    some eigenvector carries more than min_weight of its weight beyond its leading root - a group mixed less than that
-    keeps CP2K's roots, each with its own energy and force at one run (the planar V root of ethylene carries 2 % of
-    the spin-incomplete root above it, whose force differs by 2 %). A state is a dict with X (the rotated amplitudes),
-    omega (the expectation value sum_k U_kj^2 omegas[k]), s2 (the excess eigenvalue), roots (the group's 0-based
-    roots), weights (U_kj^2 over them) and group (the group's index, None for a root left alone). Returns the states
-    in the order of their omega and the list of purified groups (roots, the excess eigenvalues, the weights) for the
-    record."""
+    a singlet crossing a spin-incomplete root) rotated to the eigenvectors of their excess-<S^2> block, pair by pair:
+    the candidate pairs are a root of the class "mixed" with every root coupled to it by |s2_matrix[k, l]| above
+    mix_min within window of it, the pairs are taken by decreasing |s2_matrix[k, l]|, a root in one pair at most, and
+    a pair is rotated when an eigenvector carries more than min_weight of its weight beyond its leading root (a pair
+    mixed less than that keeps CP2K's roots, each with its own energy and force at one run - the planar V root of
+    ethylene carries 2 % of the spin-incomplete root above it, whose force differs by 2 %). Pairs, not larger groups:
+    a chain of weak couplings would spread the lowest eigenvector over roots far above and move its energy by tenths
+    of an eV from step to step. A state is a dict with X (the rotated amplitudes), omega (the expectation value
+    sum_k U_kj^2 omegas[k]), s2 (the excess eigenvalue), roots (the pair's 0-based roots), weights (U_kj^2 over them)
+    and pair (the pair's index, None for a root left alone). Returns the states in the order of their omega and the
+    list of purified pairs (roots, the excess eigenvalues, the weights) for the record."""
     omegas = np.asarray(omegas, dtype=float)
     n = len(X_list)
-    parent = list(range(n))
-
-    def find(k):
-        while parent[k] != k:
-            parent[k] = parent[parent[k]]
-            k = parent[k]
-        return k
+    candidates = set()
     for k in range(n):
-        for l in range(k + 1, n):
-            if abs(s2_matrix[k, l]) > mix_min and abs(omegas[k] - omegas[l]) < window:
-                parent[find(k)] = find(l)
-    groups = {}
-    for k in range(n):
-        groups.setdefault(find(k), []).append(k)
-    states, purified = [], []
-    for members in groups.values():
-        members = sorted(members)
-        if len(members) == 1 or not any(classes[k] == "mixed" for k in members):
-            for k in members:
-                states.append({"X": np.asarray(X_list[k], dtype=float), "omega": float(omegas[k]),
-                               "s2": float(s2_matrix[k, k]), "roots": [k], "weights": [1.0], "group": None})
+        if classes[k] != "mixed":
             continue
-        block = s2_matrix[np.ix_(members, members)]
+        for l in range(n):
+            if l != k and abs(s2_matrix[k, l]) > mix_min and abs(omegas[k] - omegas[l]) < window:
+                candidates.add((abs(s2_matrix[k, l]), min(k, l), max(k, l)))
+    used = set()
+    pairs = []
+    for _, k, l in sorted(candidates, reverse=True):
+        if k in used or l in used:
+            continue
+        used.update((k, l))
+        pairs.append((k, l))
+    states, purified = [], []
+
+    def single(k):
+        return {"X": np.asarray(X_list[k], dtype=float), "omega": float(omegas[k]), "s2": float(s2_matrix[k, k]),
+                "roots": [k], "weights": [1.0], "pair": None}
+    for k in range(n):
+        if k not in used:
+            states.append(single(k))
+    for k, l in pairs:
+        block = np.array([[s2_matrix[k, k], s2_matrix[k, l]], [s2_matrix[l, k], s2_matrix[l, l]]])
         vals, U = np.linalg.eigh(0.5 * (block + block.T))
         if float((1.0 - (U ** 2).max(axis=0)).max()) <= min_weight:
-            for k in members:
-                states.append({"X": np.asarray(X_list[k], dtype=float), "omega": float(omegas[k]),
-                               "s2": float(s2_matrix[k, k]), "roots": [k], "weights": [1.0], "group": None})
+            states.append(single(k))
+            states.append(single(l))
             continue
         gi = len(purified)
-        for j in range(len(members)):
+        for j in range(2):
             w = U[:, j] ** 2
-            X_new = sum(U[k, j] * np.asarray(X_list[m], dtype=float) for k, m in enumerate(members))
-            states.append({"X": X_new, "omega": float(np.dot(w, omegas[members])), "s2": float(vals[j]),
-                           "roots": list(members), "weights": [float(v) for v in w], "group": gi})
-        purified.append({"roots": list(members), "s2": [float(v) for v in vals],
-                         "weights": [[float(v) for v in U[:, j] ** 2] for j in range(len(members))]})
+            X_new = U[0, j] * np.asarray(X_list[k], dtype=float) + U[1, j] * np.asarray(X_list[l], dtype=float)
+            states.append({"X": X_new, "omega": float(w[0] * omegas[k] + w[1] * omegas[l]), "s2": float(vals[j]),
+                           "roots": [k, l], "weights": [float(w[0]), float(w[1])], "pair": gi})
+        purified.append({"roots": [k, l], "s2": [float(v) for v in vals],
+                         "weights": [[float(v) for v in U[:, j] ** 2] for j in range(2)]})
     states.sort(key=lambda s: s["omega"])
     return states, purified
 
