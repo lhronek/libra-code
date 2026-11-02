@@ -5934,7 +5934,6 @@ def _cp2k_force_refresh(params, itraj, coordinates, nat, nstates):
 
 # ======================= the fragment diabatic basis on the fly (dia_basis "fragment") =======================
 FRAGMENT_DIA_REORDERINGS = (0, 1, 2, 22, 5, 52)
-PURIFIED_FORCE_WEIGHT_MIN = 1e-3  ### a root below this weight in a purified spin-flip state is left out of its force (one CP2K run per root kept)
 
 
 def fragment_options(params):
@@ -6850,13 +6849,12 @@ def cp2k_compute_adi_impl(q, params, full_id):
             excess = s2_spin_flip(X, n_a_occ, n_b_occ, S_ab)
             s2_all.append(s2_total(excess, n_a_occ, n_b_occ))
             cls_all.append(classify_spin(excess, s2_low_spin_max, s2_high_spin_min, s_ref))
-        # the spin mixing the Davidson leaves between roots - a degenerate singlet and triplet delivered as two
-        # mixtures, a singlet crossing a spin-incomplete root - is undone within every group of roots that share it
-        # (purify_spin_mixtures): the states handed over are the eigenvectors of the group's <S^2> block, their energies
-        # the expectation values, their forces the weighted forces of their roots
+        # roots of mixed <S^2> within spin_purify_window are rotated to pure spins when another spin's root holds more
+        # than spin_purify_min_weight of a singlet (purify_spin_mixtures) - the state's energy and force the roots' weighted
         s2_excess = s2_spin_flip_matrix(X_all, n_a_occ, n_b_occ, S_ab)
         purify_window = float(params.get("spin_purify_window", 0.5 / units.au2ev))
-        sf_states, purified = purify_spin_mixtures(X_all, omegas[:nroots], s2_excess, cls_all, purify_window)
+        min_weight = float(params.get("spin_purify_min_weight", 0.05))
+        sf_states, purified = purify_spin_mixtures(X_all, omegas[:nroots], s2_excess, cls_all, purify_window, min_weight)
         for st in sf_states:
             st["cls"] = classify_spin(st["s2"], s2_low_spin_max, s2_high_spin_min, s_ref)
         low = [st for st in sf_states if st["cls"] == low_name]
@@ -6869,10 +6867,10 @@ def cp2k_compute_adi_impl(q, params, full_id):
         manifold = low[:nstates]
         # CP2K's 1-based root of every state: the leading root of a purified state, the root itself otherwise
         roots = [int(st["roots"][int(np.argmax(st["weights"]))]) + 1 for st in manifold]
-        # the roots a state's force is built from, with their weights: every root above the floor, renormalized
+        # the roots a state's force is built from: every root with a weight above spin_purify_min_weight, renormalized
         force_roots = []
         for st in manifold:
-            kept = [(int(r) + 1, float(w)) for r, w in zip(st["roots"], st["weights"]) if w > PURIFIED_FORCE_WEIGHT_MIN]
+            kept = [(int(r) + 1, float(w)) for r, w in zip(st["roots"], st["weights"]) if w > min_weight]
             total_w = sum(w for _, w in kept)
             force_roots.append([(r, w / total_w) for r, w in kept])
         E_ref = float(res["E_adi"][0])
@@ -6915,8 +6913,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
         st_sd, _ = sd_overlaps(sd_states, St_in, Sp_in, Sc_in, orthonormalize=sd_orthon, kernel=sd_kernel,
                                cache=sd_cache)
         st_ci = T_prev.T @ st_sd @ T_curr
-        # every state of the previous step continues into one state of this step, or the manifold changed its
-        # identity (a state replaced by the next one of its class) and the engine would relabel across a gap
+        # a previous state without a continuation above state_reordering_min_overlap: the manifold changed identity
         if not is_first_time:
             from libra_py.workflows.nbra import step3
             floor = float(params.get("state_reordering_min_overlap", step3.CONTINUITY_FLOOR))
@@ -7559,7 +7556,7 @@ CP2K_COMPUTE_ADI_KEYS = frozenset(("E_adi_last", "S_prev", "_ao_atom_map", "_ste
                                    "s2_high_spin_min", "s2_low_spin_max", "s_ihalf_prev", "sd_basis",
                                    "sd_capture_max_drop", "sd_overlap_kernel", "sd_prev", "sd_state_ordering",
                                    "sf_basis", "sf_eref", "sf_force_roots", "sf_omegas", "sf_prev", "sf_roots",
-                                   "spin_flip", "spin_purify_window", "state_reordering_min_overlap",
+                                   "spin_flip", "spin_purify_min_weight", "spin_purify_window", "state_reordering_min_overlap",
                                    "time_dependent", "timestep", "working_directory_prefix"))
 def cp2k_compute_adi(q, params, full_id):
     """Traceback-printing wrapper: C++ callers swallow Python exceptions. A repeated call for the same step, active

@@ -234,15 +234,18 @@ def s2_spin_flip_brute_matrix(X_list, n_alpha_occ, n_beta_occ, S_ab, threshold=1
     return M
 
 
-def purify_spin_mixtures(X_list, omegas, s2_matrix, classes, window, mix_min=0.05):
+def purify_spin_mixtures(X_list, omegas, s2_matrix, classes, window, min_weight=0.05, mix_min=0.05):
     """The roots whose spin mixing the Davidson left in (a degenerate singlet and triplet pair delivered as two mixtures,
     a singlet crossing a spin-incomplete root) rotated to the eigenvectors of their excess-<S^2> block: the roots are
     grouped by the edges (k, l) with |s2_matrix[k, l]| above mix_min and |omegas[k] - omegas[l]| below window, every
-    group with a root of the class "mixed" is diagonalized in its block, and its states take the eigenvectors. A state
-    is a dict with X (the rotated amplitudes), omega (the expectation value sum_k U_kj^2 omegas[k]), s2 (the excess
-    eigenvalue), roots (the group's 0-based roots), weights (U_kj^2 over them) and group (the group's index, None for a
-    root left alone). Returns the states in the order of their omega and the list of purified groups (roots, the
-    excess eigenvalues, the weights) for the record."""
+    group with a root of the class "mixed" is diagonalized in its block, and its states take the eigenvectors when
+    some eigenvector carries more than min_weight of its weight beyond its leading root - a group mixed less than that
+    keeps CP2K's roots, each with its own energy and force at one run (the planar V root of ethylene carries 2 % of
+    the spin-incomplete root above it, whose force differs by 2 %). A state is a dict with X (the rotated amplitudes),
+    omega (the expectation value sum_k U_kj^2 omegas[k]), s2 (the excess eigenvalue), roots (the group's 0-based
+    roots), weights (U_kj^2 over them) and group (the group's index, None for a root left alone). Returns the states
+    in the order of their omega and the list of purified groups (roots, the excess eigenvalues, the weights) for the
+    record."""
     omegas = np.asarray(omegas, dtype=float)
     n = len(X_list)
     parent = list(range(n))
@@ -269,6 +272,11 @@ def purify_spin_mixtures(X_list, omegas, s2_matrix, classes, window, mix_min=0.0
             continue
         block = s2_matrix[np.ix_(members, members)]
         vals, U = np.linalg.eigh(0.5 * (block + block.T))
+        if float((1.0 - (U ** 2).max(axis=0)).max()) <= min_weight:
+            for k in members:
+                states.append({"X": np.asarray(X_list[k], dtype=float), "omega": float(omegas[k]),
+                               "s2": float(s2_matrix[k, k]), "roots": [k], "weights": [1.0], "group": None})
+            continue
         gi = len(purified)
         for j in range(len(members)):
             w = U[:, j] ** 2
