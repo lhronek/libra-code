@@ -2332,7 +2332,8 @@ def run_step3_ks_nacs_libint(params):
             * **params['ks_homo_index']** (integer): the index of the KS HOMO + 1 (it starts from 1)
             * **params['data_dim']** (integer): the dimension of the energy/overlap matrices stored as .npz
             * **params['start_time']** (integer): the initial step for reading the files
-            * **params['finish_time']** (integer): the final step for reading the files
+            * **params['finish_time']** (integer): one past the last step read - a folder holding fewer frames ends the
+                range at the last frame present, with a WARNING naming the first missing file
             * **params['sorting_type']** (string): it performs sorting the elements of the overlap matrices
                 either by their 'energy' or 'identity'.
             * **params['apply_phase_correction']** (bool): a True or False flag for performing the phase-correction
@@ -2439,6 +2440,14 @@ def run_step3_ks_nacs_libint(params):
     start_time = params['start_time']
     # The final time-step
     finish_time = params['finish_time']
+    # a step 2 cut short leaves fewer frames than asked for - the route goes on with the frames present and says so: every
+    # step needs its own S, St and E files and the next frame's S and E (the orthonormalized time overlap of its interval),
+    # the clipped end stands in params and the record
+    finish_time = data_read.clip_step_range(start_time, finish_time,
+                                            lambda s: [F'{params["path_to_npz_files"]}/{name}' for name in
+                                                       (F'S_ks_{s}.npz', F'St_ks_{s}.npz', F'E_ks_{s}.npz', F'S_ks_{s + 1}.npz', F'E_ks_{s + 1}.npz')],
+                                            'run_step3_ks_nacs_libint')
+    params['finish_time'] = finish_time
     # The number of processors
     nprocs = params['nprocs']
     # The dt value is in fs and will be turned into atomic unit
@@ -2468,7 +2477,8 @@ def run_step3_ks_nacs_libint(params):
     # the record a step-4 runner reads: isUKS decides with sd_charge whether the spin-adaptation
     # factor sqrt 2 belongs on the NACs of the reference SD (closed-shell neutral reference only)
     with open(marker_file, 'w') as f:
-        json.dump({'im_file_contains': 'Im(Hvib) = -d', 'isUKS': int(params.get('isUKS', 0))}, f)
+        json.dump({'im_file_contains': 'Im(Hvib) = -d', 'isUKS': int(params.get('isUKS', 0)),
+                   'start_time': int(start_time), 'finish_time': int(finish_time)}, f)
     t2 = time.time()
     # If we're using multiprocessing, create a pool of processors
     if params['use_multiprocessing']:
@@ -4429,7 +4439,8 @@ def run_step3_pod(params):
                 must equal the sum of pod_occupied
             * **params['path_to_save_sd_Hvibs']** (string): the output directory [default: cwd/res-pod]
             * **params['start_time']**, **params['finish_time']** (int): the frames read, finish_time one past the
-                last - Hvib and St are written for start_time..finish_time-2, U for start_time..finish_time-1
+                last - Hvib and St are written for start_time..finish_time-2, U for start_time..finish_time-1 (a folder
+                holding fewer frames ends the range at the last frame present, with a WARNING)
             * **params['time_step']** (float): the frame spacing in fs [default: 1.0]
             * **params['pod_occupied']** (list of int): the occupied block states of every block - the valence
                 electron pairs of every fragment - in the block order of the POD section
@@ -4558,6 +4569,13 @@ def run_step3_pod(params):
     selection, sel_algo, sel_alpha = _check_selection_options(params)
     res_dir_1, res_dir_2 = params['path_to_npz_files'], params['path_to_save_sd_Hvibs']
     start_time, finish_time = int(params['start_time']), int(params['finish_time'])
+    # a step 2 cut short leaves fewer frames than asked for - the route goes on with the frames present and says so: a frame
+    # needs its POD Hamiltonian and the time overlap of the interval into it, so the first frame needs no St
+    finish_time = data_read.clip_step_range(start_time, finish_time,
+                                            lambda k: [F'{res_dir_1}/POD_cp2k_hab_{k}.npz']
+                                            + ([F'{res_dir_1}/St_pod_cp2k_{k - 1}.npz'] if k > start_time else []),
+                                            'run_step3_pod')
+    params['finish_time'] = finish_time
     if finish_time - start_time < 2:
         raise ValueError("run_step3_pod needs at least two frames (finish_time - start_time >= 2)")
     dt = params['time_step'] * units.fs2au
@@ -4839,7 +4857,8 @@ def run_step3_pod(params):
         sp.save_npz(F'{res_dir_2}/U_sd_{frames[k]}.npz', sp.csc_matrix(V[k]))
         sp.save_npz(F'{res_dir_2}/E_sd_{frames[k]}.npz', sp.csc_matrix(np.diag(E_adi[k])))
     with open(marker_file, 'w') as f:
-        json.dump({'im_file_contains': 'Im(Hvib) = -d', 'isUKS': 0, 'sd_charge': 1, 'route': 'pod_hamiltonian'}, f)
+        json.dump({'im_file_contains': 'Im(Hvib) = -d', 'isUKS': 0, 'sd_charge': 1, 'route': 'pod_hamiltonian',
+                   'start_time': int(start_time), 'finish_time': int(finish_time)}, f)
     dia_index = [("loc", None, frag[c], rank[c]) for c in range(n)]
     pops_list = [np.eye(nblk)[frag] for _ in frames]
     hole_list = [np.full((n, nblk), np.nan) for _ in frames]
@@ -4938,7 +4957,8 @@ def run_step3_sd_nacs_libint(params):
             * **params['ks_homo_index']** (integer): the index of the KS HOMO + 1 (it starts from 1)
             * **params['data_dim']** (integer): the dimension of the energy/overlap matrices stored as .npz
             * **params['start_time']** (integer): the initial step for reading the files
-            * **params['finish_time']** (integer): the final step for reading the files
+            * **params['finish_time']** (integer): one past the last step read - a folder holding fewer frames ends the
+                range at the last frame present, with a WARNING naming the first missing file
             * **params['sorting_type']** (string): it performs sorting the elements of the overlap matrices
                                                    either by their 'energy' or 'identity'.
             * **params['apply_phase_correction']** (bool): a True or False flag for performing the phase-correction
@@ -5160,6 +5180,25 @@ def run_step3_sd_nacs_libint(params):
     data_dim = params['data_dim']
     start_time = params['start_time']
     finish_time = params['finish_time']
+    # a step 2 cut short leaves fewer frames than asked for - the route goes on with the frames present and says so: a step
+    # needs its own S_ks and E_ks (the fragment operators too when a carrier is localized) and the time overlap St_ks of the
+    # interval into it, so the last step needs no St_ks - the clipped end stands in params and the record
+    frag_prefixes = []
+    if str(params['localized_carrier']) != 'none':
+        prefix, nfrag = _fragment_operator_prefix(params, params['path_to_npz_files'], start_time)
+        frag_prefixes = [F'{prefix}{f}_ks' for f in range(nfrag)]
+    # the many-body basis reads the TD-DFT output of every step (step2_many_body.get_excitation_analysis_output)
+    mb_log = {'cp2k': 'step_{}.log', 'gaussian': 'step_{}.log', 'dftb+': 'TRA_{}.DAT'}.get(params['es_software'].lower()) \
+        if params['is_many_body'] else None
+
+    def sd_step_files(s):
+        names = [F'{p}_{s}.npz' for p in ['S_ks', 'E_ks'] + frag_prefixes] + ([F'St_ks_{s - 1}.npz'] if s > start_time else [])
+        paths = [F'{params["path_to_npz_files"]}/{name}' for name in names]
+        if mb_log is not None:
+            paths.append(F'{params["logfile_directory"]}/{mb_log.format(s)}')
+        return paths
+    finish_time = data_read.clip_step_range(start_time, finish_time, sd_step_files, 'run_step3_sd_nacs_libint')
+    params['finish_time'] = finish_time
     dt = params['time_step'] * units.fs2au
     nac_algo = params['nac_algo']
     if nac_algo not in (0, 1):
@@ -5184,7 +5223,7 @@ def run_step3_sd_nacs_libint(params):
     # SD-level ones - a Koopmans hole / electron basis or a UKS basis holds open-shell states only, no factor
     with open(marker_file, 'w') as f:
         json.dump({'im_file_contains': 'Im(Hvib) = -d', 'isUKS': int(params.get('isUKS', 0)),
-                   'sd_charge': int(params.get('sd_charge', 0))}, f)
+                   'sd_charge': int(params.get('sd_charge', 0)), 'start_time': int(start_time), 'finish_time': int(finish_time)}, f)
 
     # the active space by identity: the window orbitals followed between the frames before any basis is built
     if selection == 'identity':

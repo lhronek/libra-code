@@ -43,6 +43,22 @@ DATA_READ_KEYS = frozenset((
     "fsnap", "get_imag", "get_real", "isnap"
 ))
 
+
+def clip_step_range(start, finish, files_of, where):
+    """The end of the contiguous run of steps from `start` whose files all exist, `finish` at most - files_of(step) lists the
+    paths a step needs. A step 2 or 3 cut short leaves fewer files than the runner asked for: the caller goes on with the
+    steps present and the WARNING names the requested range, the range found and the first file missing (the frames must be
+    consecutive, so a gap ends the range as well) - the first step's files missing raise, there is nothing to go on with"""
+    for step in range(start, finish):
+        missing = [f for f in files_of(step) if not os.path.isfile(f)]
+        if missing:
+            if step == start:
+                raise FileNotFoundError(F"{where}: the files of the first step {start} are missing ({missing[0]}) - nothing to continue with")
+            print(F"WARNING in {where}: steps {start} to {finish - 1} were requested but the files end at step {step - 1} "
+                  F"({missing[0]} is missing) - continuing with steps {start} to {step - 1}")
+            return step
+    return finish
+
 # the keys get_all_data reads from its params dict - refused at the entry
 GET_ALL_DATA_KEYS = frozenset((
     "Hvib_im_prefix", "Hvib_im_suffix", "Hvib_re_prefix", "Hvib_re_suffix", "St_re_prefix", "St_re_suffix", "is_sparse",
@@ -135,7 +151,8 @@ def get_data(params):
                 about. These indices will be used to determine the size of the created CMATRIX objects
                 and only these states will be extracted from the original files [ default: range(data_dim) ]
             * **params["isnap"]** ( int ): index of the first file to read [Required!]
-            * **params["fsnap"]** ( int ): index of the final file to read [Required!]
+            * **params["fsnap"]** ( int ): one past the index of the last file to read [Required!] - a folder holding fewer
+                files ends the range at the last file present, with a WARNING naming the first missing file
             * **params["data_re_prefix"]** ( string ): prefixes of the files with real part of the data [Required!]
             * **params["data_im_prefix"]** ( string ): prefixes of the files with imaginary part of the data [Required!]
             * **params["data_re_suffix"]** ( string ): suffixes of the files with real part of the Hvib(t) [default: "_re"]
@@ -180,8 +197,16 @@ def get_data(params):
 
     ndim = params["data_dim"]  # the number of cols/row in the input files
 
+    def files_of(i):
+        names = []
+        if params["get_real"] == 1:
+            names.append(params["data_re_prefix"] + str(i) + params["data_re_suffix"])
+        if params["get_imag"] == 1:
+            names.append(params["data_im_prefix"] + str(i) + params["data_im_suffix"])
+        return names
+    fsnap = clip_step_range(params["isnap"], params["fsnap"], files_of, "data_read.get_data")
     data = []
-    for i in range(params["isnap"], params["fsnap"]):
+    for i in range(params["isnap"], fsnap):
 
         filename_re = params["data_re_prefix"] + str(i) + params["data_re_suffix"]
         filename_im = params["data_im_prefix"] + str(i) + params["data_im_suffix"]
@@ -398,7 +423,8 @@ def get_all_data(params):
     Args:
         params (dictionary):
             * **params['istep']*: The initial step
-            * **params['nsteps']*: Number of steps to be read from the inital step
+            * **params['nsteps']*: Number of steps to be read from the inital step - a folder holding fewer steps ends the
+                range at the last step present, with a WARNING naming the first missing file
             * **params['path_to_res_files']*: The full path to where the data are stored
             * **params['Hvib_re_prefix']*: The prefix of the real part of the Hamiltonian file
             * **params['Hvib_im_prefix']*: The prefix of the imaginary part of the Hamiltonian file
@@ -436,6 +462,11 @@ def get_all_data(params):
     # the CMATRIX(re, im) reconstructions and the signed nac below assume the
     # canonical convention (_im = Im(Hvib) = -d)
     warn_legacy_hvib_dir(path_to_res_files)
+    ext = ".npz" if params['is_sparse'] else ""
+    fstep = clip_step_range(istep, fstep, lambda step: [F'{path_to_res_files}/{hvib_re_prefix}{step}{hvib_re_suffix}{ext}',
+                                                        F'{path_to_res_files}/{hvib_im_prefix}{step}{hvib_im_suffix}{ext}',
+                                                        F'{path_to_res_files}/{st_re_prefix}{step}{st_re_suffix}{ext}'],
+                            "data_read.get_all_data")
     if params['is_sparse']:
         for step in range(istep, fstep):
             print('Reading the data of step', step)
