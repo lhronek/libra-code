@@ -6852,7 +6852,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
         # roots of mixed <S^2> within spin_purify_window are rotated to pure spins when another spin's root holds more
         # than spin_purify_min_weight of a singlet (purify_spin_mixtures) - the state's energy and force the roots' weighted
         s2_excess = s2_spin_flip_matrix(X_all, n_a_occ, n_b_occ, S_ab)
-        purify_window = float(params.get("spin_purify_window", 0.5 / units.au2ev))
+        purify_window = float(params.get("spin_purify_window", 2.0 / units.au2ev))
         min_weight = float(params.get("spin_purify_min_weight", 0.05))
         sf_states, purified = purify_spin_mixtures(X_all, omegas[:nroots], s2_excess, cls_all, purify_window, min_weight)
         for st in sf_states:
