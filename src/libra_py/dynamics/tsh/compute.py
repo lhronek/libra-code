@@ -1029,6 +1029,9 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
             ///================= NBRA options =========================================
             ///===============================================================================
 
+            * **dyn_params["direct_init"]** (int): 0 is the only accepted value - the key is read since 2023 and
+                used nowhere, so generic_recipe and the RPI patch dynamics refuse any other value [ default: 0 ]
+
             * **dyn_params["isNBRA"]** (int): A flag for NBRA calculations. Since in NBRA, the Hamiltonian is
               the same for all the trajectories we can only compute the Hamiltonian related properties once for one
               trajectory and increase the speed of calculations. If we set the value to 1 it will consider the NBRA
@@ -1905,7 +1908,11 @@ def generic_recipe(_dyn_params, compute_model, _model_params, _init_elec, _init_
     is_nbra = _sync_nbra_flag(dyn_params)
 
     ntraj = dyn_params["ntraj"]
+    # direct_init is read here since 2023 and used nowhere - 0 is the only value that does what it says
     direct_init = dyn_params["direct_init"]
+    if int(direct_init) != 0:
+        raise ValueError(F"generic_recipe: direct_init = {direct_init} - the key has no implementation (read and never used), "
+                         F"0 is the only accepted value")
 
     # ========== Electronic params =========
     # Setup the electronic variables

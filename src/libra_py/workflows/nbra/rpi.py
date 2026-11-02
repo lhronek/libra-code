@@ -149,6 +149,9 @@ def run_patch_dyn_serial(_rpi_params, _dyn_params, compute_model, _model_params,
     comn.check_input(dyn_params, {"rep_tdse": 1, "rep_sh": 1, "is_nbra": 0, "direct_init": 0, "ntraj": 1,
                                   "quantum_dofs": list(range(ndof))
                                   }, [])
+    if int(dyn_params["direct_init"]) != 0:
+        raise ValueError(F"run_patch_dyn_serial: direct_init = {dyn_params['direct_init']} - the key has no implementation (read and never "
+                         F"used), 0 is the only accepted value")
     
     nsteps, dt = rpi_params["nsteps"], rpi_params["dt"]
     iconds, npatches, nstates = rpi_params["iconds"], rpi_params["npatches"], rpi_params["nstates"]
@@ -272,6 +275,9 @@ def generic_patch_dyn(_rpi_params, _dyn_params, compute_model, _model_params, _i
     comn.check_input(dyn_params, {"rep_tdse": 1, "rep_sh": 1, "is_nbra": 0, "direct_init": 0, "ntraj": 1,
                                   "quantum_dofs": list(range(ndof))
                                   }, [])
+    if int(dyn_params["direct_init"]) != 0:
+        raise ValueError(F"generic_patch_dyn: direct_init = {dyn_params['direct_init']} - the key has no implementation (read and never "
+                         F"used), 0 is the only accepted value")
 
     # RPI setting
     nsteps, dt = rpi_params["nsteps"], rpi_params["dt"]
