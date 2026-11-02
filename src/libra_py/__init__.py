@@ -6,6 +6,18 @@
 # * License, or (at your option) any later version.
 # * http://www.gnu.org/copyleft/gpl.txt
 # ***********************************************************/
+import sys
+
+# every libra process writes whole lines: a stdout sent to a file is block-buffered, and the forked pool workers of step 2,
+# step 3 and the dynamics share the runner's - the 8 KB chunks of several workers land interleaved mid-line in the common
+# log, a child process's output overtakes the lines still in the buffer (the C stdout of the C++ prints is line-buffered by
+# liblibra_core's import, a stream without reconfigure - a notebook's or a capture - is left alone)
+if hasattr(sys.stdout, "reconfigure") and not getattr(sys.stdout, "line_buffering", False):
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+    except (ValueError, OSError):      # a detached or closed stream
+        pass
+
 
 def __getattr__(name):
     # lazy: importing libra_py must not load the C++ extension (banner

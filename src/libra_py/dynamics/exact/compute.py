@@ -358,7 +358,6 @@ def run_relaxation(_params, _potential, model_params):
         data_savers.mem_saver: when mem_output_level > 0, else None
     """
 
-    data_outs.line_buffered_output()      # whole lines from every pooled worker into a shared log
     params = dict(_params)
     refuse_unknown_keys(params, PARAMS_KEYS, "exact.run_relaxation", "params", "no function of the exact module reads")
     critical_params = []

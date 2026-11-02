@@ -831,7 +831,6 @@ def run_qtag(_q, _p, _alp, _s, _states, _coeff, _iM, _dyn_params, _compute_model
 
     """
 
-    data_outs.line_buffered_output()      # whole lines from every pooled worker into a shared log
     dyn_params = dict(_dyn_params)
     Q = MATRIX(_q)
     P = MATRIX(_p)

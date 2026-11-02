@@ -198,17 +198,3 @@ def bin2list(name, sz):
         x.append(X.get(i, 0))
 
     return x
-
-
-def line_buffered_output():
-    """Flushes sys.stdout at every newline. The pooled dynamics workers a runner forks share its stdout, and when that is a
-    file the default block buffering lands their 8 KB chunks interleaved mid-line in the common log - a line-buffered
-    stream writes every line whole as it completes. Called at every dynamics entry (the C++ prints go through the C
-    stdout, which liblibra_core sets line-buffered at import). A stream without reconfigure (a notebook's, a
-    redirect_stdout capture) is left alone."""
-    stream = sys.stdout
-    if hasattr(stream, "reconfigure") and not getattr(stream, "line_buffering", False):
-        try:
-            stream.reconfigure(line_buffering=True)
-        except (ValueError, OSError):      # a detached or closed stream
-            pass
