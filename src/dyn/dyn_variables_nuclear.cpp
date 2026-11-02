@@ -178,9 +178,8 @@ void dyn_variables::init_nuclear_dyn_var(bp::dict _params, Random& rnd){
 
 
   if( !(init_type==0 || init_type==1 || init_type==2 || init_type==3 || init_type==4 || init_type==5)  ){
-    cout<<"WARNINIG in init_nuclear_dyn_var: \
-           the init_type = "<<init_type<<" is not known\
-           Allowed values are: [0, 1, 2, 3, 4, 5]\n";
+    cout<<"ERROR in init_nuclear_dyn_var: the init_type = "<<init_type<<" is not known. Allowed values are: [0, 1, 2, 3, 4, 5]\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   if(_Q.size() != _P.size()){

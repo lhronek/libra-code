@@ -796,14 +796,14 @@ void dyn_variables::init_amplitudes(bp::dict _params, Random& rnd){
 
   ///# Sanity check
   if(! ((rep==0) || (rep==1)) ){
-    cout<<"WARNINIG in init_amplitudes:\
-           the rep = "<<rep<<" is not known. Allowed values are: [0, 1]\n";
+    cout<<"ERROR in init_amplitudes: the rep = "<<rep<<" is not known. Allowed values are: [0, 1]\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   if(! (init_type==0 || init_type==1 || init_type==2 || init_type==3 || init_type==4 ||
         init_type==5 || init_type==6)){
-    cout<<"WARNINIG in init_amplitudes:\
-           the init_type = "<<init_type<<" is not known. Allowed values are: [0, 1, 2, 3, 4, 5, 6]\n";
+    cout<<"ERROR in init_amplitudes: the init_type = "<<init_type<<" is not known. Allowed values are: [0, 1, 2, 3, 4, 5, 6]\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   // SQC window sampling: the window fixes gamma unless given explicitly
@@ -1026,13 +1026,13 @@ void dyn_variables::init_density_matrix(bp::dict _params){
 
   ///================= Sanity check ================================
   if(! ((rep==0) || (rep==1)) ){
-    cout<<"WARNINIG in init_density_matrix:\
-           the rep = "<<rep<<" is not known. Allowed values are: [0, 1]\n";
+    cout<<"ERROR in init_density_matrix: the rep = "<<rep<<" is not known. Allowed values are: [0, 1]\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   if(! (init_dm_type==0 || init_dm_type==1 )){
-    cout<<"WARNINIG in init_density_matrix:\
-           the init_dm_type = "<<init_dm_type<<" is not known. Allowed values are: [0, 1]\n";
+    cout<<"ERROR in init_density_matrix: the init_dm_type = "<<init_dm_type<<" is not known. Allowed values are: [0, 1]\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
 
@@ -1143,13 +1143,13 @@ void dyn_variables::init_active_states(bp::dict _params, Random& rnd){
 
   ///================= Sanity check ================================
   if(! ((rep==0) || (rep==1)) ){
-    cout<<"WARNINIG in init_active_states:\
-           the rep = "<<rep<<" is not known. Allowed values are: [0, 1]\n";
+    cout<<"ERROR in init_active_states: the rep = "<<rep<<" is not known. Allowed values are: [0, 1]\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   if(! (init_type==0 || init_type==1 || init_type==2 || init_type==3 || init_type==4 || init_type==5 || init_type==6) ){
-    cout<<"WARNINIG in init_active_states:\
-           the init_type = "<<init_type<<" is not known. Allowed values are: [0, 1, 2, 3, 4]\n";
+    cout<<"ERROR in init_active_states: the init_type = "<<init_type<<" is not known. Allowed values are: [0, 1, 2, 3, 4, 5, 6]\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   if(init_type==0 || init_type==1 || init_type==4 || init_type==5 || init_type==6){
@@ -1273,13 +1273,13 @@ void dyn_variables::init_active_states_dia(bp::dict _params, Random& rnd){
 
   ///================= Sanity check ================================
   if(! ((rep==0) || (rep==1)) ){
-    cout<<"WARNINIG in init_active_states_dia:\
-           the rep = "<<rep<<" is not known. Allowed values are: [0, 1]\n";
+    cout<<"ERROR in init_active_states_dia: the rep = "<<rep<<" is not known. Allowed values are: [0, 1]\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
 
   if(! (init_type==0 || init_type==1 || init_type==2 || init_type==3 || init_type==4 || init_type==5 || init_type==6) ){
-    cout<<"WARNINIG in init_active_states_dia:\
-           the init_type = "<<init_type<<" is not known. Allowed values are: [0, 1, 2, 3, 4]\n";
+    cout<<"ERROR in init_active_states_dia: the init_type = "<<init_type<<" is not known. Allowed values are: [0, 1, 2, 3, 4, 5, 6]\n";
+    std::cout << std::flush; throw std::runtime_error("libra C++ error - see the message printed above");
   }
   
   if(init_type==0 || init_type==1 || init_type==4 || init_type==5 || init_type==6){
