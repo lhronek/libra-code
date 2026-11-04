@@ -6890,7 +6890,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
         s2_excess = s2_spin_flip_matrix(X_all, n_a_occ, n_b_occ, S_ab)
         purify_window = float(params.get("spin_purify_window", 2.0 / units.au2ev))
         min_weight = float(params.get("spin_purify_min_weight", 0.05))
-        sf_states, purified = purify_spin_mixtures(X_all, omegas[:nroots], s2_excess, cls_all, purify_window, min_weight)
+        sf_states, purified = purify_spin_mixtures(X_all, omegas[:nroots], s2_excess, purify_window, min_weight)
         for st in sf_states:
             st["cls"] = classify_spin(st["s2"], s2_low_spin_max, s2_high_spin_min, s_ref)
         low = [st for st in sf_states if st["cls"] == low_name]

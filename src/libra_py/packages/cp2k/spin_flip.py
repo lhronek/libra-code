@@ -234,12 +234,14 @@ def s2_spin_flip_brute_matrix(X_list, n_alpha_occ, n_beta_occ, S_ab, threshold=1
     return M
 
 
-def purify_spin_mixtures(X_list, omegas, s2_matrix, classes, window, min_weight=0.05, mix_min=0.05):
+def purify_spin_mixtures(X_list, omegas, s2_matrix, window, min_weight=0.05, mix_min=0.05):
     """The roots whose spin mixing the Davidson left in (a degenerate singlet and triplet pair delivered as two mixtures,
-    a singlet crossing a spin-incomplete root) rotated to the eigenvectors of their excess-<S^2> block, pair by pair:
-    the candidate pairs are a root of the class "mixed" with every root coupled to it by |s2_matrix[k, l]| above
-    mix_min within window of it, the pairs are taken by decreasing |s2_matrix[k, l]|, a root in one pair at most, and
-    a pair is rotated when an eigenvector carries more than min_weight of its weight beyond its leading root (a pair
+    a singlet crossing a spin-incomplete root, S0 and the triplet mixing at the twist) rotated to the eigenvectors of
+    their excess-<S^2> block, pair by pair: the candidate pairs are every two roots within window of each other
+    coupled by |s2_matrix[k, l]| above mix_min - whatever their classes, a pair mixing below the class thresholds (a
+    "singlet" at 0.4 with a "triplet" at 1.6) included - the pairs are taken by decreasing |s2_matrix[k, l]|, a root in
+    one pair at most, and a pair is rotated when an eigenvector carries more than min_weight of its weight beyond its
+    leading root (a pair
     mixed less than that keeps CP2K's roots, each with its own energy and force at one run - the planar V root of
     ethylene carries 2 % of the spin-incomplete root above it, whose force differs by 2 %). Pairs, not larger groups:
     a chain of weak couplings would spread the lowest eigenvector over roots far above and move its energy by tenths
@@ -251,11 +253,9 @@ def purify_spin_mixtures(X_list, omegas, s2_matrix, classes, window, min_weight=
     n = len(X_list)
     candidates = set()
     for k in range(n):
-        if classes[k] != "mixed":
-            continue
-        for l in range(n):
-            if l != k and abs(s2_matrix[k, l]) > mix_min and abs(omegas[k] - omegas[l]) < window:
-                candidates.add((abs(s2_matrix[k, l]), min(k, l), max(k, l)))
+        for l in range(k + 1, n):
+            if abs(s2_matrix[k, l]) > mix_min and abs(omegas[k] - omegas[l]) < window:
+                candidates.add((abs(s2_matrix[k, l]), k, l))
     used = set()
     pairs = []
     for _, k, l in sorted(candidates, reverse=True):
