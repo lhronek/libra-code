@@ -6361,18 +6361,19 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     carries the reference's own multiplicity (its exact Ms
                     component has the excess 2 S_ref) [default 1.5] - between
                     the two bounds a spin-incomplete mixture, in no manifold
-                spin_purify_window (float, Ha): a root of mixed spin and a root
-                    coupled to it by the excess-<S^2> matrix within this energy
-                    are rotated as a pair to the eigenvectors of their 2 x 2
-                    block (purify_spin_mixtures, the pairs taken by decreasing
-                    coupling, a root in one pair at most) - a rotated state's
-                    energy and force are the roots' weighted ones [default 2 eV:
-                    the spin-incomplete root of ethylene mixes into the V state
-                    from 1.3 eV above it]
-                spin_purify_min_weight (float): a pair is rotated only when an
-                    eigenvector carries more than this weight beyond its leading
-                    root, and a rotated state's force is built from its roots
-                    above this weight, one force run each [default 0.05]
+                spin_purify_window (float, Ha): two roots coupled by their
+                    excess-<S^2> matrix element within this energy are rotated
+                    as a pair to the eigenvectors of their 2 x 2 block
+                    (purify_spin_mixtures, the pairs taken by decreasing
+                    coupling, a root in one pair at most, every pair rotated) -
+                    a rotated state's energy is the roots' weighted one
+                    [default 2 eV: the spin-incomplete root of ethylene mixes
+                    into the V state from 1.3 eV above it]
+                spin_purify_min_weight (float): the force floor of a rotated
+                    state - its force is built from the roots carrying more
+                    than this weight, one force run each; below it the energy
+                    is the rotated one and the force the leading root's, 0 runs
+                    every root's force [default 0.05]
                 state_reordering_min_overlap (float): the continuity floor of the
                     manifold - a state of the previous step whose largest time
                     overlap with this step's states lies below it refuses the
@@ -6885,12 +6886,12 @@ def cp2k_compute_adi_impl(q, params, full_id):
             excess = s2_spin_flip(X, n_a_occ, n_b_occ, S_ab)
             s2_all.append(s2_total(excess, n_a_occ, n_b_occ))
             cls_all.append(classify_spin(excess, s2_low_spin_max, s2_high_spin_min, s_ref))
-        # roots of mixed <S^2> within spin_purify_window are rotated to pure spins when another spin's root holds more
-        # than spin_purify_min_weight of a singlet (purify_spin_mixtures) - the state's energy and force the roots' weighted
+        # roots coupled by their excess <S^2> within spin_purify_window are rotated to pure spins (purify_spin_mixtures) -
+        # a rotated state's energy is the roots' weighted one, its force the weighted one of the roots above the floor
         s2_excess = s2_spin_flip_matrix(X_all, n_a_occ, n_b_occ, S_ab)
         purify_window = float(params.get("spin_purify_window", 2.0 / units.au2ev))
         min_weight = float(params.get("spin_purify_min_weight", 0.05))
-        sf_states, purified = purify_spin_mixtures(X_all, omegas[:nroots], s2_excess, purify_window, min_weight)
+        sf_states, purified = purify_spin_mixtures(X_all, omegas[:nroots], s2_excess, purify_window)
         for st in sf_states:
             st["cls"] = classify_spin(st["s2"], s2_low_spin_max, s2_high_spin_min, s_ref)
         low = [st for st in sf_states if st["cls"] == low_name]

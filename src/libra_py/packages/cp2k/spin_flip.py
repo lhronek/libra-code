@@ -234,16 +234,16 @@ def s2_spin_flip_brute_matrix(X_list, n_alpha_occ, n_beta_occ, S_ab, threshold=1
     return M
 
 
-def purify_spin_mixtures(X_list, omegas, s2_matrix, window, min_weight=0.05, mix_min=0.05):
+def purify_spin_mixtures(X_list, omegas, s2_matrix, window, mix_min=0.05):
     """The roots whose spin mixing the Davidson left in (a degenerate singlet and triplet pair delivered as two mixtures,
     a singlet crossing a spin-incomplete root, S0 and the triplet mixing at the twist) rotated to the eigenvectors of
     their excess-<S^2> block, pair by pair: the candidate pairs are every two roots within window of each other
     coupled by |s2_matrix[k, l]| above mix_min - whatever their classes, a pair mixing below the class thresholds (a
     "singlet" at 0.4 with a "triplet" at 1.6) included - the pairs are taken by decreasing |s2_matrix[k, l]|, a root in
-    one pair at most, and a pair is rotated when an eigenvector carries more than min_weight of its weight beyond its
-    leading root (a pair
-    mixed less than that keeps CP2K's roots, each with its own energy and force at one run - the planar V root of
-    ethylene carries 2 % of the spin-incomplete root above it, whose force differs by 2 %). Pairs, not larger groups:
+    one pair at most, and every pair is rotated, however small the mixing: a rotation threshold on the weight made the
+    energy jump by the weight times the gap when the mixing crossed it (the stage devel-261102: 22 - 134 meV steps of the
+    total energy), while the rotation itself is continuous in the geometry - the force floor on the weights is the
+    driver's (spin_purify_min_weight). Pairs, not larger groups:
     a chain of weak couplings would spread the lowest eigenvector over roots far above and move its energy by tenths
     of an eV from step to step. A state is a dict with X (the rotated amplitudes), omega (the expectation value
     sum_k U_kj^2 omegas[k]), s2 (the excess eigenvalue), roots (the pair's 0-based roots), weights (U_kj^2 over them)
@@ -274,10 +274,6 @@ def purify_spin_mixtures(X_list, omegas, s2_matrix, window, min_weight=0.05, mix
     for k, l in pairs:
         block = np.array([[s2_matrix[k, k], s2_matrix[k, l]], [s2_matrix[l, k], s2_matrix[l, l]]])
         vals, U = np.linalg.eigh(0.5 * (block + block.T))
-        if float((1.0 - (U ** 2).max(axis=0)).max()) <= min_weight:
-            states.append(single(k))
-            states.append(single(l))
-            continue
         gi = len(purified)
         for j in range(2):
             w = U[:, j] ** 2
