@@ -234,7 +234,7 @@ def s2_spin_flip_brute_matrix(X_list, n_alpha_occ, n_beta_occ, S_ab, threshold=1
     return M
 
 
-def purify_spin_mixtures(X_list, omegas, s2_matrix, window, mix_min=0.05):
+def purify_spin_mixtures(X_list, omegas, s2_matrix, window, mix_min=0.05, mix_full=0.1):
     """The roots whose spin mixing the Davidson left in (a degenerate singlet and triplet pair delivered as two mixtures,
     a singlet crossing a spin-incomplete root, S0 and the triplet mixing at the twist, the V character spread over three
     roots on the hot ground state) rotated to the eigenvectors of their excess-<S^2> block, group by group: two roots are
@@ -244,7 +244,10 @@ def purify_spin_mixtures(X_list, omegas, s2_matrix, window, mix_min=0.05):
     groups are taken by decreasing coupling of their first pair, a root in one group at most, and every group is
     rotated, however small the mixing: a rotation threshold on the weight makes the energy jump by the weight times the
     gap when the mixing crosses it, while the rotation itself is continuous in the geometry - the force floor on the
-    weights is the driver's (spin_purify_min_weight). A clique, not a connected component: a chain of weak couplings
+    weights is the driver's (spin_purify_min_weight). A coupling enters its group's block damped, scaled by the cubic
+    step from 0 at mix_min to 1 at mix_full, so that a root crossing the threshold joins or leaves with no step in any
+    state's energy or amplitudes (the hard switch stepped them by the root's weight, (mix_min / the excess gap)^2 -
+    mix_full at or below mix_min keeps the hard switch). A clique, not a connected component: a chain of weak couplings
     would spread the lowest eigenvector over roots far above and move its energy by tenths of an eV from step to step.
     Not pairs alone: three mutually coupled roots sharing one singlet leave a pair's eigenvector contaminated and flip
     the pairing when the strongest coupling changes hands (the V state at an excess 0.34, its time overlap 0.66 at the
@@ -257,6 +260,12 @@ def purify_spin_mixtures(X_list, omegas, s2_matrix, window, mix_min=0.05):
 
     def coupled(k, l):
         return abs(s2_matrix[k, l]) > mix_min and abs(omegas[k] - omegas[l]) < window
+
+    def onset(c):
+        if mix_full <= mix_min:
+            return 1.0
+        t = min(max((abs(c) - mix_min) / (mix_full - mix_min), 0.0), 1.0)
+        return t * t * (3.0 - 2.0 * t)
     edges = sorted(((abs(s2_matrix[k, l]), k, l) for k in range(n) for l in range(k + 1, n) if coupled(k, l)), reverse=True)
     used = set()
     groups = []
@@ -281,7 +290,7 @@ def purify_spin_mixtures(X_list, omegas, s2_matrix, window, mix_min=0.05):
         if k not in used:
             states.append(single(k))
     for group in groups:
-        block = np.array([[s2_matrix[a, b] for b in group] for a in group], dtype=float)
+        block = np.array([[s2_matrix[a, b] * (1.0 if a == b else onset(s2_matrix[a, b])) for b in group] for a in group], dtype=float)
         vals, U = np.linalg.eigh(0.5 * (block + block.T))
         gi = len(purified)
         for j in range(len(group)):

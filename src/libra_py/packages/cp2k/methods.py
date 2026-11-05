@@ -6367,7 +6367,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     strongest coupled pair with every root coupled to all of
                     its members (purify_spin_mixtures, the groups taken by
                     decreasing coupling, a root in one group at most, every
-                    group rotated) - a rotated state's energy is the roots'
+                    group rotated, a coupling damped in from the threshold to
+                    twice it) - a rotated state's energy is the roots'
                     weighted one
                     [default 2 eV: the spin-incomplete root of ethylene mixes
                     into the V state from 1.3 eV above it]
