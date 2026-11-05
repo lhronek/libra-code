@@ -62,6 +62,8 @@ class _WholeLines:
     def _after_fork(self):
         self._lock = threading.Lock()      # the parent's threads, one of them maybe holding the lock, do not exist here
         self._parts = {}
+        import multiprocessing.util
+        multiprocessing.util.Finalize(None, self.flush_all, exitpriority=0)      # a pool worker ends by os._exit, past atexit
 
     def __getattr__(self, name):
         return getattr(self._stream, name)
