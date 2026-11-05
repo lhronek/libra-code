@@ -1401,6 +1401,22 @@ def read_homo_index(filename: str, isUKS: bool = False):
     return reference_occupation(filename, isUKS=isUKS)
 
 
+def read_pod_block_electrons(filename: str):
+    """The electron counts of the POD blocks of a CP2K log in the &BLOCK order - the 'Number of block electrons' lines
+    of the Projection-operator section (the NELECTRON of every block, 0 where it is not set). Empty without the section.
+    """
+    counts, inside = [], False
+    with open(filename, errors="ignore") as f:
+        for line in f:
+            if "Projection-operator method" in line:
+                inside = True
+            elif inside and "Number of block electrons" in line:
+                counts.append(int(float(line.split("=")[1])))
+            elif inside and "Coupling elements" in line:
+                break
+    return counts
+
+
 def read_molog_file(filename: str):
     """
     This function reads the coefficiets of the molecular orbitals printed out

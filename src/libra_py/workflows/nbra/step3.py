@@ -4404,10 +4404,11 @@ def run_step3_pod(params):
     the frames (step2 read_pod_cp2k_files: POD_cp2k_hab_{step}.npz and St_pod_cp2k_{step}.npz). No orbital of
     the dimer is localized: the diabatic states are the block states, complete within every fragment block.
 
-    The diabatic basis: of every block f the highest num_occ_states_per_block[f] of its pod_occupied[f] occupied
-    block states, block-major, the block HOMO first (rank 0). A basis state is the one-hole determinant of the
-    cation with the hole in that block state, all other occupied block states of the basis filled (the block
-    states outside the basis are frozen, as the orbitals outside the active space of the SD route). With the phase
+    The diabatic basis: of every block f the highest num_occ_states_per_block[f] of its doubly occupied block
+    states (the whole part of its electron pairs), block-major, the block HOMO first (rank 0). A basis state is the
+    one-hole determinant of the cation with the hole in that block state, all other occupied block states of the
+    basis filled (the block states outside the basis are frozen, as the orbitals outside the active space of the SD
+    route). With the phase
     (-1)^i on the determinant of the i-th basis state (i in the basis order) the one-body Hamiltonian h between the
     determinants is H_hole = tr(h_act) 1 - h_act, h_act the POD Hamiltonian over the basis states, and their time
     overlap is det(St_act) times the cofactor matrix of St_act, St_act the time overlaps of the basis states -
@@ -4436,14 +4437,17 @@ def run_step3_pod(params):
             * **params['path_to_npz_files']** (string): the step-2 directory with POD_cp2k_hab_{step}.npz of every
                 frame start_time..finish_time-1 and St_pod_cp2k_{step}.npz of start_time..finish_time-2
             * **params['logfile_directory']** (string): the step-2 CP2K logs - the HOMO index of the neutral system
-                must equal the sum of pod_occupied
+                and the electron counts of the POD blocks (the NELECTRON of the &BLOCK sections)
             * **params['path_to_save_sd_Hvibs']** (string): the output directory [default: cwd/res-pod]
             * **params['start_time']**, **params['finish_time']** (int): the frames read, finish_time one past the
                 last - Hvib and St are written for start_time..finish_time-2, U for start_time..finish_time-1 (a folder
                 holding fewer frames ends the range at the last frame present, with a WARNING)
             * **params['time_step']** (float): the frame spacing in fs [default: 1.0]
-            * **params['pod_occupied']** (list of int): the occupied block states of every block - the valence
-                electron pairs of every fragment - in the block order of the POD section
+            * **params['pod_occupied']** (list of numbers): the electron pairs of every block in the &BLOCK order,
+                a half for a block with an odd electron count (a cut bond - its dangling state is half-filled in the
+                block's aufbau order, stays out of the basis and must lie above the doubly occupied states, the
+                strongest coupling between two odd blocks names it). Read from the log's NELECTRON prints when they
+                are set - the key, if given, must agree - and required when the log carries none [default: None]
             * **params['num_occ_states_per_block']** (int or list of int): the basis states of every block, from the
                 block HOMO down [default: None = all occupied block states]
             * **params['sd_charge']** (int): 1, the hole basis of the cation - the only value implemented
@@ -4525,8 +4529,8 @@ def run_step3_pod(params):
     Returns:
         dict: the report written to pod_route_report.json
     """
-    critical_params = ['path_to_npz_files', 'logfile_directory', 'start_time', 'finish_time', 'pod_occupied']
-    default_params = {'path_to_save_sd_Hvibs': os.getcwd() + '/res-pod', 'time_step': 1.0,
+    critical_params = ['path_to_npz_files', 'logfile_directory', 'start_time', 'finish_time']
+    default_params = {'path_to_save_sd_Hvibs': os.getcwd() + '/res-pod', 'time_step': 1.0, 'pod_occupied': None,
                       'num_occ_states_per_block': None, 'sd_charge': 1, 'isUKS': 0, 'localized_carrier': 'hole',
                       'diabatization_scheme': 'pod_cp2k', 'apply_phase_correction': True,
                       'apply_orthonormalization': 'lowdin_cached', 'do_state_reordering': 0,
@@ -4544,7 +4548,7 @@ def run_step3_pod(params):
         if key in params:
             raise ValueError(F"run_step3_pod: params['{key}'] is a key of the SD route - the POD route has no "
                              F"Kohn-Sham basis, num_occ_states_per_block selects the hole basis of every block from "
-                             F"its pod_occupied states")
+                             F"its doubly occupied states")
     unknown = sorted(set(params) - set(default_params) - set(critical_params))
     if unknown:
         raise ValueError(F"run_step3_pod: params {unknown} are not options of the POD route - its keys are "
@@ -4597,9 +4601,42 @@ def run_step3_pod(params):
         raise ValueError("the numbers of POD block states change along the trajectory")
     nmo = nmo_list[0]
     nblk = len(nmo)
-    occupied = [int(o) for o in params['pod_occupied']]
-    if len(occupied) != nblk:
-        raise ValueError(F"pod_occupied lists {len(occupied)} blocks, the POD prints carry {nblk}")
+    # the electron pairs of every block: the NELECTRON prints of the step-2 log, pod_occupied where the log has none -
+    # a block with an odd count has a half-filled state in its aufbau order, its whole part is the doubly occupied set
+    log = sorted(glob.glob(params['logfile_directory'] + '/*.log'))[0]
+    homo = CP2K_methods.read_homo_index(log)
+    electrons = CP2K_methods.read_pod_block_electrons(log)
+    given = params['pod_occupied']
+    if electrons and all(e > 0 for e in electrons):
+        if len(electrons) != nblk:
+            raise ValueError(F"the step-2 log {log} prints {len(electrons)} POD blocks, the POD prints carry {nblk}")
+        if sum(electrons) != 2 * homo:
+            raise ValueError(F"the NELECTRON of the &BLOCK sections {electrons} sum to {sum(electrons)} electrons, the "
+                             F"neutral system of the step-2 log {log} has {2 * homo}")
+        pairs = [e / 2.0 for e in electrons]
+        if given is not None:
+            given = [float(o) for o in given]
+            if len(given) != nblk or any(abs(g - q) > 1e-9 for g, q in zip(given, pairs)):
+                raise ValueError(F"pod_occupied {params['pod_occupied']} does not match the electron pairs {pairs} of "
+                                 F"the &BLOCK sections of the step-2 log (NELECTRON {electrons}) - the log's counts "
+                                 F"define the doubly occupied block states, drop the key or give these values")
+    else:
+        if given is None:
+            raise ValueError(F"the step-2 log {log} prints the block electron counts {electrons} (the NELECTRON of "
+                             F"the &BLOCK sections, 0 = not set) - params['pod_occupied'] gives the electron pairs "
+                             F"of every block")
+        pairs = [float(o) for o in given]
+        if len(pairs) != nblk:
+            raise ValueError(F"pod_occupied lists {len(pairs)} blocks, the POD prints carry {nblk}")
+        if any(abs(2.0 * q - round(2.0 * q)) > 1e-9 for q in pairs):
+            raise ValueError(F"pod_occupied {given} - the electron pairs of a block are a whole or a half number")
+        if abs(sum(pairs) - homo) > 1e-9:
+            raise ValueError(F"pod_occupied {given} sums to {sum(pairs):g} electron pairs, the neutral system of the "
+                             F"step-2 log has {homo} occupied orbitals")
+        electrons = [int(round(2.0 * q)) for q in pairs]
+    occupied = [e // 2 for e in electrons]
+    odd = [f for f in range(nblk) if electrons[f] % 2]
+    pairs_record = [int(q) if float(q).is_integer() else q for q in pairs]
     per_block = params['num_occ_states_per_block']
     if per_block is None:
         per_block = list(occupied)
@@ -4611,17 +4648,13 @@ def run_step3_pod(params):
         raise ValueError(F"num_occ_states_per_block lists {len(per_block)} blocks, the POD prints carry {nblk}")
     for f in range(nblk):
         if not 0 <= per_block[f] <= occupied[f] <= nmo[f]:
-            raise ValueError(F"block {f}: 0 <= num_occ_states_per_block {per_block[f]} <= pod_occupied {occupied[f]} "
-                             F"<= {nmo[f]} block states is needed")
+            raise ValueError(F"block {f}: 0 <= num_occ_states_per_block {per_block[f]} <= the doubly occupied states "
+                             F"{occupied[f]} <= {nmo[f]} block states is needed")
     if sum(per_block) < 2:
         raise ValueError("the hole basis needs at least two block states")
     if not params['apply_phase_correction']:
         print("WARNING: apply_phase_correction False - the eigenvector signs of every frame are arbitrary, St_sd and "
               "Hvib_sd_im carry them and the couplings are not those of followed states")
-    homo = CP2K_methods.read_homo_index(sorted(glob.glob(params['logfile_directory'] + '/*.log'))[0])
-    if sum(occupied) != homo:
-        raise ValueError(F"pod_occupied {occupied} sums to {sum(occupied)} occupied block states, the neutral system "
-                         F"of the step-2 log has {homo} occupied orbitals")
     off = np.concatenate(([0], np.cumsum(nmo)))
     block_gap = {}
     for f in range(nblk):
@@ -4631,8 +4664,34 @@ def run_step3_pod(params):
             if min(gaps) <= 0.0:
                 raise ValueError(F"block {f}: the block state {occupied[f]} (first virtual) lies below the state "
                                  F"{occupied[f] - 1} (last occupied) at frame {frames[int(np.argmin(gaps))]} - "
-                                 F"pod_occupied does not sit at a gap of the block")
+                                 F"the doubly occupied count does not sit at a gap of the block")
             block_gap[str(f)] = float(min(gaps) * units.au2ev)
+    # an odd block's dangling state: the state with the strongest coupling to another odd block (the cut bond, eV
+    # scale) - inside the doubly occupied set the aufbau count would put a hole into it
+    dangling = {}
+    if odd:
+        h0, _ = _pod_route_frame(np.load(F'{res_dir_1}/POD_cp2k_hab_{frames[0]}.npz'))
+        for f in odd:
+            others = np.concatenate([np.arange(off[g], off[g + 1]) for g in odd if g != f])
+            V = np.abs(h0[off[f]:off[f + 1]][:, others])
+            i, j = np.unravel_index(int(np.argmax(V)), V.shape)
+            g = int(np.searchsorted(off, others[j], side='right') - 1)
+            partner = int(others[j] - off[g])
+            e_dangling = float(h0[off[f] + i, off[f] + i] * units.au2ev)
+            top = off[f] + occupied[f] - 1
+            above = float((h0[off[f] + i, off[f] + i] - h0[top, top]) * units.au2ev) if occupied[f] else None
+            dangling[str(f)] = {"state": int(i) + 1, "energy_eV": e_dangling, "above_occupied_eV": above,
+                                "coupling_eV": float(V[i, j] * units.au2ev), "partner_block": g,
+                                "partner_state": partner + 1}
+            if i < occupied[f]:
+                raise ValueError(F"block {f} has an odd electron count ({electrons[f]}): its dangling state {i + 1} "
+                                 F"(coupled {V[i, j] * units.au2ev:.2f} eV to state {partner + 1} of block {g}) lies "
+                                 F"inside its {occupied[f]} doubly occupied states - the aufbau count mis-assigns the "
+                                 F"half-filled state and the hole basis would hold the dangling state")
+            print(F"WARNING in run_step3_pod: block {f} has an odd electron count ({electrons[f]}) - its {occupied[f]} "
+                  F"lowest states are taken as doubly occupied, the dangling state {i + 1} of the cut bond lies "
+                  F"{'' if above is None else F'{above:.2f} eV above them '}at {e_dangling:.2f} eV, coupled "
+                  F"{V[i, j] * units.au2ev:.2f} eV to state {partner + 1} of block {g}")
 
     idx, frag, rank = _pod_route_hole_basis(nmo, occupied, per_block)
     n = len(idx)
@@ -4868,7 +4927,8 @@ def run_step3_pod(params):
     off_order = len(tracked)
     _write_diabatization_records(res_dir_2, 'hole', dia_index, pops_list, hole_list, energy_list, start_time,
                                  operator='pod_cp2k', basis='sd',
-                                 extra={"route": "pod_hamiltonian", "pod_occupied": occupied,
+                                 extra={"route": "pod_hamiltonian", "pod_occupied": pairs_record,
+                                        "block_electrons": electrons,
                                         "num_occ_states_per_block": per_block,
                                         "route_note": "the diabatic states are the occupied POD block states "
                                                       "themselves (the one-hole determinants of the cation), the "
@@ -4905,7 +4965,8 @@ def run_step3_pod(params):
                                             "edge_departures the states that left the basis of their block ([frame, "
                                             "state, kept, carried by the basis, the block state taken])"})
     report = {"frames": [start_time, finish_time], "n_states": n, "blocks": nblk, "block_states": nmo,
-              "pod_occupied": occupied, "num_occ_states_per_block": per_block,
+              "pod_occupied": pairs_record, "block_electrons": electrons, "odd_blocks": odd,
+              "dangling_states": dangling, "num_occ_states_per_block": per_block,
               "min_continuity": float(min(np.abs(np.diag(St)).min() for St in St_act)),
               "max_hole_minus_block_overlap": float(max(np.abs(St_hole[k] - St_act[k]).max()
                                                         for k in range(len(St_act)))),
