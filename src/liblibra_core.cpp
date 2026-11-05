@@ -315,8 +315,11 @@ BOOST_PYTHON_MODULE(liblibra_core){
   // chunks from several forked workers land interleaved mid-line, stderr unbuffered, every << piece its own write; line
   // buffering writes every line whole as it completes (set before the banner, the streams' first output - Python's own
   // sys.stdout and sys.stderr never touch these streams)
-  setvbuf(stdout, NULL, _IOLBF, 0);
-  setvbuf(stderr, NULL, _IOLBF, 0);
+  // own buffers: after python -u a setvbuf without one keeps glibc's one-byte buffer
+  static char libra_stdout_buf[1 << 16];
+  static char libra_stderr_buf[1 << 16];
+  setvbuf(stdout, libra_stdout_buf, _IOLBF, sizeof libra_stdout_buf);
+  setvbuf(stderr, libra_stderr_buf, _IOLBF, sizeof libra_stderr_buf);
 
   libra_print_banner();
 
