@@ -13,7 +13,7 @@ import threading
 
 
 class _WholeLines:
-    """sys.stdout of every libra process: a line goes out whole, in one write, when its newline arrives. print writes a
+    """sys.stdout and sys.stderr of every libra process: a line goes out whole, in one write, when its newline arrives. print writes a
     line in pieces (the text, the end), the forked pool workers of step 2, step 3 and the dynamics share the runner's
     stdout, and `python -u` makes it unbuffered - the pieces of several workers landed interleaved mid-line in the common
     log, and two threads of one process merged their lines. Each thread's pieces wait in its own buffer until the newline,
@@ -67,10 +67,14 @@ class _WholeLines:
         return getattr(self._stream, name)
 
 
-if sys.stdout is not None and not getattr(sys.stdout, "_libra_whole_lines", False):
-    sys.stdout = _WholeLines(sys.stdout)
-    atexit.register(sys.stdout.flush_all)
-    os.register_at_fork(after_in_child=sys.stdout._after_fork)
+for _name in ("stdout", "stderr"):
+    _stream = getattr(sys, _name)
+    if _stream is not None and not getattr(_stream, "_libra_whole_lines", False):
+        _wrapped = _WholeLines(_stream)
+        setattr(sys, _name, _wrapped)
+        atexit.register(_wrapped.flush_all)
+        os.register_at_fork(after_in_child=_wrapped._after_fork)
+del _name, _stream
 
 
 def __getattr__(name):
