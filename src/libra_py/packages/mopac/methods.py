@@ -545,7 +545,7 @@ def read_mopac_orbital_info(params_):
 MOPAC_COMPUTE_ADI_KEYS = frozenset(("MO_prev", "act_state", "atom_labels", "data_prev", "do_Lowdin", "energy_zero",
                                     "exe", "is_first_time", "mopac_input_prefix", "mopac_output_prefix",
                                     "mopac_run_params", "nelec_act_space", "nstates", "orbital_space",
-                                    "s_ci_inv_prev", "timestep", "working_directory_prefix"))
+                                    "s_ci_inv_prev", "se_pop_adi", "timestep", "working_directory_prefix"))
 def mopac_compute_adi(q, params, full_id):
     """
     Compute adiabatic-state energies, overlaps, time-overlaps, and vibronic

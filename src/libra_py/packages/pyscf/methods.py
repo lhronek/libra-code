@@ -56,7 +56,7 @@ PYSCF_COMPUTE_ADI_KEYS = frozenset(("act_state", "atom_labels", "basis", "charge
                                     "do_diabatic_state_reordering", "force_refresh", "force_rows", "force_source",
                                     "fragment_atom_lists", "is_first_time", "localized_carrier",
                                     "localized_excitations", "method", "nelecas", "norbcas", "nstates",
-                                    "occupancy_tolerance", "pod2gs_kept_block", "pyscf_obj", "timestep",
+                                    "occupancy_tolerance", "pod2gs_kept_block", "pyscf_obj", "se_pop_adi", "timestep",
                                     "working_directory_prefix"))
 def pyscf_compute_adi(q, params, full_id):
     """

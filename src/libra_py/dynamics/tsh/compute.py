@@ -1754,6 +1754,9 @@ def run_dynamics(dyn_var, _dyn_params, ham, compute_model, _model_params, rnd, i
                 index_st = index_st % nfiles
             model_params.update({"timestep": index, "timestep_st": index_st})
             model_params["act_state"] = { itraj : dyn_var.act_states[itraj] for itraj in range(ntraj)  } 
+            # the adiabatic populations the step propagates - the CP2K spin-flip driver weighs its lost states by them
+            C_adi = data_conv.MATRIX2nparray(dyn_var.get_ampl_adi())
+            model_params["se_pop_adi"] = {itraj: (np.abs(C_adi[:, itraj]) ** 2).tolist() for itraj in range(ntraj)}
 
 
             compute_dynamics(dyn_var, restrict(dyn_params, ENGINE_KEYS), ham, ham_aux, compute_model, model_params, rnd, therm)

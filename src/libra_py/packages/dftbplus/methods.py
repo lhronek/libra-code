@@ -2981,7 +2981,7 @@ DFTB_COMPUTE_ADI_KEYS = frozenset(("MO_prev", "_soi_excluded_by_couplings", "act
                                    "force_rows", "force_source", "is_first_time", "num_occ_alpha", "num_occ_beta",
                                    "num_occ_states", "num_unocc_alpha", "num_unocc_beta", "num_unocc_states",
                                    "odin_exe", "odin_max_ang_mom", "orbital_space", "read_forces", "s_ci_inv_prev",
-                                   "sd_capture_max_drop", "timestep", "working_directory_prefix"))
+                                   "sd_capture_max_drop", "se_pop_adi", "timestep", "working_directory_prefix"))
 def dftb_compute_adi(q, params, full_id):
     """
     Compute adiabatic electronic properties and derivative couplings for one trajectory

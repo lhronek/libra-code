@@ -5518,7 +5518,7 @@ def fill_adiabatic_hamiltonians(obj, E, st_ci, s_ci=None):
 CP2K_COMPUTE_ADI_NBRA_KEYS = frozenset(("MO_prev", "_nbra_last_input", "act_state", "atom_labels", "ci_threshold",
                                         "coordinates_prev", "data_prev", "is_first_time", "logfile_name",
                                         "lowest_orbital", "nelec_act_space", "nstates", "overlap_filename",
-                                        "s_ci_inv_prev", "time_overlap_filename", "timestep", "timestep_st",
+                                        "s_ci_inv_prev", "se_pop_adi", "time_overlap_filename", "timestep", "timestep_st",
                                         "working_directory_prefix"))
 def cp2k_compute_adi_nbra(q, params, full_id):
     """
@@ -6378,9 +6378,16 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     every root's force [default 0.05]
                 state_reordering_min_overlap (float): the continuity floor of the
                     manifold - a state of the previous step whose largest time
-                    overlap with this step's states lies below it refuses the
-                    step, the manifold changed its identity [default 1/sqrt(2),
-                    step 3's floor]
+                    overlap with this step's states lies below it is lost, the
+                    manifold changed its identity: the active state lost refuses
+                    the step, the inactive ones refuse above
+                    continuity_lost_pop_max [default 1/sqrt(2), step 3's floor]
+                continuity_lost_pop_max (float): the population (se_pop_adi) the
+                    lost inactive states may carry for the step to pass with a
+                    WARNING and a "continuity lost" line in spin-flip-record.txt -
+                    above it the step is refused, and so is every lost state when
+                    no populations were handed over [default 0: every lost state
+                    refuses]
                 carrier_reference (str): with spin_flip 1 and dia_basis
                     "fragment", required - "ground": the hole and the electron
                     of every excited root relative to the lowest one, which stays
@@ -6450,6 +6457,9 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     additionally sits on the 5e-2 print floor)
                                                              [default 1e-6]
                 act_state (dict itraj->int): synced by run_dynamics each step
+                se_pop_adi (dict itraj->list): the adiabatic populations of the step,
+                    synced by run_dynamics each step like act_state - read by the
+                    continuity check of the spin-flip branch
                 force_refresh (dict itraj->int): set by the engine's call-back after a hop
                     (hop_force_refresh) - the call hands back the new state's force at the
                     same geometry and nothing else, see _cp2k_force_refresh
@@ -6952,23 +6962,45 @@ def cp2k_compute_adi_impl(q, params, full_id):
         st_sd, _ = sd_overlaps(sd_states, St_in, Sp_in, Sc_in, orthonormalize=sd_orthon, kernel=sd_kernel,
                                cache=sd_cache)
         st_ci = T_prev.T @ st_sd @ T_curr
-        # a previous state without a continuation above state_reordering_min_overlap: the manifold changed identity
+        # a previous state without a continuation above state_reordering_min_overlap is lost: the active state lost refuses the
+        # step, an inactive one above continuity_lost_pop_max of its population (se_pop_adi), every one without the populations
+        lost_note = ""
         if not is_first_time:
             from libra_py.workflows.nbra import step3
             floor = float(params.get("state_reordering_min_overlap", step3.CONTINUITY_FLOOR))
             continuity = np.abs(st_ci).max(axis=1)
             partner = np.abs(st_ci).argmax(axis=1)
-            if (continuity < floor).any() or len(set(int(p) for p in partner)) < nstates:
-                k = int(np.argmin(continuity))
+            lost = [k for k in range(nstates) if continuity[k] < floor]
+            for p in sorted(set(int(x) for x in partner)):
+                claimants = sorted((k for k in range(nstates) if int(partner[k]) == p), key=lambda k: continuity[k])
+                lost += [k for k in claimants[:-1] if k not in lost]        # two states on one partner: the weaker has none
+            if lost:
+                lost = sorted(lost)
+                k = min(lost, key=lambda j: continuity[j])
                 E_prev = np.asarray(params["E_adi_last"][itraj], dtype=float)
-                raise ValueError(F"{wd} step {params.get('timestep', '?')}: the state {k} of the previous step "
-                                 F"({E_prev[k] * units.au2ev:.4f} eV) continues into no state of this step - its largest time "
-                                 F"overlap |<{k}|{int(partner[k])}>| = {continuity[k]:.3f} (state {int(partner[k])} at "
-                                 F"{E_adi_curr[int(partner[k])] * units.au2ev:.4f} eV) lies below state_reordering_min_overlap "
-                                 F"{floor:.4g}, the partners {partner.tolist()} - the manifold changed its identity: the roots "
-                                 F"{roots}, <S^2> {np.round(s2_all, 3).tolist()}"
-                                 + (F", the purified groups {[[r + 1 for r in p['roots']] for p in purified]}" if purified else "")
-                                 + " (spin-flip-record.txt) - a lower threshold lets the step through")
+                pops = params.get("se_pop_adi", {}).get(itraj)
+                lost_pop = None if pops is None else float(sum(float(pops[j]) for j in lost))
+                pop_max = float(params.get("continuity_lost_pop_max", 0.0))
+                what = (F"{wd} step {params.get('timestep', '?')}: the state {k} of the previous step "
+                        F"({E_prev[k] * units.au2ev:.4f} eV) continues into no state of this step - its largest time "
+                        F"overlap |<{k}|{int(partner[k])}>| = {continuity[k]:.3f} (state {int(partner[k])} at "
+                        F"{E_adi_curr[int(partner[k])] * units.au2ev:.4f} eV) lies below state_reordering_min_overlap "
+                        F"{floor:.4g}, the partners {partner.tolist()} - the manifold changed its identity: the roots "
+                        F"{roots}, <S^2> {np.round(s2_all, 3).tolist()}"
+                        + (F", the purified groups {[[r + 1 for r in p['roots']] for p in purified]}" if purified else "")
+                        + " (spin-flip-record.txt)")
+                if act_state in lost:
+                    raise ValueError(F"{what} - the active state {act_state} is among the lost states {lost}, its force "
+                                     F"would be another state's")
+                if lost_pop is None:
+                    raise ValueError(F"{what} - no populations handed over (se_pop_adi), every lost state refuses the step")
+                if lost_pop > pop_max:
+                    raise ValueError(F"{what} - the lost states {lost} carry the population {lost_pop:.4f}, above "
+                                     F"continuity_lost_pop_max {pop_max:g}")
+                print(F"WARNING cp2k_compute_adi_impl: {what} - the lost states {lost} carry the population {lost_pop:.4f}, "
+                      F"below continuity_lost_pop_max {pop_max:g}, the step passes", flush=True)
+                lost_note = (F"  continuity lost: states {lost}, the largest overlaps {np.round(continuity[lost], 3).tolist()}, "
+                             F"the population {lost_pop:.4f} below continuity_lost_pop_max {pop_max:g} - passed\n")
         sf_signs = np.ones(nstates)
         for k in range(nstates):
             if st_ci[k, k] < 0.0:
@@ -6996,6 +7028,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
                 if st["group"] is not None:
                     rec.write(F"  state {k} = roots {[r + 1 for r in st['roots']]} weights {np.round(st['weights'], 3).tolist()}  "
                               F"omega {st['omega'] * units.au2ev:9.4f} eV  <S^2> {st['s2']:.4f}  {st['cls']}\n")
+            if lost_note:
+                rec.write(lost_note)
     elif time_dependent:
         # ---------------- CI data, phase-consistent ----------------
         if params.get("ci_source", "namd_print") == "namd_print":
@@ -7578,7 +7612,8 @@ def _step_cached(params, itraj, key):
 CP2K_COMPUTE_ADI_KEYS = frozenset(("E_adi_last", "S_prev", "_ao_atom_map", "_step_results", "act_state",
                                    "align_mo_phases", "allow_negative_excitation_energy", "allow_unconverged_scf",
                                    "ao_overlap_method", "apply_orthonormalization", "atom_labels",
-                                   "carrier_reference", "ci_prev", "ci_source", "ci_threshold", "coordinates_prev",
+                                   "carrier_reference", "ci_prev", "ci_source", "ci_threshold", "continuity_lost_pop_max",
+                                   "coordinates_prev",
                                    "cp2k_data_dir", "cp2k_exe", "csr_chunk_rows", "dia_basis", "dia_basis_hvib",
                                    "dia_basis_max_drop", "dia_state", "diabatic_state_reordering_alpha",
                                    "diabatic_state_reordering_min_overlap", "diabatization_scheme",
@@ -7593,7 +7628,7 @@ CP2K_COMPUTE_ADI_KEYS = frozenset(("E_adi_last", "S_prev", "_ao_atom_map", "_ste
                                    "overlap_csr_write", "overlap_template", "parse_pool_workers",
                                    "pod2gs_kept_block", "prefetch_trajectories", "project", "retry_templates",
                                    "s2_high_spin_min", "s2_low_spin_max", "s_ihalf_prev", "sd_basis",
-                                   "sd_capture_max_drop", "sd_overlap_kernel", "sd_prev", "sd_state_ordering",
+                                   "sd_capture_max_drop", "sd_overlap_kernel", "sd_prev", "sd_state_ordering", "se_pop_adi",
                                    "sf_basis", "sf_eref", "sf_force_roots", "sf_omegas", "sf_prev", "sf_roots",
                                    "spin_flip", "spin_purify_min_weight", "spin_purify_window", "state_reordering_min_overlap",
                                    "time_dependent", "timestep", "working_directory_prefix"))

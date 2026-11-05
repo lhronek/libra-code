@@ -46,7 +46,7 @@ class tmp:
 
 
 RUN_PSI4_ADI_KEYS = frozenset(("charge", "grad_method_ex", "grad_method_gs", "labels", "nstates", "options",
-                               "spin_multiplicity", "verbosity"))
+                               "se_pop_adi", "spin_multiplicity", "verbosity"))
 def run_psi4_adi(q, params_, full_id):
     """
 
