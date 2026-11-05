@@ -176,7 +176,7 @@ def s2_spin_flip(X, n_alpha_occ, n_beta_occ, S_ab):
 def s2_spin_flip_matrix(X_list, n_alpha_occ, n_beta_occ, S_ab):
     """The excess-<S^2> matrix over the states X_list: <S_+ Psi_k | S_+ Psi_l> by the landing patterns of _s2_landing,
     every pattern's coefficients of the two states multiplied (the diagonal is s2_spin_flip) - s2_total on the
-    diagonal gives <S^2>, the off-diagonal elements the spin mixing of the pairs (purify_spin_mixtures)."""
+    diagonal gives <S^2>, the off-diagonal elements the spin mixing of the roots (purify_spin_mixtures)."""
     parts = [_s2_landing(X, n_alpha_occ, n_beta_occ, S_ab) for X in X_list]
     n = len(parts)
     M = np.zeros((n, n))
@@ -236,52 +236,61 @@ def s2_spin_flip_brute_matrix(X_list, n_alpha_occ, n_beta_occ, S_ab, threshold=1
 
 def purify_spin_mixtures(X_list, omegas, s2_matrix, window, mix_min=0.05):
     """The roots whose spin mixing the Davidson left in (a degenerate singlet and triplet pair delivered as two mixtures,
-    a singlet crossing a spin-incomplete root, S0 and the triplet mixing at the twist) rotated to the eigenvectors of
-    their excess-<S^2> block, pair by pair: the candidate pairs are every two roots within window of each other
-    coupled by |s2_matrix[k, l]| above mix_min - whatever their classes, a pair mixing below the class thresholds (a
-    "singlet" at 0.4 with a "triplet" at 1.6) included - the pairs are taken by decreasing |s2_matrix[k, l]|, a root in
-    one pair at most, and every pair is rotated, however small the mixing: a rotation threshold on the weight made the
-    energy jump by the weight times the gap when the mixing crossed it (the stage devel-261102: 22 - 134 meV steps of the
-    total energy), while the rotation itself is continuous in the geometry - the force floor on the weights is the
-    driver's (spin_purify_min_weight). Pairs, not larger groups:
-    a chain of weak couplings would spread the lowest eigenvector over roots far above and move its energy by tenths
-    of an eV from step to step. A state is a dict with X (the rotated amplitudes), omega (the expectation value
-    sum_k U_kj^2 omegas[k]), s2 (the excess eigenvalue), roots (the pair's 0-based roots), weights (U_kj^2 over them)
-    and pair (the pair's index, None for a root left alone). Returns the states in the order of their omega and the
-    list of purified pairs (roots, the excess eigenvalues, the weights) for the record."""
+    a singlet crossing a spin-incomplete root, S0 and the triplet mixing at the twist, the V character spread over three
+    roots on the hot ground state) rotated to the eigenvectors of their excess-<S^2> block, group by group: two roots are
+    coupled when they lie within window of each other and |s2_matrix[k, l]| exceeds mix_min - whatever their classes, a
+    pair mixing below the class thresholds (a "singlet" at 0.4 with a "triplet" at 1.6) included - a group is the
+    strongest coupled pair extended by every root coupled to all of its members (a clique of the coupling graph), the
+    groups are taken by decreasing coupling of their first pair, a root in one group at most, and every group is
+    rotated, however small the mixing: a rotation threshold on the weight makes the energy jump by the weight times the
+    gap when the mixing crosses it, while the rotation itself is continuous in the geometry - the force floor on the
+    weights is the driver's (spin_purify_min_weight). A clique, not a connected component: a chain of weak couplings
+    would spread the lowest eigenvector over roots far above and move its energy by tenths of an eV from step to step.
+    Not pairs alone: three mutually coupled roots sharing one singlet leave a pair's eigenvector contaminated and flip
+    the pairing when the strongest coupling changes hands (the V state at an excess 0.34, its time overlap 0.66 at the
+    flip). A state is a dict with X (the rotated amplitudes), omega (the expectation value sum_k U_kj^2 omegas[k]), s2
+    (the excess eigenvalue), roots (the group's 0-based roots), weights (U_kj^2 over them) and group (the group's index,
+    None for a root left alone). Returns the states in the order of their omega and the list of purified groups (roots,
+    the excess eigenvalues, the weights) for the record."""
     omegas = np.asarray(omegas, dtype=float)
     n = len(X_list)
-    candidates = set()
-    for k in range(n):
-        for l in range(k + 1, n):
-            if abs(s2_matrix[k, l]) > mix_min and abs(omegas[k] - omegas[l]) < window:
-                candidates.add((abs(s2_matrix[k, l]), k, l))
+
+    def coupled(k, l):
+        return abs(s2_matrix[k, l]) > mix_min and abs(omegas[k] - omegas[l]) < window
+    edges = sorted(((abs(s2_matrix[k, l]), k, l) for k in range(n) for l in range(k + 1, n) if coupled(k, l)), reverse=True)
     used = set()
-    pairs = []
-    for _, k, l in sorted(candidates, reverse=True):
+    groups = []
+    for _, k, l in edges:
         if k in used or l in used:
             continue
-        used.update((k, l))
-        pairs.append((k, l))
+        group = [k, l]
+        # the unused roots coupled to every member join, the strongest first, each checked against the grown group
+        joiners = sorted(((min(abs(s2_matrix[m, j]) for j in group), m) for m in range(n)
+                          if m not in used and m not in group and all(coupled(m, j) for j in group)), reverse=True)
+        for _, m in joiners:
+            if all(coupled(m, j) for j in group):
+                group.append(m)
+        used.update(group)
+        groups.append(sorted(group))
     states, purified = [], []
 
     def single(k):
         return {"X": np.asarray(X_list[k], dtype=float), "omega": float(omegas[k]), "s2": float(s2_matrix[k, k]),
-                "roots": [k], "weights": [1.0], "pair": None}
+                "roots": [k], "weights": [1.0], "group": None}
     for k in range(n):
         if k not in used:
             states.append(single(k))
-    for k, l in pairs:
-        block = np.array([[s2_matrix[k, k], s2_matrix[k, l]], [s2_matrix[l, k], s2_matrix[l, l]]])
+    for group in groups:
+        block = np.array([[s2_matrix[a, b] for b in group] for a in group], dtype=float)
         vals, U = np.linalg.eigh(0.5 * (block + block.T))
         gi = len(purified)
-        for j in range(2):
+        for j in range(len(group)):
             w = U[:, j] ** 2
-            X_new = U[0, j] * np.asarray(X_list[k], dtype=float) + U[1, j] * np.asarray(X_list[l], dtype=float)
-            states.append({"X": X_new, "omega": float(w[0] * omegas[k] + w[1] * omegas[l]), "s2": float(vals[j]),
-                           "roots": [k, l], "weights": [float(w[0]), float(w[1])], "pair": gi})
-        purified.append({"roots": [k, l], "s2": [float(v) for v in vals],
-                         "weights": [[float(v) for v in U[:, j] ** 2] for j in range(2)]})
+            X_new = sum(U[i, j] * np.asarray(X_list[r], dtype=float) for i, r in enumerate(group))
+            states.append({"X": X_new, "omega": float(np.dot(w, omegas[group])), "s2": float(vals[j]),
+                           "roots": list(group), "weights": [float(v) for v in w], "group": gi})
+        purified.append({"roots": list(group), "s2": [float(v) for v in vals],
+                         "weights": [[float(v) for v in U[:, j] ** 2] for j in range(len(group))]})
     states.sort(key=lambda s: s["omega"])
     return states, purified
 

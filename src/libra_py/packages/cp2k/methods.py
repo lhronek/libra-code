@@ -6363,10 +6363,12 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     the two bounds a spin-incomplete mixture, in no manifold
                 spin_purify_window (float, Ha): two roots coupled by their
                     excess-<S^2> matrix element within this energy are rotated
-                    as a pair to the eigenvectors of their 2 x 2 block
-                    (purify_spin_mixtures, the pairs taken by decreasing
-                    coupling, a root in one pair at most, every pair rotated) -
-                    a rotated state's energy is the roots' weighted one
+                    to the eigenvectors of their block, a group being the
+                    strongest coupled pair with every root coupled to all of
+                    its members (purify_spin_mixtures, the groups taken by
+                    decreasing coupling, a root in one group at most, every
+                    group rotated) - a rotated state's energy is the roots'
+                    weighted one
                     [default 2 eV: the spin-incomplete root of ethylene mixes
                     into the V state from 1.3 eV above it]
                 spin_purify_min_weight (float): the force floor of a rotated
@@ -6898,7 +6900,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
         if len(low) < nstates:
             raise ValueError(F"{wd} step {params.get('timestep', '?')}: {len(low)} {low_name} states among the "
                              F"{nroots} spin-flip roots (<S^2> {np.round(s2_all, 3).tolist()}"
-                             + (F", the purified pairs {[[r + 1 for r in p['roots']] for p in purified]} -> "
+                             + (F", the purified groups {[[r + 1 for r in p['roots']] for p in purified]} -> "
                                 F"{[np.round(p['s2'], 3).tolist() for p in purified]}" if purified else "")
                              + F") for {nstates} states - raise number_of_states")
         manifold = low[:nstates]
@@ -6965,7 +6967,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
                                  F"{E_adi_curr[int(partner[k])] * units.au2ev:.4f} eV) lies below state_reordering_min_overlap "
                                  F"{floor:.4g}, the partners {partner.tolist()} - the manifold changed its identity: the roots "
                                  F"{roots}, <S^2> {np.round(s2_all, 3).tolist()}"
-                                 + (F", the purified pairs {[[r + 1 for r in p['roots']] for p in purified]}" if purified else "")
+                                 + (F", the purified groups {[[r + 1 for r in p['roots']] for p in purified]}" if purified else "")
                                  + " (spin-flip-record.txt) - a lower threshold lets the step through")
         sf_signs = np.ones(nstates)
         for k in range(nstates):
@@ -6991,7 +6993,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
                 rec.write(F"  purified roots {[r + 1 for r in p['roots']]} -> <S^2> {np.round(p['s2'], 3).tolist()}  "
                           F"weights {[np.round(w, 3).tolist() for w in p['weights']]}\n")
             for k, st in enumerate(manifold):
-                if st["pair"] is not None:
+                if st["group"] is not None:
                     rec.write(F"  state {k} = roots {[r + 1 for r in st['roots']]} weights {np.round(st['weights'], 3).tolist()}  "
                               F"omega {st['omega'] * units.au2ev:9.4f} eV  <S^2> {st['s2']:.4f}  {st['cls']}\n")
     elif time_dependent:
