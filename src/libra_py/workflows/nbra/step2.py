@@ -489,6 +489,31 @@ def translational_vectors_of(params):
     return CP2K_methods.generate_translational_vectors([0, 0, 0], params["periodic_images"], params["periodicity_type"])
 
 
+def collect_leftovers(params):
+    """Collect what the per-step collectors left (a run stopped between a CP2K run and its collection, the last step's
+    cubes, the restart files) by the names step 2 writes: the CP2K logs, the generated overlap input and the orbital
+    images move into their folders, the restart files and (remove_cube) the cube files go - the launcher's run.log and a
+    user's image, wfn or cube in the working directory stay. Python moves, not a shell glob: `mv *.log` over the files
+    of a long run exceeds the kernel's argument limit (2 MB, about 100 000 names) and os.system would hide its failure.
+    """
+    for f in sorted(glob.glob("OUT-ot_*.log") + glob.glob("OUT-diag_*.log") + glob.glob("step_*.log")):
+        if os.path.isfile(f):
+            shutil.move(f, os.path.join(params["all_logfiles"], f))
+    if os.path.isfile("overlap_deltat_auto.inp"):
+        shutil.move("overlap_deltat_auto.inp", os.path.join(params["all_inpfiles"], "overlap_deltat_auto.inp"))
+    ext = params["image_format"].lower()
+    for f in sorted(set(glob.glob(F"Diag_libra-*-*.{ext}") + glob.glob(F"Diag_*-*.{ext}"))):
+        if os.path.isfile(f):
+            shutil.move(f, os.path.join(params["all_images"], f))
+    for f in sorted(set(glob.glob("OT_*-RESTART*") + glob.glob("Diag_*-RESTART*"))):
+        if os.path.isfile(f):
+            os.remove(f)
+    if params["remove_cube"]:
+        for f in sorted(set(glob.glob("Diag_libra-*-WFN_*.cube") + glob.glob("Diag_*-WFN_*.cube"))):
+            if os.path.isfile(f):
+                os.remove(f)
+
+
 def run_cp2k_libint_step2(params):
     """
     This function runs the step2 for computing the MO overlaps for both DFT and xTB calculations and saves them as sparse
@@ -1481,22 +1506,5 @@ def run_cp2k_libint_step2(params):
         CP2K_methods.collect_inp_files(step, params["all_inpfiles"])
         CP2K_methods.collect_xyz_files(step, params["all_xyzfiles"])
         CP2K_methods.collect_log_files(step, params["all_logfiles"])
-    # the sweeps of what the per-step collectors left - a run stopped between a CP2K run and its collection, the last
-    # step's cubes, the restart files; python moves, not a shell glob: a `mv *.log` over the files of a long run exceeds the
-    # kernel's argument limit (2 MB here, about 100 000 names) and os.system would hide its failure
-    for f in sorted(glob.glob("*.log")):
-        if os.path.isfile(f):
-            shutil.move(f, os.path.join(params["all_logfiles"], f))
-    if os.path.isfile("overlap_deltat_auto.inp"):
-        shutil.move("overlap_deltat_auto.inp", os.path.join(params["all_inpfiles"], "overlap_deltat_auto.inp"))
-    for f in sorted(glob.glob(F'*{params["image_format"].lower()}')):
-        if os.path.isfile(f):
-            shutil.move(f, os.path.join(params["all_images"], f))
-    for f in glob.glob("*.wfn*") + glob.glob("*.tdwfn*"):
-        if os.path.isfile(f):
-            os.remove(f)
-    if params["remove_cube"]:
-        for f in glob.glob("*.cube"):
-            if os.path.isfile(f):
-                os.remove(f)
+    collect_leftovers(params)
     print('Done with the job!!!')
