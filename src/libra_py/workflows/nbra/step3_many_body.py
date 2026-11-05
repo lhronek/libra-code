@@ -52,6 +52,12 @@ from . import mapping, step2_many_body, step3, step4
 
 #######################################################################################
 # Helper functions
+def get_step2_mb_sp_files(params, step):
+    """the files get_step2_mb_sp_properties reads for one step (step2_many_body.excitation_analysis_files) - a test that
+    replaces the reader by synthetic properties replaces this one beside it"""
+    return step2_many_body.excitation_analysis_files(params, step)
+
+
 def get_step2_mb_sp_properties(_params):
     """
     This function extracts information from es output files. It currently works for

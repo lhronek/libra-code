@@ -135,6 +135,17 @@ def normalize_ci_coefficients(ci_coefficients_raw_unnorm):
     return ci_coefficients_raw_norm
 
 
+def excitation_analysis_files(params, step):
+    """the files get_excitation_analysis_output reads for one step: the TD-DFT log of cp2k and gaussian, the TRA file of
+    dftb+ - the step-range clipping of step 3 checks them before the reader runs"""
+    logfile_directory = params.get("logfile_directory", "logfiles")
+    es_software = params.get("es_software", "cp2k")
+    names = {"cp2k": F"step_{step}.log", "gaussian": F"step_{step}.log", "dftb+": F"TRA_{step}.DAT"}
+    if es_software not in names:
+        raise ValueError(F"es_software {es_software!r} has no excitation-analysis reader - cp2k, gaussian and dftb+ are implemented")
+    return [F"{logfile_directory}/{names[es_software]}"]
+
+
 def get_excitation_analysis_output(params):
     """
     This function reads the information of the excited states from the log file of the single point calculations.
@@ -177,7 +188,7 @@ def get_excitation_analysis_output(params):
 
     if es_software == "cp2k":
 
-        logfile_name = F"{logfile_directory}/step_{curr_step}.log"
+        logfile_name = excitation_analysis_files(params, curr_step)[0]
         params.update({"logfile_name": logfile_name})
         # Extract the excitation energies and their configurations from the output file.
         # this chain and its consumers expect the master 4-tuple with eV, whichever form the reader returned
@@ -188,14 +199,14 @@ def get_excitation_analysis_output(params):
 
     elif es_software == "gaussian":
 
-        logfile_name = F"{logfile_directory}/step_{curr_step}.log"
+        logfile_name = excitation_analysis_files(params, curr_step)[0]
         params.update({"logfile_name": logfile_name})
         excitation_energies, ci_basis_raw, ci_coefficients_raw_unnorm, spin_components = \
             Gaussian_methods.read_gaussian_tddft_log_file(restrict(params, Gaussian_methods.READ_TDDFT_LOG_KEYS))
 
     elif es_software == "dftb+":
 
-        logfile_name = F"{logfile_directory}/TRA_{curr_step}.DAT"
+        logfile_name = excitation_analysis_files(params, curr_step)[0]
         params.update({"logfile_name": logfile_name})
         excitation_energies, ci_basis_raw, ci_coefficients_raw_unnorm, spin_components = \
             DFTB_methods.read_dftbplus_TRA_file(restrict(params, DFTB_methods.READ_TRA_FILE_KEYS))

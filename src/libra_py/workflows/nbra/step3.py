@@ -5248,15 +5248,12 @@ def run_step3_sd_nacs_libint(params):
     if str(params['localized_carrier']) != 'none':
         prefix, nfrag = _fragment_operator_prefix(params, params['path_to_npz_files'], start_time)
         frag_prefixes = [F'{prefix}{f}_ks' for f in range(nfrag)]
-    # the many-body basis reads the TD-DFT output of every step (step2_many_body.get_excitation_analysis_output)
-    mb_log = {'cp2k': 'step_{}.log', 'gaussian': 'step_{}.log', 'dftb+': 'TRA_{}.DAT'}.get(params['es_software'].lower()) \
-        if params['is_many_body'] else None
-
+    # the many-body basis reads a TD-DFT output per step - its reader names the files (step3_many_body.get_step2_mb_sp_files)
     def sd_step_files(s):
         names = [F'{p}_{s}.npz' for p in ['S_ks', 'E_ks'] + frag_prefixes] + ([F'St_ks_{s - 1}.npz'] if s > start_time else [])
         paths = [F'{params["path_to_npz_files"]}/{name}' for name in names]
-        if mb_log is not None:
-            paths.append(F'{params["logfile_directory"]}/{mb_log.format(s)}')
+        if params['is_many_body']:
+            paths += step3_many_body.get_step2_mb_sp_files(params, s)
         return paths
     finish_time = data_read.clip_step_range(start_time, finish_time, sd_step_files, 'run_step3_sd_nacs_libint')
     params['finish_time'] = finish_time
