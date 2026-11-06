@@ -626,12 +626,6 @@ def wf_calc_nD(_params):
     # Define which timesteps to calculate the wf for...
     snaps = params['snaps']
 
-    # Open directory with coeffs, q, p, a, s data...
-    qfile = open(prefix + "/q.txt")
-    pfile = open(prefix + "/p.txt")
-    afile = open(prefix + "/a.txt")
-    cfile = open(prefix + "/coeffs.txt")
-
     # Make the output directory...
     if not os.path.isdir(prefix + "/wfc"):
         os.mkdir(prefix + "/wfc")
@@ -659,10 +653,12 @@ def wf_calc_nD(_params):
         wfpts.append(coords)
 
     # Read the trajectory data and compute the wf on the mesh...
-    Qdata = qfile.readlines()
-    Pdata = pfile.readlines()
-    Adata = afile.readlines()
-    Coeff = cfile.readlines()
+    with open(prefix + "/q.txt") as qfile, open(prefix + "/p.txt") as pfile, open(prefix + "/a.txt") as afile, \
+            open(prefix + "/coeffs.txt") as cfile:
+        Qdata = qfile.readlines()
+        Pdata = pfile.readlines()
+        Adata = afile.readlines()
+        Coeff = cfile.readlines()
 
     for isnap in snaps:
         qdata = Qdata[isnap].strip().split()
@@ -671,41 +667,41 @@ def wf_calc_nD(_params):
         coeffs = Coeff[isnap].strip().split()
 
         # print(len(coeffs), F"nstates = {nstates}, ntraj = {ntraj}  isnap = {isnap}")
-        outfile = open(F"{prefix}/wfc/{data_type1}_snap_{isnap}_{data_type2}_{data_type3}", "w")
+        with open(F"{prefix}/wfc/{data_type1}_snap_{isnap}_{data_type2}_{data_type3}", "w") as outfile:
 
-        for pt in wfpts:
-            for nn in pt:
-                outfile.write(str(nn) + " ")
+            for pt in wfpts:
+                for nn in pt:
+                    outfile.write(str(nn) + " ")
 
-            idata = 0
-            for state in range(nstates):
-                wf = 0 + 0j
-                for j in range(ntraj):
-                    re_indx = 2 * ntraj * state + 2 * j + 0
-                    im_indx = 2 * ntraj * state + 2 * j + 1
+                idata = 0
+                for state in range(nstates):
+                    wf = 0 + 0j
+                    for j in range(ntraj):
+                        re_indx = 2 * ntraj * state + 2 * j + 0
+                        im_indx = 2 * ntraj * state + 2 * j + 1
 
-                    # print(F" state = {state}, traj = {j}, re_indx = {re_indx}, im_indx = {im_indx}")
+                        # print(F" state = {state}, traj = {j}, re_indx = {re_indx}, im_indx = {im_indx}")
 
-                    re = float(coeffs[re_indx])
-                    im = float(coeffs[im_indx])
+                        re = float(coeffs[re_indx])
+                        im = float(coeffs[im_indx])
 
-                    coeff = complex(re, im)
+                        coeff = complex(re, im)
 
-                    # coeff = complex(float(coeffs[2*(state*ntraj+j) ]), float(coeffs[2*(state*ntraj+j)+1]))
+                        # coeff = complex(float(coeffs[2*(state*ntraj+j) ]), float(coeffs[2*(state*ntraj+j)+1]))
 
-                    gaus = 1.0 + 0.0j
-                    for dof in range(ndof):
-                        qj = float(qdata[idata])
-                        pj = float(pdata[idata])
-                        aj = float(adata[idata])
-                        idata += 1
+                        gaus = 1.0 + 0.0j
+                        for dof in range(ndof):
+                            qj = float(qdata[idata])
+                            pj = float(pdata[idata])
+                            aj = float(adata[idata])
+                            idata += 1
 
-                        q = pt[dof]
-                        gaus *= (aj / np.pi)**0.25 * np.exp(-0.5 * aj * (q - qj)**2 + complex(0.0, pj * (q - qj)))
+                            q = pt[dof]
+                            gaus *= (aj / np.pi)**0.25 * np.exp(-0.5 * aj * (q - qj)**2 + complex(0.0, pj * (q - qj)))
 
-                    wf += coeff * gaus
-                outfile.write(str(abs(wf)**2) + " ")
-            outfile.write("\n")
+                        wf += coeff * gaus
+                    outfile.write(str(abs(wf)**2) + " ")
+                outfile.write("\n")
 
 
 def run_qtag(_q, _p, _alp, _s, _states, _coeff, _iM, _dyn_params, _compute_model, _model_params):
