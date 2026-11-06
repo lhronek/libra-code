@@ -129,7 +129,7 @@ boost::python::list is_repeating(vector<int>& A){
 */
   int res = 0;
   int sz = A.size();
-  int reap;
+  int reap = -1;   // no repeating element
 
   for(int i=0;i<sz-1;i++){
     vector<int> tmp = std::vector<int>(A.begin()+i+1,A.end());
