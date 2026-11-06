@@ -1203,6 +1203,7 @@ def plot_dyn(plot_params):
         which_dia_states ( list of ints ) : indices of the diabatic states to print [ default: [0] ]
         colors ( dictionary ): the definition of the colors to use
         clrs_index ( list of strings ) : defines the mapping of the colors on integers and vice versa
+        do_show ( int ): 1 - show every figure, 0 - save them alone [ default: 1 ]
 
     See in the ```dynamics_hdf5.py``` file for the data sets available
 
@@ -1233,7 +1234,7 @@ def plot_dyn(plot_params):
     default_params = {"prefix": "out", "filename": "data.hdf", "output_level": 3,
                       "which_trajectories": [0], "which_dofs": [0],
                       "which_adi_states": [0], "which_dia_states": [0],
-                      "colors": colors, "clrs_index": clrs_index
+                      "colors": colors, "clrs_index": clrs_index, "do_show": 1
                       }
     warn_unknown_keys(plot_params, TSH_PLOT_KEYS, "plot_dyn", "plot_params", "the TSH plots do not read")
     comn.check_input(plot_params, default_params, critical_params)
@@ -1247,11 +1248,16 @@ def plot_dyn(plot_params):
     which_dia_states = plot_params["which_dia_states"]
     colors = plot_params["colors"]
     clrs_index = plot_params["clrs_index"]
+    do_show = plot_params["do_show"]
 
     out_prefix = prefix
 
     def _save(name):
         plt.savefig(F"{out_prefix}/{name}.{fmt}", dpi=300)
+
+    def _done():
+        if do_show:
+            plt.show()
 
     with open_hdf5(F"{prefix}/{filename}", 'r') as f:
 
@@ -1281,7 +1287,7 @@ def plot_dyn(plot_params):
             plt.plot(t, _dataset(f, "dEtot_ave")[:], label="Total energy", linewidth=2, color=colors["31"])
 
             _save("t-en")
-            plt.show()
+            _done()
 
         if output_level >= 2:
 
@@ -1302,7 +1308,7 @@ def plot_dyn(plot_params):
                 plt.plot(t, S[:, tr], label="", linewidth=2, color=colors["11"])
 
             _save("t-state_indices")
-            plt.show()
+            _done()
 
         if output_level >= 3:
 
@@ -1346,7 +1352,7 @@ def plot_dyn(plot_params):
                 plt.plot(t, Ddia[:, istate, istate].real, label=F"state {istate}", linewidth=2, color=_color(colors, clrs_index, indx))
 
             _save("t-pops")
-            plt.show()
+            _done()
 
         if output_level >= 3:
 
@@ -1380,7 +1386,7 @@ def plot_dyn(plot_params):
                     plt.plot(Q[:, k, idof - dsel.start], P[:, k, idof - dsel.start], label="", linewidth=2, color=_color(colors, clrs_index, indx))
 
             _save("t-q-p")
-            plt.show()
+            _done()
 
         if output_level >= 4:
 
@@ -1416,7 +1422,7 @@ def plot_dyn(plot_params):
                     plt.plot(t, Edia[:, k, indx], label="", linewidth=2, color=_color(colors, clrs_index, indx))
 
             _save("t-hvib")
-            plt.show()
+            _done()
 
         if output_level >= 4:
 
@@ -1450,7 +1456,7 @@ def plot_dyn(plot_params):
                     plt.plot(t, Pr[:, k, indx], label="", linewidth=2, color=_color(colors, clrs_index, indx))
 
             _save("St-projector")
-            plt.show()
+            _done()
 
         if output_level >= 4:
 
@@ -1475,7 +1481,7 @@ def plot_dyn(plot_params):
                     plt.plot(t, U[:, k, indx], label="", linewidth=2, color=_color(colors, clrs_index, indx))
 
             _save("basis_transform")
-            plt.show()
+            _done()
 
         plt.close()
 
