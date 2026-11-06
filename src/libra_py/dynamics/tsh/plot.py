@@ -237,9 +237,10 @@ def _color(colors, clrs_index, indx):
 
 
 def _legend(plt, fontsize):
-    """The legend of the current axes - none without a labeled curve (no_label 1, nothing drawn)."""
+    """The legend of the current axes - none without a labeled curve (no_label 1, nothing drawn), and out of the tight
+    layout: a legend of many curves would squeeze the plot area and still not fit."""
     if plt.gca().get_legend_handles_labels()[1]:
-        plt.legend(fontsize=fontsize)
+        plt.legend(fontsize=fontsize).set_in_layout(False)
 
 
 def add_energies(plt, hdf_file, plot_params_, property_type):
