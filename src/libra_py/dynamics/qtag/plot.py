@@ -489,6 +489,6 @@ def trajectories(_plt_params):
 
         ax.axes.set_xlim(xlimits[0], xlimits[1])
         ax.axes.set_ylim(ylimits[0], ylimits[1])
-        ax.text(6, 6.5, labels[state], fontsize=12)
+        ax.text(0.6, 0.8, labels[state], fontsize=12, transform=ax.transAxes)    # axes coordinates: a data position lies outside another run's range
 
     plt.tight_layout()
