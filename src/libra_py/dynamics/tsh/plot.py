@@ -1049,186 +1049,133 @@ def plot_dynamics(plot_params_):
     def _save(name):
         plt.savefig(F"{out_prefix}/{name}.{fmt}", dpi=plot_params["dpi"])
 
+    def _figure(num):
+        plt.close(num)       # the figure of an earlier call with this number would keep its size and its curves
+        plt.figure(num=num, figsize=plot_params["figsize"], dpi=plot_params["dpi"], edgecolor='black',
+                   frameon=plot_params["frameon"])
+        plt.subplot(1, 1, 1)
+
+    def _done(name, res):
+        if plot_params["save_figures"] == 1 and res == 1:
+            _save(name)
+
     with open_hdf5(F"{prefix}/{filename}", 'r') as f:
 
         # ===== Energy Components vs. Time =========
         if "energies" in what_to_plot:
-            plt.figure(num=1, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(1)
             res = add_energies(plt, f, plot_params, "energies")
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("average_energies-vs-t")
+            _done("average_energies-vs-t", res)
 
         # ===== Energy Components Fluctuations vs. Time =========
         if "energy_fluctuations" in what_to_plot:
-            plt.figure(num=2, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(2)
             res = add_energies(plt, f, plot_params, "energy_fluctuations")
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("average_energy_fluctuations-vs-t")
+            _done("average_energy_fluctuations-vs-t", res)
 
         # ===== Coordinates vs Time  =========
         if "coordinates" in what_to_plot:
-            plt.figure(num=3, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(3)
             res = add_cooordinates_vs_t(plt, f, plot_params)
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("q-vs-t")
+            _done("q-vs-t", res)
 
         # ===== Momenta vs Time  =========
         if "momenta" in what_to_plot:
-            plt.figure(num=4, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(4)
             res = add_momenta_vs_t(plt, f, plot_params)
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("p-vs-t")
+            _done("p-vs-t", res)
 
         # ===== Forces vs Time  =========
         if "forces" in what_to_plot:
-            plt.figure(num=5, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(5)
             res = add_forces_vs_t(plt, f, plot_params)
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("f-vs-t")
+            _done("f-vs-t", res)
 
         # ===== Phase space  =========
         if "phase_space" in what_to_plot:
-            plt.figure(num=6, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(6)
             res = add_phase_space(plt, f, plot_params)
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("phase_space")
+            _done("phase_space", res)
 
         # ====== Populations of all kinds ================
         if "se_pop_adi" in what_to_plot:
-            plt.figure(num=7, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(7)
             res = add_populations(plt, f, plot_params_, "se_pop_adi")
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("se_pop_adi")
+            _done("se_pop_adi", res)
 
         if "se_pop_dia" in what_to_plot:
-            plt.figure(num=8, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(8)
             res = add_populations(plt, f, plot_params_, "se_pop_dia")
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("se_pop_dia")
+            _done("se_pop_dia", res)
 
         if "sh_pop_adi" in what_to_plot:
-            plt.figure(num=9, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(9)
             res = add_populations(plt, f, plot_params_, "sh_pop_adi")
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("sh_pop_adi")
+            _done("sh_pop_adi", res)
 
         if "sh_pop_dia" in what_to_plot:
-            plt.figure(num=10, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(10)
             res = add_populations(plt, f, plot_params_, "sh_pop_dia")
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("sh_pop_dia")
+            _done("sh_pop_dia", res)
 
         if "mash_pop_adi" in what_to_plot:
-            plt.figure(num=11, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(11)
             res = add_populations(plt, f, plot_params_, "mash_pop_adi")
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("mash_pop_adi")
+            _done("mash_pop_adi", res)
 
         if "mash_pop_dia" in what_to_plot:
-            plt.figure(num=12, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(12)
             res = add_populations(plt, f, plot_params_, "mash_pop_dia")
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("mash_pop_dia")
+            _done("mash_pop_dia", res)
 
         if "sh_pop_adi_TR" in what_to_plot:
-            plt.figure(num=13, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(13)
             res = add_populations(plt, f, plot_params_, "sh_pop_adi_TR")
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("sh_pop_adi_TR")
+            _done("sh_pop_adi_TR", res)
 
         if "sh_pop_dia_TR" in what_to_plot:
-            plt.figure(num=14, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(14)
             res = add_populations(plt, f, plot_params_, "sh_pop_dia_TR")
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("sh_pop_dia_TR")
+            _done("sh_pop_dia_TR", res)
 
         # ====== Coherences ================
         if "coherence_adi" in what_to_plot:
-            plt.figure(num=15, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(15)
             res = add_coherence_indicators(plt, f, plot_params_, "coherence_adi")
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("coherence_adi")
+            _done("coherence_adi", res)
 
         if "coherence_dia" in what_to_plot:
-            plt.figure(num=16, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(16)
             res = add_coherence_indicators(plt, f, plot_params_, "coherence_dia")
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("coherence_dia")
+            _done("coherence_dia", res)
 
         # ===== Trajectory-resolved adiabatic energies =========
         if "traj_resolved_adiabatic_ham" in what_to_plot:
-            plt.figure(num=17, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(17)
             res = add_trajectory_resolved_ham_property(plt, f, plot_params, "hvib_adi")
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("hvib_adi")
+            _done("hvib_adi", res)
 
         if "traj_resolved_diabatic_ham" in what_to_plot:
-            plt.figure(num=18, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(18)
             res = add_trajectory_resolved_ham_property(plt, f, plot_params, "hvib_dia")
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("hvib_dia")
+            _done("hvib_dia", res)
 
         # ===== Time-overlaps and projectors =========
         if "time_overlaps" in what_to_plot:
-            plt.figure(num=19, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(19)
             res = add_time_overlaps_projectors(plt, f, plot_params, "St")
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("time_overlaps")
+            _done("time_overlaps", res)
 
         if "projector" in what_to_plot:
-            plt.figure(num=20, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(20)
             res = add_time_overlaps_projectors(plt, f, plot_params, "projector")
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("projectors")
+            _done("projectors", res)
 
         # ===== Basis transforms =========
         if "basis_transform" in what_to_plot:
-            plt.figure(num=21, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(21)
             res = add_basis_transform(plt, f, plot_params)
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("basist_transform-vs-t")
+            _done("basist_transform-vs-t", res)
 
         if do_show:
             plt.show()
@@ -2227,70 +2174,59 @@ def plot_dynamics_xf(plot_params_):
     def _save(name):
         plt.savefig(F"{out_prefix}/{name}.{fmt}", dpi=plot_params["dpi"])
 
+    def _figure(num):
+        plt.close(num)       # the figure of an earlier call with this number would keep its size and its curves
+        plt.figure(num=num, figsize=plot_params["figsize"], dpi=plot_params["dpi"], edgecolor='black',
+                   frameon=plot_params["frameon"])
+        plt.subplot(1, 1, 1)
+
+    def _done(name, res):
+        if plot_params["save_figures"] == 1 and res == 1:
+            _save(name)
+
     with open_hdf5(F"{prefix}/{filename}", 'r') as f:
 
         # ===== Coordinates vs Time  =========
         if "q_aux" in what_to_plot:
-            plt.figure(num=1, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(1)
             res = add_cooordinates_aux_vs_t(plt, f, plot_params)
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("q_aux-vs-t")
+            _done("q_aux-vs-t", res)
 
         # ===== Momenta vs Time  =========
         if "p_aux" in what_to_plot:
-            plt.figure(num=2, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(2)
             res = add_momenta_aux_vs_t(plt, f, plot_params)
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("p_aux-vs-t")
+            _done("p_aux-vs-t", res)
 
         # ===== Spatial derivaties of the Phase vs Time  =========
         if "nab_phase" in what_to_plot:
-            plt.figure(num=3, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(3)
             res = add_nab_phase_vs_t(plt, f, plot_params)
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("nab_phase-vs-t")
+            _done("nab_phase-vs-t", res)
 
         # ===== Phase space  =========
         if "phase_space_aux" in what_to_plot:
-            plt.figure(num=4, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(4)
             res = add_phase_space_aux(plt, f, plot_params)
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("phase_space_aux")
+            _done("phase_space_aux", res)
 
         # ===== Quantum momenta vs Time  =========
         if "p_quant" in what_to_plot:
-            plt.figure(num=5, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(5)
             res = add_p_quant_vs_t(plt, f, plot_params)
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("p_quant-vs-t")
+            _done("p_quant-vs-t", res)
 
         # ===== Vector potential vs Time  =========
         if "VP" in what_to_plot:
-            plt.figure(num=6, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(6)
             res = add_VP_vs_t(plt, f, plot_params)
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("VP-vs-t")
+            _done("VP-vs-t", res)
 
         # ===== Vector potential vs Time  =========
         if "f_xf" in what_to_plot:
-            plt.figure(num=7, figsize=plot_params["figsize"], dpi=plot_params["dpi"],
-                       edgecolor='black', frameon=plot_params["frameon"])
-            plt.subplot(1, 1, 1)
+            _figure(7)
             res = add_f_xf_vs_t(plt, f, plot_params)
-            if plot_params["save_figures"] == 1 and res == 1:
-                _save("f_xf-vs-t")
+            _done("f_xf-vs-t", res)
 
         if do_show:
             plt.show()
