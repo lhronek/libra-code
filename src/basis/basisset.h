@@ -111,6 +111,7 @@ public:
   std::vector<ergo_real> coeffList; 
 
   basisset_shell_struct(int max_no_of_contr){
+    type = 0; contrCount = 0; shell_ID = 0;
     exponentList = std::vector<ergo_real>(max_no_of_contr, 0.0);
     coeffList = std::vector<ergo_real>(max_no_of_contr, 0.0);
   }
