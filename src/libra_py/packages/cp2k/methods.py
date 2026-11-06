@@ -17,7 +17,7 @@
 """
 
 
-import os, sys, math, re, copy, time, glob, shlex, shutil, subprocess, threading
+import os, sys, math, re, copy, time, glob, shlex, shutil, subprocess, threading, itertools
 import json
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
@@ -3883,7 +3883,12 @@ def read_cp2k_s_csr(filename, n=None, chunk_rows=None):
         seen = False
         with open(filename) as f:
             while True:
-                a = np.loadtxt(f, dtype=float, ndmin=2, max_rows=int(chunk_rows))
+                line = f.readline()                  # numpy warns on a read without data: the next line is looked at first
+                while line and not line.strip():
+                    line = f.readline()
+                if not line:
+                    break
+                a = np.loadtxt(itertools.chain([line], f), dtype=float, ndmin=2, max_rows=int(chunk_rows))
                 if a.size == 0:
                     break
                 seen = True
