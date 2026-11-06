@@ -118,6 +118,8 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
 
                 * ** plot_params["clrs_index"]** ( list of strings ): the mapping of a color definition to its "name" (similar to the one found below)
 
+                * ** plot_params["do_show"]** ( 0 or 1 ): 1 - show the three figures, 0 - compute and return the scan alone [ default: 1 ]
+
 
     """
 
@@ -176,7 +178,7 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
     plot_params_default = {"which_ham_dia": [], "which_ham_adi": [],
                            "which_d1ham_dia": [], "which_d1ham_adi": [],
                            "which_dc1_dia": [], "which_dc1_adi": [],
-                           "colors": colors_, "clrs_index": clrs_index_
+                           "colors": colors_, "clrs_index": clrs_index_, "do_show": 1
                            }
     warn_unknown_keys(plot_params, set(plot_params_default) | set(plot_params_critical), "plot_pes_properties", "plot_params", "plot_pes_properties does not read")
     comn.check_input(plot_params, plot_params_default, plot_params_critical)
@@ -188,6 +190,7 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
     which_dc1_adi = plot_params["which_dc1_adi"]
     colors = plot_params["colors"]
     clrs_index = plot_params["clrs_index"]
+    do_show = plot_params["do_show"]
 
     grid = []
     nsteps = 0
@@ -337,7 +340,8 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
         plt.plot(grid, ham_adi[it_indx], label='$H_{%i, %i}$' %
                  (it[0], it[1]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
     _legend()
-    plt.show()
+    if do_show:
+        plt.show()
     # plt.clf()
     plt.close()
 
@@ -361,7 +365,8 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
         plt.plot(grid, d1ham_adi[it_indx], label='$dH_{%i, %i} / dR_{%i}$' %
                  (it[1], it[2], it[0]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
     _legend()
-    plt.show()
+    if do_show:
+        plt.show()
     # plt.clf()
     plt.close()
 
@@ -385,7 +390,8 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
         plt.plot(grid, dc1_adi[it_indx], label='$< \\psi_{%i} | dR_{%i} | \\psi_{%i} >$' % (
             it[1], it[0], it[2]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
     _legend()
-    plt.show()
+    if do_show:
+        plt.show()
     # plt.clf()
     plt.close()
 
