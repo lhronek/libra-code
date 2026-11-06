@@ -93,11 +93,7 @@ public:
     n_cols = n_cols_;
     n_elts = n_rows * n_cols;
 
-    M = new T1[n_elts];
-
-    for (int i = 0; i < n_elts; i++) {
-      M[i] = (T1)0.0;
-    }
+    M = new T1[n_elts]();   // value-initialized: zeros
   }
 
   ///< Copy constructor
