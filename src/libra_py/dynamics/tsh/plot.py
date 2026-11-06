@@ -236,6 +236,12 @@ def _color(colors, clrs_index, indx):
     return davis.curve_color(colors, clrs_index, indx)
 
 
+def _legend(plt, fontsize):
+    """The legend of the current axes - none without a labeled curve (no_label 1, nothing drawn)."""
+    if plt.gca().get_legend_handles_labels()[1]:
+        plt.legend(fontsize=fontsize)
+
+
 def add_energies(plt, hdf_file, plot_params_, property_type):
     """
     Adds the plotting of the ensemble-averaged kinetic, potential, and total energies
@@ -319,7 +325,7 @@ def add_energies(plt, hdf_file, plot_params_, property_type):
         # if "extended" in which_energies:
         #    plt.plot(t, hdf_file["dE_NHC/data"][:],
         #             label="Extended energy", linewidth=Lw, color = colors[ clrs_index[3] ])
-    plt.legend(fontsize=legend_fontsize)
+    _legend(plt, legend_fontsize)
     plt.tight_layout()
 
     return res
@@ -404,7 +410,7 @@ def add_trajectory_resolved_ham_property(plt, hdf_file, plot_params_, ham_proper
                              linewidth=Lw, color=_color(colors, clrs_index, indx))
                 res = 1
 
-    plt.legend(fontsize=legend_fontsize)
+    _legend(plt, legend_fontsize)
     plt.tight_layout()
 
     return res
@@ -469,7 +475,7 @@ def add_cooordinates_vs_t(plt, hdf_file, plot_params_):
     else:
         res = 0
 
-    plt.legend(fontsize=legend_fontsize)
+    _legend(plt, legend_fontsize)
     plt.tight_layout()
 
     return res
@@ -534,7 +540,7 @@ def add_momenta_vs_t(plt, hdf_file, plot_params_):
     else:
         res = 0
 
-    plt.legend(fontsize=legend_fontsize)
+    _legend(plt, legend_fontsize)
     plt.tight_layout()
 
     return res
@@ -599,7 +605,7 @@ def add_forces_vs_t(plt, hdf_file, plot_params_):
     else:
         res = 0
 
-    plt.legend(fontsize=legend_fontsize)
+    _legend(plt, legend_fontsize)
     plt.tight_layout()
 
     return res
@@ -663,7 +669,7 @@ def add_phase_space(plt, hdf_file, plot_params_):
                     plt.plot(Q[:, k, d], P[:, k, d], label=F"traj={tr} dof={dof}", linewidth=Lw,
                              color=_color(colors, clrs_index, dof))
 
-    plt.legend(fontsize=legend_fontsize)
+    _legend(plt, legend_fontsize)
     plt.tight_layout()
 
     return res
@@ -807,7 +813,7 @@ def add_populations(plt, hdf_file, plot_params_, pop_type):
                 plt.plot(t, series[:, indx], label=F"state {istate}", linewidth=Lw,
                          color=_color(colors, clrs_index, indx))
 
-    plt.legend(fontsize=legend_fontsize)
+    _legend(plt, legend_fontsize)
     plt.tight_layout()
 
     return res
@@ -877,7 +883,7 @@ def add_coherence_indicators(plt, hdf_file, plot_params_, coh_type):
                     plt.plot(t, C[:, istate2, istate], label=lbl, linewidth=Lw, color=_color(colors, clrs_index, indx))
                     res = 1
 
-    plt.legend(fontsize=legend_fontsize)
+    _legend(plt, legend_fontsize)
     plt.tight_layout()
 
     return res
@@ -949,7 +955,7 @@ def add_time_overlaps_projectors(plt, hdf_file, plot_params_, prop_type):
                 plt.plot(t, M[:, k, indx], label=F"state {istate}", linewidth=Lw, color=_color(colors, clrs_index, indx))
                 res = 1
 
-    plt.legend(fontsize=legend_fontsize)
+    _legend(plt, legend_fontsize)
     plt.tight_layout()
 
     return res
@@ -1008,7 +1014,7 @@ def add_basis_transform(plt, hdf_file, plot_params_):
                 plt.plot(t, U[:, k, indx], label=lbl, linewidth=Lw, color=_color(colors, clrs_index, indx))
                 res = 1
 
-    plt.legend(fontsize=legend_fontsize)
+    _legend(plt, legend_fontsize)
     plt.tight_layout()
 
     return res
@@ -1711,7 +1717,7 @@ def add_cooordinates_aux_vs_t(plt, hdf_file, plot_params_):
     else:
         res = 0
 
-    plt.legend(fontsize=legend_fontsize)
+    _legend(plt, legend_fontsize)
     plt.tight_layout()
 
     return res
@@ -1789,7 +1795,7 @@ def add_momenta_aux_vs_t(plt, hdf_file, plot_params_):
     else:
         res = 0
 
-    plt.legend(fontsize=legend_fontsize)
+    _legend(plt, legend_fontsize)
     plt.tight_layout()
 
     return res
@@ -1859,7 +1865,7 @@ def add_nab_phase_vs_t(plt, hdf_file, plot_params_):
     else:
         res = 0
 
-    plt.legend(fontsize=legend_fontsize)
+    _legend(plt, legend_fontsize)
     plt.tight_layout()
 
     return res
@@ -1938,7 +1944,7 @@ def add_phase_space_aux(plt, hdf_file, plot_params_):
                         plt.plot(Qa[:, k, istate, d], Pa[:, k, istate, d],
                                  label=F"traj={tr} state={istate} dof={dof}", linewidth=Lw, color=_color(colors, clrs_index, indx))
 
-    plt.legend(fontsize=legend_fontsize)
+    _legend(plt, legend_fontsize)
     plt.tight_layout()
 
     return res
@@ -2003,7 +2009,7 @@ def add_p_quant_vs_t(plt, hdf_file, plot_params_):
     else:
         res = 0
 
-    plt.legend(fontsize=legend_fontsize)
+    _legend(plt, legend_fontsize)
     plt.tight_layout()
 
     return res
@@ -2068,7 +2074,7 @@ def add_VP_vs_t(plt, hdf_file, plot_params_):
     else:
         res = 0
 
-    plt.legend(fontsize=legend_fontsize)
+    _legend(plt, legend_fontsize)
     plt.tight_layout()
 
     return res
@@ -2133,7 +2139,7 @@ def add_f_xf_vs_t(plt, hdf_file, plot_params_):
     else:
         res = 0
 
-    plt.legend(fontsize=legend_fontsize)
+    _legend(plt, legend_fontsize)
     plt.tight_layout()
 
     return res

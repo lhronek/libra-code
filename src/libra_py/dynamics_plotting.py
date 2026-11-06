@@ -51,6 +51,12 @@ import matplotlib.pyplot as plt   # plots
 # from matplotlib.mlab import griddata
 
 
+def _legend():
+    """The legend of the current axes when a curve carries a label - an empty panel draws none."""
+    if plt.gca().get_legend_handles_labels()[1]:
+        plt.legend()
+
+
 def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
     """
         Args:
@@ -321,7 +327,7 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
     for it_indx, it in enumerate(which_ham_dia):
         plt.plot(grid, ham_dia[it_indx], label='$H_{%i, %i}$' %
                  (it[0], it[1]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
-    plt.legend()
+    _legend()
 
     plt.subplot(1, 2, 2)
     plt.title('Adiabatic energies')
@@ -330,7 +336,7 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
     for it_indx, it in enumerate(which_ham_adi):
         plt.plot(grid, ham_adi[it_indx], label='$H_{%i, %i}$' %
                  (it[0], it[1]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
-    plt.legend()
+    _legend()
     plt.show()
     # plt.clf()
     plt.close()
@@ -345,7 +351,7 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
     for it_indx, it in enumerate(which_d1ham_dia):
         plt.plot(grid, d1ham_dia[it_indx], label='$dH_{%i, %i} / dR_{%i}$' %
                  (it[1], it[2], it[0]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
-    plt.legend()
+    _legend()
 
     plt.subplot(1, 2, 2)
     plt.title('Derivatives of adiabatic energies')
@@ -354,7 +360,7 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
     for it_indx, it in enumerate(which_d1ham_adi):
         plt.plot(grid, d1ham_adi[it_indx], label='$dH_{%i, %i} / dR_{%i}$' %
                  (it[1], it[2], it[0]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
-    plt.legend()
+    _legend()
     plt.show()
     # plt.clf()
     plt.close()
@@ -369,7 +375,7 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
     for it_indx, it in enumerate(which_dc1_dia):
         plt.plot(grid, dc1_dia[it_indx], label='$< \\psi_{%i} | dR_{%i} | \\psi_{%i} >$' % (
             it[1], it[0], it[2]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
-    plt.legend()
+    _legend()
 
     plt.subplot(1, 2, 2)
     plt.title('Derivatives couplings, adiabatic rep.')
@@ -378,7 +384,7 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
     for it_indx, it in enumerate(which_dc1_adi):
         plt.plot(grid, dc1_adi[it_indx], label='$< \\psi_{%i} | dR_{%i} | \\psi_{%i} >$' % (
             it[1], it[0], it[2]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
-    plt.legend()
+    _legend()
     plt.show()
     # plt.clf()
     plt.close()
@@ -600,7 +606,7 @@ def plot_surfaces(_compute_model, _param_sets, states_of_interest, xmin, xmax, d
             for k1 in states_of_interest:
                 plt.plot(X, hdia[k1], label='$H_{%i%i}$' %
                          (k1, k1), linewidth=_linewidth, color=data_visualize.curve_color(colors, clrs_index, k1))
-            plt.legend()
+            _legend()
 
             plt.subplot(1, 2, 2)
             plt.ylim(ylim[0], ylim[1])
@@ -612,7 +618,7 @@ def plot_surfaces(_compute_model, _param_sets, states_of_interest, xmin, xmax, d
             for k1 in states_of_interest:
                 plt.plot(X, hadi[k1], label='$E_{%i}$' % (k1), linewidth=_linewidth,
                          color=data_visualize.curve_color(colors, clrs_index, k1))
-            plt.legend()
+            _legend()
 
             if save_figures:
                 if not os.path.exists(F"{prefix}"):
@@ -649,7 +655,7 @@ def plot_surfaces(_compute_model, _param_sets, states_of_interest, xmin, xmax, d
                     # plt.plot(X, uij[k1][k2], label='$dia_{%i} | adi_{%i}$' % (k1, k2), linewidth=7, color = data_visualize.curve_color(colors, clrs_index, k1))
                     plt.plot(X, uij[k1][k2], label='$< \\psi^{dia}_{%i} | \\psi^{adi}_{%i} >$' % (
                         k1, k2), linewidth=_linewidth, color=data_visualize.curve_color(colors, clrs_index, k1))
-            plt.legend()
+            _legend()
 
             if save_figures:
                 if not os.path.exists(F"{prefix}"):
@@ -682,7 +688,7 @@ def plot_surfaces(_compute_model, _param_sets, states_of_interest, xmin, xmax, d
                          color=data_visualize.curve_color(colors, clrs_index, k1))
                 plt.plot(X, hadi[k1], label='$E_{%i}$' % (k1), linewidth=_linewidth,
                          color=data_visualize.curve_color(colors, clrs_index, k1))
-            plt.legend()
+            _legend()
 
             plt.subplot(1, 2, 2)
             plt.ylim(ylim2[0], ylim2[1])
@@ -702,7 +708,7 @@ def plot_surfaces(_compute_model, _param_sets, states_of_interest, xmin, xmax, d
                                 k1, k2), linewidth=_linewidth, ls="--",
                                 color=data_visualize.curve_color(colors, clrs_index, cnt + 1))
                         cnt = cnt + 1
-            plt.legend()
+            _legend()
 
             if save_figures:
                 if not os.path.exists(F"{prefix}"):
