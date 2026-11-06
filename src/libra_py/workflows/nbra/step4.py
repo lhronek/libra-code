@@ -80,7 +80,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 STEP4_KEYS = frozenset((
     "Boltz_opt", "Boltz_opt_BL", "Hvib_im_prefix", "Hvib_im_suffix", "Hvib_re_prefix", "Hvib_re_suffix", "Hvib_type", "T",
     "acf_filename", "acf_type", "active_space", "data_set_paths", "data_type", "decoherence_constants", "decoherence_method",
-    "decoherence_times", "detect_SD_difference", "do_QSH_output", "do_center", "do_output", "do_return", "dt", "dw",
+    "decoherence_times", "detect_SD_difference", "do_QSH_output", "do_center", "do_output", "do_return", "do_show", "dt", "dw",
     "excitations", "extend_md", "extend_md_time", "filename", "gap_fit", "gap_min_exception", "init_time", "init_times",
     "istate", "logname", "meta_info", "nfiles", "nfreqs", "nstates", "nsteps", "ntraj", "outfile", "output_files_prefix",
     "output_set_paths", "qsh_Hvib_im_prefix", "qsh_Hvib_im_suffix", "qsh_Hvib_re_prefix", "qsh_Hvib_re_suffix",

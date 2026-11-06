@@ -60,6 +60,8 @@ def compute_freqs(H_vib, params):
 
                 * nsteps: the number of the QSH-MD steps to do
 
+                * do_show: 1 - show the ACF / spectrum figure of every pair, 0 - save it alone [ default: 1 ]
+
             SeeAlso: influence_spectrum.compute_mat_elt for the description of other parameters:
 
                 * filename
@@ -90,11 +92,12 @@ def compute_freqs(H_vib, params):
 
     # Set defaults and check critical parameters
     critical_params = []
-    default_params = {"output_files_prefix": "_qsh", "nsteps": len(H_vib)}
+    default_params = {"output_files_prefix": "_qsh", "nsteps": len(H_vib), "do_show": 1}
     refuse_unknown_keys(params, step4.STEP4_KEYS, "qsh.compute_freqs", "params", "no function of the step-4 family reads")
     comn.check_input(params, default_params, critical_params)
 
     output_files_prefix = params["output_files_prefix"]
+    do_show = params["do_show"]
 
     # Local variables and dimensions
     nstates = H_vib[0].num_of_rows
@@ -123,7 +126,10 @@ def compute_freqs(H_vib, params):
 
             plt.tight_layout()
             plt.savefig(F"{output_files_prefix}-{i}-{j}-acf-ifs.png", dpi=300)
-            plt.show()
+            if do_show:
+                plt.show()
+            elif not mpl.is_interactive():
+                plt.close(figure)      # nobody shows it - a notebook (interactive mode) displays the open figures itself
 
     dt = params["dt"]
     conv = units.wavn2au * units.fs2au
