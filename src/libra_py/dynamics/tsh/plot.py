@@ -401,7 +401,7 @@ def add_trajectory_resolved_ham_property(plt, hdf_file, plot_params_, ham_proper
         t = _time_axis(hdf_file)
         states = _selected(which_states, nstates)[0]
         trajs = _selected(which_trajectories, ntraj)[0]
-        E = _series(hdf_file[F"{ham_property_type}/data"], trajs, states, states)
+        E = _series(hdf_file[F"{ham_property_type}/data"], trajs, states, states).real    # Hvib is complex, its diagonal real
         for indx, istate in enumerate(states):
             for k, tr in enumerate(trajs):
                 if no_label:
@@ -807,7 +807,7 @@ def add_populations(plt, hdf_file, plot_params_, pop_type):
             if not states:
                 series = np.empty((len(t), 0))
             elif pop_type in ["D_dia", "D_adi"]:
-                series = _diagonal_series(P, states)
+                series = _diagonal_series(P, states).real    # the density is complex, its diagonal real
             else:
                 series = P[:, selection]
             for indx, istate in enumerate(states):
@@ -950,7 +950,7 @@ def add_time_overlaps_projectors(plt, hdf_file, plot_params_, prop_type):
         t = _time_axis(hdf_file)
         states = _selected(which_states, nstates)[0]
         trajs = _selected(which_trajectories, ntraj)[0]
-        M = _series(hdf_file[F"{prop_type}/data"], trajs, states, states)
+        M = _series(hdf_file[F"{prop_type}/data"], trajs, states, states).real    # the real part of a complex matrix
         for indx, istate in enumerate(states):
             for k, tr in enumerate(trajs):
                 plt.plot(t, M[:, k, indx], label=F"state {istate}", linewidth=Lw, color=_color(colors, clrs_index, indx))
@@ -1008,7 +1008,7 @@ def add_basis_transform(plt, hdf_file, plot_params_):
         trajs = _selected(which_trajectories, ntraj)[0]
         pairs = [(istate2, istate) for istate in _selected(which_adi_states, nadi)[0]
                  for istate2 in _selected(which_dia_states, ndia)[0]]
-        U = _series(hdf_file["basis_transform/data"], trajs, [pr[0] for pr in pairs], [pr[1] for pr in pairs])
+        U = _series(hdf_file["basis_transform/data"], trajs, [pr[0] for pr in pairs], [pr[1] for pr in pairs]).real    # the real part of a complex matrix
         for indx, (istate2, istate) in enumerate(pairs):
             lbl = '$< \\psi^{dia}_{%i} | \\psi^{adi}_{%i} >$' % (istate2, istate)
             for k, tr in enumerate(trajs):
@@ -1334,7 +1334,7 @@ def plot_dyn(plot_params):
             plt.ylabel('Population, a.u.')
 
             for indx, istate in enumerate(adi):
-                plt.plot(t, Dadi[:, istate, istate], label=F"state {istate}", linewidth=2, color=_color(colors, clrs_index, indx))
+                plt.plot(t, Dadi[:, istate, istate].real, label=F"state {istate}", linewidth=2, color=_color(colors, clrs_index, indx))
 
             # ================ dia SE populations =============
             plt.subplot(1, 3, 3)
@@ -1343,7 +1343,7 @@ def plot_dyn(plot_params):
             plt.ylabel('Population, a.u.')
 
             for indx, istate in enumerate(dia):
-                plt.plot(t, Ddia[:, istate, istate], label=F"state {istate}", linewidth=2, color=_color(colors, clrs_index, indx))
+                plt.plot(t, Ddia[:, istate, istate].real, label=F"state {istate}", linewidth=2, color=_color(colors, clrs_index, indx))
 
             _save("t-pops")
             plt.show()
@@ -1391,8 +1391,8 @@ def plot_dyn(plot_params):
             trajs = _selected(which_trajectories, ntraj)[0]
             adi = _selected(which_adi_states, nadi)[0]
             dia = _selected(which_dia_states, ndia)[0]
-            Eadi = _series(_dataset(f, "hvib_adi"), trajs, adi, adi)
-            Edia = _series(_dataset(f, "hvib_dia"), trajs, dia, dia)
+            Eadi = _series(_dataset(f, "hvib_adi"), trajs, adi, adi).real    # Hvib is complex, its diagonal real
+            Edia = _series(_dataset(f, "hvib_dia"), trajs, dia, dia).real
 
             # ============== Adiabatic energies =============
             plt.figure(num=None, figsize=(24, 12), dpi=300, frameon=False)
@@ -1425,8 +1425,8 @@ def plot_dyn(plot_params):
             # the plotted diagonal time overlaps and projectors read in trajectory slabs
             trajs = _selected(which_trajectories, ntraj)[0]
             adi = _selected(which_adi_states, nadi)[0]
-            St = _series(_dataset(f, "St"), trajs, adi, adi)
-            Pr = _series(_dataset(f, "projector"), trajs, adi, adi)
+            St = _series(_dataset(f, "St"), trajs, adi, adi).real    # the real parts of complex matrices
+            Pr = _series(_dataset(f, "projector"), trajs, adi, adi).real
 
             # ============== St diagonal matrix elements =============
             plt.figure(num=None, figsize=(24, 12), dpi=300, frameon=False)
@@ -1461,7 +1461,7 @@ def plot_dyn(plot_params):
             trajs = _selected(which_trajectories, ntraj)[0]
             pairs = [(istate2, istate) for istate in _selected(which_adi_states, nadi)[0]
                      for istate2 in _selected(which_dia_states, ndia)[0]]
-            U = _series(_dataset(f, "basis_transform"), trajs, [pr[0] for pr in pairs], [pr[1] for pr in pairs])
+            U = _series(_dataset(f, "basis_transform"), trajs, [pr[0] for pr in pairs], [pr[1] for pr in pairs]).real
 
             # ============== dia-to-adia transformation matrix =============
             plt.figure(num=None, figsize=(24, 24), dpi=300, frameon=False)
