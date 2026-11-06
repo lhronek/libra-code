@@ -37,7 +37,7 @@ IF(WITH_LAPACK_ZHEEVD)
   # cmake/modules/LibraBlasProbe.cmake)
   INCLUDE(LibraBlasProbe)
   SET(LIBRA_ZHEEVD_LIBS "")
-  FIND_PACKAGE(BLAS QUIET)   # OpenBLAS/MKL bundle LAPACK and CBLAS
+  LIBRA_FIND_BLAS()   # OpenBLAS/MKL bundle LAPACK and CBLAS
   IF(BLAS_FOUND)
     libra_probe_zheevd("${BLAS_LIBRARIES}" LIBRA_HAVE_ZHEEVD)
     libra_probe_zgemm("${BLAS_LIBRARIES}" LIBRA_HAVE_ZGEMM_FOR_EXP)

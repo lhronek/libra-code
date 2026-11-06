@@ -58,6 +58,25 @@ ENDIF()
 
 message(STATUS "Python executable: ${Python3_EXECUTABLE}")
 
+# the Python environment's libraries first (its BLAS, Boost, Eigen): the library linked is then the one loaded at run time
+get_filename_component(LIBRA_PYTHON_BIN "${Python3_EXECUTABLE}" DIRECTORY)
+get_filename_component(LIBRA_ENV_PREFIX "${LIBRA_PYTHON_BIN}" DIRECTORY)
+list(PREPEND CMAKE_PREFIX_PATH "${LIBRA_ENV_PREFIX}")
+message(STATUS "Libraries searched first in: ${LIBRA_ENV_PREFIX}")
+# the environment's BLAS when it has one (conda ships OpenBLAS as libblas.so without a libopenblas.so, which FindBLAS wants)
+find_library(LIBRA_ENV_BLAS NAMES openblas blas PATHS "${LIBRA_ENV_PREFIX}/lib" "${LIBRA_ENV_PREFIX}/lib64" NO_DEFAULT_PATH)
+macro(LIBRA_FIND_BLAS)
+  if(LIBRA_ENV_BLAS)
+    set(BLAS_FOUND TRUE)
+    set(BLAS_LIBRARIES "${LIBRA_ENV_BLAS}")
+  else()
+    FIND_PACKAGE(BLAS QUIET)
+  endif()
+endmacro()
+if(LIBRA_ENV_BLAS)
+  message(STATUS "BLAS of the environment: ${LIBRA_ENV_BLAS}")
+endif()
+
 #if(Python3_EXECUTABLE MATCHES "^/usr/")
 #    message(FATAL_ERROR
 #        "System Python detected (${Python3_EXECUTABLE}). "
