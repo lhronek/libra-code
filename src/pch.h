@@ -48,6 +48,9 @@
 //#include <libint2.hpp>
 
 // Boost
+#ifndef BOOST_PYTHON_MAX_ARITY
+#define BOOST_PYTHON_MAX_ARITY 30   // before the boost headers, the exporters with more than 15 arguments need it
+#endif
 #include <boost/python.hpp>
 #include <boost/python/suite/indexing/vector_indexing_suite.hpp>
 #include <boost/python/suite/indexing/map_indexing_suite.hpp>
@@ -60,9 +63,6 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/foreach.hpp>
-
-
-#define BOOST_PYTHON_MAX_ARITY 30
 
 
 #endif // PCH_H
