@@ -91,7 +91,8 @@ SET(LIBRA_Python3_VERSION "${Python3_VERSION_MAJOR}${Python3_VERSION_MINOR}")
 #
 
 MESSAGE(STATUS "Looking for Boost libraries...")
-SET(Boost_NO_BOOST_CMAKE TRUE) # to fix the problem of finding python37 libs
+# off: Boost's own config finds pythonXY since 1.73, the legacy module warns for every newer Boost
+#SET(Boost_NO_BOOST_CMAKE TRUE) # to fix the problem of finding python37 libs
 SET(Boost_USE_STATIC_LIBS=OFF)
 SET(Boost_USE_MULTITHREADED=OFF)
 SET(Boost_USE_STATIC_RUNTIME=OFF)
