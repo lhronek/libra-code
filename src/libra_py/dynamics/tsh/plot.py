@@ -36,6 +36,7 @@ import copy
 
 #import h5py  # the files open through hdf5_io.open_hdf5
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 # from matplotlib.mlab import griddata
 
@@ -241,6 +242,12 @@ def _legend(plt, fontsize):
     layout: a legend of many curves would squeeze the plot area and still not fit."""
     if plt.gca().get_legend_handles_labels()[1]:
         plt.legend(fontsize=fontsize).set_in_layout(False)
+
+
+def _close_unseen():
+    """A figure nobody shows is closed - a notebook (interactive mode) displays the open figures itself."""
+    if not matplotlib.is_interactive():
+        plt.close()
 
 
 def add_energies(plt, hdf_file, plot_params_, property_type):
@@ -1065,6 +1072,8 @@ def plot_dynamics(plot_params_):
     def _done(name, res):
         if plot_params["save_figures"] == 1 and res == 1:
             _save(name)
+        if not do_show:
+            _close_unseen()
 
     with open_hdf5(F"{prefix}/{filename}", 'r') as f:
 
@@ -1258,6 +1267,8 @@ def plot_dyn(plot_params):
     def _done():
         if do_show:
             plt.show()
+        else:
+            _close_unseen()
 
     with open_hdf5(F"{prefix}/{filename}", 'r') as f:
 
@@ -2196,6 +2207,8 @@ def plot_dynamics_xf(plot_params_):
     def _done(name, res):
         if plot_params["save_figures"] == 1 and res == 1:
             _save(name)
+        if not do_show:
+            _close_unseen()
 
     with open_hdf5(F"{prefix}/{filename}", 'r') as f:
 
