@@ -337,7 +337,7 @@ def read_trajectory_xyz_file_gaussian(trajectory_xyz_file_name: str, time_step: 
 
     Returns:
 
-        coordinates (2D numpy array): The numpy array containing the coordinates of the time_step.
+        coordinates (list of lists of str): the frame's lines split into tokens, the two header lines first.
 
     """
 
@@ -357,9 +357,7 @@ def read_trajectory_xyz_file_gaussian(trajectory_xyz_file_name: str, time_step: 
     for i in range(n * time_step, n * (time_step + 1)):
         coordinates.append(lines[i].split())
 
-    coordinates = np.array(coordinates)
-
-    return coordinates
+    return coordinates      # the frame's lines split - the two header lines are shorter than the atom lines
 
 
 def gaussian_input(project_name, time_step, sample_input, trajectory_xyz_file_name):
