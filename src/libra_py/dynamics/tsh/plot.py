@@ -949,7 +949,7 @@ def add_time_overlaps_projectors(plt, hdf_file, plot_params_, prop_type):
     plt.xticks(fontsize=axes_fontsize[0])
     plt.yticks(fontsize=axes_fontsize[1])
     plt.xlabel('Time, fs', fontsize=axes_label_fontsize[0])
-    plt.ylabel('Magnitude', fontsize=axes_label_fontsize[1])
+    plt.ylabel('Real part', fontsize=axes_label_fontsize[1])
 
     res = 0
     if "time/data" in hdf_file.keys() and F"{prop_type}/data" in hdf_file.keys():
@@ -1006,7 +1006,7 @@ def add_basis_transform(plt, hdf_file, plot_params_):
     plt.xticks(fontsize=axes_fontsize[0])
     plt.yticks(fontsize=axes_fontsize[1])
     plt.xlabel('Time, fs', fontsize=axes_label_fontsize[0])
-    plt.ylabel('Magnitude', fontsize=axes_label_fontsize[1])
+    plt.ylabel('Real part', fontsize=axes_label_fontsize[1])
 
     res = 0
     if "time/data" in hdf_file.keys() and "basis_transform/data" in hdf_file.keys():
