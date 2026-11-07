@@ -235,7 +235,7 @@ def s2_spin_flip_brute_matrix(X_list, n_alpha_occ, n_beta_occ, S_ab, threshold=1
     return M
 
 
-def purify_spin_mixtures(X_list, omegas, s2_matrix, window, mix_min=0.05, mix_full=0.1):
+def purify_spin_mixtures(X_list, omegas, s2_matrix, window, mix_min=0.05, mix_full=0.1, degenerate=0.25):
     """The roots whose spin mixing the Davidson left in (a degenerate singlet and triplet pair delivered as two mixtures,
     a singlet crossing a spin-incomplete root, S0 and the triplet mixing at the twist, the V character spread over three
     roots on the hot ground state) rotated to the eigenvectors of their excess-<S^2> block, group by group: two roots are
@@ -248,7 +248,10 @@ def purify_spin_mixtures(X_list, omegas, s2_matrix, window, mix_min=0.05, mix_fu
     weights is the driver's (spin_purify_min_weight). A coupling enters its group's block damped, scaled by the cubic
     step from 0 at mix_min to 1 at mix_full, so that a root crossing the threshold joins or leaves with no step in any
     state's energy or amplitudes (the hard switch stepped them by the root's weight, (mix_min / the excess gap)^2 -
-    mix_full at or below mix_min keeps the hard switch). A clique, not a connected component: a chain of weak couplings
+    mix_full at or below mix_min keeps the hard switch). Two eigenvectors of one spin cannot be told apart by S^2 - a
+    group holding a second singlet-like root beside V would hand V an arbitrary share of it - so within every run of
+    eigenvalues closer than degenerate the energy is diagonalized and a group's singlet subspace is spanned by its energy
+    eigenstates (degenerate 0 keeps the plain eigenvectors). A clique, not a connected component: a chain of weak couplings
     would spread the lowest eigenvector over roots far above and move its energy by tenths of an eV from step to step.
     Not pairs alone: three mutually coupled roots sharing one singlet leave a pair's eigenvector contaminated and flip
     the pairing when the strongest coupling changes hands (the V state at an excess 0.34, its time overlap 0.66 at the
@@ -292,14 +295,27 @@ def purify_spin_mixtures(X_list, omegas, s2_matrix, window, mix_min=0.05, mix_fu
             states.append(single(k))
     for group in groups:
         block = np.array([[s2_matrix[a, b] * (1.0 if a == b else onset(s2_matrix[a, b])) for b in group] for a in group], dtype=float)
-        vals, U = np.linalg.eigh(0.5 * (block + block.T))
+        block = 0.5 * (block + block.T)
+        vals, U = np.linalg.eigh(block)
+        # the energy diagonalized within every run of near-degenerate S^2 eigenvalues
+        H = np.diag(omegas[group])
+        j = 0
+        while j < len(group):
+            k = j + 1
+            while k < len(group) and vals[k] - vals[k - 1] < degenerate:
+                k += 1
+            if k - j > 1:
+                _, V = np.linalg.eigh(U[:, j:k].T @ H @ U[:, j:k])
+                U[:, j:k] = U[:, j:k] @ V
+            j = k
+        s2_of = np.einsum("ij,ik,kj->j", U, block, U)
         gi = len(purified)
         for j in range(len(group)):
             w = U[:, j] ** 2
             X_new = sum(U[i, j] * np.asarray(X_list[r], dtype=float) for i, r in enumerate(group))
-            states.append({"X": X_new, "omega": float(np.dot(w, omegas[group])), "s2": float(vals[j]),
+            states.append({"X": X_new, "omega": float(np.dot(w, omegas[group])), "s2": float(s2_of[j]),
                            "roots": list(group), "weights": [float(v) for v in w], "group": gi})
-        purified.append({"roots": list(group), "s2": [float(v) for v in vals],
+        purified.append({"roots": list(group), "s2": [float(v) for v in s2_of],
                          "weights": [[float(v) for v in U[:, j] ** 2] for j in range(len(group))]})
     states.sort(key=lambda s: s["omega"])
     return states, purified
