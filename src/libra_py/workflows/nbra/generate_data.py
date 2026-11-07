@@ -86,10 +86,12 @@ def make_input(prefix, input_template, software, trajectory_xyz_file, step):
             elif "}" in code:
                 end = i
                 break
+        for i in range(geometry_line):
+            f.write(lines_input[i])
         f.write("Geometry = xyzFormat {\n")
         f.write(F"<<< coord-{step}.xyz \n")
         f.write("}\n")
-        for i in range(end + 1):
+        for i in range(end + 1, len(lines_input)):
             f.write(lines_input[i])
         f.close()
 
