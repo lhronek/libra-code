@@ -853,6 +853,14 @@ def read_velocity_xyz_file(file_name: str, step: int):
     return labels, data_conv.nparray2MATRIX(np.asarray(vel, dtype=float).reshape(-1, 1))
 
 
+def _cp2k_keyword(line):
+    """The keyword a CP2K input line sets and the line's uncommented text: the upper-case first token once the # or !
+    comment is stripped - ("", "") for a blank or comment line."""
+    code = line.split("#")[0].split("!")[0]
+    tokens = code.split()
+    return (tokens[0].upper() if tokens else ""), code
+
+
 def CP2K_input_static(cp2k_sample_energy_input: str, project_name: str,
                       trajectory_file: str, time_step: int):
     """
@@ -892,32 +900,29 @@ def CP2K_input_static(cp2k_sample_energy_input: str, project_name: str,
 
     f = open(f_new, 'w')
     for i in range(0, len(lines)):
+        keyword, code = _cp2k_keyword(lines[i])
         # Writing the COORD_FILE_NAME in the input
-        if 'COORD_FILE_NAME'.lower() in lines[i].lower().split():
+        if keyword == 'COORD_FILE_NAME':
             f.write('      COORD_FILE_NAME')
             f.write(' coord-%d' % time_step + '.xyz')
             f.write('\n')
         # Writing the project name
-        elif 'PROJECT'.lower() in lines[i].lower().split():
-            f.write('  PROJECT')
-            f.write(' %s' % project_name + '-%d' % time_step)
-            f.write('\n')
-        elif 'PROJECT_NAME'.lower() in lines[i].lower().split():
+        elif keyword in ('PROJECT', 'PROJECT_NAME'):
             f.write('  PROJECT')
             f.write(' %s' % project_name + '-%d' % time_step)
             f.write('\n')
         # Writing the WFN_RESTART_FILE_NAME of the previous time step
-        elif 'WFN_RESTART_FILE_NAME'.lower() in lines[i].lower().split() and ".wfn" in lines[i].lower() and "!" not in lines[i].lower():
+        elif keyword == 'WFN_RESTART_FILE_NAME' and ".wfn" in code.lower():
             f.write('    WFN_RESTART_FILE_NAME')
             f.write(' %s' % project_name + '-%d' % (time_step - 1) + '-RESTART.wfn')
             f.write('\n')
         # Writing the WFN_RESTART_FILE_NAME of the previous time step for the tddft calculation
-        elif 'WFN_RESTART_FILE_NAME'.lower() in lines[i].lower().split() and ".tdwfn" in lines[i].lower() and "!" not in lines[i].lower():
+        elif keyword == 'WFN_RESTART_FILE_NAME' and ".tdwfn" in code.lower():
             f.write('    WFN_RESTART_FILE_NAME')
             f.write(' %s' % project_name + '-%d' % (time_step - 1) + '-RESTART.tdwfn')
             f.write('\n')
         # Setting the scf guess to restart, CP2K will automatically switch to atomic if the wfn file does not exist
-        elif 'SCF_GUESS'.lower() in lines[i].lower().split():
+        elif keyword == 'SCF_GUESS':
             f.write('    SCF_GUESS RESTART')
             f.write('\n')
         else:
@@ -2074,13 +2079,14 @@ def cp2k_xtb_ot_inp(ot_inp_temp: str, traj_xyz_filename: str, step: int):
     file = open('xtb_ot_step_%d.inp' % step, 'w')
 
     for i in range(len(lines)):
-        if 'PROJECT_NAME'.lower() in lines[i].lower():
+        keyword, _ = _cp2k_keyword(lines[i])
+        if keyword == 'PROJECT_NAME':
             file.write('PROJECT_NAME OT_%d\n' % step)
-        elif 'COORD_FILE_NAME'.lower() in lines[i].lower():
+        elif keyword == 'COORD_FILE_NAME':
             file.write('COORD_FILE_NAME coord-%d.xyz\n' % step)
-        elif 'WFN_RESTART_FILE_NAME'.lower() in lines[i].lower():
+        elif keyword == 'WFN_RESTART_FILE_NAME':
             file.write('WFN_RESTART_FILE_NAME OT_%d-RESTART.wfn\n' % (step - 1))
-        elif 'SCF_GUESS'.lower() in lines[i].lower():
+        elif keyword == 'SCF_GUESS':
             file.write('SCF_GUESS RESTART\n')
         else:
             file.write(lines[i])
@@ -2133,17 +2139,24 @@ def cp2k_xtb_diag_inp(diag_inp_temp: str, step: int, wfn_restart_file=None, traj
 
     file = open('xtb_diag_step_%d.inp' % step, 'w')
 
+    stack = []      # the CP2K sections open at the line
     for i in range(len(lines)):
-        if 'PROJECT_NAME'.lower() in lines[i].lower():
+        keyword, _ = _cp2k_keyword(lines[i])
+        if keyword.startswith('&END'):
+            if stack:
+                stack.pop()
+        elif keyword.startswith('&'):
+            stack.append(keyword[1:])
+        if keyword == 'PROJECT_NAME':
             file.write('PROJECT_NAME Diag_%d\n' % step)
-        elif 'COORD_FILE_NAME'.lower() in lines[i].lower():
+        elif keyword == 'COORD_FILE_NAME':
             file.write('COORD_FILE_NAME coord-%d.xyz\n' % step)
-        elif 'WFN_RESTART_FILE_NAME'.lower() in lines[i].lower():
+        elif keyword == 'WFN_RESTART_FILE_NAME':
             file.write('WFN_RESTART_FILE_NAME %s\n' % wfn_restart_file)
-        elif 'SCF_GUESS'.lower() in lines[i].lower():
+        elif keyword == 'SCF_GUESS':
             file.write('SCF_GUESS RESTART\n')
-        elif 'FILENAME'.lower() in lines[i].lower():
-            file.write('FILENAME libra\n')
+        elif keyword == 'FILENAME' and stack and stack[-1] == 'MO_MOLDEN':
+            file.write('FILENAME libra\n')      # step 2 reads Diag_{step}-libra-1_0.molden
         else:
             file.write(lines[i])
 
@@ -4010,8 +4023,7 @@ def make_cp2k_input(params, working_directory="."):
     out = []
     stack = []  # CP2K section stack, upper-case names
     for line in lines:
-        tokens = line.split()
-        keyword = tokens[0].upper() if tokens else ""
+        keyword, _ = _cp2k_keyword(line)
 
         # --- maintain the section stack ---
         entering, ending = None, keyword.startswith("&END")
