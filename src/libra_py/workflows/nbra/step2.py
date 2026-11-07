@@ -436,7 +436,7 @@ def cp2k_libint_step2_defaults():
         "isxTB": False,
         "isUKS": False,
         "is_periodic": False,
-        "periodicity_type": "none",
+        "periodicity_type": None,
         "periodic_images": [1, 1, 1],
         "translational_vectors": None,
         "remove_molden": True,
@@ -557,11 +557,13 @@ def run_cp2k_libint_step2(params):
                                            differ.
 
                              is_periodic (bool): Flag for periodic systems - the AO overlaps include the images of the
-                                                 cell A_cell_vector, B_cell_vector, C_cell_vector (Angstrom) [default: False].
+                                                 cell A_cell_vector, B_cell_vector, C_cell_vector (Angstrom), read from the
+                                                 &CELL of cp2k_diag_input_template where the runner leaves them unset - a
+                                                 set vector must equal the template's [default: False].
 
                              periodicity_type (string): the periodic directions - "none", "XY", "XZ", "YZ" or "XYZ" - the
                                                         translational vectors are built from it and periodic_images when
-                                                        translational_vectors is None [default: "none"].
+                                                        translational_vectors is None [default: None = the template's PERIODIC].
 
                              periodic_images (list of 3 ints): the number of image cells in each direction for the
                                                                 translational vectors [default: [1, 1, 1]].
@@ -695,6 +697,8 @@ def run_cp2k_libint_step2(params):
         raise ValueError("params['isXTB'] is not read by this workflow - use 'isxTB'")
     refuse_unknown_keys(params, STEP2_CP2K_KEYS, "step2.run_cp2k_libint_step2", "params", "no function of the CP2K step-2 workflow reads")
     comn.check_input(params, default_params, critical_params)
+    if params['is_periodic']:
+        CP2K_methods.fill_cell_from_template(params, params['cp2k_diag_input_template'])
     if params['is_periodic'] and params['translational_vectors'] is None:
         params['translational_vectors'] = translational_vectors_of(params)
 

@@ -5055,6 +5055,89 @@ def _template_has_section(text, name):
     return False
 
 
+def _cell_from_lengths(lengths, angles):
+    """The A, B, C vectors of the ABC lengths and the ALPHA_BETA_GAMMA angles (degrees): a along x, b in the xy plane."""
+    def cos(x):
+        return 0.0 if x == 90.0 else math.cos(math.radians(x))
+    a, b, c = lengths
+    alpha, beta, gamma = angles
+    sin_gamma = math.sin(math.radians(gamma))
+    cx = c * cos(beta)
+    cy = c * (cos(alpha) - cos(beta) * cos(gamma)) / sin_gamma
+    cz = math.sqrt(max(c * c - cx * cx - cy * cy, 0.0))
+    return [a, 0.0, 0.0], [b * cos(gamma), b * sin_gamma, 0.0], [cx, cy, cz]
+
+
+def read_cp2k_cell(template):
+    """The cell of a CP2K input's &SUBSYS &CELL as (A, B, C, periodic): the vectors in Angstrom as lists of three floats (ABC
+    lengths and ALPHA_BETA_GAMMA angles converted, a along x and b in the xy plane), periodic as the PERIODIC value in CP2K's
+    spelling (XYZ when the keyword is absent). Comment lines and a nested &CELL_REF are not read, CELL_FILE_NAME and a unit
+    other than angstrom are refused."""
+    stack = []
+    vectors, lengths, angles, periodic, seen = {}, None, None, None, False
+    for line in _template_text(template).splitlines():
+        keyword, code = cp2k_keyword(line)
+        if not keyword:
+            continue
+        if keyword.startswith("&END"):
+            if stack:
+                stack.pop()
+            continue
+        if keyword.startswith("&"):
+            stack.append(keyword[1:])
+            if stack[-2:] == ["SUBSYS", "CELL"]:
+                seen = True
+            continue
+        if stack[-2:] != ["SUBSYS", "CELL"]:
+            continue
+        values = code.split()[1:]
+        unit = None
+        if values and values[0].startswith("["):
+            unit = values[0].strip("[]").lower()
+            values = values[1:]
+        if keyword in ("A", "B", "C", "ABC") and unit not in (None, "angstrom"):
+            raise ValueError(F"{template}: &CELL {keyword} in [{unit}] - the cell is read in angstrom")
+        if keyword in ("A", "B", "C"):
+            vectors[keyword] = [float(v) for v in values[:3]]
+        elif keyword == "ABC":
+            lengths = [float(v) for v in values[:3]]
+        elif keyword == "ALPHA_BETA_GAMMA":
+            if unit not in (None, "deg"):
+                raise ValueError(F"{template}: &CELL ALPHA_BETA_GAMMA in [{unit}] - the angles are read in degrees")
+            angles = [float(v) for v in values[:3]]
+        elif keyword == "PERIODIC":
+            periodic = values[0].upper()
+        elif keyword == "CELL_FILE_NAME":
+            raise ValueError(F"{template}: the cell comes from CELL_FILE_NAME - set A_cell_vector, B_cell_vector and "
+                             F"C_cell_vector in the runner")
+    if not seen:
+        raise ValueError(F"{template} has no &SUBSYS &CELL section")
+    if len(vectors) == 3 and lengths is None:
+        A, B, C = vectors["A"], vectors["B"], vectors["C"]
+    elif lengths is not None and not vectors:
+        A, B, C = _cell_from_lengths(lengths, angles or [90.0, 90.0, 90.0])
+    else:
+        raise ValueError(F"{template}: &CELL gives the vectors {sorted(vectors)} and ABC {lengths} - A, B, C or ABC, "
+                         F"not both nor a part")
+    return A, B, C, periodic or "XYZ"
+
+
+def fill_cell_from_template(params, template):
+    """A periodic run's cell from the template's &SUBSYS &CELL: A_cell_vector, B_cell_vector, C_cell_vector and
+    periodicity_type are filled where the runner left them None or absent, a given vector that differs from the template's
+    is refused - CP2K ran the template's cell. A given periodicity_type stays: the images are the runner's choice."""
+    A, B, C, periodic = read_cp2k_cell(template)
+    for key, vector in (("A_cell_vector", A), ("B_cell_vector", B), ("C_cell_vector", C)):
+        given = params.get(key)
+        if given is None:
+            params[key] = vector
+        elif not np.allclose(given, vector, rtol=0.0, atol=1e-6):
+            raise ValueError(F"{key} {list(given)} differs from the &CELL of {template}, {vector} - the overlaps need the "
+                             F"cell CP2K ran")
+    if params.get("periodicity_type") is None:
+        params["periodicity_type"] = "none" if periodic == "NONE" else periodic
+
+
 def _scan_overlap_template(text):
     """Comment-stripped scan of a CP2K input: does it request an overlap
     output - an active &S_CSR_WRITE block, or an OVERLAP keyword directly

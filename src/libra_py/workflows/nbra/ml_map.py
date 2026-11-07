@@ -314,10 +314,11 @@ def train(params):
             write_wfn_file: A boolean flag for writing `wfn` files readable by CP2K.
             path_to_save_wfn_files: The full path to save the `wfn` files.
             is_periodic: The flag for periodicity of he system for computing the overlaps.
-            A_cell_vector: A list containing the A cell vector.
-            B_cell_vector: A list containing the B cell vector.
-            C_cell_vector: A list containing the C cell vector.
-            periodicity_type: The periodicity type for each direction of the periodic cell.
+            A_cell_vector: A list containing the A cell vector (Angstrom) - None reads it from the &CELL of
+                           cp2k_ml_input_template, a given vector must equal the template's.
+            B_cell_vector: A list containing the B cell vector - None as for A_cell_vector.
+            C_cell_vector: A list containing the C cell vector - None as for A_cell_vector.
+            periodicity_type: The periodicity type for each direction of the periodic cell - None takes the template's PERIODIC.
             lowest_orbital: The lowest orbital index to be saved. STARTS FROM 1
             highest_orbital: The highest orbital index to be saved. STARTS FROM 1
             res_dir: The full path to save the overlap, time-overlap, and energies
@@ -358,19 +359,10 @@ def train(params):
         'write_wfn_file': False,
         'path_to_save_wfn_files': './wfn_files',
         'is_periodic': False,
-        'A_cell_vector': [
-            25.0,
-            0.0,
-            0.0],
-        'B_cell_vector': [
-            0.0,
-            25.0,
-            0.0],
-        'C_cell_vector': [
-            0.0,
-            0.0,
-            25.0],
-        'periodicity_type': 'XYZ',
+        'A_cell_vector': None,
+        'B_cell_vector': None,
+        'C_cell_vector': None,
+        'periodicity_type': None,
         'lowest_orbital': 1,
         'highest_orbital': 5,
         'res_dir': './res',
@@ -378,6 +370,8 @@ def train(params):
     # First load the default parameters etc
     refuse_unknown_keys(params, ML_MAP_KEYS, "ml_map.train", "params", "no function of the ml_map workflow reads")
     comn.check_input(params, default_params, critical_params)
+    if params["is_periodic"]:
+        CP2K_methods.fill_cell_from_template(params, params["cp2k_ml_input_template"])
 
     # Find the training indices
     if len(params["user_train_indices"]) > 0:
@@ -728,6 +722,8 @@ def compute_properties(params, models, input_scalers, output_scalers):
         None
     """
     refuse_unknown_keys(params, COMPUTE_PROPERTIES_KEYS, "ml_map.compute_properties", "params", "no function of the ml_map properties workflow reads")
+    if params.get("is_periodic"):
+        CP2K_methods.fill_cell_from_template(params, params["cp2k_ml_input_template"])
     # First find the indices of the input data
     # indices = find_indices_inputs(params)
     istep = params["istep"]
