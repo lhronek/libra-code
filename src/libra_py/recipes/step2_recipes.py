@@ -323,10 +323,7 @@ def run_step2_jobs(params):
         f.close()
 
         f = open("submit_" + str(njob) + ".slm", 'w')
-        f.close()
         for i in range(submit_template_file_size):
-
-            f = open("submit_" + str(njob) + ".slm", 'a')
 
             submit_template_file_line = submit_template_file[i].split()
             if not submit_template_file_line:
@@ -346,6 +343,7 @@ def run_step2_jobs(params):
 
             else:
                 f.write(submit_template_file[i])
+        f.close()
 
         logger.debug(f"Updated submit_template.slm")
 

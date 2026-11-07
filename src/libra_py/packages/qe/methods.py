@@ -1211,6 +1211,8 @@ def out2pdb(out_filename, T, dt, pdb_prefix):
                     else:
                         break
 
+    if not fr.closed:      # a frame cut short by the end of the file
+        fr.close()
     f.close()
 
 

@@ -927,6 +927,7 @@ def CP2K_input_static(cp2k_sample_energy_input: str, project_name: str,
             f.write('\n')
         else:
             f.write(lines[i])
+    f.close()
 
 
 READ_ENERGIES_LOG_KEYS = frozenset(("logfile_name", "max_band", "min_band", "spin", "time"))
