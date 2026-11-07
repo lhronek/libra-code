@@ -1075,7 +1075,7 @@ def plot_dynamics(plot_params_):
         if not do_show:
             _close_unseen()
 
-    with open_hdf5(F"{prefix}/{filename}", 'r') as f:
+    with open_hdf5(F"{prefix}/{filename}", 'r') as f, plt.rc_context({"figure.max_open_warning": 0}):
 
         # ===== Energy Components vs. Time =========
         if "energies" in what_to_plot:
@@ -2210,7 +2210,7 @@ def plot_dynamics_xf(plot_params_):
         if not do_show:
             _close_unseen()
 
-    with open_hdf5(F"{prefix}/{filename}", 'r') as f:
+    with open_hdf5(F"{prefix}/{filename}", 'r') as f, plt.rc_context({"figure.max_open_warning": 0}):
 
         # ===== Coordinates vs Time  =========
         if "q_aux" in what_to_plot:
