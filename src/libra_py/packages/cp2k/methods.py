@@ -853,7 +853,7 @@ def read_velocity_xyz_file(file_name: str, step: int):
     return labels, data_conv.nparray2MATRIX(np.asarray(vel, dtype=float).reshape(-1, 1))
 
 
-def _cp2k_keyword(line):
+def cp2k_keyword(line):
     """The keyword a CP2K input line sets and the line's uncommented text: the upper-case first token once the # or !
     comment is stripped - ("", "") for a blank or comment line."""
     code = line.split("#")[0].split("!")[0]
@@ -900,7 +900,7 @@ def CP2K_input_static(cp2k_sample_energy_input: str, project_name: str,
 
     f = open(f_new, 'w')
     for i in range(0, len(lines)):
-        keyword, code = _cp2k_keyword(lines[i])
+        keyword, code = cp2k_keyword(lines[i])
         # Writing the COORD_FILE_NAME in the input
         if keyword == 'COORD_FILE_NAME':
             f.write('      COORD_FILE_NAME')
@@ -2080,7 +2080,7 @@ def cp2k_xtb_ot_inp(ot_inp_temp: str, traj_xyz_filename: str, step: int):
     file = open('xtb_ot_step_%d.inp' % step, 'w')
 
     for i in range(len(lines)):
-        keyword, _ = _cp2k_keyword(lines[i])
+        keyword, _ = cp2k_keyword(lines[i])
         if keyword == 'PROJECT_NAME':
             file.write('PROJECT_NAME OT_%d\n' % step)
         elif keyword == 'COORD_FILE_NAME':
@@ -2142,7 +2142,7 @@ def cp2k_xtb_diag_inp(diag_inp_temp: str, step: int, wfn_restart_file=None, traj
 
     stack = []      # the CP2K sections open at the line
     for i in range(len(lines)):
-        keyword, _ = _cp2k_keyword(lines[i])
+        keyword, _ = cp2k_keyword(lines[i])
         if keyword.startswith('&END'):
             if stack:
                 stack.pop()
@@ -4024,7 +4024,7 @@ def make_cp2k_input(params, working_directory="."):
     out = []
     stack = []  # CP2K section stack, upper-case names
     for line in lines:
-        keyword, _ = _cp2k_keyword(line)
+        keyword, _ = cp2k_keyword(line)
 
         # --- maintain the section stack ---
         entering, ending = None, keyword.startswith("&END")

@@ -63,25 +63,27 @@ def make_input(prefix, input_template, software, trajectory_xyz_file, step):
     if software.lower() == "cp2k":
         f = open(F"input_{prefix}_{step}.inp", "w")
         for i in range(len(lines_input)):
-            if "COORD_FILE_NAME".lower() in lines_input[i].lower():
+            keyword, _ = CP2K_methods.cp2k_keyword(lines_input[i])
+            if keyword == "COORD_FILE_NAME":
                 f.write(F"     COORD_FILE_NAME  coord-{step}.xyz \n")
-            elif "project " in lines_input[i].lower() or "project_name" in lines_input[i].lower():
+            elif keyword in ("PROJECT", "PROJECT_NAME"):
                 f.write(F"  PROJECT {prefix}_{step}\n")
-            elif "filename" in lines_input[i].lower() and "!" not in lines_input[i]:
-                f.write("     FILENAME libra\n")
+            elif keyword == "FILENAME":
+                f.write("     FILENAME libra\n")      # save_data reads {prefix}_{step}-libra-1_0.Log
             else:
                 f.write(lines_input[i])
         f.close()
     elif software.lower() == "dftb+":
         f = open(F"dftb_in_{prefix}_{step}.hsd", "w")
         for i in range(len(lines_input)):
-            if "geometry" in lines_input[i].lower():
+            if "geometry" in lines_input[i].split("#")[0].lower():
                 geometry_line = i
                 break
         for i in range(geometry_line, len(lines_input)):
-            if "{" in lines_input[i]:
+            code = lines_input[i].split("#")[0]
+            if "{" in code:
                 start = i
-            elif "}" in lines_input[i]:
+            elif "}" in code:
                 end = i
                 break
         f.write("Geometry = xyzFormat {\n")

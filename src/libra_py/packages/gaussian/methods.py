@@ -387,14 +387,15 @@ def gaussian_input(project_name, time_step, sample_input, trajectory_xyz_file_na
     f.close()
 
     for i in range(0, len(lines)):
+        code = lines[i].split('!')[0]
         # Find the chk line for placing the check file
-        if '%chk=' in lines[i].lower():
+        if '%chk=' in code.lower():
             chk_line = i
         # Find the rwf line for placing the rwf file
-        if '%rwf=' in lines[i].lower():
+        if '%rwf=' in code.lower():
             rwf_line = i
-        # Find the line with '#', this line shows the calculation types for Gaussian
-        if '#' in lines[i]:
+        # Find the line starting with '#', this line shows the calculation types for Gaussian
+        if code.lstrip().startswith('#'):
             calc_type_line = i
 
     # Extract the coordinates from the trajectory xyz file
