@@ -3395,7 +3395,8 @@ def read_cp2k_newtonx_output(filename):
               nspin (1 or 2) - for UKS additionally the beta channel as
               X_b, C_occ_b, C_virt_b, E_occ_b, E_virt_b, phases_occ_b, phases_virt_b
     """
-    lines = open(filename).readlines()
+    with open(filename) as fh:
+        lines = fh.readlines()
 
     def read_triplet_matrix(start):
         rows, i = [], start
@@ -5331,7 +5332,8 @@ def _wfn_ao_atom_map(basis):
 
 def _fortran_records(path):
     """The records of a gfortran unformatted sequential file (4-byte length markers)."""
-    data = open(path, "rb").read()
+    with open(path, "rb") as fh:
+        data = fh.read()
     out, pos = [], 0
     while pos < len(data):
         n = int(np.frombuffer(data[pos:pos + 4], dtype="<i4")[0])

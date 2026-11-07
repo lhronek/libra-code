@@ -23,7 +23,8 @@ def read_tdwfn(path):
     spin, the eigenvalues (Hartree) and, state by state and spin by spin, the eigenvector as cp_fm_write_unformatted
     writes it - one Fortran record per column, nao doubles each. Returns a dict with nstates, nspins, nao, nmo_active
     (list), evals (ndarray) and evects (list over states of lists over spins of (nao, nmo_active) arrays)."""
-    data = open(path, "rb").read()
+    with open(path, "rb") as fh:
+        data = fh.read()
     pos = 0
 
     def record():
