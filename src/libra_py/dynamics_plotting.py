@@ -308,94 +308,87 @@ def plot_pes_properties(comp_model, _model_params, _pes_params, _plot_params):
         for it_indx, it in enumerate(which_dc1_adi):
             dc1_adi[it_indx].append(ham.get_dc1_adi(it[0], tid).get(it[1], it[2]).real)
 
-    plt.rc('axes', titlesize=38)      # fontsize of the axes title
-    plt.rc('axes', labelsize=38)      # fontsize of the x and y labels
-    plt.rc('legend', fontsize=36)     # legend fontsize
-    plt.rc('xtick', labelsize=28)     # fontsize of the tick labels
-    plt.rc('ytick', labelsize=28)     # fontsize of the tick labels
+    with plt.rc_context({'axes.titlesize': 38, 'axes.labelsize': 38, 'legend.fontsize': 36, 'xtick.labelsize': 28, 'ytick.labelsize': 28,
+                         'figure.subplot.left': 0.2, 'figure.subplot.right': 0.95, 'figure.subplot.bottom': 0.13,
+                         'figure.subplot.top': 0.88}):
 
-    plt.rc('figure.subplot', left=0.2)
-    plt.rc('figure.subplot', right=0.95)
-    plt.rc('figure.subplot', bottom=0.13)
-    plt.rc('figure.subplot', top=0.88)
+        # ======== Now lets plot what we have computed ===========
+        plt.figure(figsize=(36, 18))  # dpi=300, frameon=False)
+        # findx = plt.gcf().number
+        # plt.figure(findx + 1, figsize=(36, 18)) # dpi=300, frameon=False)
+        plt.subplot(1, 2, 1)
+        plt.title('Diabatic energies')
+        plt.xlabel('Coordinate, a.u.')
+        plt.ylabel('Energy, a.u.')
+        for it_indx, it in enumerate(which_ham_dia):
+            plt.plot(grid, ham_dia[it_indx], label='$H_{%i, %i}$' %
+                     (it[0], it[1]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
+        _legend()
 
-    # ======== Now lets plot what we have computed ===========
-    plt.figure(figsize=(36, 18))  # dpi=300, frameon=False)
-    # findx = plt.gcf().number
-    # plt.figure(findx + 1, figsize=(36, 18)) # dpi=300, frameon=False)
-    plt.subplot(1, 2, 1)
-    plt.title('Diabatic energies')
-    plt.xlabel('Coordinate, a.u.')
-    plt.ylabel('Energy, a.u.')
-    for it_indx, it in enumerate(which_ham_dia):
-        plt.plot(grid, ham_dia[it_indx], label='$H_{%i, %i}$' %
-                 (it[0], it[1]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
-    _legend()
+        plt.subplot(1, 2, 2)
+        plt.title('Adiabatic energies')
+        plt.xlabel('Coordinate, a.u.')
+        plt.ylabel('Energy, a.u.')
+        for it_indx, it in enumerate(which_ham_adi):
+            plt.plot(grid, ham_adi[it_indx], label='$H_{%i, %i}$' %
+                     (it[0], it[1]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
+        _legend()
+        if do_show:
+            plt.show()
+        # plt.clf()
+        plt.close()
 
-    plt.subplot(1, 2, 2)
-    plt.title('Adiabatic energies')
-    plt.xlabel('Coordinate, a.u.')
-    plt.ylabel('Energy, a.u.')
-    for it_indx, it in enumerate(which_ham_adi):
-        plt.plot(grid, ham_adi[it_indx], label='$H_{%i, %i}$' %
-                 (it[0], it[1]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
-    _legend()
-    if do_show:
-        plt.show()
-    # plt.clf()
-    plt.close()
+        plt.figure(figsize=(36, 18))  # dpi=300, frameon=False)
+        # findx = plt.gcf().number
+        # plt.figure(findx + 1, figsize=(36, 18)) # dpi=300, frameon=False)
+        plt.subplot(1, 2, 1)
+        plt.title('Derivatives of diabatic energies')
+        plt.xlabel('Coordinate, a.u.')
+        plt.ylabel('Derivative energy, a.u.')
+        for it_indx, it in enumerate(which_d1ham_dia):
+            plt.plot(grid, d1ham_dia[it_indx], label='$dH_{%i, %i} / dR_{%i}$' %
+                     (it[1], it[2], it[0]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
+        _legend()
 
-    plt.figure(figsize=(36, 18))  # dpi=300, frameon=False)
-    # findx = plt.gcf().number
-    # plt.figure(findx + 1, figsize=(36, 18)) # dpi=300, frameon=False)
-    plt.subplot(1, 2, 1)
-    plt.title('Derivatives of diabatic energies')
-    plt.xlabel('Coordinate, a.u.')
-    plt.ylabel('Derivative energy, a.u.')
-    for it_indx, it in enumerate(which_d1ham_dia):
-        plt.plot(grid, d1ham_dia[it_indx], label='$dH_{%i, %i} / dR_{%i}$' %
-                 (it[1], it[2], it[0]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
-    _legend()
+        plt.subplot(1, 2, 2)
+        plt.title('Derivatives of adiabatic energies')
+        plt.xlabel('Coordinate, a.u.')
+        plt.ylabel('Derivative energy, a.u.')
+        for it_indx, it in enumerate(which_d1ham_adi):
+            plt.plot(grid, d1ham_adi[it_indx], label='$dH_{%i, %i} / dR_{%i}$' %
+                     (it[1], it[2], it[0]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
+        _legend()
+        if do_show:
+            plt.show()
+        # plt.clf()
+        plt.close()
 
-    plt.subplot(1, 2, 2)
-    plt.title('Derivatives of adiabatic energies')
-    plt.xlabel('Coordinate, a.u.')
-    plt.ylabel('Derivative energy, a.u.')
-    for it_indx, it in enumerate(which_d1ham_adi):
-        plt.plot(grid, d1ham_adi[it_indx], label='$dH_{%i, %i} / dR_{%i}$' %
-                 (it[1], it[2], it[0]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
-    _legend()
-    if do_show:
-        plt.show()
-    # plt.clf()
-    plt.close()
+        plt.figure(figsize=(36, 18))  # dpi=300, frameon=False)
+        # findx = plt.gcf().number
+        # plt.figure(findx + 1, figsize=(36, 18)) # dpi=300, frameon=False)
+        plt.subplot(1, 2, 1)
+        plt.title('Derivatives couplings, diabatic rep.')
+        plt.xlabel('Coordinate, a.u.')
+        plt.ylabel('Derivative coupling, a.u.')
+        for it_indx, it in enumerate(which_dc1_dia):
+            plt.plot(grid, dc1_dia[it_indx], label='$< \\psi_{%i} | dR_{%i} | \\psi_{%i} >$' % (
+                it[1], it[0], it[2]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
+        _legend()
 
-    plt.figure(figsize=(36, 18))  # dpi=300, frameon=False)
-    # findx = plt.gcf().number
-    # plt.figure(findx + 1, figsize=(36, 18)) # dpi=300, frameon=False)
-    plt.subplot(1, 2, 1)
-    plt.title('Derivatives couplings, diabatic rep.')
-    plt.xlabel('Coordinate, a.u.')
-    plt.ylabel('Derivative coupling, a.u.')
-    for it_indx, it in enumerate(which_dc1_dia):
-        plt.plot(grid, dc1_dia[it_indx], label='$< \\psi_{%i} | dR_{%i} | \\psi_{%i} >$' % (
-            it[1], it[0], it[2]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
-    _legend()
+        plt.subplot(1, 2, 2)
+        plt.title('Derivatives couplings, adiabatic rep.')
+        plt.xlabel('Coordinate, a.u.')
+        plt.ylabel('Derivative energy, a.u.')
+        for it_indx, it in enumerate(which_dc1_adi):
+            plt.plot(grid, dc1_adi[it_indx], label='$< \\psi_{%i} | dR_{%i} | \\psi_{%i} >$' % (
+                it[1], it[0], it[2]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
+        _legend()
+        if do_show:
+            plt.show()
+        # plt.clf()
+        plt.close()
 
-    plt.subplot(1, 2, 2)
-    plt.title('Derivatives couplings, adiabatic rep.')
-    plt.xlabel('Coordinate, a.u.')
-    plt.ylabel('Derivative energy, a.u.')
-    for it_indx, it in enumerate(which_dc1_adi):
-        plt.plot(grid, dc1_adi[it_indx], label='$< \\psi_{%i} | dR_{%i} | \\psi_{%i} >$' % (
-            it[1], it[0], it[2]), linewidth=5, color=data_visualize.curve_color(colors, clrs_index, it_indx))
-    _legend()
-    if do_show:
-        plt.show()
-    # plt.clf()
-    plt.close()
-
-    return scan_path
+        return scan_path
 
 
 def plot_surfaces(_compute_model, _param_sets, states_of_interest, xmin, xmax, dx, _plot_params,
@@ -526,203 +519,205 @@ def plot_surfaces(_compute_model, _param_sets, states_of_interest, xmin, xmax, d
     for i in range(nsteps):
         X.append(xmin + i * dx)
 
-    plt.rc('axes', titlesize=_titlesize)      # fontsize of the axes title
-    plt.rc('axes', labelsize=_labelsize)      # fontsize of the x and y labels
-    plt.rc('legend', fontsize=_fontsize)      # legend fontsize
-    plt.rc('xtick', labelsize=_xticksize)     # fontsize of the tick labels
-    plt.rc('ytick', labelsize=_yticksize)     # fontsize of the tick labels
+    def _ticks():
+        plt.tick_params(axis='x', labelsize=_xticksize)
+        plt.tick_params(axis='y', labelsize=_yticksize)
 
-    plt.rc('figure.subplot', left=margin_left)
-    plt.rc('figure.subplot', right=margin_right)
-    plt.rc('figure.subplot', bottom=margin_bottom)
-    plt.rc('figure.subplot', top=margin_top)
+    with plt.rc_context({'axes.titlesize': _titlesize, 'axes.labelsize': _labelsize, 'legend.fontsize': _fontsize,
+                         'figure.subplot.left': margin_left, 'figure.subplot.right': margin_right,
+                         'figure.subplot.bottom': margin_bottom, 'figure.subplot.top': margin_top}):
 
-    sz = len(_param_sets)
-    for iset in range(sz):
+        sz = len(_param_sets)
+        for iset in range(sz):
 
-        # The "nstates" field must be specified
-        model_params = dict(_param_sets[iset])
-        comn.check_input(model_params, {}, ["nstates"])
-        n = model_params["nstates"]
-        nstates = n
+            # The "nstates" field must be specified
+            model_params = dict(_param_sets[iset])
+            comn.check_input(model_params, {}, ["nstates"])
+            n = model_params["nstates"]
+            nstates = n
 
-        ham = nHamiltonian(nstates, nstates, _ndof)  # ndia, nadi, nnucl
-        ham.init_all(1)
+            ham = nHamiltonian(nstates, nstates, _ndof)  # ndia, nadi, nnucl
+            ham.init_all(1)
 
-        hdia, hadi, nac, nac_abs = [], [], [], []
-        uij = []              # projecitions of the MOs onto elementary basis
-
-        for k1 in range(nstates):
-            hadi.append([])
-            hdia.append([])
-            nac_k1 = []
-            nac_abs_k1 = []
-            uij_k1 = []
-            for k2 in range(nstates):
-                uij_k1.append([])
-                nac_k1.append([])
-                nac_abs_k1.append([])
-            uij.append(uij_k1)
-            nac.append(nac_k1)
-            nac_abs.append(nac_abs_k1)
-
-        for i in range(nsteps):
-            scan_coord = MATRIX(_ndof, 1)
-            for j in range(_ndof):
-                scan_coord.set(j, 0, _all_coordinates[j])
-            scan_coord.set(_active_dof, 0, X[i])
-
-            # Diabatic properties
-            ham.compute_diabatic(_compute_model, scan_coord, model_params)
-
-            # Adiabatic properties
-            ham.compute_adiabatic(1)
-
-            U = ham.get_basis_transform()
-            # P = U * U.H()  # population matrix
+            hdia, hadi, nac, nac_abs = [], [], [], []
+            uij = []              # projecitions of the MOs onto elementary basis
 
             for k1 in range(nstates):
-                hadi[k1].append(ham.get_ham_adi().get(k1, k1).real)
-                hdia[k1].append(ham.get_ham_dia().get(k1, k1).real)
-
+                hadi.append([])
+                hdia.append([])
+                nac_k1 = []
+                nac_abs_k1 = []
+                uij_k1 = []
                 for k2 in range(nstates):
-                    uij[k1][k2].append(U.get(k1, k2).real**2 + U.get(k1, k2).imag**2)
-                    nac_k1_k2 = ham.get_dc1_adi(0).get(k1, k2).real
-                    nac[k1][k2].append(nac_k1_k2)
-                    nac_abs[k1][k2].append(abs(nac_k1_k2))
+                    uij_k1.append([])
+                    nac_k1.append([])
+                    nac_abs_k1.append([])
+                uij.append(uij_k1)
+                nac.append(nac_k1)
+                nac_abs.append(nac_abs_k1)
 
-        # print(hadi)
+            for i in range(nsteps):
+                scan_coord = MATRIX(_ndof, 1)
+                for j in range(_ndof):
+                    scan_coord.set(j, 0, _all_coordinates[j])
+                scan_coord.set(_active_dof, 0, X[i])
 
-        if plotting_option == 0:  # Plot diabatic and adiabatic surfaces separately, plot projections too
+                # Diabatic properties
+                ham.compute_diabatic(_compute_model, scan_coord, model_params)
 
-            findx = plt.gcf().number
-            print("Current figre index is ", findx)
+                # Adiabatic properties
+                ham.compute_adiabatic(1)
 
-            # ==================== Diabatic and Adiabatic surfaces ==============
-            # plt.figure(findx + 1, figsize=fig_size ) # dpi=300, frameon=False)
-            plt.figure(figsize=fig_size)  # dpi=300, frameon=False)
-
-            plt.subplot(1, 2, 1)
-            plt.ylim(ylim[0], ylim[1])
-            plt.xlim(xlim[0], xlim[1])
-
-            # plt.title('Params set %i: Ham_dia' % (iset) )
-            plt.xlabel('Coordinate, a.u.')
-            plt.ylabel('Energy, a.u.')
-            for k1 in states_of_interest:
-                plt.plot(X, hdia[k1], label='$H_{%i%i}$' %
-                         (k1, k1), linewidth=_linewidth, color=data_visualize.curve_color(colors, clrs_index, k1))
-            _legend()
-
-            plt.subplot(1, 2, 2)
-            plt.ylim(ylim[0], ylim[1])
-            plt.xlim(xlim[0], xlim[1])
-            # plt.title('Params set %i: Ham_adi' % (iset))
-            plt.xlabel('Coordinate, a.u.')
-            # plt.ylabel('Energy, a.u.')
-            plt.yticks([])
-            for k1 in states_of_interest:
-                plt.plot(X, hadi[k1], label='$E_{%i}$' % (k1), linewidth=_linewidth,
-                         color=data_visualize.curve_color(colors, clrs_index, k1))
-            _legend()
-
-            if save_figures:
-                if not os.path.exists(F"{prefix}"):
-                    os.system(F"mkdir {prefix}")
-                plt.savefig(F"{prefix}/Ham_dia_E_adi_set_{iset}.png", dpi=dpi_value)
-
-            if do_show:
-                plt.show()
-
-            # plt.clf()
-            # plt.close()
-
-            # =================== Projections ============================
-            findx = plt.gcf().number
-            print("Current figre index is ", findx)
-            # plt.figure( findx + 1, figsize=fig_size ) # dpi=300, frameon=False)
-            plt.figure(figsize=fig_size)  # dpi=300, frameon=False)
-            sz1 = len(states_of_interest)
-
-            for k2 in states_of_interest:
-                indx = states_of_interest.index(k2)
-
-                # plt.figure(2*iset+1+indx, figsize=(36, 18)) # dpi=300, frameon=False)
-                # plt.figure(2*iset+1+indx, figsize=fig_size) # dpi=300, frameon=False)
-                plt.subplot(sz1, 1, indx + 1)
-
-                # plt.subplot(1, sz1, 1+indx)
-                # plt.subplot(1, 1, 1+indx)
-                # plt.title('Params set %i: Adi state %i' % (iset, k2) )
-                plt.xlabel('Coordinate, a.u.')
-                plt.ylabel('Projection')
+                U = ham.get_basis_transform()
+                # P = U * U.H()  # population matrix
 
                 for k1 in range(nstates):
-                    # plt.plot(X, uij[k1][k2], label='$dia_{%i} | adi_{%i}$' % (k1, k2), linewidth=7, color = data_visualize.curve_color(colors, clrs_index, k1))
-                    plt.plot(X, uij[k1][k2], label='$< \\psi^{dia}_{%i} | \\psi^{adi}_{%i} >$' % (
-                        k1, k2), linewidth=_linewidth, color=data_visualize.curve_color(colors, clrs_index, k1))
-            _legend()
+                    hadi[k1].append(ham.get_ham_adi().get(k1, k1).real)
+                    hdia[k1].append(ham.get_ham_dia().get(k1, k1).real)
 
-            if save_figures:
-                if not os.path.exists(F"{prefix}"):
-                    os.system(F"mkdir {prefix}")
-                plt.savefig(F"{prefix}/projections_set_{iset}.png", dpi=dpi_value)
+                    for k2 in range(nstates):
+                        uij[k1][k2].append(U.get(k1, k2).real**2 + U.get(k1, k2).imag**2)
+                        nac_k1_k2 = ham.get_dc1_adi(0).get(k1, k2).real
+                        nac[k1][k2].append(nac_k1_k2)
+                        nac_abs[k1][k2].append(abs(nac_k1_k2))
 
-            if do_show:
-                plt.show()
+            # print(hadi)
 
-            # plt.clf()
-            # plt.close()
+            if plotting_option == 0:  # Plot diabatic and adiabatic surfaces separately, plot projections too
 
-        elif plotting_option == 1:  # Plot diabatic and adiabatic surfaces in one picture, using dashed lines for diabatic
-            # Plot NACs in a separate panel
+                findx = plt.gcf().number
+                print("Current figre index is ", findx)
 
-            findx = plt.gcf().number
-            plt.figure(figsize=fig_size)  # dpi=300, frameon=False)
+                # ==================== Diabatic and Adiabatic surfaces ==============
+                # plt.figure(findx + 1, figsize=fig_size ) # dpi=300, frameon=False)
+                plt.figure(figsize=fig_size)  # dpi=300, frameon=False)
 
-            plt.subplot(1, 2, 1)
-            plt.ylim(ylim[0], ylim[1])
-            plt.xlim(xlim[0], xlim[1])
+                plt.subplot(1, 2, 1)
+                _ticks()
+                plt.ylim(ylim[0], ylim[1])
+                plt.xlim(xlim[0], xlim[1])
 
-            # plt.title('Params set %i: Ham_dia' % (iset) )
-            plt.xlabel('Coordinate, a.u.')
-            plt.ylabel('Energy, a.u.')
+                # plt.title('Params set %i: Ham_dia' % (iset) )
+                plt.xlabel('Coordinate, a.u.')
+                plt.ylabel('Energy, a.u.')
+                for k1 in states_of_interest:
+                    plt.plot(X, hdia[k1], label='$H_{%i%i}$' %
+                             (k1, k1), linewidth=_linewidth, color=data_visualize.curve_color(colors, clrs_index, k1))
+                _legend()
 
-            for k1 in states_of_interest:
-                plt.plot(X, hdia[k1], label='$H_{%i%i}$' %
-                         (k1, k1), linewidth=_linewidth, ls="--",
-                         color=data_visualize.curve_color(colors, clrs_index, k1))
-                plt.plot(X, hadi[k1], label='$E_{%i}$' % (k1), linewidth=_linewidth,
-                         color=data_visualize.curve_color(colors, clrs_index, k1))
-            _legend()
+                plt.subplot(1, 2, 2)
+                _ticks()
+                plt.ylim(ylim[0], ylim[1])
+                plt.xlim(xlim[0], xlim[1])
+                # plt.title('Params set %i: Ham_adi' % (iset))
+                plt.xlabel('Coordinate, a.u.')
+                # plt.ylabel('Energy, a.u.')
+                plt.yticks([])
+                for k1 in states_of_interest:
+                    plt.plot(X, hadi[k1], label='$E_{%i}$' % (k1), linewidth=_linewidth,
+                             color=data_visualize.curve_color(colors, clrs_index, k1))
+                _legend()
 
-            plt.subplot(1, 2, 2)
-            plt.ylim(ylim2[0], ylim2[1])
-            plt.xlim(xlim[0], xlim[1])
-            # plt.title('Params set %i: Ham_adi' % (iset))
-            plt.xlabel('Coordinate, a.u.')
-            plt.ylabel('NAC, a.u.')
-            cnt = 0
-            for k1 in states_of_interest:
+                if save_figures:
+                    if not os.path.exists(F"{prefix}"):
+                        os.system(F"mkdir {prefix}")
+                    plt.savefig(F"{prefix}/Ham_dia_E_adi_set_{iset}.png", dpi=dpi_value)
+
+                if do_show:
+                    plt.show()
+
+                # plt.clf()
+                # plt.close()
+
+                # =================== Projections ============================
+                findx = plt.gcf().number
+                print("Current figre index is ", findx)
+                # plt.figure( findx + 1, figsize=fig_size ) # dpi=300, frameon=False)
+                plt.figure(figsize=fig_size)  # dpi=300, frameon=False)
+                sz1 = len(states_of_interest)
+
                 for k2 in states_of_interest:
-                    if k2 > k1:
-                        plt.plot(X, nac[k1][k2], label='$NAC_{%i%i}$' %
-                                 (k1, k2), linewidth=_linewidth,
-                                 color=data_visualize.curve_color(colors, clrs_index, cnt))
-                        if show_nac_abs:
-                            plt.plot(X, nac_abs[k1][k2], label='$NAC_{%i%i}$' % (
-                                k1, k2), linewidth=_linewidth, ls="--",
-                                color=data_visualize.curve_color(colors, clrs_index, cnt + 1))
-                        cnt = cnt + 1
-            _legend()
+                    indx = states_of_interest.index(k2)
 
-            if save_figures:
-                if not os.path.exists(F"{prefix}"):
-                    os.system(F"mkdir {prefix}")
-                plt.savefig(F"{prefix}/Ham_dia_E_adi_NAC_set_{iset}.png", dpi=dpi_value)
+                    # plt.figure(2*iset+1+indx, figsize=(36, 18)) # dpi=300, frameon=False)
+                    # plt.figure(2*iset+1+indx, figsize=fig_size) # dpi=300, frameon=False)
+                    plt.subplot(sz1, 1, indx + 1)
+                    _ticks()
 
-            if do_show:
-                plt.show()
+                    # plt.subplot(1, sz1, 1+indx)
+                    # plt.subplot(1, 1, 1+indx)
+                    # plt.title('Params set %i: Adi state %i' % (iset, k2) )
+                    plt.xlabel('Coordinate, a.u.')
+                    plt.ylabel('Projection')
+
+                    for k1 in range(nstates):
+                        # plt.plot(X, uij[k1][k2], label='$dia_{%i} | adi_{%i}$' % (k1, k2), linewidth=7, color = data_visualize.curve_color(colors, clrs_index, k1))
+                        plt.plot(X, uij[k1][k2], label='$< \\psi^{dia}_{%i} | \\psi^{adi}_{%i} >$' % (
+                            k1, k2), linewidth=_linewidth, color=data_visualize.curve_color(colors, clrs_index, k1))
+                _legend()
+
+                if save_figures:
+                    if not os.path.exists(F"{prefix}"):
+                        os.system(F"mkdir {prefix}")
+                    plt.savefig(F"{prefix}/projections_set_{iset}.png", dpi=dpi_value)
+
+                if do_show:
+                    plt.show()
+
+                # plt.clf()
+                # plt.close()
+
+            elif plotting_option == 1:  # Plot diabatic and adiabatic surfaces in one picture, using dashed lines for diabatic
+                # Plot NACs in a separate panel
+
+                findx = plt.gcf().number
+                plt.figure(figsize=fig_size)  # dpi=300, frameon=False)
+
+                plt.subplot(1, 2, 1)
+                _ticks()
+                plt.ylim(ylim[0], ylim[1])
+                plt.xlim(xlim[0], xlim[1])
+
+                # plt.title('Params set %i: Ham_dia' % (iset) )
+                plt.xlabel('Coordinate, a.u.')
+                plt.ylabel('Energy, a.u.')
+
+                for k1 in states_of_interest:
+                    plt.plot(X, hdia[k1], label='$H_{%i%i}$' %
+                             (k1, k1), linewidth=_linewidth, ls="--",
+                             color=data_visualize.curve_color(colors, clrs_index, k1))
+                    plt.plot(X, hadi[k1], label='$E_{%i}$' % (k1), linewidth=_linewidth,
+                             color=data_visualize.curve_color(colors, clrs_index, k1))
+                _legend()
+
+                plt.subplot(1, 2, 2)
+                _ticks()
+                plt.ylim(ylim2[0], ylim2[1])
+                plt.xlim(xlim[0], xlim[1])
+                # plt.title('Params set %i: Ham_adi' % (iset))
+                plt.xlabel('Coordinate, a.u.')
+                plt.ylabel('NAC, a.u.')
+                cnt = 0
+                for k1 in states_of_interest:
+                    for k2 in states_of_interest:
+                        if k2 > k1:
+                            plt.plot(X, nac[k1][k2], label='$NAC_{%i%i}$' %
+                                     (k1, k2), linewidth=_linewidth,
+                                     color=data_visualize.curve_color(colors, clrs_index, cnt))
+                            if show_nac_abs:
+                                plt.plot(X, nac_abs[k1][k2], label='$NAC_{%i%i}$' % (
+                                    k1, k2), linewidth=_linewidth, ls="--",
+                                    color=data_visualize.curve_color(colors, clrs_index, cnt + 1))
+                            cnt = cnt + 1
+                _legend()
+
+                if save_figures:
+                    if not os.path.exists(F"{prefix}"):
+                        os.system(F"mkdir {prefix}")
+                    plt.savefig(F"{prefix}/Ham_dia_E_adi_NAC_set_{iset}.png", dpi=dpi_value)
+
+                if do_show:
+                    plt.show()
             # plt.clf()
             # plt.close()
     # plt.close()
