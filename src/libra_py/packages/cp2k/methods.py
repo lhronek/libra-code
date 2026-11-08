@@ -4193,6 +4193,10 @@ def run_cp2k(coords_bohr, params):
                 unconverged SCF (only reachable with CP2K's
                 IGNORE_CONVERGENCE_FAILURE, which downgrades the abort to a
                 warning) - 0 raises on it                                [default 0]
+            allow_unconverged_tddfpt (int): 1 accepts a step whose log reports an
+                unconverged TDDFPT Davidson ("TDDFPT run did NOT converge") or
+                Z-vector solve ("The linear solver didn't converge"), which CP2K
+                reports as a warning and runs on from - 0 raises on it   [default 0]
             project (str), coord_file (str), number_of_states (int): see make_cp2k_input
 
     Returns:
@@ -4201,7 +4205,7 @@ def run_cp2k(coords_bohr, params):
     Raises:
         RuntimeError: if CP2K exits non-zero (tail of the log is included) with
             the main template and every retry_templates entry, or if the run
-            that succeeded reports an unconverged SCF
+            that succeeded reports an unconverged SCF, Davidson or Z-vector solve
     """
     atom_labels = params["atom_labels"]
     exe = params.get("cp2k_exe", "cp2k.psmp")
@@ -4286,6 +4290,17 @@ def run_cp2k(coords_bohr, params):
                     f"forces are not usable. Fix the SCF (density mixing, MAX_SCF) or add a "
                     f"retry_templates entry that does, allow_unconverged_scf = 1 accepts the "
                     f"step regardless")
+        # an unconverged Davidson or Z-vector solve is a warning in the log and the run exits 0 with the
+        # roots or the excited-state force it reached
+        if int(params.get("allow_unconverged_tddfpt", 0)) == 0:
+            for needle, what, knob in ((b"TDDFPT run did NOT converge", "Davidson", "MAX_ITER and MAX_KV of &TDDFPT"),
+                                       (b"The linear solver didn't", "Z-vector", "MAX_ITER of &TDDFPT &LINRES"),
+                                       (b"The linear solver did NOT converge", "Z-vector", "MAX_ITER of &TDDFPT &LINRES")):
+                if _log_contains(logfile, needle):
+                    raise RuntimeError(
+                        f"CP2K reported an unconverged TDDFPT {what} solve in {wd} ({logfile}) - its excitation "
+                        f"energies and excited-state force are not usable. Raise {knob} or add a retry_templates "
+                        f"entry that does, allow_unconverged_tddfpt = 1 accepts the step regardless")
 
     # the restart files of the step's start, kept aside: a retry starts from them (the previous
     # step's converged density), not from the density the failed attempt left behind
@@ -5998,7 +6013,7 @@ def _cp2k_run_params(params, is_first_time, wd, act_state, force_source, nexc, n
                   ("atom_labels", "input_template", "ot_template", "ot_restart_source", "time_dependent",
                    "force_source", "cp2k_exe", "cp2k_data_dir",
                    "omp_num_threads", "mpi_executable", "nprocs", "project",
-                   "retry_templates", "allow_unconverged_scf", "spin_flip",
+                   "retry_templates", "allow_unconverged_scf", "allow_unconverged_tddfpt", "spin_flip",
                    "allow_negative_excitation_energy")
                   if k in params}
     if params.get("ot_first_call_only", False) and not is_first_time:
@@ -6404,6 +6419,9 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     turn after an unconverged SCF, each from the restart the
                     failed attempt left [default: none]
                 allow_unconverged_scf (bool): accept an unconverged SCF instead
+                    of refusing the step [default: False]
+                allow_unconverged_tddfpt (bool): accept an unconverged TDDFPT
+                    Davidson or Z-vector solve (CP2K warns and runs on) instead
                     of refusing the step [default: False]
                 project (str): the CP2K PROJECT name, the stem of the restart
                     and output files [default: "libra"]
@@ -7732,6 +7750,7 @@ def _step_cached(params, itraj, key):
 
 CP2K_COMPUTE_ADI_KEYS = frozenset(("E_adi_last", "S_prev", "_ao_atom_map", "_step_results", "act_state",
                                    "align_mo_phases", "allow_negative_excitation_energy", "allow_unconverged_scf",
+                                   "allow_unconverged_tddfpt",
                                    "ao_overlap_method", "apply_orthonormalization", "atom_labels",
                                    "carrier_reference", "ci_prev", "ci_source", "ci_threshold", "continuity_lost_pop_max",
                                    "coordinates_prev",
