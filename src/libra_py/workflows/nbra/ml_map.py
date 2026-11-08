@@ -696,7 +696,7 @@ COMPUTE_PROPERTIES_KEYS = frozenset(("A_cell_vector", "B_cell_vector", "C_cell_v
                                      "istep", "lowest_orbital", "npartition", "nprocs", "output_property",
                                      "partitioning_method", "path_to_input_mats", "path_to_output_mats",
                                      "path_to_sample_files", "path_to_save_ref_mos", "path_to_save_wfn_files",
-                                     "path_to_trajectory_xyz_file", "prefix", "res_dir", "sample_molden_file",
+                                     "path_to_trajectory_xyz_file", "periodicity_type", "prefix", "res_dir", "sample_molden_file",
                                      "sample_wfn_file", "save_ao_overlap", "save_ml_ham", "save_ml_mos",
                                      "save_ref_eigenvalues", "save_ref_eigenvectors", "translational_vectors",
                                      "write_wfn_file"))
