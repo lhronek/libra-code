@@ -6505,7 +6505,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     its members (purify_spin_mixtures, the groups taken by
                     decreasing coupling, a root in one group at most, every
                     group rotated, a coupling damped in from the threshold to
-                    twice it, the energy diagonalized within a group's
+                    twice it and out over spin_purify_window_fade at the
+                    edge, the energy diagonalized within a group's
                     near-degenerate S^2 eigenvalues) - a rotated state's
                     energy is the roots' weighted one
                     [default 2 eV: the spin-incomplete root of ethylene mixes
@@ -6515,6 +6516,10 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     than this weight, one force run each; below it the energy
                     is the rotated one and the force the leading root's, 0 runs
                     every root's force [default 0.05]
+                spin_purify_window_fade (float, Ha): the band at the window's
+                    edge over which a coupling fades out, so that a pair
+                    crossing the edge forms or dissolves with no step - 0 keeps
+                    the hard edge [default 0.5 eV]
                 state_reordering_min_overlap (float): the continuity floor of the
                     manifold - a state of the previous step whose largest time
                     overlap with this step's states lies below it is lost, the
@@ -7042,7 +7047,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
         s2_excess = s2_spin_flip_matrix(X_all, n_a_occ, n_b_occ, S_ab)
         purify_window = float(params.get("spin_purify_window", 2.0 / units.au2ev))
         min_weight = float(params.get("spin_purify_min_weight", 0.05))
-        sf_states, purified = purify_spin_mixtures(X_all, omegas[:nroots], s2_excess, purify_window)
+        window_fade = float(params.get("spin_purify_window_fade", 0.5 / units.au2ev))
+        sf_states, purified = purify_spin_mixtures(X_all, omegas[:nroots], s2_excess, purify_window, window_fade=window_fade)
         for st in sf_states:
             st["cls"] = classify_spin(st["s2"], s2_low_spin_max, s2_high_spin_min, s_ref)
         low = [st for st in sf_states if st["cls"] == low_name]
@@ -7770,7 +7776,7 @@ CP2K_COMPUTE_ADI_KEYS = frozenset(("E_adi_last", "S_prev", "_ao_atom_map", "_ste
                                    "s2_high_spin_min", "s2_low_spin_max", "s_ihalf_prev", "sd_basis",
                                    "sd_capture_max_drop", "sd_overlap_kernel", "sd_prev", "sd_state_ordering", "se_pop_adi",
                                    "sf_basis", "sf_eref", "sf_force_roots", "sf_omegas", "sf_prev", "sf_roots",
-                                   "spin_flip", "spin_purify_min_weight", "spin_purify_window", "state_reordering_min_overlap",
+                                   "spin_flip", "spin_purify_min_weight", "spin_purify_window", "spin_purify_window_fade", "state_reordering_min_overlap",
                                    "time_dependent", "timestep", "working_directory_prefix"))
 def cp2k_compute_adi(q, params, full_id):
     """Traceback-printing wrapper: C++ callers swallow Python exceptions. A repeated call for the same step, active

@@ -235,7 +235,7 @@ def s2_spin_flip_brute_matrix(X_list, n_alpha_occ, n_beta_occ, S_ab, threshold=1
     return M
 
 
-def purify_spin_mixtures(X_list, omegas, s2_matrix, window, mix_min=0.05, mix_full=0.1, degenerate=0.25):
+def purify_spin_mixtures(X_list, omegas, s2_matrix, window, mix_min=0.05, mix_full=0.1, degenerate=0.25, *, window_fade):
     """The roots whose spin mixing the Davidson left in (a degenerate singlet and triplet pair delivered as two mixtures,
     a singlet crossing a spin-incomplete root, S0 and the triplet mixing at the twist, the V character spread over three
     roots on the hot ground state) rotated to the eigenvectors of their excess-<S^2> block, group by group: two roots are
@@ -248,7 +248,11 @@ def purify_spin_mixtures(X_list, omegas, s2_matrix, window, mix_min=0.05, mix_fu
     weights is the driver's (spin_purify_min_weight). A coupling enters its group's block damped, scaled by the cubic
     step from 0 at mix_min to 1 at mix_full, so that a root crossing the threshold joins or leaves with no step in any
     state's energy or amplitudes (the hard switch stepped them by the root's weight, (mix_min / the excess gap)^2 -
-    mix_full at or below mix_min keeps the hard switch). Two eigenvectors of one spin cannot be told apart by S^2 - a
+    mix_full at or below mix_min keeps the hard switch). A coupling fades out towards the window's edge as well, scaled
+    by the cubic step over the last window_fade of the window (the driver's spin_purify_window_fade - 0.5 eV at a 2 eV
+    window: from 1.5 to 2 eV), so that a pair crossing the edge forms or dissolves with no step either (0 keeps the hard
+    edge). Two eigenvectors of one spin
+    cannot be told apart by S^2 - a
     group holding a second singlet-like root beside V would hand V an arbitrary share of it - so within every run of
     eigenvalues closer than degenerate the energy is diagonalized and a group's singlet subspace is spanned by its energy
     eigenstates (degenerate 0 keeps the plain eigenvectors). A clique, not a connected component: a chain of weak couplings
@@ -269,6 +273,12 @@ def purify_spin_mixtures(X_list, omegas, s2_matrix, window, mix_min=0.05, mix_fu
         if mix_full <= mix_min:
             return 1.0
         t = min(max((abs(c) - mix_min) / (mix_full - mix_min), 0.0), 1.0)
+        return t * t * (3.0 - 2.0 * t)
+
+    def fade(k, l):
+        if window_fade <= 0.0:
+            return 1.0
+        t = min(max((window - abs(omegas[k] - omegas[l])) / window_fade, 0.0), 1.0)
         return t * t * (3.0 - 2.0 * t)
     edges = sorted(((abs(s2_matrix[k, l]), k, l) for k in range(n) for l in range(k + 1, n) if coupled(k, l)), reverse=True)
     used = set()
@@ -294,7 +304,8 @@ def purify_spin_mixtures(X_list, omegas, s2_matrix, window, mix_min=0.05, mix_fu
         if k not in used:
             states.append(single(k))
     for group in groups:
-        block = np.array([[s2_matrix[a, b] * (1.0 if a == b else onset(s2_matrix[a, b])) for b in group] for a in group], dtype=float)
+        block = np.array([[s2_matrix[a, b] * (1.0 if a == b else onset(s2_matrix[a, b]) * fade(a, b)) for b in group] for a in group],
+                         dtype=float)
         block = 0.5 * (block + block.T)
         vals, U = np.linalg.eigh(block)
         # the energy diagonalized within every run of near-degenerate S^2 eigenvalues
