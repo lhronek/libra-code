@@ -6033,6 +6033,139 @@ def _remove_stale_prints(wd, project):
             os.remove(stale)
 
 
+def _overlap_run_params(params, overlap_template, wd):
+    """The parameters of the OVERLAP_DELTAT run in wd/odt: the execution-layer keys and allow_unconverged_scf (a property
+    of the run, not of a template - retry_templates stay out, they are main-input templates and the overlap run has its
+    own), the overlap template and the parse pool of the prefetch."""
+    odt = {k: params[k] for k in ("atom_labels", "cp2k_exe", "cp2k_data_dir", "omp_num_threads", "mpi_executable", "nprocs",
+                                  "csr_chunk_rows", "allow_unconverged_scf") if k in params}
+    odt["overlap_template"] = overlap_template
+    odt["working_directory"] = f"{wd}/odt"
+    parse_pool = _prefetch_parse_pool(params)
+    if parse_pool is not None:
+        odt["_parse_pool"] = parse_pool
+    return odt
+
+
+def _spin_flip_manifold(wd, project, mo, S_ao, omegas, n_a_occ, n_b_occ, nmo, nstates, params, what):
+    """The spin-flip manifold of one solved geometry: the roots of the TDDFPT restart in wd expanded over the beta
+    virtual MOs, their excess <S^2> and spin classes, the coupled roots rotated to pure spins (purify_spin_mixtures) and
+    the lowest nstates low-spin states with their roots and force roots - the step's own solve and the displaced solves
+    of the force along the velocity read the same construction. `what` names the solve in a refusal."""
+    s_ref = s_reference(n_a_occ, n_b_occ)
+    low_name = spin_name(s_ref - 1.0)
+    s2_low_spin_max = float(params.get("s2_low_spin_max", 0.5))
+    s2_high_spin_min = float(params.get("s2_high_spin_min", 1.5))
+    td = read_tdwfn(f"{wd}/{project}-RESTART.tdwfn")
+    if td["nspins"] != 1 or td["nmo_active"][0] != n_a_occ or td["nao"] != mo["C"].shape[1]:
+        raise ValueError(F"{what}: the TDDFPT restart carries {td['nspins']} spin block(s) of {td['nmo_active']} "
+                         F"active orbitals over {td['nao']} AOs - a spin-flip run writes one block of the "
+                         F"{n_a_occ} alpha occupied responses over {mo['C'].shape[1]} AOs")
+    if "E" in mo:
+        # with every MO in the wfn the TDDFPT keeps the SCF orbitals, so a degenerate alpha pair keeps its rotation
+        check_restart_orbitals(mo["E"][:n_a_occ], nmo, mo["C"].shape[1], wd)
+    omegas = np.asarray(omegas, dtype=float)
+    nroots = min(td["nstates"], len(omegas))
+    S_ab = mo["C"] @ S_ao @ mo["C_b"].T
+    X_all, s2_all, cls_all = [], [], []
+    for k in range(nroots):
+        # the amplitudes for the aligned alpha occupied orbitals - their CP2K phases restore the stored columns
+        X, left, total = spin_flip_amplitudes(td["evects"][k][0], mo["C_b"], S_ao, n_b_occ, mo["C"][:n_a_occ])
+        if abs(total - 1.0) > 1e-4:
+            raise ValueError(F"spin-flip root {k + 1}: the beta MOs of the wfn carry {total:.6f} of the "
+                             F"response - ADDED_MOS must cover every virtual of both spins")
+        if left > 1e-6:
+            raise ValueError(F"spin-flip root {k + 1}: {left:.1e} of the response lies on the beta occupied "
+                             F"orbitals - not a spin-flip response of this reference")
+        X_all.append(X)
+        excess = s2_spin_flip(X, n_a_occ, n_b_occ, S_ab)
+        s2_all.append(s2_total(excess, n_a_occ, n_b_occ))
+        cls_all.append(classify_spin(excess, s2_low_spin_max, s2_high_spin_min, s_ref))
+    # roots coupled by their excess <S^2> within spin_purify_window are rotated to pure spins (purify_spin_mixtures) -
+    # a rotated state's energy is the roots' weighted one, its force the weighted one of the roots above the floor
+    s2_excess = s2_spin_flip_matrix(X_all, n_a_occ, n_b_occ, S_ab)
+    purify_window = float(params.get("spin_purify_window", 2.0 / units.au2ev))
+    min_weight = float(params.get("spin_purify_min_weight", 0.05))
+    coupling_min = float(params.get("spin_purify_coupling_min", 0.05))
+    coupling_ramp = float(params.get("spin_purify_coupling_ramp", 0.05))
+    s2_tolerance = float(params.get("spin_purify_s2_tolerance", 0.25))
+    window_fade = float(params.get("spin_purify_window_fade", 0.5 / units.au2ev))
+    sf_states, purified = purify_spin_mixtures(X_all, omegas[:nroots], s2_excess, purify_window, coupling_min=coupling_min,
+                                               coupling_ramp=coupling_ramp, s2_tolerance=s2_tolerance, window_fade=window_fade)
+    for st in sf_states:
+        st["cls"] = classify_spin(st["s2"], s2_low_spin_max, s2_high_spin_min, s_ref)
+    low = [st for st in sf_states if st["cls"] == low_name]
+    if len(low) < nstates:
+        raise ValueError(F"{what}: {len(low)} {low_name} states among the "
+                         F"{nroots} spin-flip roots (<S^2> {np.round(s2_all, 3).tolist()}"
+                         + (F", the purified groups {[[r + 1 for r in p['roots']] for p in purified]} -> "
+                            F"{[np.round(p['s2'], 3).tolist() for p in purified]}" if purified else "")
+                         + F") for {nstates} states - raise number_of_states")
+    manifold = low[:nstates]
+    # CP2K's 1-based root of every state: the leading root of a purified state, the root itself otherwise
+    roots = [int(st["roots"][int(np.argmax(st["weights"]))]) + 1 for st in manifold]
+    # the roots a state's force is built from: every root with a weight above spin_purify_min_weight, renormalized
+    force_roots = []
+    for st in manifold:
+        kept = [(int(r) + 1, float(w)) for r, w in zip(st["roots"], st["weights"]) if w > min_weight]
+        total_w = sum(w for _, w in kept)
+        force_roots.append([(r, w / total_w) for r, w in kept])
+    return {"omegas": omegas, "nroots": nroots, "s2_all": s2_all, "cls_all": cls_all, "purified": purified,
+            "manifold": manifold, "roots": roots, "force_roots": force_roots}
+
+
+def _spin_flip_fd_force(params, itraj, coordinates, wd, state, state_roots, forces, nstates, overlap_template, what):
+    """The force of a purified state along the step's own displacement (velocity Verlet's mid-step velocity) from the
+    purified energies at the geometry displaced by -+ spin_purify_force_fd_step: the roots' weighted forces lack the gap
+    times the gradient of the S^2 weights, finite at a crossing (17 meV a step at ethylene's S0 / T1 twist crossing) -
+    two energy-only solves (the OT and the Davidson seeded with the step's restart files, the AO overlap job of the
+    S^2 block) in wd/fd-minus and wd/fd-plus replace the force's component along the displacement, the components
+    across stay the weighted ones. state_roots are the state's (root, weight) pairs the forces were combined from.
+    Returns (forces, record line): unchanged and no line where the state is one root or the step is 0, unchanged with a
+    line where the trajectory has no previous geometry (its first call)."""
+    step = float(params.get("spin_purify_force_fd_step", 0.002 * units.Angst))
+    if step < 0.0:
+        raise ValueError(F"spin_purify_force_fd_step = {step} - a displacement in Bohr, 0 keeps the roots' weighted forces")
+    force_roots = list(state_roots)
+    if step == 0.0 or len(force_roots) < 2:
+        return forces, ""
+    vh = np.asarray(params["sf_step_direction"][itraj], dtype=float)
+    if not np.any(vh):
+        return forces, (F"  fd force: state {state} of roots {[(r, round(w, 3)) for r, w in force_roots]} without a previous "
+                        F"geometry - the weighted forces alone\n")
+    project = params.get("project", "libra")
+    homo = params["homo"][itraj]
+    n_a_occ, n_b_occ = int(homo[0]), int(homo[1])
+    LO, HI = int(params["lowest_orbital"]), int(params["highest_orbital"])
+    q = np.asarray(coordinates, dtype=float).reshape(-1)
+    energies = {}
+    for tag, sign in (("minus", -1.0), ("plus", 1.0)):
+        wd_fd = F"{wd}/fd-{tag}"
+        os.makedirs(wd_fd, exist_ok=True)
+        for f in (F"{project}-RESTART.wfn", F"{project}-RESTART.tdwfn", F"{project}_ot-RESTART.wfn"):
+            if os.path.exists(F"{wd}/{f}"):          # the step's solution seeds the OT and the Davidson
+                shutil.copy(F"{wd}/{f}", F"{wd_fd}/{f}")
+        q_fd = q + sign * step * vh
+        run_params = _cp2k_run_params(params, False, wd_fd, 0, "none", nstates - 1)
+        run_params["force_source"] = "none"                      # the energies alone, as the first call of a trajectory
+        _remove_stale_prints(wd_fd, project)
+        res_fd = compute_state_energy_and_force(q_fd, run_params)
+        mo_fd = load_wfn_mo_data(F"{wd_fd}/{project}-RESTART.wfn")
+        ovl = mo_overlaps_via_cp2k(mo_fd, mo_fd, q_fd, q_fd, LO, HI, _overlap_run_params(params, overlap_template, wd_fd),
+                                   return_ao_overlap=True)
+        sfm = _spin_flip_manifold(wd_fd, project, mo_fd, ovl[3], res_fd["omegas"], n_a_occ, n_b_occ, mo_fd["C"].shape[0],
+                                  nstates, params, F"{what}, the solve at {sign * step:+.4g} Bohr along the step")
+        energies[tag] = float(res_fd["E_adi"][0]) + float(sfm["manifold"][state]["omega"])
+    slope = (energies["plus"] - energies["minus"]) / (2.0 * step)
+    f = np.asarray(forces, dtype=float).reshape(-1)
+    along = float(np.dot(f, vh))
+    f = f + (-slope - along) * vh
+    note = (F"  fd force: state {state} of roots {[(r, round(w, 3)) for r, w in force_roots]}, the purified energies "
+            F"{energies['minus']:.8f} / {energies['plus']:.8f} Ha at -+ {step:.4g} Bohr along the step, dE/ds {slope:+.6f} "
+            F"against the weighted forces' {-along:+.6f} Ha/Bohr - the component along the step replaced\n")
+    return f.reshape(np.shape(forces)), note
+
+
 def _cp2k_force_refresh(params, itraj, coordinates, nat, nstates):
     """The hand-over of the engine's call-back after a change of the active state (hop_force_refresh): the rows of
     the regular call of this step with the new state's row - one CP2K force run for that state at the same
@@ -6061,6 +6194,12 @@ def _cp2k_force_refresh(params, itraj, coordinates, nat, nstates):
                                        F"regular call of the step by {dev:.2e} Ha - the geometry moved between them")
                 part = weight * np.asarray(res["forces"], dtype=float)
                 total = part if total is None else total + part
+            total, fd_note = _spin_flip_fd_force(params, itraj, coordinates, wd, new_state, params["sf_force_roots"][itraj][new_state],
+                                                 total, nstates, params.get("overlap_template", None) or os.path.join(wd, "overlap_deltat_auto.inp"),
+                                                 F"{wd} step {params.get('timestep', '?')} force_refresh")
+            if fd_note:
+                with open(f"{wd}/spin-flip-record.txt", "a") as rec:
+                    rec.write(fd_note)
             return total
         # the roots up to the new state alone (the regular call's variational roots in a smaller subspace) - a hop
         # to the ground state needs none, CP2K aborts on NSTATES 0, so one root stays
@@ -6527,6 +6666,17 @@ def cp2k_compute_adi_impl(q, params, full_id):
                     edge over which a coupling fades out, so that a pair
                     crossing the edge forms or dissolves with no step - 0 keeps
                     the hard edge [default 0.5 eV]
+                spin_purify_force_fd_step (float, Bohr): the displacement of the
+                    two energy-only solves (the geometry -+ this step along the
+                    step's own displacement, the OT and the Davidson seeded with
+                    the step's restart files, the AO overlap job) whose purified
+                    energies give a mixed state's force along the velocity - the
+                    roots' weighted forces lack the gap times the gradient of
+                    the S^2 weights, 17 meV a step at ethylene's S0 / T1 twist
+                    crossing; the components across the velocity stay the
+                    weighted ones, the first call of a trajectory has no
+                    direction and keeps them all - 0 keeps the weighted forces
+                    [default 0.002 A]
                 state_reordering_min_overlap (float): the continuity floor of the
                     manifold - a state of the previous step whose largest time
                     overlap with this step's states lies below it is lost, the
@@ -6688,7 +6838,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
     # ---------------- per-trajectory caches ----------------
     for key in ("mo_prev", "ci_prev", "E_adi_last", "force_rows", "S_prev", "sd_prev",
                 "coordinates_prev", "is_first_time", "act_state", "homo", "nelec",
-                "sf_roots", "sf_force_roots", "sf_prev", "sf_omegas", "sf_eref"):
+                "sf_roots", "sf_force_roots", "sf_prev", "sf_omegas", "sf_eref", "sf_step_direction"):
         params.setdefault(key, {})
     is_first_time = params["is_first_time"].get(itraj, True)
     act_state = int(params["act_state"].get(itraj, 0))
@@ -6908,18 +7058,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
             overlap_template = auto
         coords_prev = _carried(params, "coordinates_prev", itraj,
                                coordinates, is_first_time)
-        # the execution-layer keys and allow_unconverged_scf (a property of the run, not of a template) -
-        # retry_templates stay out, they are main-input templates and the overlap run has its own
-        odt = {k: params[k] for k in ("atom_labels", "cp2k_exe", "cp2k_data_dir",
-                                      "omp_num_threads", "mpi_executable", "nprocs",
-                                      "csr_chunk_rows", "allow_unconverged_scf")
-               if k in params}
-        odt["overlap_template"] = overlap_template
-        odt["working_directory"] = f"{wd}/odt"
+        odt = _overlap_run_params(params, overlap_template, wd)
         _prefetch_abort_check(params)
-        parse_pool = _prefetch_parse_pool(params)
-        if parse_pool is not None:
-            odt["_parse_pool"] = parse_pool
         # the Mulliken fragment operators of the step ride on the same AO overlap - they need the AO -> atom map, which
         # the wfn loader carries and the other MO sources take from the step's wfn restart (the basis layout is the
         # run's, read once)
@@ -7017,73 +7157,24 @@ def cp2k_compute_adi_impl(q, params, full_id):
         # every root classified by its spin, the lowest nstates low-spin roots handed over as the states
         n_a_occ, n_b_occ = int(homos[0]), int(homos[1])
         nmo = mo_curr["C"].shape[0]
-        s_ref = s_reference(n_a_occ, n_b_occ)
-        low_name = spin_name(s_ref - 1.0)
         if LO != 1 or HI != nmo:
             raise ValueError(F"spin_flip needs the whole MO set in the orbital window - lowest_orbital 1 and "
                              F"highest_orbital {nmo} (the beta virtual expansion of the roots is complete over every "
                              F"virtual) - got {LO}..{HI}")
-        td = read_tdwfn(f"{wd}/{project}-RESTART.tdwfn")
-        if td["nspins"] != 1 or td["nmo_active"][0] != n_a_occ or td["nao"] != mo_curr["C"].shape[1]:
-            raise ValueError(F"{wd}: the TDDFPT restart carries {td['nspins']} spin block(s) of {td['nmo_active']} "
-                             F"active orbitals over {td['nao']} AOs - a spin-flip run writes one block of the "
-                             F"{n_a_occ} alpha occupied responses over {mo_curr['C'].shape[1]} AOs")
-        if "E" in mo_curr:
-            # with every MO in the wfn the TDDFPT keeps the SCF orbitals, so a degenerate alpha pair keeps its rotation
-            check_restart_orbitals(mo_curr["E"][:n_a_occ], nmo, mo_curr["C"].shape[1], wd)
-        omegas = np.asarray(res["omegas"], dtype=float)
-        nroots = min(td["nstates"], len(omegas))
-        S_ab = mo_curr["C"] @ S_ao_curr @ mo_curr["C_b"].T
-        X_all, s2_all, cls_all = [], [], []
-        for k in range(nroots):
-            # the amplitudes for the aligned alpha occupied orbitals - their CP2K phases restore the stored columns
-            X, left, total = spin_flip_amplitudes(td["evects"][k][0], mo_curr["C_b"], S_ao_curr, n_b_occ,
-                                                  mo_curr["C"][:n_a_occ])
-            if abs(total - 1.0) > 1e-4:
-                raise ValueError(F"spin-flip root {k + 1}: the beta MOs of the wfn carry {total:.6f} of the "
-                                 F"response - ADDED_MOS must cover every virtual of both spins")
-            if left > 1e-6:
-                raise ValueError(F"spin-flip root {k + 1}: {left:.1e} of the response lies on the beta occupied "
-                                 F"orbitals - not a spin-flip response of this reference")
-            X_all.append(X)
-            excess = s2_spin_flip(X, n_a_occ, n_b_occ, S_ab)
-            s2_all.append(s2_total(excess, n_a_occ, n_b_occ))
-            cls_all.append(classify_spin(excess, s2_low_spin_max, s2_high_spin_min, s_ref))
-        # roots coupled by their excess <S^2> within spin_purify_window are rotated to pure spins (purify_spin_mixtures) -
-        # a rotated state's energy is the roots' weighted one, its force the weighted one of the roots above the floor
-        s2_excess = s2_spin_flip_matrix(X_all, n_a_occ, n_b_occ, S_ab)
-        purify_window = float(params.get("spin_purify_window", 2.0 / units.au2ev))
-        min_weight = float(params.get("spin_purify_min_weight", 0.05))
-        coupling_min = float(params.get("spin_purify_coupling_min", 0.05))
-        coupling_ramp = float(params.get("spin_purify_coupling_ramp", 0.05))
-        s2_tolerance = float(params.get("spin_purify_s2_tolerance", 0.25))
-        window_fade = float(params.get("spin_purify_window_fade", 0.5 / units.au2ev))
-        sf_states, purified = purify_spin_mixtures(X_all, omegas[:nroots], s2_excess, purify_window, coupling_min=coupling_min,
-                                                   coupling_ramp=coupling_ramp, s2_tolerance=s2_tolerance, window_fade=window_fade)
-        for st in sf_states:
-            st["cls"] = classify_spin(st["s2"], s2_low_spin_max, s2_high_spin_min, s_ref)
-        low = [st for st in sf_states if st["cls"] == low_name]
-        if len(low) < nstates:
-            raise ValueError(F"{wd} step {params.get('timestep', '?')}: {len(low)} {low_name} states among the "
-                             F"{nroots} spin-flip roots (<S^2> {np.round(s2_all, 3).tolist()}"
-                             + (F", the purified groups {[[r + 1 for r in p['roots']] for p in purified]} -> "
-                                F"{[np.round(p['s2'], 3).tolist() for p in purified]}" if purified else "")
-                             + F") for {nstates} states - raise number_of_states")
-        manifold = low[:nstates]
-        # CP2K's 1-based root of every state: the leading root of a purified state, the root itself otherwise
-        roots = [int(st["roots"][int(np.argmax(st["weights"]))]) + 1 for st in manifold]
-        # the roots a state's force is built from: every root with a weight above spin_purify_min_weight, renormalized
-        force_roots = []
-        for st in manifold:
-            kept = [(int(r) + 1, float(w)) for r, w in zip(st["roots"], st["weights"]) if w > min_weight]
-            total_w = sum(w for _, w in kept)
-            force_roots.append([(r, w / total_w) for r, w in kept])
+        sfm = _spin_flip_manifold(wd, project, mo_curr, S_ao_curr, res["omegas"], n_a_occ, n_b_occ, nmo, nstates, params,
+                                  F"{wd} step {params.get('timestep', '?')}")
+        omegas, nroots, s2_all, cls_all = sfm["omegas"], sfm["nroots"], sfm["s2_all"], sfm["cls_all"]
+        purified, manifold, roots, force_roots = sfm["purified"], sfm["manifold"], sfm["roots"], sfm["force_roots"]
+        # the step's own displacement, velocity Verlet's mid-step velocity - the direction of the force correction
+        d_step = coordinates - np.asarray(coords_prev, dtype=float).reshape(-1)
+        params["sf_step_direction"][itraj] = d_step / np.linalg.norm(d_step) if np.any(d_step) else np.zeros_like(d_step)
         E_ref = float(res["E_adi"][0])
         E_adi_curr = E_ref + np.array([st["omega"] for st in manifold])
         mixed_inside = [k + 1 for k in range(nroots) if cls_all[k] == "mixed" and omegas[k] < manifold[-1]["omega"]]
         # the force of the active state: one run per contributing root, the first run's reused when it is one of them
         needed = [r for r, _ in force_roots[act_state] if r != sf_root_guess]
         rerun = force_source == "active_state" and len(needed) > 0
+        fd_note = ""
         if rerun:
             run_forces = {r: np.asarray(res["forces"], dtype=float) for r, _ in force_roots[act_state] if r == sf_root_guess}
             for r in needed:
@@ -7104,6 +7195,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
                 omegas = w_force
             forces = sum(w * run_forces[r] for r, w in force_roots[act_state])
             E_adi_curr = E_ref + np.array([float(np.dot(st["weights"], omegas[st["roots"]])) for st in manifold])
+            forces, fd_note = _spin_flip_fd_force(params, itraj, coordinates, wd, act_state, force_roots[act_state], forces,
+                                                  nstates, odt["overlap_template"], F"{wd} step {params.get('timestep', '?')}")
         params["sf_roots"][itraj] = roots
         params["sf_force_roots"][itraj] = force_roots
         params["sf_omegas"][itraj] = omegas
@@ -7186,6 +7279,8 @@ def cp2k_compute_adi_impl(q, params, full_id):
                               F"omega {st['omega'] * units.au2ev:9.4f} eV  <S^2> {st['s2']:.4f}  {st['cls']}\n")
             if lost_note:
                 rec.write(lost_note)
+            if fd_note:
+                rec.write(fd_note)
     elif time_dependent:
         # ---------------- CI data, phase-consistent ----------------
         if params.get("ci_source", "namd_print") == "namd_print":
@@ -7786,8 +7881,9 @@ CP2K_COMPUTE_ADI_KEYS = frozenset(("E_adi_last", "S_prev", "_ao_atom_map", "_ste
                                    "pod2gs_kept_block", "prefetch_trajectories", "project", "retry_templates",
                                    "s2_high_spin_min", "s2_low_spin_max", "s_ihalf_prev", "sd_basis",
                                    "sd_capture_max_drop", "sd_overlap_kernel", "sd_prev", "sd_state_ordering", "se_pop_adi",
-                                   "sf_basis", "sf_eref", "sf_force_roots", "sf_omegas", "sf_prev", "sf_roots",
-                                   "spin_flip", "spin_purify_coupling_min", "spin_purify_coupling_ramp", "spin_purify_min_weight",
+                                   "sf_basis", "sf_eref", "sf_force_roots", "sf_omegas", "sf_prev", "sf_roots", "sf_step_direction",
+                                   "spin_flip", "spin_purify_coupling_min", "spin_purify_coupling_ramp", "spin_purify_force_fd_step",
+                                   "spin_purify_min_weight",
                                    "spin_purify_s2_tolerance", "spin_purify_window", "spin_purify_window_fade", "state_reordering_min_overlap",
                                    "time_dependent", "timestep", "working_directory_prefix"))
 def cp2k_compute_adi(q, params, full_id):
