@@ -75,22 +75,22 @@ STEP3_KEYS = frozenset((
     "S_data_im_prefix", "S_data_im_suffix", "S_data_re_prefix", "S_data_re_suffix", "St_data_im_prefix", "St_data_im_suffix",
     "St_data_re_prefix", "St_data_re_suffix", "active_space", "active_space_num_occ_orbitals", "active_space_selection",
     "active_space_selection_algo", "active_space_selection_alpha", "allow_nonorthonormal_overlaps", "apply_orthonormalization",
-    "apply_phase_correction", "blas_num_threads", "ci_read_drops", "ci_threshold", "curr_step", "data_dim", "data_im_prefix",
-    "data_im_suffix", "data_re_prefix", "data_re_suffix", "data_set_paths", "diabatic_state_reordering_alpha",
-    "diabatic_state_reordering_min_overlap", "diabatization_scheme", "do_diabatic_state_reordering", "do_orthogonalization",
-    "do_output", "do_phase_correction", "do_state_reordering", "dt", "es_software", "finish_time", "fsnap", "get_imag",
-    "get_real", "highest_orbital", "homo_alpha_index", "homo_beta_index", "homo_index", "hvib_data_im_prefix",
-    "hvib_data_im_suffix", "hvib_data_re_prefix", "hvib_data_re_suffix", "isUKS", "is_many_body", "isnap", "ks_homo_index",
-    "ks_orbital_indicies", "localized_carrier", "logfile_directory", "logfile_name", "lowest_orbital", "nac_algo", "nprocs",
-    "npz_file_ks_homo_alpha_index", "npz_file_ks_homo_beta_index", "npz_file_ks_homo_index", "num_occ_alpha", "num_occ_beta",
-    "num_occ_states", "num_occ_states_per_block", "num_unocc_alpha", "num_unocc_beta", "num_unocc_states", "number_of_states",
-    "occupancy_tolerance", "orbital_indices", "orbital_normalization", "orbital_perms", "orbital_phase_correction",
-    "orbital_space", "outdir", "output_dir_prefix", "output_set_paths", "path_to_npz_files", "path_to_save_ks_Hvibs",
-    "path_to_save_sd_Hvibs", "pod_occupied", "read_S_data", "read_S_im", "read_S_re", "read_St_data", "read_St_im",
-    "read_St_re", "read_hvib_data", "read_hvib_im", "read_hvib_re", "save_files", "sd_capture_max_drop", "sd_charge",
-    "sd_overlap_kernel", "sd_states_reindexed_sorted", "sd_unique_basis", "sorting_type", "spin_adapted", "start_time",
-    "state_normalization", "state_phase_correction", "state_reordering_alpha", "state_reordering_min_overlap", "time_step",
-    "use_multiprocessing", "verbosity"
+    "apply_phase_correction", "blas_num_threads", "carrier_spin", "ci_read_drops", "ci_threshold", "curr_step", "data_dim",
+    "data_im_prefix", "data_im_suffix", "data_re_prefix", "data_re_suffix", "data_set_paths",
+    "diabatic_state_reordering_alpha", "diabatic_state_reordering_min_overlap", "diabatization_scheme",
+    "do_diabatic_state_reordering", "do_orthogonalization", "do_output", "do_phase_correction", "do_state_reordering", "dt",
+    "es_software", "finish_time", "fsnap", "get_imag", "get_real", "highest_orbital", "homo_alpha_index", "homo_beta_index",
+    "homo_index", "hvib_data_im_prefix", "hvib_data_im_suffix", "hvib_data_re_prefix", "hvib_data_re_suffix", "isUKS",
+    "is_many_body", "isnap", "ks_homo_index", "ks_orbital_indicies", "localized_carrier", "logfile_directory", "logfile_name",
+    "lowest_orbital", "nac_algo", "nprocs", "npz_file_ks_homo_alpha_index", "npz_file_ks_homo_beta_index",
+    "npz_file_ks_homo_index", "num_occ_alpha", "num_occ_beta", "num_occ_states", "num_occ_states_per_block", "num_unocc_alpha",
+    "num_unocc_beta", "num_unocc_states", "number_of_states", "occupancy_tolerance", "orbital_indices",
+    "orbital_normalization", "orbital_perms", "orbital_phase_correction", "orbital_space", "outdir", "output_dir_prefix",
+    "output_set_paths", "path_to_npz_files", "path_to_save_ks_Hvibs", "path_to_save_sd_Hvibs", "pod_occupied", "read_S_data",
+    "read_S_im", "read_S_re", "read_St_data", "read_St_im", "read_St_re", "read_hvib_data", "read_hvib_im", "read_hvib_re",
+    "save_files", "sd_capture_max_drop", "sd_charge", "sd_overlap_kernel", "sd_states_reindexed_sorted", "sd_unique_basis",
+    "sorting_type", "spin_adapted", "start_time", "state_normalization", "state_phase_correction", "state_reordering_alpha",
+    "state_reordering_min_overlap", "time_step", "use_multiprocessing", "verbosity"
 ))
 
 
@@ -4348,9 +4348,12 @@ def _save_u_sd(res_dir, W, cum_phase, step):
 
 def _pod_route_frame(hab, spin=0):
     """h_POD of one frame in the block-state basis, block order: the block energies on the diagonal, the printed
-    couplings V_b{i}_b{j} (i < j) and their transposes between the blocks. Returns (h, nmo), nmo the states of every
-    block."""
+    couplings V_b{i}_b{j} (i < j) and their transposes between the blocks - of the spin channel spin (0 alpha, 1 beta,
+    a restricted step 2 prints 0 alone). Returns (h, nmo), nmo the states of every block."""
     nblk = len([key for key in hab.files if key.startswith("E_b") and key.endswith(F"_s{spin}")])
+    if nblk == 0:
+        raise ValueError(F"the POD print carries no block energies of the spin channel {spin} (E_b*_s{spin}) - its "
+                         F"keys are {sorted(hab.files)}")
     nmo = [len(hab[F"E_b{ib}_s{spin}"]) for ib in range(nblk)]
     off = np.concatenate(([0], np.cumsum(nmo)))
     h = np.zeros((off[-1], off[-1]))
@@ -4417,6 +4420,13 @@ def run_step3_pod(params):
     1/sqrt(2) does not continue itself (two block states of one fragment swap between the frames) and the run is
     refused, as in the SD route.
 
+    An unrestricted step 2 (isUKS 1) prints the block states of both spins: the route reads the channel
+    carrier_spin - its block energies, couplings and time overlaps - and builds the same basis, the block states
+    doubly occupied in the neutral. The reference is read off the electron counts of the two spins in the step-2
+    log: equal counts are the neutral itself, one electron fewer in the carrier's channel is its doublet cation
+    (CHARGE 1, MULTIPLICITY 2 - CP2K takes the electron from beta), the Hamiltonian then the cation's own. Any
+    other reference is refused.
+
     Written into path_to_save_sd_Hvibs - the file set of run_step3_sd_nacs_libint, so that the step-4 runner and the
     plots read it unchanged, the 'sd' states here being the ADIABATIC hole states, the eigenstates of H_hole of every
     frame by increasing energy (identity-followed under do_state_reordering 2):
@@ -4426,7 +4436,8 @@ def run_step3_pod(params):
         St_sd_{k}_re.npz    the time overlaps of the adiabatic states, V(k)^T St_hole(k) V(k+1),
         U_sd_{k}.npz        rows the diabatic (block) states, columns the adiabatic ones - V(k), U H_sd U^T = H_hole,
         U_sd_labels.json    what every diabatic state is (fragment = block, rank, mean block energy in eV,
-                            manifold null), with "route": "pod_hamiltonian" and the basis counts,
+                            manifold null), with "route": "pod_hamiltonian", the basis counts and, under isUKS 1,
+                            the reference (carrier_spin, reference_electrons - alpha, beta - and reference_charge),
         U_sd_pops.txt       the block populations of the states (1 on their own block),
         hvib_convention.json, pod_route_report.json (the continuity minimum, the first-order deviation of the
                             determinant overlaps from the block-state overlaps, the reordered frames, the block gaps).
@@ -4437,7 +4448,8 @@ def run_step3_pod(params):
             * **params['path_to_npz_files']** (string): the step-2 directory with POD_cp2k_hab_{step}.npz of every
                 frame start_time..finish_time-1 and St_pod_cp2k_{step}.npz of start_time..finish_time-2
             * **params['logfile_directory']** (string): the step-2 CP2K logs - the HOMO index of the neutral system
-                and the electron counts of the POD blocks (the NELECTRON of the &BLOCK sections)
+                (under isUKS 1 the electron counts of the two spins) and the electron counts of the POD blocks (the
+                NELECTRON of the &BLOCK sections)
             * **params['path_to_save_sd_Hvibs']** (string): the output directory [default: cwd/res-pod]
             * **params['start_time']**, **params['finish_time']** (int): the frames read, finish_time one past the
                 last - Hvib and St are written for start_time..finish_time-2, U for start_time..finish_time-1 (a folder
@@ -4447,11 +4459,18 @@ def run_step3_pod(params):
                 a half for a block with an odd electron count (a cut bond - its dangling state is half-filled in the
                 block's aufbau order, stays out of the basis and must lie above the doubly occupied states, the
                 strongest coupling between two odd blocks names it). Read from the log's NELECTRON prints when they
-                are set - the key, if given, must agree - and required when the log carries none [default: None]
+                are set - the key, if given, must agree - and required when the log carries none. In a cation's step 2
+                (isUKS 1) the NELECTRON stay the neutral's (CP2K does not check their sum) - blocks that partition
+                the cation's own electrons do not say which block gave the electron and need the key, the neutral's
+                pairs [default: None]
             * **params['num_occ_states_per_block']** (int or list of int): the basis states of every block, from the
                 block HOMO down [default: None = all occupied block states]
             * **params['sd_charge']** (int): 1, the hole basis of the cation - the only value implemented
-            * **params['isUKS']** (int): 0 - the only value implemented
+            * **params['isUKS']** (int): 0 [default] a restricted step 2, 1 an unrestricted one - refused when the
+                step-2 files carry the other number of spin channels
+            * **params['carrier_spin']** (string): 'alpha' or 'beta' - the spin channel of the hole under isUKS 1
+                [default: 'beta'], refused under isUKS 0. A cation's hole is in the channel with fewer electrons,
+                the other channel is refused there.
             * **params['localized_carrier']** (string): 'hole' - the only value implemented
             * **params['diabatization_scheme']** (string): 'pod_cp2k' - the only value implemented
             * **params['apply_phase_correction']** (bool): follow the signs of the adiabatic states through
@@ -4531,8 +4550,8 @@ def run_step3_pod(params):
     """
     critical_params = ['path_to_npz_files', 'logfile_directory', 'start_time', 'finish_time']
     default_params = {'path_to_save_sd_Hvibs': os.getcwd() + '/res-pod', 'time_step': 1.0, 'pod_occupied': None,
-                      'num_occ_states_per_block': None, 'sd_charge': 1, 'isUKS': 0, 'localized_carrier': 'hole',
-                      'diabatization_scheme': 'pod_cp2k', 'apply_phase_correction': True,
+                      'num_occ_states_per_block': None, 'sd_charge': 1, 'isUKS': 0, 'carrier_spin': 'beta',
+                      'localized_carrier': 'hole', 'diabatization_scheme': 'pod_cp2k', 'apply_phase_correction': True,
                       'apply_orthonormalization': 'lowdin_cached', 'do_state_reordering': 0,
                       'state_reordering_alpha': 0.0, 'do_diabatic_state_reordering': 0,
                       'diabatic_state_reordering_alpha': 0.0,
@@ -4554,10 +4573,14 @@ def run_step3_pod(params):
         raise ValueError(F"run_step3_pod: params {unknown} are not options of the POD route - its keys are "
                          F"{sorted(set(default_params) | set(critical_params))}")
     refuse_unknown_keys(params, STEP3_KEYS, "step3.run_step3_pod", "params", "no function of the step-3 workflow reads")
+    if 'carrier_spin' in params and not params.get('isUKS', 0):
+        raise ValueError("run_step3_pod: params['carrier_spin'] is the spin channel of an unrestricted step 2 "
+                         "(isUKS 1) - a restricted one has a single channel")
     comn.check_input(params, default_params, critical_params)
     # the values the route implements - every other value is refused
     for key, allowed, hint in (('sd_charge', (1,), "the frozen-orbital hole basis of the cation"),
-                               ('isUKS', (0,), "closed-shell block states"),
+                               ('isUKS', (0, 1), "a restricted or an unrestricted step 2"),
+                               ('carrier_spin', ('alpha', 'beta'), "the spin channel of the hole"),
                                ('localized_carrier', ('hole',), "the hole of the cation"),
                                ('diabatization_scheme', ('pod_cp2k',), "the POD prints of CP2K"),
                                ('nac_algo', (0,), "the POD route writes the HST couplings (St^T - St) / 2 dt, the NPI "
@@ -4591,28 +4614,62 @@ def run_step3_pod(params):
                          F"output path or move the legacy files away")
 
     frames = list(range(start_time, finish_time))
+    isUKS = int(params['isUKS'])
+    carrier_spin = params['carrier_spin'] if isUKS else None
+    spin = 1 if carrier_spin == 'beta' else 0
+    with np.load(F'{res_dir_1}/POD_cp2k_hab_{start_time}.npz') as hab:
+        two_spins = any(key.endswith('_s1') for key in hab.files)
+    if two_spins and not isUKS:
+        raise ValueError(F"run_step3_pod: POD_cp2k_hab_{start_time}.npz carries two spin channels - the step 2 was "
+                         F"unrestricted, set isUKS 1 (and carrier_spin, the hole's channel)")
+    if isUKS and not two_spins:
+        raise ValueError(F"run_step3_pod: isUKS 1, but POD_cp2k_hab_{start_time}.npz carries one spin channel - the "
+                         F"step 2 was restricted (isUKS 0)")
     # the block-state energies of every frame - the full h of a frame is sliced to the tracked states later
     h_diag, nmo_list = [], []
     for k in frames:
-        h, nmo = _pod_route_frame(np.load(F'{res_dir_1}/POD_cp2k_hab_{k}.npz'))
+        h, nmo = _pod_route_frame(np.load(F'{res_dir_1}/POD_cp2k_hab_{k}.npz'), spin)
         h_diag.append(np.diag(h).copy())
         nmo_list.append(nmo)
     if any(nmo != nmo_list[0] for nmo in nmo_list):
         raise ValueError("the numbers of POD block states change along the trajectory")
     nmo = nmo_list[0]
     nblk = len(nmo)
+    log = sorted(glob.glob(params['logfile_directory'] + '/*.log'))[0]
+    # homo: the electron pairs of the neutral - an unrestricted reference is the neutral (equal spin counts) or its
+    # doublet cation, whose hole sits in the channel with one electron fewer
+    if isUKS:
+        counts = [int(c) for c in CP2K_methods.read_homo_index(log, isUKS=True)]
+        if counts[spin] == counts[1 - spin] + 1:
+            raise ValueError(F"run_step3_pod: the reference of the step-2 log {log} holds {counts[0]} alpha and "
+                             F"{counts[1]} beta electrons - a cation's hole is in the channel with fewer electrons, "
+                             F"carrier_spin '{'alpha' if spin else 'beta'}'")
+        if counts[1 - spin] - counts[spin] not in (0, 1):
+            raise ValueError(F"run_step3_pod: the reference of the step-2 log {log} holds {counts[0]} alpha and "
+                             F"{counts[1]} beta electrons - the POD route takes a closed-shell neutral (equal counts) "
+                             F"or its doublet cation (one electron fewer in the carrier's channel)")
+        homo = counts[1 - spin]
+    else:
+        homo = CP2K_methods.read_homo_index(log)
+        counts = [homo, homo]
+    reference_charge = 2 * homo - sum(counts)
+    reference = ({"isUKS": 1, "carrier_spin": carrier_spin, "reference_electrons": counts,
+                  "reference_charge": reference_charge} if isUKS else {})
     # the electron pairs of every block: the NELECTRON prints of the step-2 log, pod_occupied where the log has none -
     # a block with an odd count has a half-filled state in its aufbau order, its whole part is the doubly occupied set
-    log = sorted(glob.glob(params['logfile_directory'] + '/*.log'))[0]
-    homo = CP2K_methods.read_homo_index(log)
     electrons = CP2K_methods.read_pod_block_electrons(log)
     given = params['pod_occupied']
-    if electrons and all(e > 0 for e in electrons):
-        if len(electrons) != nblk:
-            raise ValueError(F"the step-2 log {log} prints {len(electrons)} POD blocks, the POD prints carry {nblk}")
+    printed = bool(electrons) and all(e > 0 for e in electrons)
+    if printed and len(electrons) != nblk:
+        raise ValueError(F"the step-2 log {log} prints {len(electrons)} POD blocks, the POD prints carry {nblk}")
+    # the blocks of a cation's step 2 may partition its own electrons - the counts do not say which block gave one
+    own = printed and reference_charge == 1 and sum(electrons) == 2 * homo - 1
+    if printed and not own:
         if sum(electrons) != 2 * homo:
             raise ValueError(F"the NELECTRON of the &BLOCK sections {electrons} sum to {sum(electrons)} electrons, the "
-                             F"neutral system of the step-2 log {log} has {2 * homo}")
+                             F"neutral system of the step-2 log {log} has {2 * homo}" + (
+                                 F" - the log holds its cation ({counts[0]} alpha, {counts[1]} beta electrons), whose "
+                                 F"own {2 * homo - 1} need pod_occupied" if reference_charge else ""))
         pairs = [e / 2.0 for e in electrons]
         if given is not None:
             given = [float(o) for o in given]
@@ -4621,6 +4678,11 @@ def run_step3_pod(params):
                                  F"the &BLOCK sections of the step-2 log (NELECTRON {electrons}) - the log's counts "
                                  F"define the doubly occupied block states, drop the key or give these values")
     else:
+        if given is None and own:
+            raise ValueError(F"the NELECTRON of the &BLOCK sections {electrons} sum to the {sum(electrons)} electrons "
+                             F"of the cation in the step-2 log {log} - the counts do not say which block gave the "
+                             F"electron: set the neutral's NELECTRON in the step-2 template (CP2K does not check "
+                             F"their sum) or give params['pod_occupied'], the neutral's electron pairs of every block")
         if given is None:
             raise ValueError(F"the step-2 log {log} prints the block electron counts {electrons} (the NELECTRON of "
                              F"the &BLOCK sections, 0 = not set) - params['pod_occupied'] gives the electron pairs "
@@ -4633,6 +4695,9 @@ def run_step3_pod(params):
         if abs(sum(pairs) - homo) > 1e-9:
             raise ValueError(F"pod_occupied {given} sums to {sum(pairs):g} electron pairs, the neutral system of the "
                              F"step-2 log has {homo} occupied orbitals")
+        if own and any(not 0 <= int(round(2.0 * q)) - e <= 1 for q, e in zip(pairs, electrons)):
+            raise ValueError(F"pod_occupied {given} against the NELECTRON {electrons} of the cation's &BLOCK sections "
+                             F"- a block of the neutral holds its cation's electrons or one more")
         electrons = [int(round(2.0 * q)) for q in pairs]
     occupied = [e // 2 for e in electrons]
     odd = [f for f in range(nblk) if electrons[f] % 2]
@@ -4670,7 +4735,7 @@ def run_step3_pod(params):
     # scale) - inside the doubly occupied set the aufbau count would put a hole into it
     dangling = {}
     if odd:
-        h0, _ = _pod_route_frame(np.load(F'{res_dir_1}/POD_cp2k_hab_{frames[0]}.npz'))
+        h0, _ = _pod_route_frame(np.load(F'{res_dir_1}/POD_cp2k_hab_{frames[0]}.npz'), spin)
         for f in odd:
             others = np.concatenate([np.arange(off[g], off[g + 1]) for g in odd if g != f])
             V = np.abs(h0[off[f]:off[f + 1]][:, others])
@@ -4718,7 +4783,8 @@ def run_step3_pod(params):
         return _check_block("block states", [
             F"{where} at frames {k0} and {k1}",
             F"(the state number counted from the bottom of the block - their time overlaps are the rows and columns "
-            F"{', '.join(map(str, g))} of St_pod_cp2k_{k0}.npz, their energies in POD_cp2k_hab_{k0}.npz)"])
+            F"{', '.join(str(x + spin * int(off[-1])) for x in g)} of St_pod_cp2k_{k0}.npz, their energies in "
+            F"POD_cp2k_hab_{k0}.npz{F', the {carrier_spin} channel (_s{spin})' if isUKS else ''})"])
     # the block state that carries every diabatic state at every frame (the energy-ordered basis of start_time at
     # the start), the printed sign of every block state followed along the trajectory - A[k] the cumulative
     # orthogonal transform of the followed basis, the signs alone or, aligned, the rotation within every block -
@@ -4734,7 +4800,7 @@ def run_step3_pod(params):
         ntot = St_k.shape[0] // 2
         if ntot != off[-1]:
             raise ValueError(F"St_pod_cp2k_{k}.npz carries {ntot} block states per spin, the POD prints {off[-1]}")
-        St = St_k[:ntot, :ntot]
+        St = St_k[spin * ntot:(spin + 1) * ntot, spin * ntot:(spin + 1) * ntot]
         cur = track[i]
         nxt = list(cur)
         if selection == 'identity':
@@ -4836,7 +4902,7 @@ def run_step3_pod(params):
         St_act.append(A[i].T @ St[np.ix_(cur, nxt)] @ A[i + 1])
     h_act = []
     for k, frame in enumerate(frames):
-        h, _ = _pod_route_frame(np.load(F'{res_dir_1}/POD_cp2k_hab_{frame}.npz'))
+        h, _ = _pod_route_frame(np.load(F'{res_dir_1}/POD_cp2k_hab_{frame}.npz'), spin)
         h_act.append(A[k].T @ h[np.ix_(track[k], track[k])] @ A[k])
     alignment = _alignment_record(dia_reordering, angles, frames, drifts)
     # the one-hole determinants in the phase convention (-1)^i
@@ -4916,8 +4982,9 @@ def run_step3_pod(params):
         sp.save_npz(F'{res_dir_2}/U_sd_{frames[k]}.npz', sp.csc_matrix(V[k]))
         sp.save_npz(F'{res_dir_2}/E_sd_{frames[k]}.npz', sp.csc_matrix(np.diag(E_adi[k])))
     with open(marker_file, 'w') as f:
-        json.dump({'im_file_contains': 'Im(Hvib) = -d', 'isUKS': 0, 'sd_charge': 1, 'route': 'pod_hamiltonian',
-                   'start_time': int(start_time), 'finish_time': int(finish_time)}, f)
+        json.dump({'im_file_contains': 'Im(Hvib) = -d', 'isUKS': isUKS, 'sd_charge': 1, 'route': 'pod_hamiltonian',
+                   'start_time': int(start_time), 'finish_time': int(finish_time),
+                   **({'carrier_spin': carrier_spin} if isUKS else {})}, f)
     dia_index = [("loc", None, frag[c], rank[c]) for c in range(n)]
     pops_list = [np.eye(nblk)[frag] for _ in frames]
     hole_list = [np.full((n, nblk), np.nan) for _ in frames]
@@ -4928,7 +4995,7 @@ def run_step3_pod(params):
     _write_diabatization_records(res_dir_2, 'hole', dia_index, pops_list, hole_list, energy_list, start_time,
                                  operator='pod_cp2k', basis='sd',
                                  extra={"route": "pod_hamiltonian", "pod_occupied": pairs_record,
-                                        "block_electrons": electrons,
+                                        "block_electrons": electrons, **reference,
                                         "num_occ_states_per_block": per_block,
                                         "route_note": "the diabatic states are the occupied POD block states "
                                                       "themselves (the one-hole determinants of the cation), the "
@@ -4965,7 +5032,7 @@ def run_step3_pod(params):
                                             "edge_departures the states that left the basis of their block ([frame, "
                                             "state, kept, carried by the basis, the block state taken])"})
     report = {"frames": [start_time, finish_time], "n_states": n, "blocks": nblk, "block_states": nmo,
-              "pod_occupied": pairs_record, "block_electrons": electrons, "odd_blocks": odd,
+              "pod_occupied": pairs_record, "block_electrons": electrons, "odd_blocks": odd, **reference,
               "dangling_states": dangling, "num_occ_states_per_block": per_block,
               "min_continuity": float(min(np.abs(np.diag(St)).min() for St in St_act)),
               "max_hole_minus_block_overlap": float(max(np.abs(St_hole[k] - St_act[k]).max()
@@ -4986,7 +5053,8 @@ def run_step3_pod(params):
               "tracked_block_states": tracked}
     with open(F'{res_dir_2}/pod_route_report.json', 'w') as f:
         json.dump(report, f, indent=1)
-    print(F"run_step3_pod: {n} hole states of {nblk} blocks ({per_block} of {occupied} occupied) over "
+    channel = F", the {carrier_spin} channel of the {'cation' if reference_charge else 'neutral'}" if isUKS else ""
+    print(F"run_step3_pod: {n} hole states of {nblk} blocks ({per_block} of {occupied} occupied{channel}) over "
           F"{len(frames)} frames - continuity min {report['min_continuity']:.4f}, |St_hole - St_block| max "
           F"{report['max_hole_minus_block_overlap']:.2e}, |St^T St - 1| max {report['max_nonunitarity']:.2e}, "
           F"{len(reordered)} reordered frames of the adiabatic states ({len(adi_unresolved)} let through below the "
