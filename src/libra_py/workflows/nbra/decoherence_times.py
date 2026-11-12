@@ -43,9 +43,9 @@ def _diagonal_energies(Hvib):
 
 
 def _gap_stack(E):
-    """|E_i - E_j| for every step of an (nsteps, nstates) energy array: an (nsteps, nstates, nstates) stack,
-    symmetric with a zero diagonal."""
-    return np.abs(E[:, :, None] - E[:, None, :])
+    """E_i - E_j for every step of an (nsteps, nstates) energy array: an (nsteps, nstates, nstates) stack,
+    antisymmetric with a zero diagonal."""
+    return E[:, :, None] - E[:, None, :]
 
 
 def _window(E, it, nsteps, idata):
@@ -54,6 +54,24 @@ def _window(E, it, nsteps, idata):
     if it < 0 or it + nsteps > len(E):
         raise ValueError(F"the window [{it}, {it + nsteps}) runs past the {len(E)} steps of data set {idata}")
     return E[it:it + nsteps]
+
+
+def _mean_gaps(Hvib, itimes, nsteps, absolute):
+    """The gaps of every step averaged over the data sets and initial times, an (nsteps, nstates, nstates) stack:
+    <|E_i - E_j|> with absolute, <E_i - E_j> without."""
+    ndata = len(Hvib)
+    nitimes = len(itimes)
+    nstates = Hvib[0][0].num_of_cols
+
+    # the windows accumulate in the order (data set, initial time)
+    acc = np.zeros((nsteps, nstates, nstates))
+    for idata in range(0, ndata):
+        E = _diagonal_energies(Hvib[idata])
+        for it_indx in range(0, nitimes):
+            it = itimes[it_indx]
+            gaps = _gap_stack(_window(E, it, nsteps, idata))
+            acc = acc + (np.abs(gaps) if absolute else gaps)
+    return acc / float(nitimes * ndata)
 
 
 NO_DECOHERENCE_TIME = 1.0e+10   # a state with itself, and a pair whose gap does not fluctuate
@@ -121,7 +139,7 @@ def energy_gaps(Hvib):
 
     """
 
-    return [data_conv.nparray2MATRIX(g) for g in _gap_stack(_diagonal_energies(Hvib))]
+    return [data_conv.nparray2MATRIX(g) for g in np.abs(_gap_stack(_diagonal_energies(Hvib)))]
 
 
 def energy_gaps_ave(Hvib, itimes, nsteps):
@@ -147,25 +165,15 @@ def energy_gaps_ave(Hvib, itimes, nsteps):
 
     """
 
-    ndata = len(Hvib)
-    nitimes = len(itimes)
-    nstates = Hvib[0][0].num_of_cols
-
-    # the windows accumulate in the order (data set, initial time)
-    acc = np.zeros((nsteps, nstates, nstates))
-    for idata in range(0, ndata):
-        E = _diagonal_energies(Hvib[idata])
-        for it_indx in range(0, nitimes):
-            it = itimes[it_indx]
-            acc = acc + _gap_stack(_window(E, it, nsteps, idata))
-    acc = acc / float(nitimes * ndata)
-    return [data_conv.nparray2MATRIX(g) for g in acc]
+    return [data_conv.nparray2MATRIX(g) for g in _mean_gaps(Hvib, itimes, nsteps, True)]
 
 
 def decoherence_times(Hvib, verbosity=0):
     """Compute the matrix of decoherence times from the time-series data
 
     Ref: Akimov, A. V; Prezhdo O. V. J. Phys. Chem. Lett. 2013, 4, 3857
+
+    The gap of a pair is E_i - E_j with its sign.
 
 
     Args:
@@ -217,6 +225,8 @@ def decoherence_times_ave_old(Hvib, itimes, nsteps, verbosity=0):
 
     Ref: Akimov, A. V; Prezhdo O. V. J. Phys. Chem. Lett. 2013, 4, 3857
 
+    The gap of a pair is E_i - E_j with its sign.
+
 
     Args:
         Hvib ( list of lists of CMATRIX objects ):
@@ -246,7 +256,7 @@ def decoherence_times_ave_old(Hvib, itimes, nsteps, verbosity=0):
     """
 
     # Compute energy gaps
-    dE = np.array([data_conv.MATRIX2nparray(g, np.float64) for g in energy_gaps_ave(Hvib, itimes, nsteps)])
+    dE = _mean_gaps(Hvib, itimes, nsteps, False)
     dE_ave, dE_std, dE_dw_bound, dE_up_bound = data_stat.stat_arrays(dE)
 
     nstates = Hvib[0][0].num_of_cols
@@ -274,6 +284,8 @@ def decoherence_times_ave(Hvib, itimes, nsteps, verbosity=0):
     that consists of vereral data sets
 
     Ref: Akimov, A. V; Prezhdo O. V. J. Phys. Chem. Lett. 2013, 4, 3857
+
+    The gap of a pair is E_i - E_j with its sign.
 
 
     Args:
@@ -311,7 +323,7 @@ def decoherence_times_ave(Hvib, itimes, nsteps, verbosity=0):
     if nsteps < 2:
         raise ValueError(F"the gap fluctuation needs a window of two steps at least, got {nsteps}")
 
-    # Compute a concatenated stack of gap magnitudes for all sub-trajectories
+    # Compute a concatenated stack of gaps for all sub-trajectories
     # the centred gaps of every window, row by row and window after window - the statistics over them without a
     # concatenated stack (one window held at a time, two passes)
     def centred_rows():
