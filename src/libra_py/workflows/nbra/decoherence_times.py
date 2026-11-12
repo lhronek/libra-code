@@ -134,8 +134,8 @@ def energy_gaps(Hvib):
 
     Returns:
         ( list of MATRIX(nstates, nstates) ): dE, where:
-            dE[t].get(i,j) is the energy gap between states i and j at time t:
-            E_i(t) - E_j(t)
+            dE[t].get(i,j) is the absolute value of the energy gap between states i and j at time t:
+            |E_i(t) - E_j(t)|
 
     """
 
