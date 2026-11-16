@@ -846,6 +846,9 @@ def run_cp2k_libint_step2(params):
                                       omp_num_threads=params["omp_num_threads"],
                                       mpi_executable=mpi_executable,
                                       nprocs=nprocs)
+            if CP2K_methods.read_cp2k_print_key(params['cp2k_diag_input_template'], ("SCF", "PRINT", "RESTART"), "LOW")[0]:
+                CP2K_methods.refuse_missing_wfn_restart(F'Diag_libra-{step}-RESTART.wfn', params['cp2k_diag_input_template'],
+                                                        "the orbitals' read or the next step takes it", "step2.run_cp2k_libint_step2")
             molden_filename = F'Diag_libra-{step}-1_0.molden'
         print('Done with step', step, 'Elapsed time:', time.time() - t1)
 #        if params['is_many_body']:

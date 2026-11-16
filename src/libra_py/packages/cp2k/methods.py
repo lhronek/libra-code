@@ -2234,6 +2234,8 @@ def run_cp2k_xtb(params):
                      omp_num_threads=omp, mpi_executable=mpi_executable,
                      nprocs=nprocs)
         print('Done with OT wfn. Elapsed time:', time.time() - t1)
+        refuse_missing_wfn_restart(F'OT_{step}-RESTART.wfn', ot_input_template, "the diagonalization of the same step restarts from it",
+                                   "run_cp2k_xtb")
         diag_wfn_restart, diag_traj = None, None
     else:
         # OT-free: chain the diagonalization runs directly - SCF_GUESS RESTART
@@ -2251,6 +2253,9 @@ def run_cp2k_xtb(params):
                  omp_num_threads=omp, mpi_executable=mpi_executable,
                  nprocs=nprocs)
     print('Done with diagonalization. Elapsed time:', time.time() - t1)
+    if read_cp2k_print_key(diag_input_template, ("SCF", "PRINT", "RESTART"), "LOW")[0]:
+        refuse_missing_wfn_restart(F'Diag_{step}-RESTART.wfn', diag_input_template, "the orbitals' read or the next step's diagonalization takes it",
+                                   "run_cp2k_xtb")
 
 
 def distribute_cp2k_libint_jobs(
@@ -5118,6 +5123,14 @@ def refuse_unwritten_wfn_restart(template, reader, where):
     if not written:
         raise ValueError(F"{where}: {template} writes no wfn restart file (&SCF &PRINT &RESTART {key_level} at &GLOBAL PRINT_LEVEL "
                          F"{run_level}) and {reader} - set &RESTART on")
+
+
+def refuse_missing_wfn_restart(restart, template, reader, where):
+    """Refuses to go on when a finished CP2K run left no wfn restart file although its input writes one (a FILENAME or an
+    &EACH in &SCF &PRINT &RESTART keeps the default file from appearing) - reader says what takes the file."""
+    if not os.path.isfile(restart):
+        raise RuntimeError(F"{where}: the run of {template} left no {restart} and {reader} - CP2K would start from the "
+                           F"atomic guess. See &SCF &PRINT &RESTART of the template (FILENAME, &EACH) and the run's log")
 
 
 def _cell_from_lengths(lengths, angles):
