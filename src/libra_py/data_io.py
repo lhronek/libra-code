@@ -19,7 +19,11 @@
            * file2intlist(filename)
            * file2doublelist(filename)
            * file2matrix(filename, nrows, ncols)
-           * file2matrix(filename, nrows, ncols)
+           * file2cmatrix(filename, nrows, ncols)
+           * replace_pattern_in_file(filename, old_string, new_string, method=0)
+           * sort_hvib_file_names(files)
+           * remove_files(*patterns)
+           * remove_trees(*patterns)
 
 .. moduleauthor:: Alexey V. Akimov
 
