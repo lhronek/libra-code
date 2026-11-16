@@ -4388,6 +4388,46 @@ def _pod_route_hole_basis(nmo, occupied, per_block):
     return idx, frag, rank
 
 
+def _pod_route_occupations(h, homo):
+    """The occupation of every block state in the closed shell of h_POD: the weight of the state in the lowest homo
+    orbitals of h, the Kohn-Sham matrix in the block-state basis - 1 for a doubly occupied state, 0 for an empty one,
+    a half for either state of a bond the blocks cut. Returns the occupations and the gap of h above its orbital
+    homo (None when every orbital is occupied)."""
+    e, C = np.linalg.eigh(h)
+    return (C[:, :homo] ** 2).sum(axis=1), (float(e[homo] - e[homo - 1]) if homo < len(e) else None)
+
+
+def _pod_route_block_electrons(occ, off, tol, where):
+    """The doubly occupied states and the electrons of every block from the occupations of its states (off: the
+    blocks' offsets): a state within tol of occupation 1 is doubly occupied, twice the block's population within tol
+    of a whole number is its electron count - the electrons beyond the pairs sit in half-filled states. Refused, with
+    `where` in the message: a doubly occupied state above another kind of state of its block, a population off a
+    whole number, fewer electrons than the pairs hold."""
+    pairs, electrons = [], []
+    for f in range(len(off) - 1):
+        o = occ[off[f]:off[f + 1]]
+        full = o >= 1.0 - tol
+        n = int(full.sum())
+        if not full[:n].all():
+            i, j = int(np.argmin(full[:n])), int(np.flatnonzero(full)[-1])
+            raise ValueError(F"{where}: the state {i + 1} of block {f} holds {o[i]:.2f} of an electron pair in the "
+                             F"reference and lies below the block's doubly occupied state {j + 1} ({o[j]:.2f}) - the hole "
+                             F"basis is the highest doubly occupied states of a block, a half-filled or an empty state "
+                             F"among them has no place in it (occupancy_tolerance {tol} draws the line at {1.0 - tol:g})")
+        total = 2.0 * float(o.sum())
+        if abs(total - round(total)) > tol:
+            raise ValueError(F"{where}: block {f} holds {total:.2f} electrons in the reference - more than "
+                             F"occupancy_tolerance {tol} off a whole number, the blocks share charge beyond a cut "
+                             F"bond's electron")
+        if round(total) < 2 * n:
+            raise ValueError(F"{where}: the {n} states of block {f} at {1.0 - tol:g} or more of an electron pair hold "
+                             F"{total:.2f} electrons in the reference, fewer than {n} pairs - a smaller "
+                             F"occupancy_tolerance than {tol} tells the pairs from the other states")
+        pairs.append(n)
+        electrons.append(int(round(total)))
+    return pairs, electrons
+
+
 def _cofactor_matrix(A):
     """C_ij = (-1)^(i+j) det(A without row i and column j) - for A the time overlaps of the orbitals of an occupied
     set, the exact time overlaps of the one-hole determinants in the phase convention (-1)^i of run_step3_pod. From
@@ -4423,6 +4463,14 @@ def run_step3_pod(params):
     1/sqrt(2) does not continue itself (two block states of one fragment swap between the frames) and the run is
     refused, as in the SD route.
 
+    The doubly occupied states of a block are read off the reference at every frame: the occupation of a block state
+    in the closed shell of the frame's h_POD (its lowest orbitals, as many as the neutral has electron pairs) is 1 for
+    a state doubly occupied in its block, 0 for an empty one and a half for either state of a bond the blocks cut.
+    A state within occupancy_tolerance of 1 is doubly occupied, twice the block's population is its electron count,
+    and the electrons beyond the pairs sit in half-filled states, which stay out of the basis - a block may be cut
+    through any number of bonds. The doubly occupied states must be the lowest of their block and the counts the same
+    at every frame, else the run is refused.
+
     An unrestricted step 2 (isUKS 1) prints the block states of both spins: the route reads the channel
     carrier_spin - its block energies, couplings and time overlaps - and builds the same basis, the block states
     doubly occupied in the neutral. The reference is read off the electron counts of the two spins in the step-2
@@ -4443,7 +4491,8 @@ def run_step3_pod(params):
                             the reference (carrier_spin, reference_electrons - alpha, beta - and reference_charge),
         U_sd_pops.txt       the block populations of the states (1 on their own block),
         hvib_convention.json, pod_route_report.json (the continuity minimum, the first-order deviation of the
-                            determinant overlaps from the block-state overlaps, the reordered frames, the block gaps).
+                            determinant overlaps from the block-state overlaps, the reordered frames, the block gaps,
+                            the occupations of the block states in the reference).
 
     Args:
         params (dictionary):
@@ -4451,21 +4500,22 @@ def run_step3_pod(params):
             * **params['path_to_npz_files']** (string): the step-2 directory with POD_cp2k_hab_{step}.npz of every
                 frame start_time..finish_time-1 and St_pod_cp2k_{step}.npz of start_time..finish_time-2
             * **params['logfile_directory']** (string): the step-2 CP2K logs - the HOMO index of the neutral system
-                (under isUKS 1 the electron counts of the two spins) and the electron counts of the POD blocks (the
-                NELECTRON of the &BLOCK sections)
+                (under isUKS 1 the electron counts of the two spins) and, as a cross-check, the electron counts of the
+                POD blocks (the NELECTRON of the &BLOCK sections)
             * **params['path_to_save_sd_Hvibs']** (string): the output directory [default: cwd/res-pod]
             * **params['start_time']**, **params['finish_time']** (int): the frames read, finish_time one past the
                 last - Hvib and St are written for start_time..finish_time-2, U for start_time..finish_time-1 (a folder
                 holding fewer frames ends the range at the last frame present, with a WARNING)
             * **params['time_step']** (float): the frame spacing in fs [default: 1.0]
             * **params['pod_occupied']** (list of numbers): the electron pairs of every block in the &BLOCK order,
-                a half for a block with an odd electron count (a cut bond - its dangling state is half-filled in the
-                block's aufbau order, stays out of the basis and must lie above the doubly occupied states, the
-                strongest coupling between two odd blocks names it). Read from the log's NELECTRON prints when they
-                are set - the key, if given, must agree - and required when the log carries none. In a cation's step 2
-                (isUKS 1) the NELECTRON stay the neutral's (CP2K does not check their sum) - blocks that partition
-                the cation's own electrons do not say which block gave the electron and need the key, the neutral's
-                pairs [default: None]
+                a half for every half-filled state (14.5 for a block of 14 pairs cut through one bond) - a cross-check
+                of the counts read off the reference, refused when it differs [default: None]. The NELECTRON prints
+                of the step-2 log are cross-checked as well (in a cation's step 2 the neutral's counts or the cation's
+                own, one block one electron short): a log that differs is refused unless the key confirms the
+                reference's counts - CP2K's files do not depend on NELECTRON
+            * **params['occupancy_tolerance']** (float): 0.25 [default] - a block state within this much of occupation
+                1 in the reference is doubly occupied, and twice a block's population may differ from a whole number
+                of electrons by at most this much (0 < occupancy_tolerance < 0.5)
             * **params['num_occ_states_per_block']** (int or list of int): the basis states of every block, from the
                 block HOMO down [default: None = all occupied block states]
             * **params['sd_charge']** (int): 1, the hole basis of the cation - the only value implemented
@@ -4553,8 +4603,9 @@ def run_step3_pod(params):
     """
     critical_params = ['path_to_npz_files', 'logfile_directory', 'start_time', 'finish_time']
     default_params = {'path_to_save_sd_Hvibs': os.getcwd() + '/res-pod', 'time_step': 1.0, 'pod_occupied': None,
-                      'num_occ_states_per_block': None, 'sd_charge': 1, 'isUKS': 0, 'carrier_spin': 'beta',
-                      'localized_carrier': 'hole', 'diabatization_scheme': 'pod_cp2k', 'apply_phase_correction': True,
+                      'occupancy_tolerance': 0.25, 'num_occ_states_per_block': None, 'sd_charge': 1, 'isUKS': 0,
+                      'carrier_spin': 'beta', 'localized_carrier': 'hole', 'diabatization_scheme': 'pod_cp2k',
+                      'apply_phase_correction': True,
                       'apply_orthonormalization': 'lowdin_cached', 'do_state_reordering': 0,
                       'state_reordering_alpha': 0.0, 'do_diabatic_state_reordering': 0,
                       'diabatic_state_reordering_alpha': 0.0,
@@ -4628,16 +4679,6 @@ def run_step3_pod(params):
     if isUKS and not two_spins:
         raise ValueError(F"run_step3_pod: isUKS 1, but POD_cp2k_hab_{start_time}.npz carries one spin channel - the "
                          F"step 2 was restricted (isUKS 0)")
-    # the block-state energies of every frame - the full h of a frame is sliced to the tracked states later
-    h_diag, nmo_list = [], []
-    for k in frames:
-        h, nmo = _pod_route_frame(np.load(F'{res_dir_1}/POD_cp2k_hab_{k}.npz'), spin)
-        h_diag.append(np.diag(h).copy())
-        nmo_list.append(nmo)
-    if any(nmo != nmo_list[0] for nmo in nmo_list):
-        raise ValueError("the numbers of POD block states change along the trajectory")
-    nmo = nmo_list[0]
-    nblk = len(nmo)
     log = sorted(glob.glob(params['logfile_directory'] + '/*.log'))[0]
     # homo: the electron pairs of the neutral - an unrestricted reference is the neutral (equal spin counts) or its
     # doublet cation, whose hole sits in the channel with one electron fewer
@@ -4658,53 +4699,83 @@ def run_step3_pod(params):
     reference_charge = 2 * homo - sum(counts)
     reference = ({"isUKS": 1, "carrier_spin": carrier_spin, "reference_electrons": counts,
                   "reference_charge": reference_charge} if isUKS else {})
-    # the electron pairs of every block: the NELECTRON prints of the step-2 log, pod_occupied where the log has none -
-    # a block with an odd count has a half-filled state in its aufbau order, its whole part is the doubly occupied set
-    electrons = CP2K_methods.read_pod_block_electrons(log)
-    given = params['pod_occupied']
-    printed = bool(electrons) and all(e > 0 for e in electrons)
-    if printed and len(electrons) != nblk:
-        raise ValueError(F"the step-2 log {log} prints {len(electrons)} POD blocks, the POD prints carry {nblk}")
-    # the blocks of a cation's step 2 may partition its own electrons - the counts do not say which block gave one
-    own = printed and reference_charge == 1 and sum(electrons) == 2 * homo - 1
-    if printed and not own:
-        if sum(electrons) != 2 * homo:
-            raise ValueError(F"the NELECTRON of the &BLOCK sections {electrons} sum to {sum(electrons)} electrons, the "
-                             F"neutral system of the step-2 log {log} has {2 * homo}" + (
-                                 F" - the log holds its cation ({counts[0]} alpha, {counts[1]} beta electrons), whose "
-                                 F"own {2 * homo - 1} need pod_occupied" if reference_charge else ""))
-        pairs = [e / 2.0 for e in electrons]
-        if given is not None:
-            given = [float(o) for o in given]
-            if len(given) != nblk or any(abs(g - q) > 1e-9 for g, q in zip(given, pairs)):
-                raise ValueError(F"pod_occupied {params['pod_occupied']} does not match the electron pairs {pairs} of "
-                                 F"the &BLOCK sections of the step-2 log (NELECTRON {electrons}) - the log's counts "
-                                 F"define the doubly occupied block states, drop the key or give these values")
-    else:
-        if given is None and own:
-            raise ValueError(F"the NELECTRON of the &BLOCK sections {electrons} sum to the {sum(electrons)} electrons "
-                             F"of the cation in the step-2 log {log} - the counts do not say which block gave the "
-                             F"electron: set the neutral's NELECTRON in the step-2 template (CP2K does not check "
-                             F"their sum) or give params['pod_occupied'], the neutral's electron pairs of every block")
-        if given is None:
-            raise ValueError(F"the step-2 log {log} prints the block electron counts {electrons} (the NELECTRON of "
-                             F"the &BLOCK sections, 0 = not set) - params['pod_occupied'] gives the electron pairs "
-                             F"of every block")
-        pairs = [float(o) for o in given]
-        if len(pairs) != nblk:
-            raise ValueError(F"pod_occupied lists {len(pairs)} blocks, the POD prints carry {nblk}")
-        if any(abs(2.0 * q - round(2.0 * q)) > 1e-9 for q in pairs):
-            raise ValueError(F"pod_occupied {given} - the electron pairs of a block are a whole or a half number")
-        if abs(sum(pairs) - homo) > 1e-9:
-            raise ValueError(F"pod_occupied {given} sums to {sum(pairs):g} electron pairs, the neutral system of the "
-                             F"step-2 log has {homo} occupied orbitals")
-        if own and any(not 0 <= int(round(2.0 * q)) - e <= 1 for q, e in zip(pairs, electrons)):
-            raise ValueError(F"pod_occupied {given} against the NELECTRON {electrons} of the cation's &BLOCK sections "
-                             F"- a block of the neutral holds its cation's electrons or one more")
-        electrons = [int(round(2.0 * q)) for q in pairs]
-    occupied = [e // 2 for e in electrons]
+    tol = float(params['occupancy_tolerance'])
+    if not 0.0 < tol < 0.5:
+        raise ValueError(F"occupancy_tolerance {tol} - the integer test needs 0 < tol < 0.5")
+    # the block-state energies of every frame - the full h of a frame is sliced to the tracked states later - and the
+    # occupations of the block states in the closed shell of the frame
+    h_diag, nmo_list, occupations, fermi_gap = [], [], [], []
+    for k in frames:
+        h, nmo = _pod_route_frame(np.load(F'{res_dir_1}/POD_cp2k_hab_{k}.npz'), spin)
+        if homo > h.shape[0]:
+            raise ValueError(F"POD_cp2k_hab_{k}.npz carries {h.shape[0]} block states, the neutral system of the step-2 "
+                             F"log {log} has {homo} occupied orbitals")
+        h_diag.append(np.diag(h).copy())
+        nmo_list.append(nmo)
+        occ, gap = _pod_route_occupations(h, homo)
+        occupations.append(occ)
+        fermi_gap.append(gap)
+    if any(nmo != nmo_list[0] for nmo in nmo_list):
+        raise ValueError("the numbers of POD block states change along the trajectory")
+    nmo = nmo_list[0]
+    nblk = len(nmo)
+    off = np.concatenate(([0], np.cumsum(nmo)))
+    # the doubly occupied states and the electrons of every block: read off the reference, the same at every frame
+    occupied, electrons = None, None
+    for i in range(len(frames)):
+        where = F"frame {frames[i]}" + ("" if fermi_gap[i] is None else
+                                        F" (the gap of the reference {fermi_gap[i] * units.au2ev:.2f} eV)")
+        counted = _pod_route_block_electrons(occupations[i], off, tol, where)
+        if i == 0:
+            occupied, electrons = counted
+        for f in range(nblk):
+            if (counted[0][f], counted[1][f]) != (occupied[f], electrons[f]):
+                was, now = occupations[0][off[f]:off[f + 1]], occupations[i][off[f]:off[f + 1]]
+                moved = [int(x) for x in np.flatnonzero((was >= 1.0 - tol) != (now >= 1.0 - tol))]
+                raise ValueError(
+                    F"{where}: block {f} holds {counted[0][f]} doubly occupied states and {counted[1][f]} "
+                    F"electrons in the reference, {occupied[f]} and {electrons[f]} at frame {frames[0]} - " + (
+                        F"the occupation of its state{'s' if len(moved) > 1 else ''} "
+                        + ", ".join(F"{x + 1} goes from {was[x]:.2f} to {now[x]:.2f}" for x in moved)
+                        + F" across the line of occupancy_tolerance {tol}" if moved else
+                        F"its population goes from {was.sum():.2f} to {now.sum():.2f} electron pairs, charge moves "
+                        F"between the blocks"))
+    halves = [e - 2 * o for e, o in zip(electrons, occupied)]
+    pairs = [e / 2.0 for e in electrons]
     odd = [f for f in range(nblk) if electrons[f] % 2]
     pairs_record = [int(q) if float(q).is_integer() else q for q in pairs]
+    counted_text = F"{occupied} doubly occupied and {halves} half-filled states"
+    occ_all = np.array(occupations)
+    full = np.concatenate([np.arange(off[f], off[f] + occupied[f]) for f in range(nblk)]).astype(int)
+    rest = np.setdiff1d(np.arange(int(off[-1])), full)
+    known_gaps = [g for g in fermi_gap if g is not None]
+    occupation_record = {
+        "doubly_occupied_min": float(occ_all[:, full].min()) if full.size else None,
+        "other_max": float(occ_all[:, rest].max()) if rest.size else None,
+        "block_electrons_off_max": float(max(np.abs(2.0 * occ_all[:, off[f]:off[f + 1]].sum(axis=1) - electrons[f]).max()
+                                             for f in range(nblk))),
+        "gap_min_eV": float(min(known_gaps) * units.au2ev) if known_gaps else None}
+    # pod_occupied and the NELECTRON prints of the step-2 log cross-check the reference's counts
+    given = params['pod_occupied']
+    if given is not None:
+        given = [float(o) for o in given]
+        if len(given) != nblk or any(abs(g - q) > 1e-9 for g, q in zip(given, pairs)):
+            raise ValueError(F"pod_occupied {params['pod_occupied']} does not match the electron pairs {pairs_record} of "
+                             F"the blocks in the reference ({counted_text}) - drop the key or give these values")
+    printed = CP2K_methods.read_pod_block_electrons(log)
+    if printed and all(e > 0 for e in printed):
+        if len(printed) != nblk:
+            raise ValueError(F"the step-2 log {log} prints {len(printed)} POD blocks, the POD prints carry {nblk}")
+        short = sorted(e - p for e, p in zip(electrons, printed))
+        # a cation's step 2 may carry its own partition: one block one electron short of the neutral's
+        if any(short) and not (reference_charge == 1 and short == [0] * (nblk - 1) + [1]):
+            text = (F"the NELECTRON {printed} of the &BLOCK sections of the step-2 log {log} against the {electrons} "
+                    F"electrons of the blocks in the reference ({counted_text})")
+            if given is None:
+                raise ValueError(text + F" - the blocks are other fragments than the counts were typed for, or a count "
+                                 F"is mistyped: CP2K's files do not depend on NELECTRON, params['pod_occupied'] = "
+                                 F"{pairs_record} runs on the reference's counts")
+            print("WARNING in run_step3_pod: " + text + " - pod_occupied confirms the reference's counts")
     per_block = params['num_occ_states_per_block']
     if per_block is None:
         per_block = list(occupied)
@@ -4723,7 +4794,6 @@ def run_step3_pod(params):
     if not params['apply_phase_correction']:
         print("WARNING: apply_phase_correction False - the eigenvector signs of every frame are arbitrary, St_sd and "
               "Hvib_sd_im carry them and the couplings are not those of followed states")
-    off = np.concatenate(([0], np.cumsum(nmo)))
     block_gap = {}
     for f in range(nblk):
         if occupied[f] < nmo[f]:
@@ -4734,32 +4804,39 @@ def run_step3_pod(params):
                                  F"{occupied[f] - 1} (last occupied) at frame {frames[int(np.argmin(gaps))]} - "
                                  F"the doubly occupied count does not sit at a gap of the block")
             block_gap[str(f)] = float(min(gaps) * units.au2ev)
-    # an odd block's dangling state: the state with the strongest coupling to another odd block (the cut bond, eV
-    # scale) - inside the doubly occupied set the aufbau count would put a hole into it
+    # the half-filled states of a block: the states beyond its pairs with the largest occupation at the first frame,
+    # one for every electron beyond the pairs, each with the half-filled state of another block coupled to it most
     dangling = {}
-    if odd:
+    if any(halves):
         h0, _ = _pod_route_frame(np.load(F'{res_dir_1}/POD_cp2k_hab_{frames[0]}.npz'), spin)
-        for f in odd:
-            others = np.concatenate([np.arange(off[g], off[g + 1]) for g in odd if g != f])
-            V = np.abs(h0[off[f]:off[f + 1]][:, others])
-            i, j = np.unravel_index(int(np.argmax(V)), V.shape)
-            g = int(np.searchsorted(off, others[j], side='right') - 1)
-            partner = int(others[j] - off[g])
-            e_dangling = float(h0[off[f] + i, off[f] + i] * units.au2ev)
+        occ0 = occupations[0]
+        carriers = {f: sorted(int(off[f] + occupied[f] + x) for x in
+                              np.argsort(-occ0[off[f] + occupied[f]:off[f + 1]], kind='stable')[:halves[f]])
+                    for f in range(nblk) if halves[f]}
+        for f, states in carriers.items():
+            others = [y for g, ys in carriers.items() if g != f for y in ys]
             top = off[f] + occupied[f] - 1
-            above = float((h0[off[f] + i, off[f] + i] - h0[top, top]) * units.au2ev) if occupied[f] else None
-            dangling[str(f)] = {"state": int(i) + 1, "energy_eV": e_dangling, "above_occupied_eV": above,
-                                "coupling_eV": float(V[i, j] * units.au2ev), "partner_block": g,
-                                "partner_state": partner + 1}
-            if i < occupied[f]:
-                raise ValueError(F"block {f} has an odd electron count ({electrons[f]}): its dangling state {i + 1} "
-                                 F"(coupled {V[i, j] * units.au2ev:.2f} eV to state {partner + 1} of block {g}) lies "
-                                 F"inside its {occupied[f]} doubly occupied states - the aufbau count mis-assigns the "
-                                 F"half-filled state and the hole basis would hold the dangling state")
-            print(F"WARNING in run_step3_pod: block {f} has an odd electron count ({electrons[f]}) - its {occupied[f]} "
-                  F"lowest states are taken as doubly occupied, the dangling state {i + 1} of the cut bond lies "
-                  F"{'' if above is None else F'{above:.2f} eV above them '}at {e_dangling:.2f} eV, coupled "
-                  F"{V[i, j] * units.au2ev:.2f} eV to state {partner + 1} of block {g}")
+            entries, texts = [], []
+            for x in states:
+                above = float((h0[x, x] - h0[top, top]) * units.au2ev) if occupied[f] else None
+                entry = {"state": int(x - off[f]) + 1, "occupation": float(occ0[x]),
+                         "energy_eV": float(h0[x, x] * units.au2ev), "above_occupied_eV": above, "coupling_eV": None,
+                         "partner_block": None, "partner_state": None}
+                text = (F"state {entry['state']} (occupation {occ0[x]:.2f} in the reference, "
+                        F"{'' if above is None else F'{above:.2f} eV above the pairs '}at {entry['energy_eV']:.2f} eV")
+                if others:
+                    y = others[int(np.argmax(np.abs(h0[x, others])))]
+                    g = int(np.searchsorted(off, y, side='right') - 1)
+                    entry.update({"coupling_eV": float(abs(h0[x, y]) * units.au2ev), "partner_block": g,
+                                  "partner_state": int(y - off[g]) + 1})
+                    text += F", coupled {entry['coupling_eV']:.2f} eV to state {entry['partner_state']} of block {g}"
+                entries.append(entry)
+                texts.append(text + ")")
+            dangling[str(f)] = entries
+            print(F"WARNING in run_step3_pod: block {f} holds {occupied[f]} electron pair{'' if occupied[f] == 1 else 's'} "
+                  F"and {halves[f]} half-filled state{'s' if halves[f] > 1 else ''} of "
+                  F"{'cut bonds' if halves[f] > 1 else 'a cut bond'}, out of the hole basis - the dangling "
+                  + ", ".join(texts))
 
     idx, frag, rank = _pod_route_hole_basis(nmo, occupied, per_block)
     n = len(idx)
@@ -4999,6 +5076,8 @@ def run_step3_pod(params):
                                  operator='pod_cp2k', basis='sd',
                                  extra={"route": "pod_hamiltonian", "pod_occupied": pairs_record,
                                         "block_electrons": electrons, **reference,
+                                        "occupancy_tolerance": tol, "doubly_occupied": occupied,
+                                        "half_filled": halves,
                                         "num_occ_states_per_block": per_block,
                                         "route_note": "the diabatic states are the occupied POD block states "
                                                       "themselves (the one-hole determinants of the cation), the "
@@ -5036,6 +5115,8 @@ def run_step3_pod(params):
                                             "state, kept, carried by the basis, the block state taken])"})
     report = {"frames": [start_time, finish_time], "n_states": n, "blocks": nblk, "block_states": nmo,
               "pod_occupied": pairs_record, "block_electrons": electrons, "odd_blocks": odd, **reference,
+              "occupancy_tolerance": tol, "doubly_occupied": occupied, "half_filled": halves,
+              "occupations": occupation_record,
               "dangling_states": dangling, "num_occ_states_per_block": per_block,
               "min_continuity": float(min(np.abs(np.diag(St)).min() for St in St_act)),
               "max_hole_minus_block_overlap": float(max(np.abs(St_hole[k] - St_act[k]).max()
