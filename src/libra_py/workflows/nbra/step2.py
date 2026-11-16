@@ -39,6 +39,7 @@ from libra_py import pod as pod_lib
 from libra_py import cube_file_methods
 from libra_py import molden_methods
 from libra_py import data_conv
+from libra_py import data_io
 from libra_py import data_read
 from libra_py import orthogonalizations
 from libra_py import units
@@ -309,11 +310,11 @@ def run(params):
 
             # Remove current run, make next run to be the current one
             if nac_method == 0 or nac_method == 1 or nac_method == 3:
-                os.system("rm -rf %s/curr0" % wd)
+                data_io.remove_trees("%s/curr0" % wd)
                 os.system("mv %s/next0 %s/curr0" % (wd, wd))
 
             if nac_method == 2 or nac_method == 3:
-                os.system("rm -rf %s/curr1" % wd)
+                data_io.remove_trees("%s/curr1" % wd)
                 os.system("mv %s/next1 %s/curr1" % (wd, wd))
 
             if verbosity > 0:
@@ -512,6 +513,18 @@ def collect_leftovers(params):
         for f in sorted(set(glob.glob("Diag_libra-*-WFN_*.cube") + glob.glob("Diag_*-WFN_*.cube"))):
             if os.path.isfile(f):
                 os.remove(f)
+
+
+def remove_restart_files(step, isxTB, with_ot):
+    """Remove the wfn restart files step 2 wrote at `step`: under xTB Diag_{step}-RESTART* and (with_ot)
+    OT_{step}-RESTART*, else Diag_libra-{step}-RESTART*. A file not written is nothing - under ot_first_call_only the
+    OT runs at the first step of a job alone."""
+    if isxTB:
+        if with_ot:
+            data_io.remove_files(F'OT_{step}-RESTART*')
+        data_io.remove_files(F'Diag_{step}-RESTART*')
+    else:
+        data_io.remove_files(F'Diag_libra-{step}-RESTART*')
 
 
 def check_wfn_restart_prints(params):
@@ -1039,15 +1052,11 @@ def run_cp2k_libint_step2(params):
                 pod_prev = pod_curr
             print('Done with computing molecular orbital overlaps. Elapsed time:', time.time() - t1)
             if params['remove_molden'] and os.path.exists(molden_filename):
-                os.system(F'rm {molden_filename}')
+                data_io.remove_files(molden_filename)
             if counter > 0:
                 if isxTB:
                     print('Removing unnecessary wfn files...')
-                    if params['cp2k_ot_input_template'] is not None:
-                        os.system(F'rm OT_{step-1}-RESTART*')
-                    os.system(F'rm Diag_{step-1}-RESTART*')
-                else:
-                    os.system(F'rm Diag_libra-{step-1}-RESTART*')
+                remove_restart_files(step - 1, isxTB, params['cp2k_ot_input_template'] is not None)
             print(F'Done with step {step}.', 'Elapsed time:', time.time() - t1_all)
             counter += 1
             CP2K_methods.collect_pdos_files(params["all_pdosfiles"])
@@ -1238,7 +1247,7 @@ def run_cp2k_libint_step2(params):
             print('Done with computing molecular orbital overlaps. Elapsed time:', time.time() - t1)
             print(F'Done with step {step}.', 'Elapsed time:', time.time() - t1_all)
             if params['remove_molden']:
-                os.system(F'rm {molden_filename}')
+                data_io.remove_files(molden_filename)
 
         else:
             # The same procedure as above but now we compute time-overlaps as well
@@ -1458,15 +1467,11 @@ def run_cp2k_libint_step2(params):
             eigenvectors_1 = eigenvectors_2
 
             if params['remove_molden']:
-                os.system(F'rm {molden_filename}')
+                data_io.remove_files(molden_filename)
 
             if isxTB:
                 print('Removing unnecessary wfn files...')
-                if params['cp2k_ot_input_template'] is not None:
-                    os.system(F'rm OT_{step-1}-RESTART*')
-                os.system(F'rm Diag_{step-1}-RESTART*')
-            else:
-                os.system(F'rm Diag_libra-{step-1}-RESTART*')
+            remove_restart_files(step - 1, isxTB, params['cp2k_ot_input_template'] is not None)
 
             if params['cube_visualization']:
                 print('Plotting cube files using VMD...')

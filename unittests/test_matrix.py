@@ -233,7 +233,7 @@ class TestMATRIX(unittest.TestCase):
             self.assertEqual(x[0], [1.0, -0.5])
             self.assertEqual(x[1], [0.6, 1.0])
 
-            os.system("rm X.txt")
+            os.remove("X.txt")
 
     def test_6(self):
         """Test binary save/load"""
@@ -259,7 +259,7 @@ class TestMATRIX(unittest.TestCase):
             self.assertEqual(Y.get(1, 0), 0.6)
             self.assertEqual(Y.get(1, 1), 1.0)
 
-            os.system("rm X.dat")
+            os.remove("X.dat")
 
     def test_7(self):
         """Test col and row extraction"""

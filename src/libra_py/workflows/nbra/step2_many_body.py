@@ -36,6 +36,7 @@ import concurrent.futures
 from liblibra_core import *
 
 from libra_py import data_conv
+from libra_py import data_io
 from libra_py import cube_file_methods
 import libra_py.packages.cp2k.methods as CP2K_methods
 import libra_py.packages.gaussian.methods as Gaussian_methods
@@ -306,7 +307,7 @@ def compute_cube_ks_overlaps(cubefiles_prev, params):
 
     # for cubefile in cubefile_names_curr:
     #    os.system( "/gpfs/scratch/brendan/cp2k/tools/cubecruncher/cubecruncher.x -center geo -i %s -o %s-1.cube " % ( cubefile, cubefile.replace( ".cube", "" ) ) )
-    #    os.system( "rm %s" % cubefile)
+    #    data_io.remove_files(cubefile)
     #    os.system( "mv %s-1.cube %s" % ( cubefile.replace(".cube",""), cubefile ) )
 
     # Reading the cube files
@@ -898,7 +899,7 @@ def run_step2_many_body(params):
     # We may have to "crunch" the cubes - this may be especially needed for periodic systems.
     # for cubefile in cubefile_names_prev:
     #    os.system( "/gpfs/scratch/brendan/cp2k/tools/cubecruncher/cubecruncher.x -center geo -i %s -o %s-1.cube " % ( cubefile, cubefile.replace( ".cube", "" ) ) )
-    #    os.system( "rm %s" % cubefile)
+    #    data_io.remove_files(cubefile)
     #    os.system( "mv %s-1.cube %s" % ( cubefile.replace(".cube",""), cubefile ) )
     cubefiles_prev = pool.map(cube_file_methods.read_cube, cubefile_names_prev)
 
@@ -924,7 +925,7 @@ def run_step2_many_body(params):
 
     # After reading the cubefiles for curr_step, we should delete them to be memory efficient
     print("Removing cubefiles")
-    os.system("rm cubefiles/*")
+    data_io.remove_files("cubefiles/*")
 
     # Froming the hvib_ks_re with energies for the first step in the job.
     # This will extract the Kohn-Sham energies and total energy from the CP2K log files and forms the Hvib_real
@@ -1025,7 +1026,7 @@ def run_step2_many_body(params):
             cube_file_methods.plot_cubes(params)
 
         # Now remove all the cube files to be memory efficient
-        os.system("rm cubefiles/*")
+        data_io.remove_files("cubefiles/*")
 
         # Appending the normalized overlap matrices in the _job variables
         S_ks_job.append(S_ks_prev)

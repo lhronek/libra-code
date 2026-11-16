@@ -256,7 +256,7 @@ class TestCMATRIX(unittest.TestCase):
             self.assertAlmostEqual(x[0], [1.0 + 1.0j, -0.5 + 0.0j])
             self.assertAlmostEqual(x[1], [0.6 + 0.0j, 1.0 + 1.0j])
 
-            os.system("rm X.txt")
+            os.remove("X.txt")
 
     def test_6(self):
         """Test binary save/load"""
@@ -282,7 +282,7 @@ class TestCMATRIX(unittest.TestCase):
             self.assertAlmostEqual(Y.get(1, 0), 0.6 + 0.5j)
             self.assertAlmostEqual(Y.get(1, 1), 1.0 + 0.0j)
 
-            os.system("rm X.dat")
+            os.remove("X.dat")
 
     def test_7(self):
         """Test col and row extraction"""

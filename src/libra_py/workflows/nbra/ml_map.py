@@ -42,7 +42,7 @@ from liblibra_core import *
 import libra_py.packages.cp2k.methods as CP2K_methods
 import libra_py.packages.dftbplus.methods as DFTB_methods
 from . import generate_data
-from libra_py import units, molden_methods, data_conv
+from libra_py import units, molden_methods, data_conv, data_io
 import util.libutil as comn
 from libra_py.params_check import refuse_unknown_keys
 
@@ -501,7 +501,7 @@ def compute_atomic_orbital_overlap_matrix(params, step):
                 molden_file_1, is_spherical, is_periodic, cell, translational_vector)
             AO_S += compute_overlaps(shell_1, shell_1p, nprocs)
     AO_S = data_conv.MATRIX2nparray(AO_S)
-    os.system(F'rm  {molden_file_1}')
+    data_io.remove_files(molden_file_1)
     new_indices = CP2K_methods.resort_ao_matrices(l_vals)
     # new_indices = molden_methods.resort_eigenvectors(l_vals)
     return AO_S[:, new_indices][new_indices, :]
@@ -553,9 +553,9 @@ def compute_mo_overlaps(params, eigenvectors_1, eigenvectors_2, step_1, step_2, 
                                                                           cell, translational_vector)
             AO_S += compute_overlaps(shell_1, shell_2p, nprocs)
     AO_S = data_conv.MATRIX2nparray(AO_S)
-    os.system(F'rm {molden_file_1}')
+    data_io.remove_files(molden_file_1)
     if molden_file_1 != molden_file_2:
-        os.system(F'rm {molden_file_2}')
+        data_io.remove_files(molden_file_2)
     new_indices = CP2K_methods.resort_ao_matrices(l_vals)
     AO_S = AO_S[:, new_indices][new_indices, :]
     if lowest_orbital is not None:
@@ -883,7 +883,7 @@ def compute_properties(params, models, input_scalers, output_scalers):
             mo_overlap_sparse = sp.csc_matrix(
                 data_conv.form_block_matrix(mo_overlap, zero_mat, zero_mat, mo_overlap))
             sp.save_npz(params["res_dir"] + F'/S_ks_{step}.npz', mo_overlap_sparse)
-            os.system(f'rm {params["path_to_input_mats"]}/{params["prefix"]}_{params["input_property"]}_{step}.npy')
+            data_io.remove_files(f'{params["path_to_input_mats"]}/{params["prefix"]}_{params["input_property"]}_{step}.npy')
         # Writing the energy files into the res directory
         energy_mat = np.diag(eigenvalues[lowest_orbital - 1:highest_orbital])     # the window's diagonal alone
         zero_mat = np.zeros(energy_mat.shape)
@@ -927,19 +927,19 @@ def compute_properties(params, models, input_scalers, output_scalers):
                     F"{data_gen_params_1['reference_mpi_exe']} -np {params['nprocs']} {data_gen_params_1['reference_software_exe']} -i input_{tmp_prefix}_{step}.inp -o output_{tmp_prefix}_{step}.out")
                 # os.system(F"{data_gen_params_1['reference_mpi_exe']} -np {params['nprocs']} {data_gen_params_1['reference_software_exe']} -i input_{tmp_prefix}_{step}.inp | grep -A 30 'SCF WAVEFUNCTION OPTIMIZATION' > output_{tmp_prefix}_{step}.out")
                 # ================= These files can be large... we can setup a flag to remove them but for ML assessment I remove them
-                # os.system(f"rm {output_name}")
+                # data_io.remove_files(output_name)
             # The algorithm for running the calculations
             # if params["compute_total_energy"]:
             # we have to make a cp2k input file based on the reference input
             # and then run it. Then since the files are large we need to remove them
-    # os.system("rm *.log *.npy *.wfn* *.inp *.xyz")
+    # data_io.remove_files("*.log", "*.npy", "*.wfn*", "*.inp", "*.xyz")
     os.makedirs("../ml_total_energy", exist_ok=True)
     for f in sorted(glob.glob("output*.out")):     # a python loop, not a shell glob - no argument limit, a failure raises
         if os.path.isfile(f):
             shutil.move(f, os.path.join("../ml_total_energy", f))
-    # os.system("rm *.out")
+    # data_io.remove_files("*.out")
     # os.chdir("../")
-    # os.system(f"rm -rf tmp_guess_ham_{params['job']}")
+    # data_io.remove_trees(f"tmp_guess_ham_{params['job']}")
 
 
 def distribute_jobs(params):

@@ -25,6 +25,7 @@ import numpy as np
 import sys
 import glob
 import libra_py.packages.cp2k.methods as CP2K_methods
+from libra_py import data_io
 import util.libutil as comn
 from libra_py.params_check import refuse_unknown_keys
 
@@ -126,7 +127,7 @@ def save_data(params, prefix, step, directory, guess):
                 os.system(f"mv {prefix}_{step}* ../sample_files")
                 os.system("cp params.json ../sample_files")
             if params["remove_raw_outputs"]:  # and step>params["istep"]:
-                os.system(F"rm {prefix}_{step}*Log {prefix}_{step}*.wfn* {prefix}_{step}*molden")
+                data_io.remove_files(F"{prefix}_{step}*Log", F"{prefix}_{step}*.wfn*", F"{prefix}_{step}*molden")
         except BaseException:
             raise ("Could not read the data from CP2K .Log files!")
 
@@ -314,8 +315,8 @@ def distribute_jobs(params):
         raise ("do_guess and do_ref cannot get False value at the same time!")
     # if params["scratch"]:
         # Remove evrything including the data
-        # os.system("rm -rf job* sample_files")# shuffled_indices.npy") # Removes the job folders and the random indices
-        # os.system('rm find . -name "*.npy" ') # This seems to be brutal! It removes everything :))
+        # data_io.remove_trees("job*", "sample_files")# shuffled_indices.npy") # Removes the job folders and the random indices
+        # data_io.remove_files(*glob.glob("**/*.npy", recursive=True)) # This seems to be brutal! It removes everything :))
         # shuffled_indices = np.arange(params["istep"], params["fstep"])
         # params["steps"] = list(range(params["istep"], params["fstep"]))
         # if params["random_selection"]:

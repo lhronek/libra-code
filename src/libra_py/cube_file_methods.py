@@ -32,6 +32,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 
 import util.libutil as comn
 import libra_py.packages.cp2k.methods as CP2K_methods
+from libra_py import data_io
 from libra_py.params_check import refuse_unknown_keys
 
 def read_cube(filename: str):
@@ -418,8 +419,8 @@ def plot_cubes(params):
             # Run the VMD by tcl file
             os.system('vmd < vmd_alpha_cube_plot_%d.tcl' % curr_step)
             os.system('vmd < vmd_beta_cube_plot_%d.tcl' % curr_step)
-            # os.system('rm vmd_alpha_cube_plot_%d.tcl' % curr_step)
-            # os.system('rm vmd_beta_cube_plot_%d.tcl' % curr_step)
+            # data_io.remove_files('vmd_alpha_cube_plot_%d.tcl' % curr_step)
+            # data_io.remove_files('vmd_beta_cube_plot_%d.tcl' % curr_step)
 
     else:
         # The same as above but with restricted spin calculations. No beta orbitals is considered.
@@ -450,7 +451,7 @@ def plot_cubes(params):
             new_file.close()
 
             os.system('vmd < vmd_cube_plot_%d.tcl' % curr_step)
-            # os.system('rm vmd_cube_plot_%d.tcl' % curr_step)
+            # data_io.remove_files('vmd_cube_plot_%d.tcl' % curr_step)
 
 
 def plot_cube_v2(params, cube_file_name, phase_factor):
@@ -546,8 +547,8 @@ def plot_cube_v2(params, cube_file_name, phase_factor):
     if params['remove_cube']:
         if together_mode:
             for name in cube_file_names:
-                os.system(F'rm {name}')
-            os.system(F'rm {tmp_name}')
+                data_io.remove_files(name)
+            data_io.remove_files(tmp_name)
         else:
-            os.system(F'rm {cube_file_name}')
-            os.system(F'rm {state_name}')
+            data_io.remove_files(cube_file_name)
+            data_io.remove_files(state_name)

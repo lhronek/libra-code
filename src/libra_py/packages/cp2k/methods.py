@@ -44,7 +44,7 @@ from libra_py.packages.cp2k.spin_flip import (read_tdwfn, check_restart_orbitals
                                               spin_flip_carrier_operators, spin_flip_carrier_operators_high_spin,
                                               s_reference, s2_total, spin_name, s2_spin_flip_matrix, purify_spin_mixtures)
 
-from libra_py import data_outs, data_read, data_stat, data_conv
+from libra_py import data_outs, data_read, data_stat, data_conv, data_io
 from libra_py import units, molden_methods
 import libra_py.orthogonalizations as ortho
 
@@ -2308,7 +2308,7 @@ def distribute_cp2k_libint_jobs(
         print('Job', njob, 'istep', istep_job, 'fstep', fstep_job, 'nsteps', fstep_job - istep_job)
 
         if os.path.exists('job%d' % (njob + 1)):
-            os.system('rm -rf job%d' % (njob + 1))
+            data_io.remove_trees('job%d' % (njob + 1))
         os.system('mkdir job%d' % (njob + 1))
         os.chdir('job%d' % (njob + 1))
         os.system('cp ../%s %s' % (submit_template, submit_template))

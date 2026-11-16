@@ -40,6 +40,8 @@ import sys
 import math
 import copy
 import re
+import glob
+import shutil
 import numpy as np
 from libra_py import data_conv
 if sys.platform == "cygwin":
@@ -396,3 +398,48 @@ def sort_hvib_file_names(files):
     for i in range(len(order)):
         files_sorted.append(kept[order[i]])
     return files_sorted
+
+
+def remove_files(*patterns):
+    """
+    Remove the files the patterns match - `rm` without a shell: a pattern without a match removes nothing and prints
+    nothing, a name with a space is one name, the number of matches has no limit, a failure raises.
+
+    Args:
+        *patterns (string): file names or glob patterns - a pattern without a match that names an existing file
+            (a name with [ or ?) is that file. Directories are left.
+
+    Returns:
+        list: the files removed
+    """
+    removed = []
+    for pattern in patterns:
+        for name in sorted(glob.glob(pattern)) or [pattern]:
+            if os.path.lexists(name) and (os.path.islink(name) or not os.path.isdir(name)):
+                os.remove(name)
+                removed.append(name)
+    return removed
+
+
+def remove_trees(*patterns):
+    """
+    Remove the files and the directory trees the patterns match - `rm -rf` without a shell, the patterns and the
+    failures as in remove_files.
+
+    Args:
+        *patterns (string): file or directory names or glob patterns
+
+    Returns:
+        list: the files and directories removed
+    """
+    removed = []
+    for pattern in patterns:
+        for name in sorted(glob.glob(pattern)) or [pattern]:
+            if not os.path.lexists(name):
+                continue
+            if os.path.isdir(name) and not os.path.islink(name):
+                shutil.rmtree(name)
+            else:
+                os.remove(name)
+            removed.append(name)
+    return removed

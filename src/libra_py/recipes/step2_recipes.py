@@ -21,6 +21,7 @@ import libra_py.packages.cp2k.methods as CP2K_methods
 import libra_py.packages.gaussian.methods as Gaussian_methods
 import libra_py.packages.dftbplus.methods as DFTB_methods
 from libra_py.workflows.nbra import step2_many_body
+from libra_py import data_io
 from libra_py.params_check import refuse_unknown_keys
 
 
@@ -248,10 +249,9 @@ def run_step2_jobs(params):
     comn.check_input(params, default_params, critical_params)
     logger.debug("Checked params in the function initialize_step2_jobs")
 
-    # Consider using shutils module here instead of os.system()
-    os.system("rm -r wd")
+    data_io.remove_trees("wd")
     os.mkdir('wd')
-    os.system("rm -r res")
+    data_io.remove_trees("res")
     os.mkdir('res')
 
     # Get the neededvariables from the params dictionary

@@ -54,6 +54,7 @@ import libra_py.packages.cp2k.methods as CP2K_methods
 import libra_py.units as units
 import libra_py.data_read as data_read
 import libra_py.data_conv as data_conv
+import libra_py.data_io as data_io
 import libra_py.hungarian as hungarian
 
 # the continuity floor of a followed state: more than half of its weight on its own continuation (cos 45 degrees) -
@@ -310,7 +311,7 @@ def output_sorted_Hvibs(Hvib, orbital_index_energy_pairs, _params={}):
 
         if (save_files):
             rd_sorted = F"{output_dir_prefix}{traj}"
-            os.system(F"rm -r {rd_sorted}")
+            data_io.remove_trees(rd_sorted)
             os.system(F"mkdir {rd_sorted}")
 
         Hvibs_sorted.append([])
@@ -2560,7 +2561,7 @@ def run_step3_ks_nacs_libint(params):
             # sp.save_npz(F'{res_dir_2}/Hvib_ks_{step-start_time}_im.npz', sp.csc_matrix( Hvib_ks ))
             sp.save_npz(F'{res_dir_2}/St_ks_{step}.npz', St_step_phase_corrected)
             sp.save_npz(F'{res_dir_2}/Hvib_ks_{step}_im.npz', sp.csc_matrix(Hvib_ks))
-            os.system(F'rm {res_dir_2}/St_ks_orthonormalized_{step}.npz')
+            data_io.remove_files(F'{res_dir_2}/St_ks_orthonormalized_{step}.npz')
     else:
         for step in range(start_time, finish_time):
             St_step = sp.load_npz(F'{res_dir_2}/St_ks_orthonormalized_{step}.npz')

@@ -63,8 +63,8 @@ def exe_gamess(params):
     os.system("/usr/bin/time %s %s %s %s > %s" % (rungms, inp, VERNO, nproc, out))
 
     # delete the files except input and output ones to do another GAMESS calculation.
-    os.system("rm *.dat")
-    os.system("rm -r %s" % (scr_dir))
+    data_io.remove_files("*.dat")
+    data_io.remove_trees(scr_dir)
 
 
 def gamess_to_libra(params, ao, E, sd_basis, active_space, suff):
