@@ -4796,7 +4796,7 @@ def run_step3_pod(params):
               "Hvib_sd_im carry them and the couplings are not those of followed states")
     block_gap = {}
     for f in range(nblk):
-        if occupied[f] < nmo[f]:
+        if 0 < occupied[f] < nmo[f]:
             a, b = off[f] + occupied[f] - 1, off[f] + occupied[f]
             gaps = [hd[b] - hd[a] for hd in h_diag]
             if min(gaps) <= 0.0:
