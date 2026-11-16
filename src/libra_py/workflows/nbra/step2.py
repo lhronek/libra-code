@@ -514,6 +514,25 @@ def collect_leftovers(params):
                 os.remove(f)
 
 
+def check_wfn_restart_prints(params):
+    """Refuses the CP2K templates of a step-2 run that write no wfn restart file for what reads it: the OT template's for
+    the diagonalization of the same step, the diagonalization template's for the orbitals (mo_source 'wfn') or for the
+    next step's diagonalization (no OT template, ot_first_call_only, a DFT template that names a wfn restart file)."""
+    where = "step2.run_cp2k_libint_step2"
+    diag_template = params['cp2k_diag_input_template']
+    ot_template = params['cp2k_ot_input_template'] if params['isxTB'] else None
+    if ot_template is not None:
+        CP2K_methods.refuse_unwritten_wfn_restart(ot_template, "the diagonalization of the same step restarts from it", where)
+    if params['isxTB']:
+        chained = ot_template is None or params.get('ot_first_call_only', False)
+    else:
+        chained = CP2K_methods.template_sets_keyword(diag_template, "WFN_RESTART_FILE_NAME", ".wfn")
+    if params['mo_source'].lower() == 'wfn':
+        CP2K_methods.refuse_unwritten_wfn_restart(diag_template, "the orbitals are read from it (mo_source 'wfn')", where)
+    elif chained:
+        CP2K_methods.refuse_unwritten_wfn_restart(diag_template, "the next step's diagonalization restarts from it", where)
+
+
 def run_cp2k_libint_step2(params):
     """
     This function runs the step2 for computing the MO overlaps for both DFT and xTB calculations and saves them as sparse
@@ -697,6 +716,7 @@ def run_cp2k_libint_step2(params):
         raise ValueError("params['isXTB'] is not read by this workflow - use 'isxTB'")
     refuse_unknown_keys(params, STEP2_CP2K_KEYS, "step2.run_cp2k_libint_step2", "params", "no function of the CP2K step-2 workflow reads")
     comn.check_input(params, default_params, critical_params)
+    check_wfn_restart_prints(params)
     if params['is_periodic']:
         CP2K_methods.fill_cell_from_template(params, params['cp2k_diag_input_template'])
     if params['is_periodic'] and params['translational_vectors'] is None:

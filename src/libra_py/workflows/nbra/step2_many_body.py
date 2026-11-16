@@ -758,6 +758,9 @@ def run_step2_many_body(params):
         # The path to executable CP2K
         cp2k_exe = params["es_software_exe"]
         cp2k_input_template = params["es_software_input_template"]
+        if CP2K_methods.template_sets_keyword(cp2k_input_template, "WFN_RESTART_FILE_NAME", ".wfn"):
+            CP2K_methods.refuse_unwritten_wfn_restart(cp2k_input_template, "the next step restarts from it",
+                                                      "step2_many_body.run_step2_many_body")
 
     elif es_software == "gaussian":
         gaussian_exe = params["es_software_exe"]

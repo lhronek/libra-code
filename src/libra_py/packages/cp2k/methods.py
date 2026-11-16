@@ -5070,6 +5070,56 @@ def _template_has_section(text, name):
     return False
 
 
+CP2K_PRINT_LEVELS = {"ON": -1, "SILENT": 0, "LOW": 1, "MEDIUM": 2, "HIGH": 3, "DEBUG": 4, "OFF": 5}
+
+
+def read_cp2k_print_key(template, path, default):
+    """Whether a CP2K input writes the print key at the end of the section path, e.g. ("SCF", "PRINT", "RESTART"), as
+    (written, key level, run level). CP2K writes a print key when the run's &GLOBAL PRINT_LEVEL (IOLEVEL, MEDIUM when
+    absent) reaches the key's level: the section's argument (ON at every level, OFF at none, SILENT for a bare section),
+    default - the key's own level in CP2K - when the input has no such section. Comment lines are not read, a level CP2K
+    does not know is refused."""
+    path = [name.upper() for name in path]
+    stack = []
+    key_level, run_level = default.upper(), "MEDIUM"
+    for line in _template_text(template).splitlines():
+        keyword, code = cp2k_keyword(line)
+        if not keyword:
+            continue
+        if keyword.startswith("&END"):
+            if stack:
+                stack.pop()
+        elif keyword.startswith("&"):
+            stack.append(keyword[1:])
+            if stack[-len(path):] == path:
+                key_level = (code.split()[1:] or ["SILENT"])[0].upper()
+        elif stack == ["GLOBAL"] and keyword in ("PRINT_LEVEL", "IOLEVEL"):
+            run_level = (code.split()[1:] or [""])[0].upper()
+    if key_level not in CP2K_PRINT_LEVELS:
+        raise ValueError(F"{template}: &{' &'.join(path)} {key_level} - CP2K's print levels are {', '.join(CP2K_PRINT_LEVELS)}")
+    if run_level not in ("SILENT", "LOW", "MEDIUM", "HIGH", "DEBUG"):
+        raise ValueError(F"{template}: &GLOBAL PRINT_LEVEL {run_level} - SILENT, LOW, MEDIUM, HIGH or DEBUG")
+    return CP2K_PRINT_LEVELS[run_level] >= CP2K_PRINT_LEVELS[key_level], key_level, run_level
+
+
+def template_sets_keyword(template, keyword, value=""):
+    """Whether an uncommented line of a CP2K input sets the keyword, with value (case-insensitive) in its text when given."""
+    for line in _template_text(template).splitlines():
+        name, code = cp2k_keyword(line)
+        if name == keyword.upper() and value.lower() in code.lower():
+            return True
+    return False
+
+
+def refuse_unwritten_wfn_restart(template, reader, where):
+    """Refuses a CP2K input that writes no wfn restart file (&SCF &PRINT &RESTART against the input's print level) - reader
+    says what takes the file: without it CP2K starts from the atomic guess and warns in its own log alone."""
+    written, key_level, run_level = read_cp2k_print_key(template, ("SCF", "PRINT", "RESTART"), "LOW")
+    if not written:
+        raise ValueError(F"{where}: {template} writes no wfn restart file (&SCF &PRINT &RESTART {key_level} at &GLOBAL PRINT_LEVEL "
+                         F"{run_level}) and {reader} - set &RESTART on")
+
+
 def _cell_from_lengths(lengths, angles):
     """The A, B, C vectors of the ABC lengths and the ALPHA_BETA_GAMMA angles (degrees): a along x, b in the xy plane."""
     def cos(x):
@@ -6970,6 +7020,14 @@ def cp2k_compute_adi_impl(q, params, full_id):
                         F"mo_source='{mo_source}' needs an active &{need} print in "
                         F"{template} - the run would complete and "
                         F"leave no MO file")
+    # the wfn restart files the next runs read must be written
+    if params.get("ot_template", None):
+        refuse_unwritten_wfn_restart(params["ot_template"], "the main run of the same step restarts from it", "cp2k_compute_adi")
+    for template in templates:
+        if mo_source == "wfn":
+            refuse_unwritten_wfn_restart(template, "the orbitals are read from it (mo_source 'wfn')", "cp2k_compute_adi")
+        elif template_sets_keyword(template, "SCF_GUESS"):
+            refuse_unwritten_wfn_restart(template, "the next step restarts from it", "cp2k_compute_adi")
     wd = f"{params.get('working_directory_prefix', 'wd')}_itraj{itraj}"
 
     # ---------------- run CP2K (execution layer) ----------------
