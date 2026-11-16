@@ -453,7 +453,7 @@ def cp2k_libint_step2_defaults():
         "y_pixels": 1024,
         "remove_cube": True,
         'together_mode': False,
-        'restart_file': True,
+        'restart_file': None,
         'ao_overlap_method': 'cp2k',
         'mo_source': 'wfn',
         'fragment_atom_lists': None,
@@ -676,6 +676,10 @@ def run_cp2k_libint_step2(params):
                              cp2k_diag_input_template (string): The CP2K diagonalization input template file name. For
                                                                 DFT calculations, this is the only parameter that we need.
 
+                             restart_file (string): A wfn file copied as Diag_libra-{step}-RESTART.wfn before every step of a
+                                                    DFT run - the step's initial guess where the template names no
+                                                    WFN_RESTART_FILE_NAME. None copies nothing. [default: None]
+
                              trajectory_xyz_filename (string): The trajectory xyz file name.
 
                              cp2k_exe (string): The full path to CP2K executable.
@@ -717,6 +721,9 @@ def run_cp2k_libint_step2(params):
     refuse_unknown_keys(params, STEP2_CP2K_KEYS, "step2.run_cp2k_libint_step2", "params", "no function of the CP2K step-2 workflow reads")
     comn.check_input(params, default_params, critical_params)
     check_wfn_restart_prints(params)
+    if params['restart_file'] is not None and (not isinstance(params['restart_file'], str) or not params['restart_file']):
+        raise ValueError(F"step2.run_cp2k_libint_step2: restart_file = {params['restart_file']!r} - the path of a wfn file (the initial "
+                         F"guess of every DFT step) or None")
     if params['is_periodic']:
         CP2K_methods.fill_cell_from_template(params, params['cp2k_diag_input_template'])
     if params['is_periodic'] and params['translational_vectors'] is None:
@@ -839,8 +846,8 @@ def run_cp2k_libint_step2(params):
                 'Diag_libra',
                 params['trajectory_xyz_filename'],
                 step)
-            if params["restart_file"]:
-                os.system(f'cp {params["restart_file"]} ./Diag_libra-{step}-RESTART.wfn')
+            if params["restart_file"] is not None:
+                shutil.copyfile(params["restart_file"], F'Diag_libra-{step}-RESTART.wfn')
             CP2K_methods.execute_cp2k(cp2k_exe, F'Diag_libra-{step}.inp',
                                       F'step_{step}.log',
                                       omp_num_threads=params["omp_num_threads"],
