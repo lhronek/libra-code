@@ -4282,8 +4282,9 @@ def _write_diabatization_records(res_dir, kind, dia_index, pops_list, hole_list,
     """U_{basis}_labels.json (the meaning of every diabatic state, with the mean energies over the
     steps: the orbital energies of the localized orbitals of an SD-level state, the excitation
     energy of a many-body one, in eV) and U_{basis}_pops.txt (per step, the fragment populations
-    of every diabatic state's localized electron orbital, then of its localized hole - nan where
-    the state has none) - basis "sd" for the SD-level states, "ci" for the many-body ones (whose
+    of every diabatic state's localized carrier - the hole under kind "hole", the electron
+    otherwise - then of the other one, nan where the state has none: the columns are named p_h
+    and p_e after what they hold) - basis "sd" for the SD-level states, "ci" for the many-body ones (whose
     untransformed state is the ground state). A localized state without an SD manifold (the POD
     route) carries manifold null. extra: further top-level entries of the labels file."""
     E = np.stack([np.asarray(e, dtype=float) for e in energy_list])
@@ -4328,8 +4329,9 @@ def _write_diabatization_records(res_dir, kind, dia_index, pops_list, hole_list,
     nst = pops_list[0].shape[0]
     rows = [np.concatenate(([start_time + i], pops_list[i].reshape(-1), hole_list[i].reshape(-1)))
             for i in range(len(pops_list))]
-    header = ("step " + " ".join(F"p_e(state{c},frag{f})" for c in range(nst) for f in range(nfrag))
-              + " " + " ".join(F"p_h(state{c},frag{f})" for c in range(nst) for f in range(nfrag)))
+    first, second = ("p_h", "p_e") if kind == "hole" else ("p_e", "p_h")
+    header = ("step " + " ".join(F"{first}(state{c},frag{f})" for c in range(nst) for f in range(nfrag))
+              + " " + " ".join(F"{second}(state{c},frag{f})" for c in range(nst) for f in range(nfrag)))
     np.savetxt(F'{res_dir}/U_{basis}_pops.txt', np.array(rows), header=header, fmt="%.6g")
 
 
