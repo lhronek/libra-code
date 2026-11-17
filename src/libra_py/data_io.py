@@ -25,6 +25,7 @@
            * remove_files(*patterns)
            * remove_trees(*patterns)
            * first_file(pattern, purpose)
+           * move_files(destination, *patterns)
 
 .. moduleauthor:: Alexey V. Akimov
 
@@ -465,3 +466,33 @@ def first_file(pattern, purpose):
     if not names:
         raise FileNotFoundError(F"no file matches {pattern} - {purpose}")
     return names[0]
+
+
+def move_files(destination, *patterns):
+    """
+    Move the files and directories the patterns match into the directory `destination` - `mv` without a shell: a name
+    with a space is one name, the number of matches has no limit, a file of the same name there is replaced, a failure
+    raises.
+
+    Args:
+        destination (string): an existing directory
+        *patterns (string): names or glob patterns - a pattern with a wildcard and no match moves nothing, a plain
+            name that does not exist is refused
+
+    Returns:
+        list: the new names
+    """
+    if not os.path.isdir(destination):
+        raise NotADirectoryError(F"move_files: {destination} is not a directory")
+    moved = []
+    for pattern in patterns:
+        names = sorted(glob.glob(pattern)) or ([pattern] if os.path.lexists(pattern) else [])
+        if not names and not any(c in pattern for c in "*?["):
+            raise FileNotFoundError(F"move_files: {pattern} does not exist")
+        for name in names:
+            target = os.path.join(destination, os.path.basename(os.path.normpath(name)))
+            if os.path.isdir(target) and not os.path.islink(target):
+                raise FileExistsError(F"move_files: the directory {target} exists")
+            shutil.move(name, target)
+            moved.append(target)
+    return moved

@@ -308,7 +308,7 @@ def compute_cube_ks_overlaps(cubefiles_prev, params):
     # for cubefile in cubefile_names_curr:
     #    os.system( "/gpfs/scratch/brendan/cp2k/tools/cubecruncher/cubecruncher.x -center geo -i %s -o %s-1.cube " % ( cubefile, cubefile.replace( ".cube", "" ) ) )
     #    data_io.remove_files(cubefile)
-    #    os.system( "mv %s-1.cube %s" % ( cubefile.replace(".cube",""), cubefile ) )
+    #    shutil.move( "%s-1.cube" % cubefile.replace(".cube",""), cubefile )
 
     # Reading the cube files
     cubefiles_curr = []
@@ -870,12 +870,12 @@ def run_step2_many_body(params):
             os.system("srun %s" % (dftbp_exe))
         else:
             os.system("%s" % (dftbp_exe))
-        os.system("mv band.out step_" + str(curr_step) + "_ks.log")
-        os.system("mv step_" + str(curr_step) + "_ks.log logfiles/.")
-        os.system("mv EXC.DAT EXC_" + str(curr_step) + ".DAT")
-        os.system("mv EXC_" + str(curr_step) + ".DAT logfiles/.")
-        os.system("mv TRA.DAT TRA_" + str(curr_step) + ".DAT")
-        os.system("mv TRA_" + str(curr_step) + ".DAT logfiles/.")
+        shutil.move("band.out", "step_" + str(curr_step) + "_ks.log")
+        data_io.move_files("logfiles", "step_" + str(curr_step) + "_ks.log")
+        shutil.move("EXC.DAT", "EXC_" + str(curr_step) + ".DAT")
+        data_io.move_files("logfiles", "EXC_" + str(curr_step) + ".DAT")
+        shutil.move("TRA.DAT", "TRA_" + str(curr_step) + ".DAT")
+        data_io.move_files("logfiles", "TRA_" + str(curr_step) + ".DAT")
         DFTB_methods.cube_generator_dftbplus(project_name,
                                              curr_step,
                                              ks_orbital_indicies[0],
@@ -883,7 +883,7 @@ def run_step2_many_body(params):
                                              waveplot_exe,
                                              int(params["isUKS"]))
 
-    os.system("mv *.cube cubefiles")
+    data_io.move_files("cubefiles", "*.cube")
     # Print the elapsed time for CP2K calculations for this step.
     print(params["es_software"], " calculation time for step ", params["curr_step"], " was ", time.time() - timer1)
 
@@ -901,7 +901,7 @@ def run_step2_many_body(params):
     # for cubefile in cubefile_names_prev:
     #    os.system( "/gpfs/scratch/brendan/cp2k/tools/cubecruncher/cubecruncher.x -center geo -i %s -o %s-1.cube " % ( cubefile, cubefile.replace( ".cube", "" ) ) )
     #    data_io.remove_files(cubefile)
-    #    os.system( "mv %s-1.cube %s" % ( cubefile.replace(".cube",""), cubefile ) )
+    #    shutil.move( "%s-1.cube" % cubefile.replace(".cube",""), cubefile )
     cubefiles_prev = pool.map(cube_file_methods.read_cube, cubefile_names_prev)
 
     # Call the pool to read the cube files
@@ -984,12 +984,12 @@ def run_step2_many_body(params):
                 os.system("srun %s" % (dftbp_exe))
             else:
                 os.system("%s" % (dftbp_exe))
-            os.system("mv band.out step_" + str(curr_step) + "_ks.log")
-            os.system("mv step_" + str(curr_step) + "_ks.log logfiles/.")
-            os.system("mv EXC.DAT EXC_" + str(curr_step) + ".DAT")
-            os.system("mv EXC_" + str(curr_step) + ".DAT logfiles/.")
-            os.system("mv TRA.DAT TRA_" + str(curr_step) + ".DAT")
-            os.system("mv TRA_" + str(curr_step) + ".DAT logfiles/.")
+            shutil.move("band.out", "step_" + str(curr_step) + "_ks.log")
+            data_io.move_files("logfiles", "step_" + str(curr_step) + "_ks.log")
+            shutil.move("EXC.DAT", "EXC_" + str(curr_step) + ".DAT")
+            data_io.move_files("logfiles", "EXC_" + str(curr_step) + ".DAT")
+            shutil.move("TRA.DAT", "TRA_" + str(curr_step) + ".DAT")
+            data_io.move_files("logfiles", "TRA_" + str(curr_step) + ".DAT")
             DFTB_methods.cube_generator_dftbplus(project_name,
                                                  curr_step,
                                                  ks_orbital_indicies[0],
@@ -997,7 +997,7 @@ def run_step2_many_body(params):
                                                  waveplot_exe,
                                                  int(params["isUKS"]))
 
-        os.system("mv *.cube cubefiles")
+        data_io.move_files("cubefiles", "*.cube")
         # Print the Timing
         print("Elapsed time for step ", params["curr_step"], " was ", time.time() - timer1)
 

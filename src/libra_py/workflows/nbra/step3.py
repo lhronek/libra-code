@@ -34,6 +34,7 @@ import functools
 import math
 import os
 import re
+import shutil
 import time
 import glob
 import json
@@ -2582,8 +2583,8 @@ def run_step3_ks_nacs_libint(params):
                 # Hvib_ks = -1.0 * CMATRIX(nac, zero)
             # sp.save_npz(F'{res_dir_2}/Hvib_ks_{step-start_time}_im.npz', sp.csc_matrix( Hvib_ks ))
             sp.save_npz(F'{res_dir_2}/Hvib_ks_{step}_im.npz', sp.csc_matrix(Hvib_ks))
-            # os.system(F'mv {res_dir_2}/St_ks_orthonormalized_{step}.npz {res_dir_2}/St_ks_{step-start_time}_re.npz')
-            os.system(F'mv {res_dir_2}/St_ks_orthonormalized_{step}.npz {res_dir_2}/St_ks_{step}.npz')
+            # shutil.move(F'{res_dir_2}/St_ks_orthonormalized_{step}.npz', F'{res_dir_2}/St_ks_{step-start_time}_re.npz')
+            shutil.move(F'{res_dir_2}/St_ks_orthonormalized_{step}.npz', F'{res_dir_2}/St_ks_{step}.npz')
 
     print('Done with phase correction. Elapsed time:', time.time() - t2)
 

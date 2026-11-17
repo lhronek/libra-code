@@ -125,7 +125,7 @@ def save_data(params, prefix, step, directory, guess):
             if step == params["istep"]:
                 # This is how we can get the sample molden, wfn, and Log files.
                 os.makedirs("../sample_files", exist_ok=True)
-                os.system(f"mv {prefix}_{step}* ../sample_files")
+                data_io.move_files("../sample_files", f"{prefix}_{step}*")
                 shutil.copy("params.json", "../sample_files")
             if params["remove_raw_outputs"]:  # and step>params["istep"]:
                 data_io.remove_files(F"{prefix}_{step}*Log", F"{prefix}_{step}*.wfn*", F"{prefix}_{step}*molden")
@@ -169,9 +169,9 @@ def run_single_point(params, prefix, step, guess):
             F"{mpi_exe} -np {params['nprocs']} {software_exe} -i input_{prefix}_{step}.inp -o output_{prefix}_{step}.log")
     elif software.lower() == "dftb+":
         os.system(F"export OMP_NUM_THREADS={nprocs}")
-        os.system(F"mv dftb_in_{prefix}_{step}.hsd dftb_in.hsd")
+        shutil.move(F"dftb_in_{prefix}_{step}.hsd", "dftb_in.hsd")
         os.system(F"{software_exe} dftb_in.hsd > output_{prefix}_{i}.log")
-        os.system(F"mv dftb_in.hsd dftb_in_{prefix}_{step}.hsd")
+        shutil.move("dftb_in.hsd", F"dftb_in_{prefix}_{step}.hsd")
 
 
 def gen_data(params, step):

@@ -311,11 +311,11 @@ def run(params):
             # Remove current run, make next run to be the current one
             if nac_method == 0 or nac_method == 1 or nac_method == 3:
                 data_io.remove_trees("%s/curr0" % wd)
-                os.system("mv %s/next0 %s/curr0" % (wd, wd))
+                shutil.move("%s/next0" % wd, "%s/curr0" % wd)
 
             if nac_method == 2 or nac_method == 3:
                 data_io.remove_trees("%s/curr1" % wd)
-                os.system("mv %s/next1 %s/curr1" % (wd, wd))
+                shutil.move("%s/next1" % wd, "%s/curr1" % wd)
 
             if verbosity > 0:
                 print("old files deleted, new have become old")

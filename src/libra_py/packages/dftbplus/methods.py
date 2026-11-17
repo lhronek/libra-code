@@ -20,7 +20,7 @@
 """
 
 
-import os, sys, math, re, shutil, struct, copy, subprocess
+import os, sys, math, re, glob, shutil, struct, copy, subprocess
 import numpy as np
 
 from liblibra_core import *
@@ -698,7 +698,10 @@ def cube_generator_dftbplus(project_name, time_step, min_band, max_band, waveplo
         cube_name = '%s-%d-WFN_%s_1-1_0.cube' % (project_name, time_step, state_name)
         print('Renaming cube for state %d' % state)
         # Now, rename the cubefile from what waveplots calls it to the standard format
-        os.system("mv *" + str(state) + "-real.cube " + cube_name)
+        cubes = sorted(glob.glob("*" + str(state) + "-real.cube"))
+        if len(cubes) != 1:
+            raise RuntimeError(F"{len(cubes)} files match *{state}-real.cube ({cubes}) - one cube is renamed to {cube_name}")
+        shutil.move(cubes[0], cube_name)
 
 
 # the keys read_dftbplus_TRA_file reads - the many-body workflow hands over restrict(params, READ_TRA_FILE_KEYS)

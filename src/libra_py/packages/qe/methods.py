@@ -54,6 +54,7 @@ import util.libutil as comn
 import libra_py.packages.qe.utils as QE_utils
 import libra_py.units as units
 import libra_py.regexlib as rgl
+from libra_py import data_io
 from libra_py.params_check import refuse_unknown_keys
 
 
@@ -1742,10 +1743,10 @@ def run_qe(params, t, dirname0, dirname1):
         os.makedirs("%s/%s" % (wd, dirname0), exist_ok=True)
 
         # Copy some results to that directory
-        os.system("mv %s.%d.out %s/%s" % (prefix0, t, wd, dirname0))
-        os.system("mv *.wfc* %s/%s" % (wd, dirname0))
-        os.system("mv x0.export %s/%s" % (wd, dirname0))  # "x0" - corresponds to x0 as a prefix in input files
-        os.system("mv x0.save %s/%s" % (wd, dirname0))  # "x0" - corresponds to x0 as a prefix in input files
+        data_io.move_files("%s/%s" % (wd, dirname0), "%s.%d.out" % (prefix0, t))
+        data_io.move_files("%s/%s" % (wd, dirname0), "*.wfc*")
+        data_io.move_files("%s/%s" % (wd, dirname0), "x0.export")  # "x0" - corresponds to x0 as a prefix in input files
+        data_io.move_files("%s/%s" % (wd, dirname0), "x0.save")  # "x0" - corresponds to x0 as a prefix in input files
 
     # Perform the soc calculation on its own, or in addition to the regular one
     if nac_method == 2 or nac_method == 3:
@@ -1758,10 +1759,10 @@ def run_qe(params, t, dirname0, dirname1):
 
         os.makedirs("%s/%s" % (wd, dirname1), exist_ok=True)
 
-        os.system("mv %s.%d.out %s/%s" % (prefix1, t, wd, dirname1))
-        os.system("mv *.wfc* %s/%s" % (wd, dirname1))
-        os.system("mv x1.export %s/%s" % (wd, dirname1))  # "x1" - corresponds to x1 as a prefix in input files
-        os.system("mv x1.save %s/%s" % (wd, dirname1))  # "x1" - corresponds to x1 as a prefix in input files
+        data_io.move_files("%s/%s" % (wd, dirname1), "%s.%d.out" % (prefix1, t))
+        data_io.move_files("%s/%s" % (wd, dirname1), "*.wfc*")
+        data_io.move_files("%s/%s" % (wd, dirname1), "x1.export")  # "x1" - corresponds to x1 as a prefix in input files
+        data_io.move_files("%s/%s" % (wd, dirname1), "x1.save")  # "x1" - corresponds to x1 as a prefix in input files
 
     print("The time to run the QE calculations = ", tim.stop())
 
