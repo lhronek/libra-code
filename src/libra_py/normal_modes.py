@@ -46,6 +46,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
 
 from . import units
 from . import md_align
+from . import data_conv
 
 
 import numpy as np
@@ -740,7 +741,7 @@ def compute_dynmat(R, D, M, E, params):
         M ( MATRIX(ndof x 1) ): masses of all DOFs
         E ( list of ndof/3 strings): atom names (elements) of all atoms
         params ( dictionary ): parameters controlling the computations, including the
-            visualization (see the visualize_modes(E, R, U, w, params) description).
+            visualization (see visualize_modes - it animates the modes about the first column of R).
             Contains keyword-value pairs:
 
             * **params["verbosity"]** ( int ): level to control verbosity
@@ -803,7 +804,8 @@ def compute_dynmat(R, D, M, E, params):
     if params["visualize"] > 0:
         if verbosity > 0:
             print("Visualizing modes based on dynamic matrix\n")
-        visualize_modes(E, R, U_a, M, w, restrict(params, VISUALIZE_MODES_KEYS))
+        arrays = [data_conv.MATRIX2nparray(X, np.float64) for X in (R, U_a, M, w_inv_cm)]
+        visualize_modes(E, arrays[0][:, 0], arrays[1], arrays[2][:, 0], arrays[3][:, 0], restrict(params, VISUALIZE_MODES_KEYS))
 
     if verbosity > 0:
         print("========= Done with the Normal modes calculations =============================")
