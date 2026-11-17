@@ -34,6 +34,7 @@ import util.libutil as comn
 import libra_py.packages.cp2k.methods as CP2K_methods
 from libra_py import data_io
 from libra_py.params_check import refuse_unknown_keys
+from libra_py.params_check import restrict
 
 def read_cube(filename: str):
     """
@@ -343,7 +344,7 @@ def plot_cubes(params):
 
     min_band = params["min_band"]
     # We plot the cubes for the previous time step
-    cubefile_names_prev = CP2K_methods.cube_file_names_cp2k(params)
+    cubefile_names_prev = CP2K_methods.cube_file_names_cp2k(restrict(params, CP2K_methods.CUBE_FILE_NAMES_KEYS))
     # read the lines of the tcl file
     tcl_file = open(path_to_tcl_file, 'r')
     tcl_lines = tcl_file.readlines()
