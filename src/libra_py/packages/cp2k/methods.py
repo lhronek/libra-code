@@ -4349,8 +4349,8 @@ def run_cp2k(coords_bohr, params):
                             f"{len(templates) - 1} retry_templates {templates[1:]}\n"
                             f"last error: {err}")
                     raise
-                print(f"WARNING in run_cp2k: CP2K failed in {wd} with {template} - "
-                      f"retrying this step with {templates[itry + 1]}")
+                cause = str(err).split("\n")[0]
+                print(f"WARNING in run_cp2k: retrying this step with {templates[itry + 1]} after {template}: {cause}")
                 continue
             break
     finally:
