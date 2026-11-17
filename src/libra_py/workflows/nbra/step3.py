@@ -4469,6 +4469,7 @@ def _cofactor_matrix(A):
     return np.linalg.det(U) * np.linalg.det(Vt) * (U * others[None, :]) @ Vt
 
 
+@_with_parent_blas_cap
 def run_step3_pod(params):
     """
     The POD-Hamiltonian route of step 3: the hole dynamics of a cation in the basis of the occupied POD block
@@ -4618,6 +4619,8 @@ def run_step3_pod(params):
             * **params['active_space_selection_alpha']** (float): the energy-penalty width of that assignment,
                 exp(-(alpha dE)^2) on the block energies of the earlier frame, in 1/Hartree [default: 0 - no penalty].
             * **params['nac_algo']** (int): 0 alone - the route writes the HST couplings (St^T - St) / 2 dt.
+            * **params['blas_num_threads']** (integer): the BLAS threads of the run. Default (None): 1 - the route is
+                serial and its matrices are small. 0 leaves the thread pool alone.
             Every key the route does not read is refused: the former option names with their present names, the
             keys of the SD route's Kohn-Sham basis (num_occ_states and its kin) with a pointer to
             num_occ_states_per_block, any other unknown key with the list of the route's keys.
@@ -4638,7 +4641,8 @@ def run_step3_pod(params):
                       'diabatic_state_reordering_alpha': 0.0,
                       'diabatic_state_reordering_min_overlap': CONTINUITY_FLOOR,
                       'state_reordering_min_overlap': CONTINUITY_FLOOR, 'active_space_selection': 'energy',
-                      'active_space_selection_algo': 2, 'active_space_selection_alpha': 0.0, 'nac_algo': 0}
+                      'active_space_selection_algo': 2, 'active_space_selection_alpha': 0.0, 'nac_algo': 0,
+                      'blas_num_threads': None}
     _refuse_former_names(params)
     # the keys of the SD route's Kohn-Sham basis have no reading here - num_occ_states in place of
     # num_occ_states_per_block ran the whole occupied space without a word
