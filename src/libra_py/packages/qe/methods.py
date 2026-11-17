@@ -1751,8 +1751,8 @@ def run_qe(params, t, dirname0, dirname1):
     # Perform the soc calculation on its own, or in addition to the regular one
     if nac_method == 2 or nac_method == 3:
         if BATCH_SYSTEM is None:
-            os.system("%s < %s.%d.in > %s.%d.out" % (EXE, prefix0, t, prefix0, t))
-            os.system("%s < x0.exp.in > x0.exp.out" % (EXE_EXPORT))
+            os.system("%s < %s.%d.in > %s.%d.out" % (EXE, prefix1, t, prefix1, t))
+            os.system("%s < x1.exp.in > x1.exp.out" % (EXE_EXPORT))
         else:
             os.system("%s -n %s %s < %s.%d.in > %s.%d.out" % (BATCH_SYSTEM, NP, EXE, prefix1, t, prefix1, t))
             os.system("%s -n %s %s < x1.exp.in > x1.exp.out" % (BATCH_SYSTEM, NP, EXE_EXPORT))
