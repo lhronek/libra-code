@@ -4266,11 +4266,22 @@ def run_cp2k(coords_bohr, params):
                 if ot_source == "diag" and os.path.exists(os.path.join(wd, f"{project}-RESTART.wfn")):
                     ot_params["wfn_restart_file"] = f"{project}-RESTART.wfn"
                 make_cp2k_input(ot_params, working_directory=wd)
+                before = wfn_restart_stamp(os.path.join(wd, ot_restart))
                 _execute("ot_input.inp", "ot.log")
+                refuse_stale_wfn_restart(os.path.join(wd, ot_restart), before, params["ot_template"],
+                                         "the main run of the same step restarts from it", "run_cp2k")
                 ot_done[0] = True
             main_params["wfn_restart_file"] = ot_restart
         make_cp2k_input(main_params, working_directory=wd)
-        return _execute(main_params.get("input_name", "input.inp"), "out.log")
+        main_restart = os.path.join(wd, f"{project}-RESTART.wfn")
+        before = wfn_restart_stamp(main_restart)
+        logfile = _execute(main_params.get("input_name", "input.inp"), "out.log")
+        # an overlap run has no SCF and writes no wfn
+        if (read_cp2k_print_key(template, ("SCF", "PRINT", "RESTART"), "LOW")[0]
+                and not template_sets_keyword(template, "OVERLAP_DELTAT")):
+            refuse_stale_wfn_restart(main_restart, before, template, "the orbitals' read or the next step's run takes it",
+                                     "run_cp2k")
+        return logfile
 
     # a stalled SCF is a property of the geometry, not of the starting density:
     # distorted excited-state geometries carry near-degenerate solutions the
@@ -5131,6 +5142,27 @@ def refuse_missing_wfn_restart(restart, template, reader, where):
     if not os.path.isfile(restart):
         raise RuntimeError(F"{where}: the run of {template} left no {restart} and {reader} - CP2K would start from the "
                            F"atomic guess. See &SCF &PRINT &RESTART of the template (FILENAME, &EACH) and the run's log")
+
+
+def wfn_restart_stamp(restart):
+    """What tells one writing of a file from the next - its inode, modification time and size, None for a file that is not there."""
+    if not os.path.isfile(restart):
+        return None
+    status = os.stat(restart)
+    return (status.st_ino, status.st_mtime_ns, status.st_size)
+
+
+def refuse_stale_wfn_restart(restart, before, template, reader, where):
+    """Refuses to go on when a finished CP2K run did not rewrite a wfn restart file its input writes - before is the file's
+    wfn_restart_stamp taken before the run, reader says what takes the file. For a file whose name stays the same from run to
+    run, where an earlier run's file is there whatever this run did. A ValueError, which run_cp2k does not retry."""
+    after = wfn_restart_stamp(restart)
+    if after is None:
+        raise ValueError(F"{where}: the run of {template} left no {restart} and {reader}. See &SCF &PRINT &RESTART of the "
+                         F"template (FILENAME, &EACH) and the run's log")
+    if after == before:
+        raise ValueError(F"{where}: the run of {template} did not rewrite {restart} (the file there is an earlier run's) and "
+                         F"{reader}. See &SCF &PRINT &RESTART of the template (FILENAME, &EACH) and the run's log")
 
 
 def _cell_from_lengths(lengths, angles):
