@@ -30,6 +30,7 @@ elif sys.platform == "linux" or sys.platform == "linux2":
     from liblibra_core import *
 import util.libutil as comn
 from libra_py.params_check import refuse_unknown_keys
+from libra_py.params_check import restrict
 
 
 def takeFirst(elem):
@@ -125,7 +126,7 @@ def compute_spectrum(Hvib, Hprime_x, Hprime_y, Hprime_z, params):
     refuse_unknown_keys(params, COMPUTE_SPECTRUM_KEYS, "step2_analysis.compute_spectrum", "params", "compute_spectrum does not read")
     opt = params["opt"]
 
-    res = compute_oscillator_strengths(Hvib, Hprime_x, Hprime_y, Hprime_z, params)
+    res = compute_oscillator_strengths(Hvib, Hprime_x, Hprime_y, Hprime_z, restrict(params, COMPUTE_OSCILLATOR_STRENGTHS_KEYS))
 
     # sort list with key
     sorted_res = None
