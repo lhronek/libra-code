@@ -125,6 +125,9 @@ def compute_spectrum(Hvib, Hprime_x, Hprime_y, Hprime_z, params):
 
     refuse_unknown_keys(params, COMPUTE_SPECTRUM_KEYS, "step2_analysis.compute_spectrum", "params", "compute_spectrum does not read")
     opt = params["opt"]
+    if opt not in (0, 1):
+        raise ValueError(F"step2_analysis.compute_spectrum: opt = {opt!r} - 0 (the transitions sorted by energy) or 1 (by oscillator "
+                         F"strength) is needed")
 
     res = compute_oscillator_strengths(Hvib, Hprime_x, Hprime_y, Hprime_z, restrict(params, COMPUTE_OSCILLATOR_STRENGTHS_KEYS))
 
