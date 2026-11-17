@@ -62,6 +62,8 @@ import libra_py.hungarian as hungarian
 # the default of state_reordering_min_overlap and diabatic_state_reordering_min_overlap, the edge and record floor
 # of _classify_continuations
 CONTINUITY_FLOOR = math.sqrt(0.5)
+# the default of active_space_edge_min_gap in eV - a selection edge closer than this cuts a degenerate group
+EDGE_MIN_GAP = 0.01
 from libra_py import orthogonalizations
 from libra_py.orthogonalizations import (validate_overlap_matrix,
                                          get_Lowdin_scipy,
@@ -75,7 +77,8 @@ from libra_py.orthogonalizations import (validate_overlap_matrix,
 STEP3_KEYS = frozenset((
     "CI_basis", "Hvib_im_prefix", "Hvib_im_suffix", "Hvib_re_prefix", "Hvib_re_suffix", "SD_basis", "SD_energy_corr",
     "S_data_im_prefix", "S_data_im_suffix", "S_data_re_prefix", "S_data_re_suffix", "St_data_im_prefix", "St_data_im_suffix",
-    "St_data_re_prefix", "St_data_re_suffix", "active_space", "active_space_num_occ_orbitals", "active_space_selection",
+    "St_data_re_prefix", "St_data_re_suffix", "active_space", "active_space_edge_min_gap",
+    "active_space_num_occ_orbitals", "active_space_selection",
     "active_space_selection_algo", "active_space_selection_alpha", "allow_edge_departures",
     "allow_nonorthonormal_overlaps", "apply_orthonormalization",
     "apply_phase_correction", "blas_num_threads", "carrier_spin", "ci_read_drops", "ci_threshold", "curr_step", "data_dim",
@@ -1073,8 +1076,8 @@ def _check_reordering_options(params, route):
     do_diabatic_state_reordering in 0 (none), 1 (Sato), 2 (Munkres-Kuhn by libra_py.hungarian), 22 (the same
     assignment by scipy's linear_sum_assignment) - the diabatic one also in 5 and 52 (the reordering of 2 and 22
     with the orthogonal alignment of a group's states, _polar_factor) - the two alphas non-negative widths in
-    1/Hartree, the two continuity thresholds between 0 (off) and 1, allow_edge_departures False or True - the keys a
-    route carries. One contract for
+    1/Hartree, the two continuity thresholds between 0 (off) and 1, allow_edge_departures False or True,
+    active_space_edge_min_gap a non-negative gap in eV - the keys a route carries. One contract for
     run_step3_ks_nacs_libint, run_step3_sd_nacs_libint and run_step3_pod."""
     for key in ('do_state_reordering', 'do_diabatic_state_reordering'):
         listed = (0, 1, 2, 22, 5, 52) if key == 'do_diabatic_state_reordering' else (0, 1, 2, 22)
@@ -1093,6 +1096,10 @@ def _check_reordering_options(params, route):
         raise ValueError(F"{route}: allow_edge_departures = {params['allow_edge_departures']!r} is not a listed "
                          F"option - False (a state that leaves its space through the edge is refused) and True "
                          F"(recorded, the run goes on) are supported")
+    gap = params.get('active_space_edge_min_gap', 0.0)
+    if not (np.isreal(gap) and gap >= 0.0):
+        raise ValueError(F"{route}: active_space_edge_min_gap = {gap!r} - a non-negative gap in eV is needed (0 "
+                         F"switches the test of the first frame off)")
 
 
 def _check_orbital_window(params, data_dim, where):
@@ -3727,6 +3734,60 @@ def _refuse_active_orbital_departures(allow, window, active_space):
                                    kept, carried, F"window position {partner}")
 
 
+def _edge_gap_record(min_gap, edges, untested, where, start_time):
+    """active_space_edge_min_gap at the first frame: a selection edge closer than min_gap (eV) to the state outside
+    it is refused - the edge cuts a degenerate group, whose members the electronic structure code orients anew at
+    every frame, so the member inside is not one state from frame to frame. edges: (the edge's name in the report,
+    the state inside, its energy, the state outside, its energy), the energies in Hartree - a min_gap of 0 refuses
+    nothing. Returns the "active_space_edge" block of the route's report: the key's value, the gap of every tested
+    edge in eV, the smallest one, the edges not tested."""
+    gaps = [float(abs(e_in - e_out) * units.au2ev) for _, _, e_in, _, e_out in edges]
+    if gaps and min(gaps) < min_gap:
+        _, inside, e_in, outside, e_out = edges[int(np.argmin(gaps))]
+        raise ValueError(F"{where}: at the first frame {start_time} {inside} ({e_in * units.au2ev:.4f} eV) lies "
+                         F"{min(gaps):.4f} eV from {outside} ({e_out * units.au2ev:.4f} eV), closer than "
+                         F"active_space_edge_min_gap {min_gap:g} eV - the selection edge cuts a degenerate group, "
+                         F"whose member inside is not one state from frame to frame. Take the whole group into the "
+                         F"selection or leave it out, or lower active_space_edge_min_gap (0 switches the test off)")
+    return {"active_space_edge_min_gap": min_gap, "gaps_eV": {edge[0]: gap for edge, gap in zip(edges, gaps)},
+            "min_gap_eV": min(gaps) if gaps else None, "untested": untested}
+
+
+def _sd_route_edge_gaps(params, active_space, start_time):
+    """The test of active_space_edge_min_gap for the SD route, by the orbital energies of start_time: in every spin
+    block the lowest occupied orbital of the active space against the orbital below it, and - where the basis holds
+    electrons in the virtual orbitals (sd_charge 0 or -1) - the highest virtual one against the orbital above it. A
+    neighbour outside the stored window is not stored and not tested - a printed line says so. Returns the record of
+    _edge_gap_record, an edge named by its two orbitals."""
+    n = params['data_dim'] // 2
+    e = np.diag(np.asarray(sp.load_npz(F"{params['path_to_npz_files']}/E_ks_{start_time}.npz").todense()).real)
+    lowest = int(params['lowest_orbital'])
+    if int(params.get('isUKS', 0)):
+        blocks = (("alpha ", 0, int(params['npz_file_ks_homo_alpha_index'])),
+                  ("beta ", n, int(params['npz_file_ks_homo_beta_index'])))
+    else:
+        blocks = (("", 0, int(params['npz_file_ks_homo_index'])),)
+    edges, untested = [], []
+    for spin, start, homo in blocks:
+        active = sorted(a - start for a in active_space if start <= a < start + n)
+        occupied, virtual = [a for a in active if a < homo], [a for a in active if a >= homo]
+        ends = [(min(occupied), -1)] if occupied else []
+        if virtual and int(params['sd_charge']) <= 0:
+            ends.append((max(virtual), 1))
+        for inside, side in ends:
+            outside = inside + side
+            if 0 <= outside < n:
+                edges.append((F"{spin}orbital {inside + lowest} / {outside + lowest}",
+                              F"the active {spin}orbital {inside + lowest}", e[start + inside],
+                              F"{spin}orbital {outside + lowest} outside the active space", e[start + outside]))
+            else:
+                untested.append(F"{spin}orbital {inside + lowest}: its neighbour is outside the stored window")
+    min_gap = float(params['active_space_edge_min_gap'])
+    if untested and min_gap > 0.0:
+        print(F"active_space_edge_min_gap: not tested at frame {start_time} - {', '.join(untested)}")
+    return _edge_gap_record(min_gap, edges, untested, "run_step3_sd_nacs_libint", start_time)
+
+
 def _reindexed_orbital_numbers(active_space, data_dim, lowest_orbital, perm=None):
     """The orbital numbers (CP2K's at the frame, from 1) of the reindexed active spin-orbitals of the SD route: the
     alpha spin-orbital j is the j-th active alpha window position, the beta -j the j-th active beta one, and the
@@ -4659,6 +4720,10 @@ def run_step3_pod(params):
                 overlaps (libra_py.hungarian) [default], 22 the same assignment by scipy's linear_sum_assignment.
             * **params['active_space_selection_alpha']** (float): the energy-penalty width of that assignment,
                 exp(-(alpha dE)^2) on the block energies of the earlier frame, in 1/Hartree [default: 0 - no penalty].
+            * **params['active_space_edge_min_gap']** (float): the smallest gap, in eV, between the lowest basis state
+                of a block and the occupied block state below it at start_time [default: 0.01] - below it the run is
+                refused: the edge of the basis cuts a degenerate group, whose member inside is not one state from
+                frame to frame. 0 switches the test off, pod_route_report.json holds the gaps (active_space_edge).
             * **params['allow_edge_departures']** (bool): False [default] - a basis state or an adiabatic state that
                 leaves its space through the edge (the space carries less than 1/sqrt(2) of it) refuses the run,
                 True - it is recorded in edge_departures and the run goes on.
@@ -4686,7 +4751,8 @@ def run_step3_pod(params):
                       'diabatic_state_reordering_min_overlap': CONTINUITY_FLOOR,
                       'state_reordering_min_overlap': CONTINUITY_FLOOR, 'active_space_selection': 'energy',
                       'active_space_selection_algo': 2, 'active_space_selection_alpha': 0.0, 'nac_algo': 0,
-                      'blas_num_threads': None, 'allow_edge_departures': False}
+                      'blas_num_threads': None, 'allow_edge_departures': False,
+                      'active_space_edge_min_gap': EDGE_MIN_GAP}
     _refuse_former_names(params)
     # the keys of the SD route's Kohn-Sham basis have no reading here - num_occ_states in place of
     # num_occ_states_per_block ran the whole occupied space without a word
@@ -4916,6 +4982,12 @@ def run_step3_pod(params):
 
     idx, frag, rank = _pod_route_hole_basis(nmo, occupied, per_block)
     n = len(idx)
+    edge_record = _edge_gap_record(
+        float(params['active_space_edge_min_gap']),
+        [(F"block {f}", F"block {f}: its basis state of rank {per_block[f] - 1}",
+          h_diag[0][off[f] + occupied[f] - per_block[f]], "the occupied block state below it",
+          h_diag[0][off[f] + occupied[f] - per_block[f] - 1]) for f in range(nblk) if 0 < per_block[f] < occupied[f]],
+        [], "run_step3_pod", start_time)
 
     def pod_state(c):
         # a basis state by libra's block and rank
@@ -5210,6 +5282,7 @@ def run_step3_pod(params):
               "swap_frames": [int(k) for k in swaps], "frames_off_energy_order": off_order,
               "unresolved_frames": [int(k) for k in unresolved], "edge_departures": edges, "alignment": alignment,
               "allow_edge_departures": bool(params['allow_edge_departures']),
+              "active_space_edge": edge_record,
               "adiabatic": {"do_state_reordering": int(params['do_state_reordering']),
                             "state_reordering_alpha": float(params['state_reordering_alpha']),
                             "state_reordering_min_overlap": float(sd_min_overlap),
@@ -5378,6 +5451,12 @@ def run_step3_sd_nacs_libint(params):
                 scipy's linear_sum_assignment, 1 Sato (get_reordering).
             * **params['active_space_selection_alpha']** (float): the energy-penalty width of that Munkres-Kuhn cost,
                 in 1/Hartree [default: 0 - no penalty] - as state_reordering_alpha.
+            * **params['active_space_edge_min_gap']** (float): the smallest gap, in eV, between the outermost orbital
+                of the active space and its neighbour outside it at start_time [default: 0.01] - below it the run is
+                refused: the edge cuts a degenerate group, whose member inside is not one orbital from frame to
+                frame. The occupied edge is tested in every spin block, the virtual one where the basis holds
+                electrons (sd_charge 0 or -1). A neighbour outside the stored window is not tested (the run prints
+                it), 0 switches the test off - sd_route_report.json holds the gaps (active_space_edge).
             * **params['allow_edge_departures']** (bool): False [default] - an SD, CI or diabatic state, or an orbital
                 of the followed active space, that leaves its space through the edge (the space carries less than
                 1/sqrt(2) of it) refuses the run, True - it is recorded in edge_departures and the run goes on.
@@ -5441,7 +5520,8 @@ def run_step3_sd_nacs_libint(params):
                       'diabatic_state_reordering_min_overlap': CONTINUITY_FLOOR,
                       'state_reordering_min_overlap': CONTINUITY_FLOOR,
                       'active_space_selection': 'energy', 'active_space_selection_algo': 2,
-                      'active_space_selection_alpha': 0.0, 'allow_edge_departures': False
+                      'active_space_selection_alpha': 0.0, 'allow_edge_departures': False,
+                      'active_space_edge_min_gap': EDGE_MIN_GAP
                       }
 
     _refuse_former_names(params)
@@ -5744,6 +5824,7 @@ def run_step3_sd_nacs_libint(params):
                             "note": "the active space is the energy positions of every frame"}
     if selection == 'identity':
         _refuse_active_orbital_departures(params['allow_edge_departures'], orbital_window, ks_active_space)
+    edge_record = _sd_route_edge_gaps(params, ks_active_space, start_time)
 
     # The flag for phase-correction algorithm
     apply_phase_correction = params['apply_phase_correction']
@@ -6013,6 +6094,7 @@ def run_step3_sd_nacs_libint(params):
                                                 "CI", allow_edge_departures=params['allow_edge_departures'])
 
     route_report["active_space"] = selection_record
+    route_report["active_space_edge"] = edge_record
     route_report["allow_edge_departures"] = bool(params['allow_edge_departures'])
     with open(F'{res_dir_2}/sd_route_report.json', 'w') as f:
         json.dump(route_report, f, indent=1)
