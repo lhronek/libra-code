@@ -4583,8 +4583,8 @@ def run_step3_pod(params):
                 rotated block Hamiltonian, the adiabatic files do not change, U_sd does), and the labels and the
                 report carry the rotation angles (alignment). A continuation
                 below diabatic_state_reordering_min_overlap is refused when it is an internal mixing and recorded
-                when the state left the basis of its block (edge_departures - without a reordering only, the
-                reordering follows a state anywhere in its block).
+                when the state left the basis of its block (edge_departures - under active_space_selection 'energy',
+                where the block's basis is its window positions - 'identity' follows a state anywhere in its block).
             * **params['diabatic_state_reordering_alpha']** (float): the energy-penalty width of the Munkres-Kuhn
                 cost of the block states, exp(-(alpha dE)^2) on the block energies of the earlier frame, in
                 1/Hartree [default: 0 - no penalty].
@@ -4592,7 +4592,8 @@ def run_step3_pod(params):
                 states [default: 1/sqrt(2) = 0.707 - more than half of a state's weight on its own continuation, a
                 mixing of 45 degrees within one frame, 0 switches the check off]: below it an internal mixing refuses
                 the run, with or without a reordering, and a departure from the basis of the block (the basis carries
-                less than the threshold of the state - without a reordering) is recorded in edge_departures - a
+                less than the threshold of the state - under active_space_selection 'energy') is recorded in
+                edge_departures - a
                 threshold below 1/sqrt(2) lets internal mixings through (0.5 admits 60 degrees) and the labels and
                 the report list them (unresolved_frames, min_continuity).
             * **params['state_reordering_min_overlap']** (float): the same threshold for the adiabatic states as
