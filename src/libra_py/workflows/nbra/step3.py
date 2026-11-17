@@ -2846,6 +2846,14 @@ def sd_diabatization_groups(sd_lists, kind, active_space=None, data_dim=None):
     return gs, groups, sorted(singles)
 
 
+class _LocalizationRefused(ValueError):
+    """localize_fragment_block's refusal with the rows of the span - the caller that knows the frame names it"""
+
+    def __init__(self, message, rows):
+        super().__init__(message)
+        self.rows = [int(r) for r in rows]
+
+
 def localize_fragment_block(P_frag, rows, energy, tol=0.25):
     """
     Orbitals localized on fragments within the span of the given orbitals, by
@@ -2896,8 +2904,9 @@ def localize_fragment_block(P_frag, rows, energy, tol=0.25):
         # the last fragment takes the rest of the span - its trace has to say so as well
         n_f = left if f == len(blocks) - 1 else int(round(tr))
         if abs(tr - n_f) > tol or n_f > left:
-            raise ValueError(F"fragment {f} holds {tr:.3f} orbitals of the span {rows} - "
-                             F"not an integer within {tol}, the fragments do not localize this manifold")
+            raise _LocalizationRefused(F"fragment {f} holds {tr:.3f} orbitals of the span {rows} - "
+                                       F"not an integer within {tol}, the fragments do not localize this manifold",
+                                       rows)
         if n_f == 0:
             continue
         vals, vecs = np.linalg.eigh(M)
@@ -3121,9 +3130,20 @@ def _sd_diabatization_series(params, sd_sorted, active_space, start_time, finish
     for i, step in enumerate(range(start_time, finish_time)):
         P_frag, E_orb = _fragment_operators_of_step(params, prefix, nfrag, step, active_space)
         operators.append(P_frag)
-        W, dia_index, pops, pops_hole, energies = sd_diabatization_step(sd_sorted[i], P_frag, E_orb, kind, dia_index,
-                                                                        active_space, params['data_dim'],
-                                                                        params['occupancy_tolerance'])
+        try:
+            W, dia_index, pops, pops_hole, energies = sd_diabatization_step(sd_sorted[i], P_frag, E_orb, kind,
+                                                                            dia_index, active_space,
+                                                                            params['data_dim'],
+                                                                            params['occupancy_tolerance'])
+        except _LocalizationRefused as err:
+            nact = P_frag[0].shape[0] // 2
+            perms = params.get('orbital_perms')
+            alpha, beta = _reindexed_orbital_numbers(active_space, params['data_dim'], params['lowest_orbital'],
+                                                     None if perms is None else perms[step])
+            orbs = [(alpha if r < nact else beta)[r % nact] for r in err.rows]
+            window = (int(params['lowest_orbital']), int(params['highest_orbital']))
+            raise ValueError("\n".join([F"frame {step}: {err}"]
+                                       + _orbital_check_block(orbs, step, None, window))) from None
         W_list.append(W)
         pops_list.append(pops)
         hole_list.append(pops_hole)
@@ -3513,11 +3533,14 @@ def _ci_diabatization_series(params, sd_sorted, SD2CI, ci_energies, active_space
         # the localized states (ci_energies are excitation energies, the ground state sits at 0 on that scale)
         gs, groups, _ = sd_diabatization_groups(sd_sorted[i], kind, active_space, data_dim)
         gs_joins = any(gs in g["rows"] for g in groups)
-        V, dia_index, pops, pops_hole, energies = ci_diabatization_step(SD2CI[i], O_hole, O_elec, ci_energies[i],
-                                                                        kind, dia_index,
-                                                                        tol=params['occupancy_tolerance'],
-                                                                        E_gs=0.0 if gs_joins else None,
-                                                                        manifolds=groups if gs_joins else None)
+        try:
+            V, dia_index, pops, pops_hole, energies = ci_diabatization_step(SD2CI[i], O_hole, O_elec, ci_energies[i],
+                                                                            kind, dia_index,
+                                                                            tol=params['occupancy_tolerance'],
+                                                                            E_gs=0.0 if gs_joins else None,
+                                                                            manifolds=groups if gs_joins else None)
+        except ValueError as err:
+            raise ValueError(F"frame {step}: {err}") from None
         V_list.append(V)
         pops_list.append(pops)
         hole_list.append(pops_hole)
@@ -3817,11 +3840,11 @@ def _check_block(kind, lines):
 
 
 def _orbital_check_block(orbitals, k0, k1, window):
-    """'ORBITALS TO CHECK IN CP2K' - 'orbitals 58, 59, 60 at frames 5257 and 5258' and their place in the step-2 files
-    (the window 50 - 65, the positions 8, 9, 10)"""
+    """'ORBITALS TO CHECK IN CP2K' - 'orbitals 58, 59, 60 at frames 5257 and 5258' (k1 None: 'at frame 5257') and
+    their place in the step-2 files (the window 50 - 65, the positions 8, 9, 10)"""
     orbs = sorted({int(o) for o in orbitals})
     return _check_block("orbitals", [
-        F"orbitals {', '.join(map(str, orbs))} at frames {k0} and {k1}",
+        F"orbitals {', '.join(map(str, orbs))} at " + (F"frame {k0}" if k1 is None else F"frames {k0} and {k1}"),
         F"(the window {window[0]} - {window[1]} of the step-2 files, their positions "
         F"{', '.join(str(o - window[0]) for o in orbs)})"])
 
