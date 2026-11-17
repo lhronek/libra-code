@@ -275,7 +275,7 @@ def compute_cube_ks_overlaps(cubefiles_prev, params):
 
         S_ks_curr (2D numpy array): The overlap matrix of the wavefunctions for the current time step.
 
-        St_ks (2D numpy array): The overlap matrix between wavefunctions of the two time step.
+        St_ks (2D numpy array): The overlap matrix <previous step | current step> of the wavefunctions of the two time steps.
 
     """
 
@@ -345,9 +345,9 @@ def compute_cube_ks_overlaps(cubefiles_prev, params):
         # Using concurrency to compute the integration and overlap matrices
         with concurrent.futures.ThreadPoolExecutor(max_workers=nprocs) as executor:
             # <psi_alp(t-1)|psi_alp(t)>
-            int_1 = executor.submit(integrate_cube_set, alp_cubes_prev, alp_cubes_curr, dv)
+            int_1 = executor.submit(integrate_cube_set, alp_cubes_curr, alp_cubes_prev, dv)
             # <psi_bet(t-1)|psi_bet(t)>
-            int_2 = executor.submit(integrate_cube_set, bet_cubes_prev, bet_cubes_curr, dv)
+            int_2 = executor.submit(integrate_cube_set, bet_cubes_curr, bet_cubes_prev, dv)
             # <psi_alp(t-1)|psi_alp(t-1)>
             int_3 = executor.submit(integrate_cube_set, alp_cubes_prev, alp_cubes_prev, dv)
             # <psi_bet(t-1)|psi_bet(t-1)>
@@ -376,7 +376,7 @@ def compute_cube_ks_overlaps(cubefiles_prev, params):
             # <psi(t)|psi(t)>
             int_2 = executor.submit(integrate_cube_set, cubefiles_curr, cubefiles_curr, dv)
             # <psi(t-1)|psi(t)>
-            int_3 = executor.submit(integrate_cube_set, cubefiles_prev, cubefiles_curr, dv)
+            int_3 = executor.submit(integrate_cube_set, cubefiles_curr, cubefiles_prev, dv)
 
         # Extracting the results
         S_prev = int_1.result()
