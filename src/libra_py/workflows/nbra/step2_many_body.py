@@ -303,7 +303,7 @@ def compute_cube_ks_overlaps(cubefiles_prev, params):
     # for curr_step
     print("Reading the cubes for step ", curr_step)
     # generate the cube file names produced by CP2K
-    cubefile_names_curr = CP2K_methods.cube_file_names_cp2k(params)
+    cubefile_names_curr = CP2K_methods.cube_file_names_cp2k(restrict(params, CP2K_methods.CUBE_FILE_NAMES_KEYS))
 
     # for cubefile in cubefile_names_curr:
     #    os.system( "/gpfs/scratch/brendan/cp2k/tools/cubecruncher/cubecruncher.x -center geo -i %s -o %s-1.cube " % ( cubefile, cubefile.replace( ".cube", "" ) ) )
@@ -626,16 +626,16 @@ def form_Hvib_real(params):
         # Read energies with alpha spin
         if es_software == "cp2k":
             params["spin"] = 1
-            E_alpha, total_energy = CP2K_methods.read_energies_from_cp2k_log_file(params)
+            E_alpha, total_energy = CP2K_methods.read_energies_from_cp2k_log_file(restrict(params, CP2K_methods.READ_ENERGIES_LOG_KEYS))
             # Read energies with beta spin
             params["spin"] = 2
-            E_beta, total_energy = CP2K_methods.read_energies_from_cp2k_log_file(params)
+            E_beta, total_energy = CP2K_methods.read_energies_from_cp2k_log_file(restrict(params, CP2K_methods.READ_ENERGIES_LOG_KEYS))
         if es_software == "gaussian":
             params["spin"] = 1
-            E_alpha, total_energy = Gaussian_methods.read_energies_from_gaussian_log_file(params)
+            E_alpha, total_energy = Gaussian_methods.read_energies_from_gaussian_log_file(restrict(params, Gaussian_methods.READ_ENERGIES_LOG_KEYS))
             # Read energies with beta spin
             params["spin"] = 2
-            E_beta, total_energy = Gaussian_methods.read_energies_from_gaussian_log_file(params)
+            E_beta, total_energy = Gaussian_methods.read_energies_from_gaussian_log_file(restrict(params, Gaussian_methods.READ_ENERGIES_LOG_KEYS))
         # Now forming the diagonal matrix containing the Kohn-Sham energies of the alpha and beta spins
         Hvib_ks_re = np.diag(np.concatenate((E_alpha, E_beta)))
     # If there is no UKS calculations set
@@ -643,17 +643,17 @@ def form_Hvib_real(params):
         if es_software == "cp2k":
             params["spin"] = 1
             # spin = 1
-            E_alpha, total_energy = CP2K_methods.read_energies_from_cp2k_log_file(params)
+            E_alpha, total_energy = CP2K_methods.read_energies_from_cp2k_log_file(restrict(params, CP2K_methods.READ_ENERGIES_LOG_KEYS))
         elif es_software == "gaussian":
             params["spin"] = 1
-            E_alpha, total_energy = Gaussian_methods.read_energies_from_gaussian_log_file(params)
+            E_alpha, total_energy = Gaussian_methods.read_energies_from_gaussian_log_file(restrict(params, Gaussian_methods.READ_ENERGIES_LOG_KEYS))
         elif es_software == "dftb+":
             # generate the log file name
             logfile_name = F"{logfile_directory}/step_{curr_step}_ks.log"
             # update the logfile_name parameter in params
             params.update({"logfile_name": logfile_name})
             params["spin"] = 1
-            E_alpha, total_energy = DFTB_methods.get_dftb_ks_energies(params)
+            E_alpha, total_energy = DFTB_methods.get_dftb_ks_energies(restrict(params, DFTB_methods.KS_ENERGIES_KEYS))
         Hvib_ks_re = np.diag(np.concatenate((E_alpha, E_alpha)))
 
     return Hvib_ks_re, total_energy
@@ -896,7 +896,7 @@ def run_step2_many_body(params):
 
     # The cube file names produced by CP2K, Here we set it as prev since we
     # don't want to read the cubes twice.
-    cubefile_names_prev = CP2K_methods.cube_file_names_cp2k(params)
+    cubefile_names_prev = CP2K_methods.cube_file_names_cp2k(restrict(params, CP2K_methods.CUBE_FILE_NAMES_KEYS))
     print("Initial step for this job, the cube file names are:\n", cubefile_names_prev)
     # We may have to "crunch" the cubes - this may be especially needed for periodic systems.
     # for cubefile in cubefile_names_prev:
@@ -923,7 +923,7 @@ def run_step2_many_body(params):
         # Update the params for states_to_be_plotted
         params.update({"states_to_be_plotted": states_to_be_plotted})
         # Plot the cubes using VMD
-        cube_file_methods.plot_cubes(params)
+        cube_file_methods.plot_cubes(restrict(params, cube_file_methods.PLOT_CUBES_KEYS))
 
     # After reading the cubefiles for curr_step, we should delete them to be memory efficient
     print("Removing cubefiles")
@@ -1026,7 +1026,7 @@ def run_step2_many_body(params):
             # Update the params with phase_factor_visual
             params.update({"phase_factor_visual": phase_factor_visual})
             # Plot the cubes
-            cube_file_methods.plot_cubes(params)
+            cube_file_methods.plot_cubes(restrict(params, cube_file_methods.PLOT_CUBES_KEYS))
 
         # Now remove all the cube files to be memory efficient
         data_io.remove_files("cubefiles/*")
