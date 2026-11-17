@@ -118,7 +118,7 @@ def job(Nstart, Nend, job_dir, prefixes):
     if os.path.isdir(job_dir):
         pass
     else:
-        os.system("mkdir %s" % job_dir)
+        os.makedirs(job_dir, exist_ok=True)
 
     # Copy all files
     i = Nstart

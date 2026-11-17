@@ -563,7 +563,7 @@ def dftb_distribute(istep, fstep, nsteps_this_job, trajectory_xyz_file, dftb_inp
     curr_step = istep
 
     # Make the job directory folders
-    os.system("mkdir job" + str(curr_job_number) + "")
+    os.makedirs("job" + str(curr_job_number), exist_ok=True)
     os.chdir("job" + str(curr_job_number) + "")
     # Copy the trajectory file and input template there
     os.system("cp ../../" + trajectory_xyz_file + " .")

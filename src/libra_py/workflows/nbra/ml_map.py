@@ -415,7 +415,7 @@ def train(params):
     print("Average MSE for all models:", np.average(models_error[:, 1]))
     print("Average R^2 for all models:", np.average(models_error[:, 2]))
     print("Done with training!!")
-    os.system(f"mkdir {params['path_to_save_models']}")
+    os.makedirs(params['path_to_save_models'], exist_ok=True)
     np.save(f"{params['path_to_save_models']}/{params['prefix']}_models_error.npy", models_error)
     if params["save_models"]:
         for i in range(len(models)):
@@ -742,7 +742,7 @@ def compute_properties(params, models, input_scalers, output_scalers):
     data_gen_params["do_ref"] = False
     data_gen_params["do_guess"] = True
     data_gen_params["reference_steps"] = indices
-    # os.system(f"mkdir tmp_guess_ham_{params['job']}")
+    # os.makedirs(f"tmp_guess_ham_{params['job']}", exist_ok=True)
     data_gen_params["guess_dir"] = os.getcwd()  # +f"/tmp_guess_ham_{params['job']}"
     params["path_to_input_mats"] = os.getcwd()  # +f"/tmp_guess_ham_{params['job']}"
     if params["write_wfn_file"]:
@@ -750,13 +750,13 @@ def compute_properties(params, models, input_scalers, output_scalers):
             params["sample_wfn_file"] = glob.glob(f"{params['path_to_sample_files']}/*ref*wfn")[0]
             basis_data, spin_data, eigen_vals_and_occ_nums, mo_coeffs = CP2K_methods.read_wfn_file(
                 params["sample_wfn_file"])
-            os.system(f'mkdir {params["path_to_save_wfn_files"]}')
+            os.makedirs(params["path_to_save_wfn_files"], exist_ok=True)
         except BaseException:
             print("Sample wfn file not found or could not be read!")
             print("Will continue without writing the wfn files")
             params["write_wfn_file"] = False
     # Now we loop over the indices which are already sorted
-    os.system(f'mkdir {params["res_dir"]}')
+    os.makedirs(params["res_dir"], exist_ok=True)
     # the stored orbital window, for step-3 consumers to verify their claim
     with open(os.path.join(params["res_dir"], 'orbital_window.json'), 'w') as f:
         json.dump({'lowest_orbital': int(lowest_orbital),
@@ -804,7 +804,7 @@ def compute_properties(params, models, input_scalers, output_scalers):
         print('diagonalizing the KS Hamiltonian matrix time:', time.time() - tt, ' seconds')
         if params["do_error_analysis"]:
             if not os.path.exists("../error_data"):
-                os.system(f"mkdir ../error_data")
+                os.makedirs("../error_data", exist_ok=True)
             # Do the error analysis only for case the output is Kohn-Sham Hamiltonian matrix
             # if params["output_property"]!="kohn_sham" or params["output_property"]!="hamiltonian":
             #    raise("Error analysis can be done only for the case 'output_property' is set to the Hamiltonian 'kohn_sham' or 'hamiltonian'...")
@@ -821,7 +821,7 @@ def compute_properties(params, models, input_scalers, output_scalers):
                 # a lot of disk space
                 if params["save_ref_eigenvalues"] or params["save_ref_eigenvectors"]:
                     if not os.path.exists(f"{params['path_to_save_ref_mos']}"):
-                        os.system(f"mkdir {params['path_to_save_ref_mos']}")
+                        os.makedirs(params['path_to_save_ref_mos'], exist_ok=True)
                 if params["save_ref_eigenvalues"]:
                     np.save(f"{params['path_to_save_ref_mos']}/E_ref_{step}.npy",
                             eigenvalues_ref)  # [lowest_orbital-1:highest_orbital])
@@ -840,15 +840,15 @@ def compute_properties(params, models, input_scalers, output_scalers):
                 pass
         if params["save_ml_ham"]:
             if not os.path.exists("../ml_hams"):
-                os.system(f"mkdir ../ml_hams")
+                os.makedirs("../ml_hams", exist_ok=True)
             np.save(f"../ml_hams/Ham_{step}.npy", ks_ham_mat)
         if params["save_ao_overlap"]:
             if not os.path.exists("../ao_overlaps"):
-                os.system(f"mkdir ../ao_overlaps")
+                os.makedirs("../ao_overlaps", exist_ok=True)
             np.save(f"../ao_overlaps/AO_S_{step}.npy", atomic_overlap)
         if params["save_ml_mos"]:
             if not os.path.exists("../ml_mos"):
-                os.system(f"mkdir ../ml_mos")
+                os.makedirs("../ml_mos", exist_ok=True)
             np.save(f"../ml_mos/eigenvectors_{step}.npy", eigenvectors)
             np.save(f"../ml_mos/eigenvalues_{step}.npy", eigenvalues)
         # numpy slicing past the end silently truncates - the saved matrices
@@ -966,7 +966,7 @@ def distribute_jobs(params):
     # Now, distribute the jobs
     for job in range(params["njobs"]):
         print("Submitting calculations for job", job)
-        os.system(f"mkdir tmp_guess_ham_{job}")
+        os.makedirs(f"tmp_guess_ham_{job}", exist_ok=True)
         os.chdir(f"tmp_guess_ham_{job}")
         params["job"] = job
         params["istep"] = int(steps_split[job][0])

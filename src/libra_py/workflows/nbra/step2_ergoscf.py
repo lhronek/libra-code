@@ -389,7 +389,7 @@ def run_step2(params, run1, run2):
     if os.path.isdir(out_dir):
         pass
     else:
-        os.system("mkdir %s" % out_dir)
+        os.makedirs(out_dir, exist_ok=True)
 
     # Compute
     clean()

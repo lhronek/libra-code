@@ -781,7 +781,7 @@ def cp2k_distribute(istep, fstep, nsteps_this_job, cp2k_positions, cp2k_input, c
     curr_step = istep
 
     # Making the job directories in the wd folder like job0, job1, ...
-    os.system("mkdir job" + str(curr_job_number) + "")
+    os.makedirs("job" + str(curr_job_number), exist_ok=True)
 
     # Change directory to job folder
     os.chdir("job" + str(curr_job_number) + "")
@@ -2310,7 +2310,7 @@ def distribute_cp2k_libint_jobs(
 
         if os.path.exists('job%d' % (njob + 1)):
             data_io.remove_trees('job%d' % (njob + 1))
-        os.system('mkdir job%d' % (njob + 1))
+        os.makedirs('job%d' % (njob + 1), exist_ok=True)
         os.chdir('job%d' % (njob + 1))
         os.system('cp ../%s %s' % (submit_template, submit_template))
         file = open('run.py', 'w')

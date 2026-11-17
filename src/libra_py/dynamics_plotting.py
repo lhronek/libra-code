@@ -620,7 +620,7 @@ def plot_surfaces(_compute_model, _param_sets, states_of_interest, xmin, xmax, d
 
                 if save_figures:
                     if not os.path.exists(F"{prefix}"):
-                        os.system(F"mkdir {prefix}")
+                        os.makedirs(F"{prefix}", exist_ok=True)
                     plt.savefig(F"{prefix}/Ham_dia_E_adi_set_{iset}.png", dpi=dpi_value)
 
                 if do_show:
@@ -658,7 +658,7 @@ def plot_surfaces(_compute_model, _param_sets, states_of_interest, xmin, xmax, d
 
                 if save_figures:
                     if not os.path.exists(F"{prefix}"):
-                        os.system(F"mkdir {prefix}")
+                        os.makedirs(F"{prefix}", exist_ok=True)
                     plt.savefig(F"{prefix}/projections_set_{iset}.png", dpi=dpi_value)
 
                 if do_show:
@@ -713,7 +713,7 @@ def plot_surfaces(_compute_model, _param_sets, states_of_interest, xmin, xmax, d
 
                 if save_figures:
                     if not os.path.exists(F"{prefix}"):
-                        os.system(F"mkdir {prefix}")
+                        os.makedirs(F"{prefix}", exist_ok=True)
                     plt.savefig(F"{prefix}/Ham_dia_E_adi_NAC_set_{iset}.png", dpi=dpi_value)
 
                 if do_show:

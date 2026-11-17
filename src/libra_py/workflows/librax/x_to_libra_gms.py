@@ -57,7 +57,8 @@ def exe_gamess(params):
     os.environ["GMSPATH"] = params["GMSPATH"]
 
     # create scratch directory
-    os.system("mkdir %s" % (scr_dir))
+    if not os.path.isdir(scr_dir):
+        os.makedirs(scr_dir)
 
     # os.system("/usr/bin/time rungms.slurm %s 01 %s > %s" % (inp,nproc,out))
     os.system("/usr/bin/time %s %s %s %s > %s" % (rungms, inp, VERNO, nproc, out))

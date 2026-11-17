@@ -121,7 +121,7 @@ def print_pdos(ham, syst, projections, prefix="pdos", emin=-35.0, emax=35.0, de=
     prms = Control_Parameters()
     prms.dos_prefix = prefix + "/"
 
-    os.system("mkdir " + prefix)
+    os.makedirs(prefix, exist_ok=True)
 
     es = ham.get_electronic_structure()
     compute_dos(es, syst, ham.basis_ao, prms, ham.atom_to_ao_map)

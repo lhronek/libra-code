@@ -504,7 +504,7 @@ def run_step2(params):
     if os.path.isdir(out_dir):
         pass
     else:
-        os.system("mkdir %s" % out_dir)
+        os.makedirs(out_dir, exist_ok=True)
 
     print("In run_step2 : params = ", params )
 
@@ -607,7 +607,7 @@ def run_step2_lz(params):
     if os.path.isdir(out_dir):
         pass
     else:
-        os.system("mkdir %s" % out_dir)
+        os.makedirs(out_dir, exist_ok=True)
 
     if get_midpoint_energy:
 

@@ -312,7 +312,7 @@ def output_sorted_Hvibs(Hvib, orbital_index_energy_pairs, _params={}):
         if (save_files):
             rd_sorted = F"{output_dir_prefix}{traj}"
             data_io.remove_trees(rd_sorted)
-            os.system(F"mkdir {rd_sorted}")
+            os.makedirs(rd_sorted, exist_ok=True)
 
         Hvibs_sorted.append([])
 
@@ -1152,7 +1152,7 @@ def limit_active_space(params):
                                          "limit_active_space reads the stored window's size from a step-2 overlap file (path_to_npz_files)")
     _check_orbital_window(params, int(sp.load_npz(sample_npz_file).shape[0]),
                           'limit_active_space')
-    os.system(f'mkdir {params["path_to_save_npz_files"]}')
+    os.makedirs(params["path_to_save_npz_files"], exist_ok=True)
     # currently working only for restricted KS
     homo_index = CP2K_methods.read_homo_index(sample_logfile, isUKS=False)
     if not l1 <= homo_index < h1:
@@ -2467,10 +2467,7 @@ def run_step3_ks_nacs_libint(params):
     # The path to save the KS Hvibs that will be calculated in this function
     res_dir_2 = params['path_to_save_ks_Hvibs']
     # Create the path
-    try:
-        os.system(F'mkdir {res_dir_2}')
-    except BaseException:
-        print(F'The directory {res_dir_2} already exists.')
+    os.makedirs(res_dir_2, exist_ok=True)
     # the _im files store Im(Hvib) = -d - files WITHOUT this marker predate
     # the convention restoration and hold +d (the NAC itself)
     marker_file = os.path.join(res_dir_2, 'hvib_convention.json')
@@ -5450,10 +5447,7 @@ def run_step3_sd_nacs_libint(params):
                          F"0 (HST) and 1 (Meek-Levine NPI) are supported")
     nprocs = params['nprocs']
 
-    try:
-        os.system(F'mkdir {res_dir_2}')
-    except BaseException:
-        print(F'The directory {res_dir_2} already exists.')
+    os.makedirs(res_dir_2, exist_ok=True)
     # the _im files store Im(Hvib) = -d - files WITHOUT this marker predate
     # the convention restoration and hold +d (the NAC itself)
     marker_file = os.path.join(res_dir_2, 'hvib_convention.json')

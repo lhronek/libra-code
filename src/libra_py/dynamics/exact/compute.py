@@ -243,7 +243,7 @@ def run_dynamics(wfc, _params, model_params, savers):
             expV.append(CMATRIX(expv))
 
     if not os.path.exists(wfc_prefix):
-        os.system(F"mkdir {wfc_prefix}")
+        os.makedirs(wfc_prefix, exist_ok=True)
 
     # =============== Propagation ==========================
 

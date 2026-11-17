@@ -180,7 +180,7 @@ def run(params):
 
     # Create the working directory where all output files will be written
     # The results directory should already exist
-    os.system("mkdir %s" % wd)
+    os.makedirs(wd, exist_ok=True)
     while t <= stop_indx:
 
         if verbosity > 0:
@@ -747,21 +747,21 @@ def run_cp2k_libint_step2(params):
     # including the overlap data and pdos files. The logfiles do not contain
     # specific data but we finally move them to all_logfiles
     if not os.path.exists(params['res_dir']):
-        os.system(F"mkdir {params['res_dir']}")
+        os.makedirs(params['res_dir'], exist_ok=True)
     # the stored orbital window, for step-3 consumers to verify their claim
     with open(os.path.join(params['res_dir'], 'orbital_window.json'), 'w') as f:
         json.dump({'lowest_orbital': int(params['lowest_orbital']),
                    'highest_orbital': int(params['highest_orbital'])}, f)
     if not os.path.exists(params['all_logfiles']):
-        os.system(F"mkdir {params['all_logfiles']}")
+        os.makedirs(params['all_logfiles'], exist_ok=True)
     if not os.path.exists(params['all_pdosfiles']):
-        os.system(F"mkdir {params['all_pdosfiles']}")
+        os.makedirs(params['all_pdosfiles'], exist_ok=True)
     if not os.path.exists(params['all_images']):
-        os.system(F"mkdir {params['all_images']}")
+        os.makedirs(params['all_images'], exist_ok=True)
     if not os.path.exists(params['all_inpfiles']):
-        os.system(F"mkdir {params['all_inpfiles']}")
+        os.makedirs(params['all_inpfiles'], exist_ok=True)
     if not os.path.exists(params['all_xyzfiles']):
-        os.system(F"mkdir {params['all_xyzfiles']}")
+        os.makedirs(params['all_xyzfiles'], exist_ok=True)
 
     # setting up the initial step and final step
     istep = params['istep']

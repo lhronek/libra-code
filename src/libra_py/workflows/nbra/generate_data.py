@@ -123,7 +123,7 @@ def save_data(params, prefix, step, directory, guess):
                 np.save(F"{directory}/{prefix}_{tmp_name}_{step}.npy", data[i])
             if step == params["istep"]:
                 # This is how we can get the sample molden, wfn, and Log files.
-                os.system("mkdir ../sample_files")
+                os.makedirs("../sample_files", exist_ok=True)
                 os.system(f"mv {prefix}_{step}* ../sample_files")
                 os.system("cp params.json ../sample_files")
             if params["remove_raw_outputs"]:  # and step>params["istep"]:
@@ -348,14 +348,15 @@ def distribute_jobs(params):
     # shuffled_indices[ref_steps:ref_steps+more_steps].tolist()
 
     # Create guess and reference directories
-    os.system(f'mkdir {params["reference_dir"]} {params["guess_dir"]}')
+    os.makedirs(params["reference_dir"], exist_ok=True)
+    os.makedirs(params["guess_dir"], exist_ok=True)
     if len(params["user_steps"]) > 0:
         params["steps"] = params["user_steps"]
         params["reference_steps"] = params["user_steps"]
     if (len(params["steps"]) / params["njobs"]) < 2:
         raise ("The division of steps/njobs is less than 2! Please select smaller number of jobs.")
     steps_split = np.array_split(params["steps"], params["njobs"])
-    # os.system(F"mkdir {res_directory}")
+    # os.makedirs(res_directory, exist_ok=True)
     # Read the submit file
     f = open(params["submit_template"], "r")
     lines_submit = f.readlines()
@@ -364,10 +365,10 @@ def distribute_jobs(params):
     for job in range(params["njobs"]):
         print(F"Submitting job {job}...")
         if params["scratch"]:
-            os.system(F"mkdir job_{job}")
+            os.makedirs(F"job_{job}", exist_ok=True)
             os.chdir(F"job_{job}")
         elif params["do_more"]:
-            os.system(F"mkdir job_more_{job}")
+            os.makedirs(F"job_more_{job}", exist_ok=True)
             os.chdir(F"job_more_{job}")
         this_job_steps = steps_split[job].tolist()
         # params["job_istep"] = int(this_job_steps[0])

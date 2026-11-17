@@ -926,7 +926,7 @@ def out2inp(out_filename, templ_filename, wd, prefix, t0, tmax, dt):
         pass
     else:
         # Create working directory and generate the files
-        os.system("mkdir %s" % wd)
+        os.makedirs(wd, exist_ok=True)
 
     # Parameters
     nat = 0   # Number of atoms per unit cell
@@ -1404,7 +1404,7 @@ def xyz2inp(out_filename, templ_filename, wd, prefix, t0, tmax, dt):
         pass
     else:
         # Create working directory and generate the files
-        os.system("mkdir %s" % wd)
+        os.makedirs(wd, exist_ok=True)
 
     # Parameters
     nat = 0   # Number of atoms per unit cell
@@ -1739,7 +1739,7 @@ def run_qe(params, t, dirname0, dirname1):
             os.system("%s -n %s %s < x0.exp.in > x0.exp.out" % (BATCH_SYSTEM, NP, EXE_EXPORT))
 
         # Create temporary directory
-        os.system("mkdir %s/%s" % (wd, dirname0))
+        os.makedirs("%s/%s" % (wd, dirname0), exist_ok=True)
 
         # Copy some results to that directory
         os.system("mv %s.%d.out %s/%s" % (prefix0, t, wd, dirname0))
@@ -1756,7 +1756,7 @@ def run_qe(params, t, dirname0, dirname1):
             os.system("%s -n %s %s < %s.%d.in > %s.%d.out" % (BATCH_SYSTEM, NP, EXE, prefix1, t, prefix1, t))
             os.system("%s -n %s %s < x1.exp.in > x1.exp.out" % (BATCH_SYSTEM, NP, EXE_EXPORT))
 
-        os.system("mkdir %s/%s" % (wd, dirname1))
+        os.makedirs("%s/%s" % (wd, dirname1), exist_ok=True)
 
         os.system("mv %s.%d.out %s/%s" % (prefix1, t, wd, dirname1))
         os.system("mv *.wfc* %s/%s" % (wd, dirname1))
