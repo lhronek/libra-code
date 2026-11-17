@@ -759,7 +759,8 @@ def run_step2_many_body(params):
         # The path to executable CP2K
         cp2k_exe = params["es_software_exe"]
         cp2k_input_template = params["es_software_input_template"]
-        if CP2K_methods.template_sets_keyword(cp2k_input_template, "WFN_RESTART_FILE_NAME", ".wfn"):
+        if (CP2K_methods.template_sets_keyword(cp2k_input_template, "WFN_RESTART_FILE_NAME", ".wfn")
+                and CP2K_methods.template_runs_scf(cp2k_input_template)):
             CP2K_methods.refuse_unwritten_wfn_restart(cp2k_input_template, "the next step restarts from it",
                                                       "step2_many_body.run_step2_many_body")
 
@@ -839,7 +840,7 @@ def run_step2_many_body(params):
         # Running the CP2K calculations
         os.system("mpirun -np %d %s -i %s-%i.inp -o logfiles/step_%d.log " %
                   (nprocs, cp2k_exe, project_name, curr_step, curr_step))
-        if CP2K_methods.read_cp2k_print_key(cp2k_input_template, ("SCF", "PRINT", "RESTART"), "LOW")[0]:
+        if CP2K_methods.template_writes_wfn_restart(cp2k_input_template):
             CP2K_methods.refuse_missing_wfn_restart(F"{project_name}-{curr_step}-RESTART.wfn", cp2k_input_template,
                                                     "the next step restarts from it", "step2_many_body.run_step2_many_body")
         # After finishing the CP2K calculations move all the pdos and cube files to specified folders
@@ -953,7 +954,7 @@ def run_step2_many_body(params):
             # Run CP2K
             os.system("mpirun -np %d %s -i %s-%i.inp -o logfiles/step_%d.log " %
                       (nprocs, cp2k_exe, project_name, curr_step, curr_step))
-            if CP2K_methods.read_cp2k_print_key(cp2k_input_template, ("SCF", "PRINT", "RESTART"), "LOW")[0]:
+            if CP2K_methods.template_writes_wfn_restart(cp2k_input_template):
                 CP2K_methods.refuse_missing_wfn_restart(F"{project_name}-{curr_step}-RESTART.wfn", cp2k_input_template,
                                                         "the next step restarts from it", "step2_many_body.run_step2_many_body")
             # Move all the pdos and cube files to one folder

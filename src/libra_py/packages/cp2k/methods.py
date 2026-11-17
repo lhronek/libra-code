@@ -2234,8 +2234,9 @@ def run_cp2k_xtb(params):
                      omp_num_threads=omp, mpi_executable=mpi_executable,
                      nprocs=nprocs)
         print('Done with OT wfn. Elapsed time:', time.time() - t1)
-        refuse_missing_wfn_restart(F'OT_{step}-RESTART.wfn', ot_input_template, "the diagonalization of the same step restarts from it",
-                                   "run_cp2k_xtb")
+        if template_runs_scf(diag_input_template):
+            refuse_missing_wfn_restart(F'OT_{step}-RESTART.wfn', ot_input_template, "the diagonalization of the same step restarts from it",
+                                       "run_cp2k_xtb")
         diag_wfn_restart, diag_traj = None, None
     else:
         # OT-free: chain the diagonalization runs directly - SCF_GUESS RESTART
@@ -2253,7 +2254,7 @@ def run_cp2k_xtb(params):
                  omp_num_threads=omp, mpi_executable=mpi_executable,
                  nprocs=nprocs)
     print('Done with diagonalization. Elapsed time:', time.time() - t1)
-    if read_cp2k_print_key(diag_input_template, ("SCF", "PRINT", "RESTART"), "LOW")[0]:
+    if template_writes_wfn_restart(diag_input_template):
         refuse_missing_wfn_restart(F'Diag_{step}-RESTART.wfn', diag_input_template, "the orbitals' read or the next step's diagonalization takes it",
                                    "run_cp2k_xtb")
 
@@ -4268,17 +4269,16 @@ def run_cp2k(coords_bohr, params):
                 make_cp2k_input(ot_params, working_directory=wd)
                 before = wfn_restart_stamp(os.path.join(wd, ot_restart))
                 _execute("ot_input.inp", "ot.log")
-                refuse_stale_wfn_restart(os.path.join(wd, ot_restart), before, params["ot_template"],
-                                         "the main run of the same step restarts from it", "run_cp2k")
+                if template_runs_scf(template):
+                    refuse_stale_wfn_restart(os.path.join(wd, ot_restart), before, params["ot_template"],
+                                             "the main run of the same step restarts from it", "run_cp2k")
                 ot_done[0] = True
             main_params["wfn_restart_file"] = ot_restart
         make_cp2k_input(main_params, working_directory=wd)
         main_restart = os.path.join(wd, f"{project}-RESTART.wfn")
         before = wfn_restart_stamp(main_restart)
         logfile = _execute(main_params.get("input_name", "input.inp"), "out.log")
-        # an overlap run has no SCF and writes no wfn
-        if (read_cp2k_print_key(template, ("SCF", "PRINT", "RESTART"), "LOW")[0]
-                and not template_sets_keyword(template, "OVERLAP_DELTAT")):
+        if template_writes_wfn_restart(template):
             refuse_stale_wfn_restart(main_restart, before, template, "the orbitals' read or the next step's run takes it",
                                      "run_cp2k")
         return logfile
@@ -5127,9 +5127,50 @@ def template_sets_keyword(template, keyword, value=""):
     return False
 
 
+def cp2k_logical(words):
+    """The value of a CP2K logical keyword or section argument from the words after its name - true for a lone name."""
+    return (words or ["T"])[0].upper() in ("1", "T", ".T.", "TRUE", ".TRUE.", "Y", "YES", "ON")
+
+
+def template_runs_scf(template):
+    """Whether CP2K runs an SCF for the input - the SCF is what restarts from a wfn file and writes one. None for an overlap
+    run (OVERLAP_DELTAT) and for the non-self-consistent methods: xTB at GFN_TYPE 0, DFTB with SELF_CONSISTENT off, the
+    Harris method (&HARRIS_METHOD on)."""
+    stack = []
+    method, gfn_type, self_consistent, harris, overlap = "GPW", "1", True, False, False
+    for line in _template_text(template).splitlines():
+        keyword, code = cp2k_keyword(line)
+        words = code.split()[1:]
+        if keyword.startswith("&END"):
+            if stack:
+                stack.pop()
+        elif keyword.startswith("&"):
+            stack.append(keyword[1:])
+            if stack[-2:] == ["DFT", "HARRIS_METHOD"]:
+                harris = cp2k_logical(words)
+        elif stack[-1:] == ["QS"] and keyword == "METHOD" and words:
+            method = words[0].upper()
+        elif stack[-1:] == ["XTB"] and keyword == "GFN_TYPE" and words:
+            gfn_type = words[0].upper()
+        elif stack[-1:] == ["DFTB"] and keyword == "SELF_CONSISTENT":
+            self_consistent = cp2k_logical(words)
+        elif stack[-1:] == ["EXCITED_STATES"] and keyword == "OVERLAP_DELTAT":
+            overlap = cp2k_logical(words)
+    return not (overlap or harris or (method == "XTB" and gfn_type == "0") or (method == "DFTB" and not self_consistent))
+
+
+def template_writes_wfn_restart(template):
+    """Whether a run of the CP2K input writes its wfn restart file: an SCF (template_runs_scf) with &SCF &PRINT &RESTART on by
+    the print rule (read_cp2k_print_key)."""
+    return template_runs_scf(template) and read_cp2k_print_key(template, ("SCF", "PRINT", "RESTART"), "LOW")[0]
+
+
 def refuse_unwritten_wfn_restart(template, reader, where):
-    """Refuses a CP2K input that writes no wfn restart file (&SCF &PRINT &RESTART against the input's print level) - reader
-    says what takes the file: without it CP2K starts from the atomic guess and warns in its own log alone."""
+    """Refuses a CP2K input that writes no wfn restart file - it runs no SCF (template_runs_scf), or &SCF &PRINT &RESTART is
+    off against the input's print level. reader says what takes the file: without it CP2K starts from the atomic guess and
+    warns in its own log alone."""
+    if not template_runs_scf(template):
+        raise ValueError(F"{where}: {template} writes no wfn restart file (CP2K runs no SCF for it) and {reader}")
     written, key_level, run_level = read_cp2k_print_key(template, ("SCF", "PRINT", "RESTART"), "LOW")
     if not written:
         raise ValueError(F"{where}: {template} writes no wfn restart file (&SCF &PRINT &RESTART {key_level} at &GLOBAL PRINT_LEVEL "
@@ -7066,12 +7107,12 @@ def cp2k_compute_adi_impl(q, params, full_id):
                         F"{template} - the run would complete and "
                         F"leave no MO file")
     # the wfn restart files the next runs read must be written
-    if params.get("ot_template", None):
+    if params.get("ot_template", None) and any(template_runs_scf(template) for template in templates):
         refuse_unwritten_wfn_restart(params["ot_template"], "the main run of the same step restarts from it", "cp2k_compute_adi")
     for template in templates:
         if mo_source == "wfn":
             refuse_unwritten_wfn_restart(template, "the orbitals are read from it (mo_source 'wfn')", "cp2k_compute_adi")
-        elif template_sets_keyword(template, "SCF_GUESS"):
+        elif template_sets_keyword(template, "SCF_GUESS") and template_runs_scf(template):
             refuse_unwritten_wfn_restart(template, "the next step restarts from it", "cp2k_compute_adi")
     wd = f"{params.get('working_directory_prefix', 'wd')}_itraj{itraj}"
 

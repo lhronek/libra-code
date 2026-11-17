@@ -530,11 +530,12 @@ def remove_restart_files(step, isxTB, with_ot):
 def check_wfn_restart_prints(params):
     """Refuses the CP2K templates of a step-2 run that write no wfn restart file for what reads it: the OT template's for
     the diagonalization of the same step, the diagonalization template's for the orbitals (mo_source 'wfn') or for the
-    next step's diagonalization (no OT template, ot_first_call_only, a DFT template that names a wfn restart file)."""
+    next step's diagonalization (no OT template, ot_first_call_only, a DFT template that names a wfn restart file). A
+    diagonalization that runs no SCF restarts from none."""
     where = "step2.run_cp2k_libint_step2"
     diag_template = params['cp2k_diag_input_template']
     ot_template = params['cp2k_ot_input_template'] if params['isxTB'] else None
-    if ot_template is not None:
+    if ot_template is not None and CP2K_methods.template_runs_scf(diag_template):
         CP2K_methods.refuse_unwritten_wfn_restart(ot_template, "the diagonalization of the same step restarts from it", where)
     if params['isxTB']:
         chained = ot_template is None or params.get('ot_first_call_only', False)
@@ -542,7 +543,7 @@ def check_wfn_restart_prints(params):
         chained = CP2K_methods.template_sets_keyword(diag_template, "WFN_RESTART_FILE_NAME", ".wfn")
     if params['mo_source'].lower() == 'wfn':
         CP2K_methods.refuse_unwritten_wfn_restart(diag_template, "the orbitals are read from it (mo_source 'wfn')", where)
-    elif chained:
+    elif chained and CP2K_methods.template_runs_scf(diag_template):
         CP2K_methods.refuse_unwritten_wfn_restart(diag_template, "the next step's diagonalization restarts from it", where)
 
 
@@ -866,7 +867,7 @@ def run_cp2k_libint_step2(params):
                                       omp_num_threads=params["omp_num_threads"],
                                       mpi_executable=mpi_executable,
                                       nprocs=nprocs)
-            if CP2K_methods.read_cp2k_print_key(params['cp2k_diag_input_template'], ("SCF", "PRINT", "RESTART"), "LOW")[0]:
+            if CP2K_methods.template_writes_wfn_restart(params['cp2k_diag_input_template']):
                 CP2K_methods.refuse_missing_wfn_restart(F'Diag_libra-{step}-RESTART.wfn', params['cp2k_diag_input_template'],
                                                         "the orbitals' read or the next step takes it", "step2.run_cp2k_libint_step2")
             molden_filename = F'Diag_libra-{step}-1_0.molden'
