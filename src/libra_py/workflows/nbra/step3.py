@@ -76,7 +76,8 @@ STEP3_KEYS = frozenset((
     "CI_basis", "Hvib_im_prefix", "Hvib_im_suffix", "Hvib_re_prefix", "Hvib_re_suffix", "SD_basis", "SD_energy_corr",
     "S_data_im_prefix", "S_data_im_suffix", "S_data_re_prefix", "S_data_re_suffix", "St_data_im_prefix", "St_data_im_suffix",
     "St_data_re_prefix", "St_data_re_suffix", "active_space", "active_space_num_occ_orbitals", "active_space_selection",
-    "active_space_selection_algo", "active_space_selection_alpha", "allow_nonorthonormal_overlaps", "apply_orthonormalization",
+    "active_space_selection_algo", "active_space_selection_alpha", "allow_edge_departures",
+    "allow_nonorthonormal_overlaps", "apply_orthonormalization",
     "apply_phase_correction", "blas_num_threads", "carrier_spin", "ci_read_drops", "ci_threshold", "curr_step", "data_dim",
     "data_im_prefix", "data_im_suffix", "data_re_prefix", "data_re_suffix", "data_set_paths",
     "diabatic_state_reordering_alpha", "diabatic_state_reordering_min_overlap", "diabatization_scheme",
@@ -1072,7 +1073,8 @@ def _check_reordering_options(params, route):
     do_diabatic_state_reordering in 0 (none), 1 (Sato), 2 (Munkres-Kuhn by libra_py.hungarian), 22 (the same
     assignment by scipy's linear_sum_assignment) - the diabatic one also in 5 and 52 (the reordering of 2 and 22
     with the orthogonal alignment of a group's states, _polar_factor) - the two alphas non-negative widths in
-    1/Hartree, the two continuity thresholds between 0 (off) and 1 - the keys a route carries. One contract for
+    1/Hartree, the two continuity thresholds between 0 (off) and 1, allow_edge_departures False or True - the keys a
+    route carries. One contract for
     run_step3_ks_nacs_libint, run_step3_sd_nacs_libint and run_step3_pod."""
     for key in ('do_state_reordering', 'do_diabatic_state_reordering'):
         listed = (0, 1, 2, 22, 5, 52) if key == 'do_diabatic_state_reordering' else (0, 1, 2, 22)
@@ -1087,6 +1089,10 @@ def _check_reordering_options(params, route):
     for key in ('state_reordering_min_overlap', 'diabatic_state_reordering_min_overlap'):
         if key in params and not (np.isreal(params[key]) and 0.0 <= params[key] <= 1.0):
             raise ValueError(F"{route}: {key} = {params[key]!r} - a threshold between 0 (off) and 1 is needed")
+    if 'allow_edge_departures' in params and params['allow_edge_departures'] not in (False, True):
+        raise ValueError(F"{route}: allow_edge_departures = {params['allow_edge_departures']!r} is not a listed "
+                         F"option - False (a state that leaves its space through the edge is refused) and True "
+                         F"(recorded, the run goes on) are supported")
 
 
 def _check_orbital_window(params, data_dim, where):
@@ -3676,8 +3682,9 @@ def _partner(row, taken):
 def _classify_continuations(d, inside, threshold):
     """The states of a frame whose continuation |<c|c>| = d falls below max(threshold, CONTINUITY_FLOOR), classified
     by what the space carries of them (inside = sqrt(sum_j |<c|j>|^2) over the space's states): EDGES - the space
-    carries less than that floor of the state, it left the space through its edge (recorded by every writer, the
-    remedy is the space), MIXED - the space carries the state but no single state does, below the threshold (an
+    carries less than that floor of the state, it left the space through its edge (refused by every writer unless
+    allow_edge_departures is True, then recorded - the remedy is the space), MIXED - the space carries the state but no
+    single state does, below the threshold (an
     internal mixing within one frame - refused after a reordering while the threshold is above 0), UNRESOLVED -
     carried, below the floor (let through and recorded). Three index arrays in the states' order - the one rule of
     the SD, CI, diabatic,
@@ -3692,6 +3699,32 @@ def _classify_continuations(d, inside, threshold):
     mixed = np.array([c for c in carried if d[c] < threshold], dtype=int)
     unresolved = np.array([c for c in carried if d[c] < CONTINUITY_FLOOR], dtype=int)
     return edges, mixed, unresolved
+
+
+def _refuse_edge_departure(allow, what, k0, k1, kept, carried, partner):
+    """An edge departure of _classify_continuations is refused unless allow_edge_departures is True: the space no
+    longer carries the state, so from frame k1 on its label names another state and no reordering inside the space
+    brings it back. what names the state, kept is its |<c|c>|, carried what the space holds of it, partner names the
+    state of its largest other overlap."""
+    if allow:
+        return
+    raise ValueError(F"{what} of frame {k0} left its space through the edge: |<c|c>| = {kept:.3f} into frame {k1}, "
+                     F"the space carries {carried:.3f} of it, its largest other overlap is with {partner} - from "
+                     F"frame {k1} on the label would name another state. Remedies: a space that holds the state (a "
+                     F"larger basis or active space, whole degenerate groups), active_space_selection 'identity' "
+                     F"(the states of start_time are followed), allow_edge_departures True (the departure is "
+                     F"recorded and the run goes on)")
+
+
+def _refuse_active_orbital_departures(allow, window, active_space):
+    """Under active_space_selection 'identity' an orbital of the active space that left the stored window (an edge
+    departure of _follow_orbitals) took its determinants with it: refused unless allow_edge_departures is True. The
+    other orbitals of the window may leave it."""
+    active = set(active_space)
+    for frame, label, kept, carried, partner in window["edge_departures"]:
+        if label in active:
+            _refuse_edge_departure(allow, F"the active-space orbital at window position {label}", frame - 1, frame,
+                                   kept, carried, F"window position {partner}")
 
 
 def _reindexed_orbital_numbers(active_space, data_dim, lowest_orbital, perm=None):
@@ -3902,7 +3935,8 @@ def _follow_diabatic_interval(W_curr, O, A_prev, groups, reordering, alpha=0.0, 
 
 
 def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=None, reordering=0, alpha=0.0,
-                            energies=None, min_overlap=CONTINUITY_FLOOR, describe_states=None, sd_content=None):
+                            energies=None, min_overlap=CONTINUITY_FLOOR, describe_states=None, sd_content=None,
+                            allow_edge_departures=False):
     """The localization eigenvectors carry arbitrary signs: every diabatic state follows the trajectory through the
     time overlaps of its own basis, O = W(i)^T St(i) W(i+1), and the sign of every column of W(i+1) is set by the
     sign of diag(O) (in place). reordering 0: a column whose |O_cc| falls below min_overlap does not continue itself -
@@ -3916,8 +3950,9 @@ def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=N
     penalty compares the followed state's energy with the candidate position's, both at the earlier frame. A state
     whose continuation carries less than min_overlap even so is one of two things: an EDGE DEPARTURE when the whole
     space carries less than min_overlap of it, sqrt(sum_j |O_cj|^2) < min_overlap - the state left the active space
-    through its edge, the reordering has nothing to assign and the remedy is the space, so the frame is recorded
-    (edges) and the run goes on - or an INTERNAL MIXING when the space carries it but no single state does (the
+    through its edge, the reordering has nothing to assign and the remedy is the space: refused, under
+    allow_edge_departures True the frame is recorded (edges) and the run goes on - or an INTERNAL MIXING when the
+    space carries it but no single state does (the
     states mixed by more than the threshold's angle within one frame, 1/sqrt(2) = 45 degrees), which is refused: the
     frame spacing does not resolve that crossing. A threshold below the floor lets internal mixings through and records
     those below it. reordering 5 or 52: the assignment and the signs of 2 or 22 follow the energy-ordered states as
@@ -3969,6 +4004,8 @@ def _follow_diabatic_states(W_list, St_list, start_time, basis="sd", dia_index=N
         for c in edge_idx:
             edges.append([start_time + i + 1, int(c), round(float(d[c]), 4), round(float(inside[c]), 4),
                           _partner(O[c], c)])
+            _refuse_edge_departure(allow_edge_departures, F"the diabatic {basis.upper()} state {c}", start_time + i,
+                                   start_time + i + 1, d[c], inside[c], F"state {_partner(O[c], c)}")
         for c in mixed_idx[:1]:
             row = np.abs(O[c]).copy()
             row[c] = -1.0
@@ -4095,10 +4132,12 @@ def _tracking_record(reordering, alpha, min_overlap, perms, swaps, unresolved, m
                 "the state that took most of it])"}
 
 
-def _continuity_record(St_list, start_time, reordering, alpha, min_overlap, perms=None, basis="SD", describe=None):
+def _continuity_record(St_list, start_time, reordering, alpha, min_overlap, perms=None, basis="SD", describe=None,
+                       allow_edge_departures=False):
     """How the states of a basis continue between the frames as labeled. A state whose |St_cc| falls below
     min_overlap is an EDGE DEPARTURE when the whole space carries less than min_overlap of it (sqrt(sum_j |St_cj|^2)
-    - it left the active space through its edge, the remedy is the space) and is recorded, or an INTERNAL MIXING
+    - it left the active space through its edge, the remedy is the space) and is refused, recorded with the run
+    going on under allow_edge_departures True, or an INTERNAL MIXING
     when the space carries it but no single state does - refused after a reordering (1 or 2: the states mixed by
     more than the threshold's angle within one frame, the frame spacing does not resolve the crossing, min_overlap
     0 switches the check off), never refused in the energy order (reordering 0: a crossing of adiabatic states is the
@@ -4118,6 +4157,8 @@ def _continuity_record(St_list, start_time, reordering, alpha, min_overlap, perm
         for j in edge_idx:
             edges.append([start_time + i + 1, int(j), round(float(c[j]), 4), round(float(inside[j]), 4),
                           _partner(A[j], j)])
+            _refuse_edge_departure(allow_edge_departures, F"the {basis} state {j}", start_time + i, start_time + i + 1,
+                                   c[j], inside[j], F"state {_partner(A[j], j)}")
         for j in mixed_idx[:1]:
             if reordering and min_overlap > 0.0:
                 row = A[j].copy()
@@ -4582,9 +4623,10 @@ def run_step3_pod(params):
                 time overlaps of the basis are transformed along (the block energies become the diagonal of the
                 rotated block Hamiltonian, the adiabatic files do not change, U_sd does), and the labels and the
                 report carry the rotation angles (alignment). A continuation
-                below diabatic_state_reordering_min_overlap is refused when it is an internal mixing and recorded
-                when the state left the basis of its block (edge_departures - under active_space_selection 'energy',
-                where the block's basis is its window positions - 'identity' follows a state anywhere in its block).
+                below diabatic_state_reordering_min_overlap is refused: an internal mixing, or a state that left the
+                basis of its block (an edge departure - under active_space_selection 'energy', where the block's basis
+                is its window positions, 'identity' follows a state anywhere in its block). allow_edge_departures
+                True records an edge departure in edge_departures and goes on.
             * **params['diabatic_state_reordering_alpha']** (float): the energy-penalty width of the Munkres-Kuhn
                 cost of the block states, exp(-(alpha dE)^2) on the block energies of the earlier frame, in
                 1/Hartree [default: 0 - no penalty].
@@ -4592,8 +4634,8 @@ def run_step3_pod(params):
                 states [default: 1/sqrt(2) = 0.707 - more than half of a state's weight on its own continuation, a
                 mixing of 45 degrees within one frame, 0 switches the check off]: below it an internal mixing refuses
                 the run, with or without a reordering, and a departure from the basis of the block (the basis carries
-                less than the threshold of the state - under active_space_selection 'energy') is recorded in
-                edge_departures - a
+                less than the threshold of the state - under active_space_selection 'energy') refuses it as well,
+                recorded in edge_departures under allow_edge_departures True - a
                 threshold below 1/sqrt(2) lets internal mixings through (0.5 admits 60 degrees) and the labels and
                 the report list them (unresolved_frames, min_continuity).
             * **params['state_reordering_min_overlap']** (float): the same threshold for the adiabatic states as
@@ -4617,6 +4659,9 @@ def run_step3_pod(params):
                 overlaps (libra_py.hungarian) [default], 22 the same assignment by scipy's linear_sum_assignment.
             * **params['active_space_selection_alpha']** (float): the energy-penalty width of that assignment,
                 exp(-(alpha dE)^2) on the block energies of the earlier frame, in 1/Hartree [default: 0 - no penalty].
+            * **params['allow_edge_departures']** (bool): False [default] - a basis state or an adiabatic state that
+                leaves its space through the edge (the space carries less than 1/sqrt(2) of it) refuses the run,
+                True - it is recorded in edge_departures and the run goes on.
             * **params['nac_algo']** (int): 0 alone - the route writes the HST couplings (St^T - St) / 2 dt.
             * **params['blas_num_threads']** (integer): the BLAS threads of the run. Default (None): 1 - the route is
                 serial and its matrices are small. 0 leaves the thread pool alone.
@@ -4641,7 +4686,7 @@ def run_step3_pod(params):
                       'diabatic_state_reordering_min_overlap': CONTINUITY_FLOOR,
                       'state_reordering_min_overlap': CONTINUITY_FLOOR, 'active_space_selection': 'energy',
                       'active_space_selection_algo': 2, 'active_space_selection_alpha': 0.0, 'nac_algo': 0,
-                      'blas_num_threads': None}
+                      'blas_num_threads': None, 'allow_edge_departures': False}
     _refuse_former_names(params)
     # the keys of the SD route's Kohn-Sham basis have no reading here - num_occ_states in place of
     # num_occ_states_per_block ran the whole occupied space without a word
@@ -4959,14 +5004,17 @@ def run_step3_pod(params):
         min_continuity = min(min_continuity, float(d.min()))
         # the space of a basis state: the whole block under 'identity' (a low continuation the block carries is an
         # internal mixing), the basis of its block under 'energy' (the window positions - a partner outside it is an
-        # edge departure, recorded)
+        # edge departure)
         space = [list(range(off[frag[c]], off[frag[c] + 1])) if selection == 'identity'
                  else [cur[b] for b in range(n) if frag[b] == frag[c]] for c in range(n)]
         inside = np.array([float(np.sqrt(np.sum(rows[c, space[c]] ** 2))) for c in range(n)])
         edge_idx, mixed_idx, unresolved_idx = _classify_continuations(d, inside, dia_min_overlap)
         for c in edge_idx:
-            edges.append([int(frames[i + 1]), int(c), round(float(d[c]), 4), round(float(inside[c]), 4),
-                          _partner(rows[c], nxt[c])])
+            partner = _partner(rows[c], nxt[c])
+            edges.append([int(frames[i + 1]), int(c), round(float(d[c]), 4), round(float(inside[c]), 4), partner])
+            _refuse_edge_departure(params['allow_edge_departures'], F"the basis state {c} ({pod_state(c)})",
+                                   int(frames[i]), int(frames[i + 1]), d[c], inside[c],
+                                   F"the block state {partner} ({pod_global(partner)})")
         for c in mixed_idx[:1]:
             row = np.abs(rows[c]).copy()
             row[nxt[c]] = -1.0
@@ -5047,13 +5095,15 @@ def run_step3_pod(params):
             V[k], E_adi[k], O = V[k][:, perm], E_adi[k][perm], O[:, perm]
         d_adi = np.abs(np.diag(O))
         adi_min_continuity = min(adi_min_continuity, float(d_adi.min()))
-        # an adiabatic state the basis no longer carries inherited an edge departure of the basis (recorded), one the
-        # basis carries but no single state does mixed internally (refused after a reordering)
+        # an adiabatic state the basis no longer carries inherited an edge departure of the basis, one the basis
+        # carries but no single state does mixed internally (refused after a reordering)
         inside_adi = np.sqrt(np.sum(O ** 2, axis=1))
         edge_idx, mixed_idx, unresolved_idx = _classify_continuations(d_adi, inside_adi, sd_min_overlap)
         for j in edge_idx:
             adi_edges.append([int(frames[k]), int(j), round(float(d_adi[j]), 4), round(float(inside_adi[j]), 4),
                               _partner(O[j], j)])
+            _refuse_edge_departure(params['allow_edge_departures'], F"the adiabatic state {j}", int(frames[k - 1]),
+                                   int(frames[k]), d_adi[j], inside_adi[j], F"state {_partner(O[j], j)}")
         for j in mixed_idx[:1]:
             if params['do_state_reordering'] in (1, 2, 22) and sd_min_overlap > 0.0:
                 row = np.abs(O[j]).copy()
@@ -5159,6 +5209,7 @@ def run_step3_pod(params):
               "active_space_selection_algo": int(sel_algo), "active_space_selection_alpha": float(sel_alpha),
               "swap_frames": [int(k) for k in swaps], "frames_off_energy_order": off_order,
               "unresolved_frames": [int(k) for k in unresolved], "edge_departures": edges, "alignment": alignment,
+              "allow_edge_departures": bool(params['allow_edge_departures']),
               "adiabatic": {"do_state_reordering": int(params['do_state_reordering']),
                             "state_reordering_alpha": float(params['state_reordering_alpha']),
                             "state_reordering_min_overlap": float(sd_min_overlap),
@@ -5272,7 +5323,8 @@ def run_step3_sd_nacs_libint(params):
                 U_sd_labels.json carries the rotation angles (alignment). A state whose
                 continuation carries less than diabatic_state_reordering_min_overlap even after the reordering is
                 refused as well when the space still carries it (an internal mixing the frame spacing does not
-                resolve) and recorded when it left the active space through its edge (edge_departures). Applies to
+                resolve) or when it left the active space through its edge (an edge departure, recorded in
+                edge_departures with the run going on under allow_edge_departures True). Applies to
                 the CI-level diabatic states (U_ci) as well.
             * **params['diabatic_state_reordering_alpha']** (float): the energy-penalty width of the Munkres-Kuhn
                 cost of the diabatic states, exp(-(alpha dE)^2) with dE the difference between the followed state's
@@ -5284,16 +5336,17 @@ def run_step3_sd_nacs_libint(params):
                 frame, 0 switches the check off]. Below it, a state the space still
                 carries (sqrt(sum_j |O_cj|^2) >= the threshold) mixed internally and the run is refused, with or
                 without a reordering - a state the space no longer carries left the active space through its edge
-                and is recorded (edge_departures in U_sd_labels.json: [frame, state, kept, carried by the space, the
-                state that took most of it]),
+                and the run is refused as well. Under allow_edge_departures True it is recorded (edge_departures in
+                U_sd_labels.json: [frame, state, kept, carried by the space, the state that took most of it]) and
                 the run goes on. A threshold below 1/sqrt(2) lets internal mixings through (0.5 admits 60 degrees):
                 unresolved_frames lists them beside min_continuity.
             * **params['state_reordering_min_overlap']** (float): the same threshold for the SD (and CI) states as
                 labeled by do_state_reordering 1 or 2: an internal mixing below it after the reordering refuses the
                 run (the frame spacing does not resolve the crossing, 0 switches the check off), an edge departure
-                is recorded [default: 1/sqrt(2) = 0.707, more than half of a state's weight on its own continuation].
-                In the energy order (do_state_reordering 0) nothing is refused - a crossing of adiabatic states is the
-                convention there and is left to the propagation.
+                refuses it in every order unless allow_edge_departures is True [default: 1/sqrt(2) = 0.707, more
+                than half of a state's weight on its own continuation]. In the energy order (do_state_reordering 0)
+                an internal mixing is not refused - a crossing of adiabatic states is the convention there and is
+                left to the propagation.
                 sd_labels.json records the determinant under every SD label at every frame (the orbital numbers of its
                 hole or electron at that frame, the excitation of a neutral basis), written before the continuity check
                 so that a refused run keeps it - the refusals name those determinants and end with the orbitals to check
@@ -5302,14 +5355,15 @@ def run_step3_sd_nacs_libint(params):
                 edge_departures, min_continuity and reordered_frames.
             * **params['active_space_selection']** (string): how the orbitals of the active space are picked at every
                 frame. 'energy' [default]: the energy positions of the frame (an orbital that crosses the edge of the
-                active space leaves the basis, the SD state it carried is recorded as an edge departure). 'identity':
+                active space leaves the basis, the SD state it carried is an edge departure). 'identity':
                 the orbitals that stood in the active space at start_time, followed through the whole stored window
                 by their time overlaps - the Kohn-Sham orbitals of the window are followed by identity between the
                 frames, per interval and spin block, and the label permutation of every frame relabels E_ks, S_ks,
                 St_ks and the fragment operators before the active space is cut out of them, so the SD basis of every
                 frame is built from the same orbitals wherever their energies took them, as the POD basis of
-                run_step3_pod is followed within its block. Nothing is refused for the orbitals themselves - the SD
-                states built from them are checked as labeled (state_reordering_min_overlap) - sd_route_report.json
+                run_step3_pod is followed within its block. An orbital of the active space that leaves the stored
+                window is an edge departure, nothing else is refused for the orbitals themselves - the SD states
+                built from them are checked as labeled (state_reordering_min_overlap) - sd_route_report.json
                 records under "active_space" the reordered frames of the window, the frames at which the active space
                 crossed its edge (active_space_edge_frames), the window positions of the active orbitals in every
                 frame off their energy positions (tracked_orbitals, 0-based in the stored window, alpha then beta),
@@ -5324,6 +5378,9 @@ def run_step3_sd_nacs_libint(params):
                 scipy's linear_sum_assignment, 1 Sato (get_reordering).
             * **params['active_space_selection_alpha']** (float): the energy-penalty width of that Munkres-Kuhn cost,
                 in 1/Hartree [default: 0 - no penalty] - as state_reordering_alpha.
+            * **params['allow_edge_departures']** (bool): False [default] - an SD, CI or diabatic state, or an orbital
+                of the followed active space, that leaves its space through the edge (the space carries less than
+                1/sqrt(2) of it) refuses the run, True - it is recorded in edge_departures and the run goes on.
             * **params['npz_file_ks_homo_index']** (integer): the KS HOMO index of the raw npz files.
             * **params['is_many_body']** (bool): a True or False flag for computing the overlaps and energies
                                                  for many-body states
@@ -5384,7 +5441,7 @@ def run_step3_sd_nacs_libint(params):
                       'diabatic_state_reordering_min_overlap': CONTINUITY_FLOOR,
                       'state_reordering_min_overlap': CONTINUITY_FLOOR,
                       'active_space_selection': 'energy', 'active_space_selection_algo': 2,
-                      'active_space_selection_alpha': 0.0
+                      'active_space_selection_alpha': 0.0, 'allow_edge_departures': False
                       }
 
     _refuse_former_names(params)
@@ -5685,6 +5742,8 @@ def run_step3_sd_nacs_libint(params):
     else:
         selection_record = {"active_space_selection": "energy",
                             "note": "the active space is the energy positions of every frame"}
+    if selection == 'identity':
+        _refuse_active_orbital_departures(params['allow_edge_departures'], orbital_window, ks_active_space)
 
     # The flag for phase-correction algorithm
     apply_phase_correction = params['apply_phase_correction']
@@ -5799,7 +5858,8 @@ def run_step3_sd_nacs_libint(params):
             return "the reference"
         perms_dia, swaps_dia, unresolved_dia, cont_dia, edges_dia, align_dia = _follow_diabatic_states(
             W_dia, St_sds, start_time, "sd", dia_index, dia_reordering, dia_alpha, _state_energies(dia_energies),
-            dia_min_overlap, describe_states=describe_dia_state, sd_content=sd_rows)
+            dia_min_overlap, describe_states=describe_dia_state, sd_content=sd_rows,
+            allow_edge_departures=params['allow_edge_departures'])
         followed = lambda records: _rotate_records(_permute_records(records, perms_dia), align_dia)
         _write_diabatization_records(res_dir_2, localized_carrier, dia_index, followed(dia_pops), followed(dia_hole),
                                      followed(dia_energies), start_time, str(params['diabatization_scheme']).lower(),
@@ -5846,7 +5906,8 @@ def run_step3_sd_nacs_libint(params):
     route_report = {"sd": _continuity_record(St_sds, start_time, params['do_state_reordering'],
                                              params['state_reordering_alpha'], sd_min_overlap,
                                              perms if params['do_state_reordering'] in (1, 2, 22) else None,
-                                             describe=sd_labels)}
+                                             describe=sd_labels,
+                                             allow_edge_departures=params['allow_edge_departures'])}
     print(F"SD states: {len(route_report['sd']['reordered_frames'])} reordered frames, "
           F"{len(route_report['sd']['unresolved_frames'])} frames let through with a continuation below the floor, "
           F"{len(route_report['sd']['edge_departures'])} edge departures (a state left the active space), continuity "
@@ -5937,7 +5998,8 @@ def run_step3_sd_nacs_libint(params):
             # the CI records hold eV, the penalty width alpha is per Hartree as for the SD states
             perms_ci_dia, swaps_ci_dia, unresolved_ci_dia, cont_ci_dia, edges_ci_dia, align_ci = _follow_diabatic_states(
                 V_dia, St_cis, start_time, "ci", ci_dia_index, dia_reordering, dia_alpha,
-                [e / units.au2ev for e in _state_energies(ci_dia_energies)], dia_min_overlap)
+                [e / units.au2ev for e in _state_energies(ci_dia_energies)], dia_min_overlap,
+                allow_edge_departures=params['allow_edge_departures'])
             followed_ci = lambda records: _rotate_records(_permute_records(records, perms_ci_dia), align_ci)
             _write_diabatization_records(res_dir_2, localized_carrier, ci_dia_index, followed_ci(ci_pops),
                                          followed_ci(ci_hole), followed_ci(ci_dia_energies), start_time,
@@ -5947,9 +6009,11 @@ def run_step3_sd_nacs_libint(params):
                                                                 cont_ci_dia, edges_ci_dia, start_time, align_ci))
         route_report["ci"] = _continuity_record(St_cis, start_time, params['do_state_reordering'],
                                                 params['state_reordering_alpha'], sd_min_overlap,
-                                                perms_ci if params['do_state_reordering'] in (1, 2, 22) else None, "CI")
+                                                perms_ci if params['do_state_reordering'] in (1, 2, 22) else None,
+                                                "CI", allow_edge_departures=params['allow_edge_departures'])
 
     route_report["active_space"] = selection_record
+    route_report["allow_edge_departures"] = bool(params['allow_edge_departures'])
     with open(F'{res_dir_2}/sd_route_report.json', 'w') as f:
         json.dump(route_report, f, indent=1)
 
