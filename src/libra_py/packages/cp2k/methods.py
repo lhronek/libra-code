@@ -787,10 +787,10 @@ def cp2k_distribute(istep, fstep, nsteps_this_job, cp2k_positions, cp2k_input, c
     os.chdir("job" + str(curr_job_number) + "")
 
     # Copy the trajectory xyz file
-    os.system("cp ../../" + cp2k_positions + " .")
+    shutil.copy("../../" + cp2k_positions, ".")
 
     # Copy the CP2K sample input
-    os.system("cp ../../" + cp2k_input + " .")
+    shutil.copy("../../" + cp2k_input, ".")
 
     # Go back to the main directory
     os.chdir("../../")
@@ -2312,7 +2312,7 @@ def distribute_cp2k_libint_jobs(
             data_io.remove_trees('job%d' % (njob + 1))
         os.makedirs('job%d' % (njob + 1), exist_ok=True)
         os.chdir('job%d' % (njob + 1))
-        os.system('cp ../%s %s' % (submit_template, submit_template))
+        shutil.copy('../%s' % submit_template, submit_template)
         file = open('run.py', 'w')
 
         for i in range(len(lines)):

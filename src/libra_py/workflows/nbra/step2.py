@@ -324,24 +324,24 @@ def run(params):
         # if t<stop_indx:
         if nac_method == 0 or nac_method == 1 or nac_method == 3:
             # The input file template defined in params["prefix0"] should have   prefix = 'x0' !
-            os.system("cp %s/curr0/x0.export/index.xml %s/x0_index_%i.xml" % (wd, rd, t))
-            os.system("cp %s/curr0/x0.save/data-file-schema.xml %s/x0_data-file-schema_%i.xml" % (wd, rd, t))
-            os.system("cp %s/curr0/%s.%d.out %s/%s.%d.out" % (wd, params["prefix0"], t, rd, params["prefix0"], t))
+            shutil.copy("%s/curr0/x0.export/index.xml" % wd, "%s/x0_index_%i.xml" % (rd, t))
+            shutil.copy("%s/curr0/x0.save/data-file-schema.xml" % wd, "%s/x0_data-file-schema_%i.xml" % (rd, t))
+            shutil.copy("%s/curr0/%s.%d.out" % (wd, params["prefix0"], t), "%s/%s.%d.out" % (rd, params["prefix0"], t))
 
             if pdos_flg == 1:
                 print("Entering pdos_flag == 1: Outputting files necessary for computing pDOS calculations with projwfc.x")
                 print("Warning: Crashes at this point may result from QE versioning. This flag is currently compatable with QE v6.2.1")
                 print("Warning: This flag is tested only for non-relativisitic cases")
 
-                os.system("cp %s/curr0/x0.save/charge-density.dat %s/x0_charge-density_%i.dat" % (wd, rd, t))
-                os.system("cp %s/curr0/x0.save/wfcdw1.dat %s/x0_wfcdw1_%i.dat" % (wd, rd, t))
-                os.system("cp %s/curr0/x0.save/wfcup1.dat %s/x0_wfcup1_%i.dat" % (wd, rd, t))
+                shutil.copy("%s/curr0/x0.save/charge-density.dat" % wd, "%s/x0_charge-density_%i.dat" % (rd, t))
+                shutil.copy("%s/curr0/x0.save/wfcdw1.dat" % wd, "%s/x0_wfcdw1_%i.dat" % (rd, t))
+                shutil.copy("%s/curr0/x0.save/wfcup1.dat" % wd, "%s/x0_wfcup1_%i.dat" % (rd, t))
 
         if nac_method == 2 or nac_method == 3:
             # The input file template defined in params["prefix1"] should have   prefix = 'x1' !
-            os.system("cp %s/curr1/x1.export/index.xml %s/x1_index_%i.xml" % (wd, rd, t))
-            os.system("cp %s/curr1/x1.save/data-file-schema.xml %s/x1_data-file-schema_%i.xml" % (wd, rd, t))
-            os.system("cp %s/curr1/%s.%d.out %s/%s.%d.out" % (wd, params["prefix1"], t, rd, params["prefix1"], t))
+            shutil.copy("%s/curr1/x1.export/index.xml" % wd, "%s/x1_index_%i.xml" % (rd, t))
+            shutil.copy("%s/curr1/x1.save/data-file-schema.xml" % wd, "%s/x1_data-file-schema_%i.xml" % (rd, t))
+            shutil.copy("%s/curr1/%s.%d.out" % (wd, params["prefix1"], t), "%s/%s.%d.out" % (rd, params["prefix1"], t))
 
         # ACHTUNG!!! Restoring wfc makes some complications, so we might need to destroy wfc objects
         # after each round of operations and create new objects from the beginning - thia may be safer!

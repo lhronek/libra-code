@@ -19,6 +19,7 @@
 
 
 import os
+import shutil
 import sys
 import time
 import re
@@ -124,7 +125,7 @@ def job(Nstart, Nend, job_dir, prefixes):
     i = Nstart
     while i <= Nend:
         for prefix in prefixes:
-            os.system("cp %s.%d.in %s" % (prefix, i, job_dir))
+            shutil.copy("%s.%d.in" % (prefix, i), job_dir)
         i = i + 1
 
 
@@ -176,7 +177,7 @@ def distribute(Nmin, Nmax, max_steps, submit_templ, exp_files, prefixes, do_subm
         os.chdir("job%d" % j)
 
         for exp_file in exp_files:
-            os.system("cp ../%s ." % exp_file)
+            shutil.copy("../%s" % exp_file, ".")
 
         if do_submit == 1:
             os.system("qsub %s" % submit_templ)
@@ -195,7 +196,7 @@ def distribute(Nmin, Nmax, max_steps, submit_templ, exp_files, prefixes, do_subm
     os.chdir("job%d" % j)
 
     for exp_file in exp_files:
-        os.system("cp ../%s ." % exp_file)
+        shutil.copy("../%s" % exp_file, ".")
 
     if do_submit == 1:
         os.system("qsub %s" % submit_templ)

@@ -471,7 +471,7 @@ def read_dftb_output(natoms, istate):
     # Check the successful completion of the calculations like this:
     if os.path.isfile('detailed.out'):
         # print("Found detailed.out")
-        os.system(F"cp detailed.out detailed_{istate}.out")
+        shutil.copy("detailed.out", F"detailed_{istate}.out")
     else:
         raise RuntimeError(F"Cannot find the file detailed.out. Hint: Current working directory "
                            F"is: {os.getcwd()}. Is this where you expect the file detailed.out "
@@ -566,9 +566,9 @@ def dftb_distribute(istep, fstep, nsteps_this_job, trajectory_xyz_file, dftb_inp
     os.makedirs("job" + str(curr_job_number), exist_ok=True)
     os.chdir("job" + str(curr_job_number) + "")
     # Copy the trajectory file and input template there
-    os.system("cp ../../" + trajectory_xyz_file + " .")
-    os.system("cp ../../" + dftb_input + " .")
-    os.system("cp ../../" + waveplot_input + " .")
+    shutil.copy("../../" + trajectory_xyz_file, ".")
+    shutil.copy("../../" + dftb_input, ".")
+    shutil.copy("../../" + waveplot_input, ".")
 
     # Now, we need to edit the submit file
     # Now, in jobs folder njob, we should do only a certain number of steps

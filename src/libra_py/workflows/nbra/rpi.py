@@ -19,6 +19,7 @@
 """
 
 import os
+import shutil
 import sys
 import numpy as np
 import scipy.sparse as sp
@@ -297,8 +298,8 @@ def generic_patch_dyn(_rpi_params, _dyn_params, compute_model, _model_params, _i
                 # Submit jobs or run each patch dynamics through this loop        
                 if rpi_params["run_slurm"]:
                     print(F"Submitting a patch dynamics job of ibatch = {ibatch}, ipatch = {ipatch}, istate = {istate}")
-                    os.system('cp ../%s %s' % (rpi_params["run_python_file"], rpi_params["run_python_file"]))
-                    os.system('cp ../%s %s' % (rpi_params["submit_template"], rpi_params["submit_template"]))
+                    shutil.copy('../%s' % rpi_params["run_python_file"], rpi_params["run_python_file"])
+                    shutil.copy('../%s' % rpi_params["submit_template"], rpi_params["submit_template"])
                     
                     icond1 = icond + ipatch * int(nsteps / npatches)
                     

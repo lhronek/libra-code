@@ -22,6 +22,7 @@ import extract_qe
 import create_input_qe
 import x_to_libra_qe
 import os
+import shutil
 import sys
 import math
 import copy
@@ -191,7 +192,7 @@ def main(params):
 
     if params["interface"] == "GAMESS":
 
-        os.system("cp %s %s" % (params["gms_inp0"], params["gms_inp"]))
+        shutil.copy(params["gms_inp0"], params["gms_inp"])
         params["gms_inp_templ"] = read_gms_inp_templ(params["gms_inp"])
         exe_gamess(params)
         label, Q, R, grads, E, c, ao, params["nel"] = gms_extract(
@@ -210,7 +211,7 @@ def main(params):
             all_grads.append(copy.deepcopy(grads))  # newly defined
 
     elif params["interface"] == "G09":
-        os.system("cp %s %s" % (params["g09_inp0"], params["g09_inp"]))
+        shutil.copy(params["g09_inp0"], params["g09_inp"])
         params["g09_inp_templ"] = read_g09_inp_templ(params["g09_inp"])
         exe_g09(params)
         # while not os.path.exists(params["g09_out"]):
@@ -244,7 +245,7 @@ def main(params):
 
             # Copy the orignal input files into working ones, which will be modified
             # so that we don't screw up the original files if something goes wrong
-            os.system("cp x%i.scf.in x%i.scf_wrk.in" % (ex_st, ex_st))
+            shutil.copy("x%i.scf.in" % ex_st, "x%i.scf_wrk.in" % ex_st)
             # AVA: params["qe_inp_templ"].append( read_qe_inp_templ("x%i.scf_wrk.in" % ex_st) )
 
             print "Starting QE calculations"

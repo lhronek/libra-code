@@ -19,6 +19,7 @@
 """
 
 import os
+import shutil
 import json
 import time
 import numpy as np
@@ -125,7 +126,7 @@ def save_data(params, prefix, step, directory, guess):
                 # This is how we can get the sample molden, wfn, and Log files.
                 os.makedirs("../sample_files", exist_ok=True)
                 os.system(f"mv {prefix}_{step}* ../sample_files")
-                os.system("cp params.json ../sample_files")
+                shutil.copy("params.json", "../sample_files")
             if params["remove_raw_outputs"]:  # and step>params["istep"]:
                 data_io.remove_files(F"{prefix}_{step}*Log", F"{prefix}_{step}*.wfn*", F"{prefix}_{step}*molden")
         except BaseException:

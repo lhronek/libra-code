@@ -20,6 +20,7 @@
 """
 
 import os
+import shutil
 import sys
 import numpy as np
 
@@ -204,7 +205,7 @@ def do_step(snap, params):
 
     # Run SCF calculations and generate the charge density for a converged calculations
     # The file x1.gen is used as a geometry
-    os.system("cp %s dftb_in.hsd" % scf_in_file)
+    shutil.copy(scf_in_file, "dftb_in.hsd")
     os.system("%s" % EXE)
 
     if do_tddftb:
@@ -303,7 +304,7 @@ def do_step(snap, params):
         # Here, we just use the energies of the bands themselves. This corresponds to the single particle picture
 
         # Just generate the Hamiltonian corresponding to the converged density matrix
-        os.system("cp %s dftb_in.hsd" % hs_in_file)
+        shutil.copy(hs_in_file, "dftb_in.hsd")
         os.system("%s" % EXE)
 
         # [0] is because we extract just the gamma-point
@@ -434,7 +435,7 @@ def do_ovlp(snap, params):
 
     # Run SCF calculations and generate the charge density for a converged calculations
     # The file x2.gen is used as a geometry
-    #os.system("cp %s dftb_in.hsd" % ovlp_in_file)
+    #shutil.copy(ovlp_in_file, "dftb_in.hsd")
     #os.system("%s" % EXE)
     odin_params.update({"filename":"x2.gen"})
     run_odin(odin_params)
@@ -512,8 +513,8 @@ def run_step2(params):
     E_prev, U_prev, Hao_prev, Sao_prev = do_step(isnap, params)
     #E_prev, U_prev, Hao_prev, Sao_prev = do_step(0, params) # just a test
 
-    os.system(F"cp hamsqr1.dat {out_dir}/hamsqr1_step{isnap}.dat")
-    os.system(F"cp oversqr.dat {out_dir}/oversqr_small_step{isnap}.dat")
+    shutil.copy("hamsqr1.dat", F"{out_dir}/hamsqr1_step{isnap}.dat")
+    shutil.copy("oversqr.dat", F"{out_dir}/oversqr_small_step{isnap}.dat")
 
     for i in range(isnap + 1, fsnap - 1):
         E_curr, U_curr, Hao_curr, Sao_curr = do_step(i, params)
@@ -521,13 +522,13 @@ def run_step2(params):
         #print("MO dimensions = ", U_curr.num_of_rows, U_curr.num_of_cols)
         #U_curr.show_matrix()
 
-        os.system(F"cp hamsqr1.dat {out_dir}/hamsqr1_step{i}.dat")
-        os.system(F"cp oversqr.dat {out_dir}/oversqr_small_step{i}.dat")
+        shutil.copy("hamsqr1.dat", F"{out_dir}/hamsqr1_step{i}.dat")
+        shutil.copy("oversqr.dat", F"{out_dir}/oversqr_small_step{i}.dat")
 
         S, S00, S11 = do_ovlp(i - 1, params)
         #S, S00, S11 = do_ovlp(0, params)  # just a test
 
-        os.system(F"cp oversqr.dat {out_dir}/oversqr_big_step{isnap}.dat")
+        shutil.copy("oversqr.dat", F"{out_dir}/oversqr_big_step{isnap}.dat")
 
         print(F"S00 - Sao_prev = {(S00 - Sao_prev[0]).real().max_elt() }") 
 

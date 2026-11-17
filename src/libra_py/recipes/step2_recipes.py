@@ -8,6 +8,7 @@
 # ***********************************************************/
 
 import os
+import shutil
 import sys
 import glob
 import logging
@@ -314,7 +315,7 @@ def run_step2_jobs(params):
 
         logger.debug("Assigning values to the variables job_init_step, nsteps_this_job, and njob in submit_template.slm")
 
-        os.system("cp ../../submit_template.slm submit_" + str(njob) + ".slm")
+        shutil.copy("../../submit_template.slm", "submit_" + str(njob) + ".slm")
         # Now, open the submit_template file in this job folder
         # Add the values to the params for this job
         f = open("submit_" + str(njob) + ".slm")

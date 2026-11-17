@@ -18,6 +18,7 @@
 
 
 import os
+import shutil
 import sys
 import numpy as np
 import libra_py.packages.cp2k.methods as CP2K_methods
@@ -288,8 +289,8 @@ def gaussian_distribute(istep, fstep, nsteps_this_job, trajectory_xyz_file, gaus
     os.makedirs("job" + str(curr_job_number), exist_ok=True)
     os.chdir("job" + str(curr_job_number) + "")
     # Copy the trajectory file and input template there
-    os.system("cp ../../" + trajectory_xyz_file + " .")
-    os.system("cp ../../" + gaussian_input + " .")
+    shutil.copy("../../" + trajectory_xyz_file, ".")
+    shutil.copy("../../" + gaussian_input, ".")
 
     # Now, we need to edit the submit file
     # Now, in jobs folder njob, we should do only a certain number of steps
