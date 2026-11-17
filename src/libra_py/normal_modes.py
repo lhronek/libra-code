@@ -50,6 +50,7 @@ from . import md_align
 
 import numpy as np
 from libra_py.params_check import refuse_unknown_keys
+from libra_py.params_check import restrict
 
 
 
@@ -802,7 +803,7 @@ def compute_dynmat(R, D, M, E, params):
     if params["visualize"] > 0:
         if verbosity > 0:
             print("Visualizing modes based on dynamic matrix\n")
-        visualize_modes(E, R, U_a, M, w, params)
+        visualize_modes(E, R, U_a, M, w, restrict(params, VISUALIZE_MODES_KEYS))
 
     if verbosity > 0:
         print("========= Done with the Normal modes calculations =============================")
