@@ -4015,11 +4015,9 @@ def make_cp2k_input(params, working_directory="."):
     with open(template) as f:
         lines = f.readlines()
 
-    # an &EXCITED_STATES block carrying OVERLAP_DELTAT is an overlap-run
-    # directive, not an excited-forces request - never drop it for act_state=0
-    # (comment-stripped like the overlap scan - a commented-out directive is
-    # not one)
-    keep_excited = any("OVERLAP_DELTAT" in ln.split("#")[0].split("!")[0].upper() for ln in lines)
+    # the &EXCITED_STATES block of an overlap run is its directive, not an
+    # excited-forces request - never dropped for act_state=0
+    keep_excited = template_is_overlap_run(template)
 
     # inject a DFT-level WFN_RESTART_FILE_NAME only if the template has none
     # (templates typically rely on the default restart name)
@@ -5132,12 +5130,28 @@ def cp2k_logical(words):
     return (words or ["T"])[0].upper() in ("1", "T", ".T.", "TRUE", ".TRUE.", "Y", "YES", "ON")
 
 
+def template_is_overlap_run(template):
+    """Whether the CP2K input is an overlap run: OVERLAP_DELTAT of &EXCITED_STATES true - a lone keyword is, an explicit F or
+    no keyword is not."""
+    stack, overlap = [], False
+    for line in _template_text(template).splitlines():
+        keyword, code = cp2k_keyword(line)
+        if keyword.startswith("&END"):
+            if stack:
+                stack.pop()
+        elif keyword.startswith("&"):
+            stack.append(keyword[1:])
+        elif stack[-1:] == ["EXCITED_STATES"] and keyword == "OVERLAP_DELTAT":
+            overlap = cp2k_logical(code.split()[1:])
+    return overlap
+
+
 def template_runs_scf(template):
     """Whether CP2K runs an SCF for the input - the SCF is what restarts from a wfn file and writes one. None for an overlap
     run (OVERLAP_DELTAT) and for the non-self-consistent methods: xTB at GFN_TYPE 0, DFTB with SELF_CONSISTENT off, the
     Harris method (&HARRIS_METHOD on)."""
     stack = []
-    method, gfn_type, self_consistent, harris, overlap = "GPW", "1", True, False, False
+    method, gfn_type, self_consistent, harris = "GPW", "1", True, False
     for line in _template_text(template).splitlines():
         keyword, code = cp2k_keyword(line)
         words = code.split()[1:]
@@ -5154,9 +5168,8 @@ def template_runs_scf(template):
             gfn_type = words[0].upper()
         elif stack[-1:] == ["DFTB"] and keyword == "SELF_CONSISTENT":
             self_consistent = cp2k_logical(words)
-        elif stack[-1:] == ["EXCITED_STATES"] and keyword == "OVERLAP_DELTAT":
-            overlap = cp2k_logical(words)
-    return not (overlap or harris or (method == "XTB" and gfn_type == "0") or (method == "DFTB" and not self_consistent))
+    return not (template_is_overlap_run(template) or harris or (method == "XTB" and gfn_type == "0")
+                or (method == "DFTB" and not self_consistent))
 
 
 def template_writes_wfn_restart(template):
