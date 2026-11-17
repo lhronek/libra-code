@@ -698,9 +698,9 @@ def cube_generator_dftbplus(project_name, time_step, min_band, max_band, waveplo
         cube_name = '%s-%d-WFN_%s_1-1_0.cube' % (project_name, time_step, state_name)
         print('Renaming cube for state %d' % state)
         # Now, rename the cubefile from what waveplots calls it to the standard format
-        cubes = sorted(glob.glob("*" + str(state) + "-real.cube"))
+        cubes = sorted(glob.glob("*-" + str(state) + "-real.cube"))
         if len(cubes) != 1:
-            raise RuntimeError(F"{len(cubes)} files match *{state}-real.cube ({cubes}) - one cube is renamed to {cube_name}")
+            raise RuntimeError(F"{len(cubes)} files match *-{state}-real.cube ({cubes}) - one cube is renamed to {cube_name}")
         shutil.move(cubes[0], cube_name)
 
 
