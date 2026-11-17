@@ -838,11 +838,12 @@ def run_step2_many_body(params):
         # Set up the cp2k input template with the atomic positions for the first timestep of this job batch
         CP2K_methods.CP2K_input_static(cp2k_input_template, project_name, trajectory_xyz_filename, curr_step)
         # Running the CP2K calculations
+        before = CP2K_methods.wfn_restart_stamp(F"{project_name}-{curr_step}-RESTART.wfn")
         os.system("mpirun -np %d %s -i %s-%i.inp -o logfiles/step_%d.log " %
                   (nprocs, cp2k_exe, project_name, curr_step, curr_step))
         if CP2K_methods.template_writes_wfn_restart(cp2k_input_template):
-            CP2K_methods.refuse_missing_wfn_restart(F"{project_name}-{curr_step}-RESTART.wfn", cp2k_input_template,
-                                                    "the next step restarts from it", "step2_many_body.run_step2_many_body")
+            CP2K_methods.refuse_stale_wfn_restart(F"{project_name}-{curr_step}-RESTART.wfn", before, cp2k_input_template,
+                                                  "the next step restarts from it", "step2_many_body.run_step2_many_body")
         # After finishing the CP2K calculations move all the pdos and cube files to specified folders
         CP2K_methods.collect_pdos_files("pdosfiles")
 
@@ -952,11 +953,12 @@ def run_step2_many_body(params):
             # Creating the CP2K input
             CP2K_methods.CP2K_input_static(cp2k_input_template, project_name, trajectory_xyz_filename, curr_step)
             # Run CP2K
+            before = CP2K_methods.wfn_restart_stamp(F"{project_name}-{curr_step}-RESTART.wfn")
             os.system("mpirun -np %d %s -i %s-%i.inp -o logfiles/step_%d.log " %
                       (nprocs, cp2k_exe, project_name, curr_step, curr_step))
             if CP2K_methods.template_writes_wfn_restart(cp2k_input_template):
-                CP2K_methods.refuse_missing_wfn_restart(F"{project_name}-{curr_step}-RESTART.wfn", cp2k_input_template,
-                                                        "the next step restarts from it", "step2_many_body.run_step2_many_body")
+                CP2K_methods.refuse_stale_wfn_restart(F"{project_name}-{curr_step}-RESTART.wfn", before, cp2k_input_template,
+                                                      "the next step restarts from it", "step2_many_body.run_step2_many_body")
             # Move all the pdos and cube files to one folder
             CP2K_methods.collect_pdos_files("pdosfiles")
 

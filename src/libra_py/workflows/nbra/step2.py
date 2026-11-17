@@ -862,14 +862,15 @@ def run_cp2k_libint_step2(params):
                 step)
             if params["restart_file"] is not None:
                 shutil.copyfile(params["restart_file"], F'Diag_libra-{step}-RESTART.wfn')
+            before = CP2K_methods.wfn_restart_stamp(F'Diag_libra-{step}-RESTART.wfn')
             CP2K_methods.execute_cp2k(cp2k_exe, F'Diag_libra-{step}.inp',
                                       F'step_{step}.log',
                                       omp_num_threads=params["omp_num_threads"],
                                       mpi_executable=mpi_executable,
                                       nprocs=nprocs)
             if CP2K_methods.template_writes_wfn_restart(params['cp2k_diag_input_template']):
-                CP2K_methods.refuse_missing_wfn_restart(F'Diag_libra-{step}-RESTART.wfn', params['cp2k_diag_input_template'],
-                                                        "the orbitals' read or the next step takes it", "step2.run_cp2k_libint_step2")
+                CP2K_methods.refuse_stale_wfn_restart(F'Diag_libra-{step}-RESTART.wfn', before, params['cp2k_diag_input_template'],
+                                                      "the orbitals' read or the next step takes it", "step2.run_cp2k_libint_step2")
             molden_filename = F'Diag_libra-{step}-1_0.molden'
         print('Done with step', step, 'Elapsed time:', time.time() - t1)
 #        if params['is_many_body']:

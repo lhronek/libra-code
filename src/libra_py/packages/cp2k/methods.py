@@ -2230,13 +2230,14 @@ def run_cp2k_xtb(params):
         print('Step', step, 'Computing the OT method wfn file...')
         cp2k_xtb_ot_inp(ot_input_template, trajectory_xyz_filename, step)
         t1 = time.time()
+        before = wfn_restart_stamp(F'OT_{step}-RESTART.wfn')
         execute_cp2k(cp2k_exe, F'xtb_ot_step_{step}.inp', F'OUT-ot_{step}.log',
                      omp_num_threads=omp, mpi_executable=mpi_executable,
                      nprocs=nprocs)
         print('Done with OT wfn. Elapsed time:', time.time() - t1)
         if template_runs_scf(diag_input_template):
-            refuse_missing_wfn_restart(F'OT_{step}-RESTART.wfn', ot_input_template, "the diagonalization of the same step restarts from it",
-                                       "run_cp2k_xtb")
+            refuse_stale_wfn_restart(F'OT_{step}-RESTART.wfn', before, ot_input_template,
+                                     "the diagonalization of the same step restarts from it", "run_cp2k_xtb")
         diag_wfn_restart, diag_traj = None, None
     else:
         # OT-free: chain the diagonalization runs directly - SCF_GUESS RESTART
@@ -2250,13 +2251,14 @@ def run_cp2k_xtb(params):
     t1 = time.time()
     print('Computing the wfn file using diagonalization method...')
     cp2k_xtb_diag_inp(diag_input_template, step, diag_wfn_restart, diag_traj)
+    before = wfn_restart_stamp(F'Diag_{step}-RESTART.wfn')
     execute_cp2k(cp2k_exe, F'xtb_diag_step_{step}.inp', F'OUT-diag_{step}.log',
                  omp_num_threads=omp, mpi_executable=mpi_executable,
                  nprocs=nprocs)
     print('Done with diagonalization. Elapsed time:', time.time() - t1)
     if template_writes_wfn_restart(diag_input_template):
-        refuse_missing_wfn_restart(F'Diag_{step}-RESTART.wfn', diag_input_template, "the orbitals' read or the next step's diagonalization takes it",
-                                   "run_cp2k_xtb")
+        refuse_stale_wfn_restart(F'Diag_{step}-RESTART.wfn', before, diag_input_template,
+                                 "the orbitals' read or the next step's diagonalization takes it", "run_cp2k_xtb")
 
 
 def distribute_cp2k_libint_jobs(
@@ -5227,8 +5229,8 @@ def wfn_restart_stamp(restart):
 
 def refuse_stale_wfn_restart(restart, before, template, reader, where):
     """Refuses to go on when a finished CP2K run did not rewrite a wfn restart file its input writes - before is the file's
-    wfn_restart_stamp taken before the run, reader says what takes the file. For a file whose name stays the same from run to
-    run, where an earlier run's file is there whatever this run did. A ValueError, which run_cp2k does not retry."""
+    wfn_restart_stamp taken before the run, reader says what takes the file. For a file an earlier run can have left under the
+    same name - it is there whatever this run did. A ValueError, which run_cp2k does not retry."""
     after = wfn_restart_stamp(restart)
     if after is None:
         raise ValueError(F"{where}: the run of {template} left no {restart} and {reader}. See &SCF &PRINT &RESTART of the "
