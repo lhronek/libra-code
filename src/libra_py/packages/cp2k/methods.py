@@ -5172,6 +5172,25 @@ def template_runs_scf(template):
                 or (method == "DFTB" and not self_consistent))
 
 
+def template_runs_tblite(template):
+    """Whether the CP2K input asks for xTB's tblite backend: GFN_TYPE TBLITE of &XTB or an active &TBLITE section there. A
+    commented-out line, &TBLITE OFF and &TBLITE_MIXER do not ask for it."""
+    stack = []
+    for line in _template_text(template).splitlines():
+        keyword, code = cp2k_keyword(line)
+        words = code.split()[1:]
+        if keyword.startswith("&END"):
+            if stack:
+                stack.pop()
+        elif keyword.startswith("&"):
+            stack.append(keyword[1:])
+            if stack[-2:] == ["XTB", "TBLITE"] and cp2k_logical(words):
+                return True
+        elif stack[-1:] == ["XTB"] and keyword == "GFN_TYPE" and words and words[0].upper() == "TBLITE":
+            return True
+    return False
+
+
 def template_writes_wfn_restart(template):
     """Whether a run of the CP2K input writes its wfn restart file: an SCF (template_runs_scf) with &SCF &PRINT &RESTART on by
     the print rule (read_cp2k_print_key)."""
@@ -7090,7 +7109,7 @@ def cp2k_compute_adi_impl(q, params, full_id):
     templates = [params["input_template"]] + list(params.get("retry_templates", []) or [])
     if params.get("time_dependent", True) and force_source in ("active_state", "all_states"):
         for template in templates:
-            if "&TBLITE" in _template_text(template).upper():
+            if template_runs_tblite(template):
                 raise ValueError(
                     F"CP2K's TDDFPT excited-state forces call the native-xTB Coulomb "
                     F"Hessian (xtb_ehess), whose neighbor lists tblite runs never "
