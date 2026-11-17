@@ -478,7 +478,8 @@ def compute_atomic_orbital_overlap_matrix(params, step):
     Returns:
         AO_S (nparray): The atomic orbital overlap matrix
     """
-    params["sample_molden_file"] = glob.glob(f"{params['path_to_sample_files']}/*ref*molden")[0]
+    params["sample_molden_file"] = data_io.first_file(f"{params['path_to_sample_files']}/*ref*molden",
+                                                      "the sample molden file of the reference calculations (path_to_sample_files)")
     sample_molden_file = params["sample_molden_file"]
     path_to_trajectory = params["path_to_trajectory_xyz_file"]
     nprocs = params["nprocs"]
@@ -527,7 +528,8 @@ def compute_mo_overlaps(params, eigenvectors_1, eigenvectors_2, step_1, step_2, 
     Returns:
         MO_overlap (nparray): The molecular orbital overlap matrix (the window block when a window is given)
     """
-    params["sample_molden_file"] = glob.glob(f"{params['path_to_sample_files']}/*ref*molden")[0]
+    params["sample_molden_file"] = data_io.first_file(f"{params['path_to_sample_files']}/*ref*molden",
+                                                      "the sample molden file of the reference calculations (path_to_sample_files)")
     sample_molden_file = params["sample_molden_file"]
     path_to_trajectory = params["path_to_trajectory_xyz_file"]
     nprocs = params["nprocs"]
@@ -767,10 +769,10 @@ def compute_properties(params, models, input_scalers, output_scalers):
         print('data generation time:', time.time() - tt, ' seconds')
         input_mat = np.load(f'{params["path_to_input_mats"]}/{params["prefix"]}_{params["input_property"]}_{step}.npy')
         if i == 0:
-            ref_mat_files = glob.glob(
-                f'{params["path_to_output_mats"]}/{params["prefix"]}_ref_{params["output_property"]}_*.npy')
             # output_mat = np.load(f'{params["path_to_output_mats"]}/{params["prefix"]}_ref_{params["output_property"]}_{step}.npy')
-            output_mat = np.load(ref_mat_files[0])
+            output_mat = np.load(data_io.first_file(
+                f'{params["path_to_output_mats"]}/{params["prefix"]}_ref_{params["output_property"]}_*.npy',
+                "a reference output matrix gives the partition's shape (path_to_output_mats)"))
         params["input_partition"] = True
         tt = time.time()
         partitioned_input = partition_matrix(params, input_mat)

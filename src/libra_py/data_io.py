@@ -24,6 +24,7 @@
            * sort_hvib_file_names(files)
            * remove_files(*patterns)
            * remove_trees(*patterns)
+           * first_file(pattern, purpose)
 
 .. moduleauthor:: Alexey V. Akimov
 
@@ -447,3 +448,20 @@ def remove_trees(*patterns):
                 os.remove(name)
             removed.append(name)
     return removed
+
+
+def first_file(pattern, purpose):
+    """
+    The first file, in sorted order, that a glob pattern matches.
+
+    Args:
+        pattern (string): the glob pattern
+        purpose (string): what the file is read for - the refusal names it
+
+    Returns:
+        string: the file name. A pattern without a match is refused with the pattern and the purpose.
+    """
+    names = sorted(glob.glob(pattern))
+    if not names:
+        raise FileNotFoundError(F"no file matches {pattern} - {purpose}")
+    return names[0]

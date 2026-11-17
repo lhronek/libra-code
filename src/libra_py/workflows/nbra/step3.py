@@ -1146,8 +1146,10 @@ def limit_active_space(params):
     nunocc = params['num_unocc_orbitals']
     l1 = params['lowest_orbital']
     h1 = params['highest_orbital']
-    sample_logfile = glob.glob(f'{params["logfile_directory"]}/*.log')[0]
-    sample_npz_file = sorted(glob.glob(f'{params["path_to_npz_files"]}/S_ks_*.npz'))[0]
+    sample_logfile = data_io.first_file(f'{params["logfile_directory"]}/*.log',
+                                        "limit_active_space reads the HOMO index from a step-2 CP2K log (logfile_directory)")
+    sample_npz_file = data_io.first_file(f'{params["path_to_npz_files"]}/S_ks_*.npz',
+                                         "limit_active_space reads the stored window's size from a step-2 overlap file (path_to_npz_files)")
     _check_orbital_window(params, int(sp.load_npz(sample_npz_file).shape[0]),
                           'limit_active_space')
     os.system(f'mkdir {params["path_to_save_npz_files"]}')
@@ -2395,7 +2397,8 @@ def run_step3_ks_nacs_libint(params):
     _check_reordering_options(params, 'run_step3_ks_nacs_libint')
     isUKS = params.get('isUKS', 0)
     if params['es_software'].lower() == 'cp2k':
-        sample_logfile = glob.glob(params['logfile_directory'] + '/*.log')[0]
+        sample_logfile = data_io.first_file(params['logfile_directory'] + '/*.log',
+                                            "run_step3_ks_nacs_libint reads the HOMO index from a step-2 CP2K log (logfile_directory)")
         if isUKS:
             params['homo_alpha_index'], params['homo_beta_index'] = CP2K_methods.read_homo_index(
                 sample_logfile, isUKS=True)
@@ -2405,7 +2408,8 @@ def run_step3_ks_nacs_libint(params):
             params['homo_index'] = CP2K_methods.read_homo_index(sample_logfile)
     if not isUKS:
         params['npz_file_ks_homo_index'] = params['homo_index'] - params['lowest_orbital'] + 1
-    sample_npz_file = sorted(glob.glob(params['path_to_npz_files'] + '/S_ks_*.npz'))[0]
+    sample_npz_file = data_io.first_file(params['path_to_npz_files'] + '/S_ks_*.npz',
+                                         "run_step3_ks_nacs_libint reads the stored window's size from a step-2 overlap file (path_to_npz_files)")
     params['data_dim'] = int(sp.load_npz(sample_npz_file).shape[0])
     _check_orbital_window(params, params['data_dim'], 'run_step3_ks_nacs_libint')
     # Number of occupied states
@@ -4702,7 +4706,8 @@ def run_step3_pod(params):
     if isUKS and not two_spins:
         raise ValueError(F"run_step3_pod: isUKS 1, but POD_cp2k_hab_{start_time}.npz carries one spin channel - the "
                          F"step 2 was restricted (isUKS 0)")
-    log = sorted(glob.glob(params['logfile_directory'] + '/*.log'))[0]
+    log = data_io.first_file(params['logfile_directory'] + '/*.log',
+                             "run_step3_pod reads the reference's electron count from a step-2 CP2K log (logfile_directory)")
     # homo: the electron pairs of the neutral - an unrestricted reference is the neutral (equal spin counts) or its
     # doublet cation, whose hole sits in the channel with one electron fewer
     if isUKS:
@@ -5399,8 +5404,10 @@ def run_step3_sd_nacs_libint(params):
 
     # CP2K parsing
     if params['es_software'].lower() == 'cp2k':
-        sample_logfile = glob.glob(params['logfile_directory'] + '/*.log')[0]
-        sample_npz_file = sorted(glob.glob(params['path_to_npz_files'] + '/S_ks_*.npz'))[0]
+        sample_logfile = data_io.first_file(params['logfile_directory'] + '/*.log',
+                                            "run_step3_sd_nacs_libint reads the HOMO index from a step-2 CP2K log (logfile_directory)")
+        sample_npz_file = data_io.first_file(params['path_to_npz_files'] + '/S_ks_*.npz',
+                                             "run_step3_sd_nacs_libint reads the stored window's size from a step-2 overlap file (path_to_npz_files)")
         params['data_dim'] = int(sp.load_npz(sample_npz_file).shape[0])
         _check_orbital_window(params, params['data_dim'], 'run_step3_sd_nacs_libint')
         if params['isUKS']:
