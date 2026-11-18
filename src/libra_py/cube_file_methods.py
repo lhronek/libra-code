@@ -39,6 +39,19 @@ from libra_py.params_check import restrict
 CUBE_NUMBER = re.compile(r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[Ee][-+]?\d+)?")
 
 
+def _cube_numbers(lines, filename, reader):
+    """
+    The numbers of a cube file's data lines as a 1D array, taken by their pattern: a writer that fills its fields
+    (CP2K's 6E13.5E3) leaves no blank between them. Anything else in the lines is a ValueError that names the file.
+    """
+    text = "".join(lines)
+    rest = CUBE_NUMBER.sub(" ", text).split()
+    if rest:
+        raise ValueError(F"cube_file_methods.{reader}: {filename} holds {rest[0]!r} among its values - "
+                         F"numbers are needed")
+    return np.array(CUBE_NUMBER.findall(text), dtype=float)
+
+
 def read_cube(filename: str):
     """
     Read scalar field data (e.g., wavefunction or electron density) from a Gaussian
@@ -87,8 +100,7 @@ def read_cube(filename: str):
     if len(CUBE_NUMBER.findall(lines[nstart])) < 6:
         nstart += 1
 
-    # the values by their pattern: a writer that fills its fields (CP2K's 6E13.5E3) leaves no blank between them
-    return np.array(CUBE_NUMBER.findall("".join(lines[nstart:])), dtype=float)
+    return _cube_numbers(lines[nstart:], filename, "read_cube")
     
 
 def grid_volume(filename: str):
@@ -204,7 +216,7 @@ def read_volumetric_data(filename: str):
 
     # Read volumetric data (flattened)
     data_start = natoms + 6
-    isovals = np.array(CUBE_NUMBER.findall("".join(lines[data_start:])), dtype=float)
+    isovals = _cube_numbers(lines[data_start:], filename, "read_volumetric_data")
 
     # Reshape into 3D array (cube convention)
     wave_fun = isovals.reshape((nx, ny, nz))
